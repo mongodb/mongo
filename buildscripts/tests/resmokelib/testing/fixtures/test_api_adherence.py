@@ -1,8 +1,7 @@
 """Unit tests for the resmokelib.testing.fixtures.interface module."""
-import logging
-import unittest
 import ast
 import os
+import unittest
 
 DISALLOWED_ROOT = "buildscripts"
 ALLOWED_IMPORTS = [

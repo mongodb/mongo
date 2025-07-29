@@ -1,0 +1,11 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+]))
+
+filegroup(
+    name = "window_function_global_hdrs",
+    srcs = glob(["*.h"]),
+)

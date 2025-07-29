@@ -128,9 +128,9 @@ You can download the mongot binary that a specific evergreen patch or version ut
 
 You can download the mongot binary from any build variant that compiles mongot--i.e., variants which include the expansion `build_mongot: true` ([example](https://github.com/10gen/mongo/blob/848b5264be2d0f93d21ffe2e4058e810f8ea18f2/etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml#L194)). More specifically, that includes:
 
--   Compile variants that are depended upon by variants which run the search end to end tests, such as the variant `amazon-linux2023-arm64-static-compile` _(! Amazon Linux 2023 arm64 Enterprise Shared Library Compile & Static Analysis)_, which is depended upon by _! Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags)_
--   Variants that compile mongot **and** run the search end to end tests, such as: `amazon-linux2023-arm64-mongot-integration-patchable` _(AL2023 arm64 mongot integration tasks)_
-    -   Note that this will be true of any of the build variants that include `mongot` in the name, such as _Enterprise RHEL 8.0 Mongot Integration_
+- Compile variants that are depended upon by variants which run the search end to end tests, such as the variant `amazon-linux2023-arm64-static-compile` _(! Amazon Linux 2023 arm64 Enterprise Shared Library Compile & Static Analysis)_, which is depended upon by _! Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags)_
+- Variants that compile mongot **and** run the search end to end tests, such as: `amazon-linux2023-arm64-mongot-integration-patchable` _(AL2023 arm64 mongot integration tasks)_
+    - Note that this will be true of any of the build variants that include `mongot` in the name, such as _Enterprise RHEL 8.0 Mongot Integration_
 
 If you're confused about evergreen build variants, check out [Intro to Evergreen Concepts](https://docs.google.com/document/d/1kHi0YuzuRcMs1sRgXRRwy5-cSF4vasAT8lQjkg2hXCU/edit?usp=sharing).
 

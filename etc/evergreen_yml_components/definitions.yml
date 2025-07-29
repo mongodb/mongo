@@ -175,8 +175,67 @@ functions:
     params:
       display_name: "generate evergreen engflow bazelrc"
       binary: bash
+      env:
+        evergreen_remote_exec: "on"
       args:
-      - "src/evergreen/generate_evergreen_engflow_bazelrc.sh"
+      - "src/evergreen/generate_evergreen_bazelrc.sh"
+
+  "override task timeout":
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/run_python_script.sh"
+          - "evergreen/generate_override_timeout.py"
+          - "--variant_name"
+          - "${compile_variant}"
+          - "--task_name"
+          - "${task_name}"
+    - *f_expansions_write
+    - command: expansions.update
+      params:
+        ignore_missing_file: true
+        file: src/override_task_timeout.yml
+    - *f_expansions_write
+    - command: timeout.update
+      params:
+        exec_timeout_secs: ${override_task_timeout}
+        timeout_secs: ${override_task_timeout}
+    - *f_expansions_write
+
+  "convert scons to bazel":
+    command: subprocess.exec
+    params:
+      display_name: "convert scons to bazel"
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/convert_scons_to_bazel/convert.py"
+      - "--noclean"
+
+  "bazel test sh": &bazel_test_sh
+    command: subprocess.exec
+    display_name: "bazel test sh"
+    type: test
+    params:
+      binary: bash
+      env:
+        evergreen_remote_exec: "on"
+        author_email: ${author_email}
+        build_id: ${build_id}
+        distro_id: ${distro_id}
+        execution: ${execution}
+        project: ${project}
+        revision: ${revision}
+        revision_order_id: ${revision_order_id}
+        task_id: ${task_id}
+        task_name: ${task_name}
+        build_variant: ${build_variant}
+        version_id: ${version_id}
+        requester: ${requester}
+      args:
+        - "src/evergreen/bazel_test.sh"
 
   "get engflow creds":
   - *get_engflow_key
@@ -265,12 +324,12 @@ functions:
     params:
       binary: bash
       args:
-      - "src/evergreen/run_python_script.sh"
-      - "evergreen/functions/binaries_extract.py"
-      - "--tarball=mongo_benchmarks.tgz"
-      - "--extraction-command=${decompress}"
-      - "--change-dir=build/install"
-      - "--move-output=build/install/benchmarks.txt:build/"
+        - "src/evergreen/run_python_script.sh"
+        - "evergreen/functions/binaries_extract.py"
+        - "--tarball=mongo_benchmarks.tgz"
+        - "--extraction-command=${decompress}"
+        - "--change-dir=${extraction_change_dir}"
+        - "--move-output=dist-test/:bazel-bin/install"
 
   "get version expansions": &get_version_expansions
     command: s3.get
@@ -288,9 +347,16 @@ functions:
     params:
       file: src/version_expansions.yml
 
+
   "get and apply version expansions":
     - *get_version_expansions
     - *apply_version_expansions
+
+  "bazel test":
+    - *get_version_expansions
+    - *apply_version_expansions
+    - *f_expansions_write
+    - *bazel_test_sh
 
   "fetch benchmarks": &fetch_benchmarks
     command: s3.get
@@ -458,11 +524,12 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/mongo-debugsymbols.${ext|tgz}
+      local_file: src/bazel-bin/dist-test-debug.${ext|tgz}
       remote_file: ${mongo_debugsymbols}
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/gzip}
+      display_name: mongo-debugsymbols.${ext|tgz}
 
   "use WiredTiger develop": &use_wiredtiger_develop
     command: subprocess.exec
@@ -471,24 +538,6 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/functions/wiredtiger_develop_use.sh"
-
-  "shared scons cache pruning":
-  - *f_expansions_write
-  - command: subprocess.exec
-    display_name: "shared scons cache pruning"
-    type: system
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/functions/shared_scons_cache_pruning.sh"
-
-  "umount shared scons directory": &umount_shared_scons_directory
-    command: subprocess.exec
-    display_name: "shared scons directory umount"
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/functions/shared_scons_directory_umount.sh"
 
   "umount tmp directory":
   - *f_expansions_write
@@ -1153,58 +1202,6 @@ functions:
       args:
       - "src/evergreen/scons_lint.sh"
 
-  "scons splunk": &scons_splunk
-    command: subprocess.exec
-    display_name: "scons splunk"
-    params:
-      background: true
-      continue_on_err: true
-      binary: bash
-      args:
-      - "./src/evergreen/scons_splunk.sh"
-
-  "scons compile":
-  - *get_version_expansions
-  - *apply_version_expansions
-  - *f_expansions_write
-  - *scons_splunk
-  - command: subprocess.exec
-    display_name: "scons compile sh"
-    type: test
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/scons_compile.sh"
-  - command: expansions.update
-    display_name: "expansions update install_dir"
-    params:
-      updates:
-      - key: install_dir
-        value: ${install_dir}
-
-# This is only used to simulate local dev compilation. Do NOT use for anything else.
-  "scons raw compile":
-  - *get_version_expansions
-  - *apply_version_expansions
-  - *f_expansions_write
-  - *scons_splunk
-  - command: subprocess.exec
-    display_name: "scons raw compile sh"
-    type: test
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/scons_raw_compile.sh"
-
-  "fetch bazel":
-  - command: subprocess.exec
-    display_name: "fetch bazel"
-    type: test
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/get_bazelisk.sh"
-
   "verify build output present":
   # Args:
   #   $output (string) - relpath to the file-to-be-checked
@@ -1257,6 +1254,12 @@ functions:
   - *f_expansions_write
   - *bazel_run_sh
 
+  "bazel compile":
+  - *get_version_expansions
+  - *apply_version_expansions
+  - *f_expansions_write
+  - *bazel_compile_sh
+
   "ninja compile sh": &ninja_compile_sh
     command: subprocess.exec
     display_name: "ninja compile sh"
@@ -1277,6 +1280,15 @@ functions:
       binary: bash
       args:
       - "src/evergreen/functions/version_expansions_generate.sh"
+
+  "enable bazel test report creation": &enable_bazel_test_report_creation
+    command: expansions.update
+    display_name: "enable bazel test report creation"
+    params:
+      updates:
+        - key: create_bazel_test_report
+          value: "true"
+
 
   "upload version expansions": &upload_version_expansions
    command: s3.put
@@ -1346,19 +1358,6 @@ functions:
       remote_file: ${project}/${version_id}/${bv_future_git_tag|version}-resmoke-constants.tgz
       bucket: mciuploads
       extract_to: src
-
-  "generate compile expansions": &generate_compile_expansions
-    command: subprocess.exec
-    display_name: "compile expansions generate sh"
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/functions/compile_expansions_generate.sh"
-
-  "apply compile expansions": &apply_compile_expansions
-    command: expansions.update
-    params:
-      file: src/compile_expansions.yml
 
   "do jepsen setup":
     - *f_expansions_write
@@ -1744,27 +1743,29 @@ functions:
       - "./src/evergreen/do_watchdog_setup.sh"
 
   "run package test":
-  - *get_version_expansions
-  - *apply_version_expansions
-  - *f_expansions_write
-  - command: subprocess.exec
-    display_name: "package test py"
-    type: test
-    params:
-      binary: bash
-      add_expansions_to_env: true
-      args:
-      - "src/evergreen/run_python_script.sh"
-      - "buildscripts/package_test.py"
-      - "--arch=${packager_arch}"
-      - "branch"
-      - "--test"
-      - "${packager_distro}"
-      - "https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"
-      - "--edition"
-      - "${repo_edition}"
-      - "--server-version"
-      - "${version}"
+    - *get_version_expansions
+    - *apply_version_expansions
+    - *f_expansions_write
+    - *fetch_dist_tarball
+    - *fetch_dist_debugsymbols
+    - command: subprocess.exec
+      display_name: "package test py"
+      type: test
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+          - "src/evergreen/run_python_script.sh"
+          - "buildscripts/package_test.py"
+          - "--arch=${packager_arch}"
+          - "branch"
+          - "--test"
+          - "${packager_distro}"
+          - "https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"
+          - "--edition"
+          - "${repo_edition}"
+          - "--server-version"
+          - "${version}"
 
   "run release package test":
   - *f_expansions_write
@@ -2159,36 +2160,6 @@ functions:
   - *tar_failed_unittests
   - *archive_failed_unittests
 
-  "archive dbtest": &archive_dbtest
-    command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: dbtest-binary.tgz
-      remote_file: ${project}/${build_variant}/${revision}/dbtest/dbtest-${build_id}-${task_name}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/tar
-      display_name: dbtest binary - Execution ${execution}
-      optional: true
-
-  "archive dbtest debugsymbols": &archive_dbtest_debug
-    command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: dbtest-debugsymbols.tgz
-      remote_file: ${project}/${build_variant}/${revision}/dbtest/dbtest-${build_id}-${task_name}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/tar
-      display_name: dbtest debugsymbols
-      optional: true
-
-  "save unstripped dbtest":
-  - *archive_dbtest
-  - *archive_dbtest_debug
-
   ### Process & archive artifacts from hung processes ###
   "run hang analyzer":
   - *f_expansions_write
@@ -2320,49 +2291,15 @@ functions:
   - *archive_undodb_recordings
 
   ### Attach report & artifacts ###
-  "attach scons config logs": &attach_scons_config_logs
-    command: s3.put
+  "create bazel test report":
+    command: subprocess.exec
     params:
-      optional: true
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/build/scons/config.log
-      remote_file: ${project}/${build_variant}/${revision}/artifacts/scons-config.log.${build_id}-${task_name}-${execution}
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/plain
-      display_name: SCons configure log
-
-  "attach scons cache logs": &attach_scons_cache_logs
-    command: s3.put
-    params:
-      optional: true
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/scons_cache.log
-      content_type: text/plain
-      remote_file: ${project}/${build_variant}/${revision}/artifacts/scons-cache.log.${build_id}-${task_name}.${execution}
-      bucket: mciuploads
-      permissions: public-read
-      display_name: SCons cache debug log
-
-  "attach scons stdout logs": &attach_scons_stdout_logs
-    command: s3.put
-    params:
-      optional: true
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/scons_stdout.log
-      content_type: text/plain
-      remote_file: ${project}/${build_variant}/${revision}/artifacts/scons-stdout.log.${build_id}-${task_name}.${execution}
-      bucket: mciuploads
-      permissions: public-read
-      display_name: SCons stdout log
-
-  "attach scons logs":
-  - *attach_scons_config_logs
-  - *attach_scons_cache_logs
-  - *attach_scons_stdout_logs
+      binary: bash
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "buildscripts/create_bazel_test_report.py"
+        - "bazel-testlogs/"
+        - "${bazel_test_silent_fail}"
 
   "attach report":
     command: attach.results
@@ -2637,36 +2574,53 @@ functions:
       args:
       - "./src/evergreen/sasl_windows_cyrussasl_teardown.sh"
 
-  "do scons setup":
-  - command: manifest.load
-  - *f_expansions_write
-  - *git_get_project
-  - *add_git_tag
-  - *set_task_expansion_macros
-  - *f_expansions_write
-  - *kill_processes
-  - *cleanup_environment
-  - *set_up_venv
-  - *upload_pip_requirements
-  - *f_expansions_write
-  - *configure_evergreen_api_credentials
-  - *get_buildnumber
-  - *f_expansions_write
-  - *set_up_credentials
-  - *f_expansions_write
-  - *use_wiredtiger_develop
-  - *f_expansions_write
-  - *set_up_win_mount_script
-  - *f_expansions_write
-  - *generate_compile_expansions
-  - *f_expansions_write
-  - *apply_compile_expansions
-  - *f_expansions_write
-  - *set_task_expansion_macros
-  - *f_expansions_write
-  - *get_engflow_key
-  - *get_engflow_cert
-  - *generate_evergreen_engflow_bazelrc
+
+  "generate evergreen bazelrc": &generate_evergreen_bazelrc
+    command: subprocess.exec
+    params:
+      display_name: "generate evergreen bazelrc"
+      binary: bash
+      args:
+        - "src/evergreen/generate_evergreen_bazelrc.sh"
+
+
+  "do bazel setup":
+    - command: manifest.load
+    - *f_expansions_write
+    - *git_get_project
+    - *add_git_tag
+    - *set_task_expansion_macros
+    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
+    - *set_up_venv
+    - *upload_pip_requirements
+    - *f_expansions_write
+    - *configure_evergreen_api_credentials
+    - *get_buildnumber
+    - *f_expansions_write
+    - *set_up_credentials
+    - *f_expansions_write
+    - *use_wiredtiger_develop
+    - *f_expansions_write
+    - *set_up_win_mount_script
+    - *f_expansions_write
+    - *set_task_expansion_macros
+    - *f_expansions_write
+    - *get_engflow_key
+    - *get_engflow_cert
+    - *generate_evergreen_bazelrc
+
+  "activate task":
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/run_python_script.sh"
+          - "evergreen/activate_task.py"
+          - "${task_to_activate}"
+          - "${skip_for_patch_author}"
 
   "gen supplementary data":
     command: subprocess.exec

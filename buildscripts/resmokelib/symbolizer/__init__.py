@@ -4,14 +4,19 @@ import os
 import shutil
 import subprocess
 import sys
-
 from typing import Optional
 
 from buildscripts import mongosymb
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
-from buildscripts.resmokelib.setup_multiversion.setup_multiversion import SetupMultiversion, _DownloadOptions
+from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
+    SetupMultiversion,
+    _DownloadOptions,
+)
 from buildscripts.resmokelib.utils import evergreen_conn
-from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path, mkdtemp_in_build_dir
+from buildscripts.resmokelib.utils.filesystem import (
+    build_hygienic_bin_path,
+    mkdtemp_in_build_dir,
+)
 
 _HELP = """
 Symbolize a backtrace JSON file given an Evergreen Task ID.
@@ -42,6 +47,8 @@ class Symbolizer(Subcommand):
         self.mongosym_args = all_args
         self.download_symbols_only = download_symbols_only
 
+        self.logger = logger or self.setup_logger()
+
         self.evg_api: evergreen_conn.RetryingEvergreenApi = evergreen_conn.get_evergreen_api()
         self.multiversion_setup = self._get_multiversion_setup()
         self.task_info = self.evg_api.task_by_id(task_id)
@@ -59,8 +66,6 @@ class Symbolizer(Subcommand):
             os.makedirs(src_parent_dir)
         except FileExistsError:
             pass
-
-        self.logger = logger or self.setup_logger()
 
     @staticmethod
     def setup_logger(debug=False) -> logging.Logger:
@@ -106,7 +111,9 @@ class Symbolizer(Subcommand):
             download_options = _DownloadOptions(db=False, ds=True, da=False, dv=False)
         else:
             download_options = _DownloadOptions(db=True, ds=True, da=False, dv=False)
-        return SetupMultiversion(download_options=download_options, ignore_failed_push=True)
+        return SetupMultiversion(
+            download_options=download_options, ignore_failed_push=True, logger=self.logger
+        )
 
     def _get_compile_artifacts(self):
         """Download compile artifacts from Evergreen."""

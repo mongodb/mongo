@@ -1,9 +1,5 @@
 """The unittest.TestCase to inject multiple cluster connection strings into TestData."""
 
-import hashlib
-import threading
-
-from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.testing.testcases import jsrunnerfile
 
 

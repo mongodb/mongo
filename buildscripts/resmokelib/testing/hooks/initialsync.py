@@ -10,9 +10,7 @@ import pymongo.errors
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset
-from buildscripts.resmokelib.testing.hooks import cleanup
-from buildscripts.resmokelib.testing.hooks import interface
-from buildscripts.resmokelib.testing.hooks import jsfile
+from buildscripts.resmokelib.testing.hooks import cleanup, interface, jsfile
 
 
 class BackgroundInitialSync(interface.Hook):

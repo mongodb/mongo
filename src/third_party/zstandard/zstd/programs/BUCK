@@ -1,44 +1,56 @@
 cxx_binary(
-    name='zstd',
-    headers=glob(['*.h'], excludes=['datagen.h', 'platform.h', 'util.h']),
-    srcs=glob(['*.c'], excludes=['datagen.c']),
-    deps=[
-        ':datagen',
-        ':util',
-        '//lib:zstd',
-        '//lib:zdict',
-        '//lib:mem',
-        '//lib:xxhash',
+    name = "zstd",
+    srcs = glob(
+        ["*.c"],
+        excludes = ["datagen.c"],
+    ),
+    headers = glob(
+        ["*.h"],
+        excludes = [
+            "datagen.h",
+            "platform.h",
+            "util.h",
+        ],
+    ),
+    linker_flags = [
+        "-lz",
+        "-llzma",
+        "-llz4",
     ],
-    preprocessor_flags=[
-        '-DZSTD_GZCOMPRESS',
-        '-DZSTD_GZDECOMPRESS',
-        '-DZSTD_LZMACOMPRESS',
-        '-DZSTD_LZMADECOMPRES',
-        '-DZSTD_LZ4COMPRESS',
-        '-DZSTD_LZ4DECOMPRES',
+    preprocessor_flags = [
+        "-DZSTD_GZCOMPRESS",
+        "-DZSTD_GZDECOMPRESS",
+        "-DZSTD_LZMACOMPRESS",
+        "-DZSTD_LZMADECOMPRES",
+        "-DZSTD_LZ4COMPRESS",
+        "-DZSTD_LZ4DECOMPRES",
     ],
-    linker_flags=[
-        '-lz',
-        '-llzma',
-        '-llz4',
+    deps = [
+        ":datagen",
+        ":util",
+        "//lib:mem",
+        "//lib:xxhash",
+        "//lib:zdict",
+        "//lib:zstd",
     ],
 )
 
 cxx_library(
-    name='datagen',
-    visibility=['PUBLIC'],
-    header_namespace='',
-    exported_headers=['datagen.h'],
-    srcs=['datagen.c'],
-    deps=['//lib:mem'],
+    name = "datagen",
+    srcs = ["datagen.c"],
+    exported_headers = ["datagen.h"],
+    header_namespace = "",
+    visibility = ["PUBLIC"],
+    deps = ["//lib:mem"],
 )
 
-
 cxx_library(
-    name='util',
-    visibility=['PUBLIC'],
-    header_namespace='',
-    exported_headers=['util.h', 'platform.h'],
-    deps=['//lib:mem'],
+    name = "util",
+    exported_headers = [
+        "util.h",
+        "platform.h",
+    ],
+    header_namespace = "",
+    visibility = ["PUBLIC"],
+    deps = ["//lib:mem"],
 )

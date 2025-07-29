@@ -33,26 +33,27 @@ It produces descriptive statistics (mean, stddev, min, max) and calculates R2 to
 estimate quality of the tested Cost Model.
 """
 
-from typing import Callable, Sequence, Tuple
-import os
 import asyncio
 import dataclasses
-import pandas as pd
-import numpy as np
-from sklearn.metrics import r2_score
-from calibration_settings import main_config, HIDDEN_STRING_VALUE, distributions
-from database_instance import DatabaseInstance, get_database_parameter
-from random_generator import RandomDistribution
-from data_generator import CollectionInfo, DataGenerator
-from benchmark import CostModelCoefficients
-from workload_execution import Query
-import workload_execution
+import os
+from typing import Callable, Sequence, Tuple
+
 import config
-import experiment as exp
-import physical_tree as pt
 import execution_tree as et
-from parameters_extractor import get_excution_stats
+import experiment as exp
+import numpy as np
+import pandas as pd
+import physical_tree as pt
+import workload_execution
+from benchmark import CostModelCoefficients
+from calibration_settings import HIDDEN_STRING_VALUE, distributions, main_config
 from cost_estimator import ExecutionStats
+from data_generator import CollectionInfo, DataGenerator
+from database_instance import DatabaseInstance, get_database_parameter
+from parameters_extractor import get_excution_stats
+from random_generator import RandomDistribution
+from sklearn.metrics import r2_score
+from workload_execution import Query
 
 
 class CostEstimator:

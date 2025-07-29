@@ -89,7 +89,7 @@ if [[ -f "failed_recorded_tests.txt" ]]; then
 fi
 
 # Copy debug symbols for dynamic builds
-lib_dir=build/install/lib
-if [ -d "$lib_dir" ] && [[ -n "$core_files" || -n "$has_recorded_failures" ]]; then
+lib_dir=bazel-bin/install/lib
+if [ -d "$lib_dir" ] && [ -n "$core_files" ]; then
   cp -r "$lib_dir" dist-unittests
 fi

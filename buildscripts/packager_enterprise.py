@@ -28,14 +28,15 @@
 # echo "Now put the dist gnupg signing keys in ~root/.gnupg"
 
 import errno
-import git
-from glob import glob
 import os
 import re
 import shutil
 import sys
 import tempfile
 import time
+from glob import glob
+
+import git
 
 sys.path.append(os.getcwd())
 

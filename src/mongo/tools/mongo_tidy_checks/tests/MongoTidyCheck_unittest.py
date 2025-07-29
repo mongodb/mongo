@@ -1,10 +1,10 @@
-import unittest
+import argparse
+import os
 import subprocess
 import sys
 import tempfile
-import os
 import textwrap
-import argparse
+import unittest
 
 
 class MongoTidyTests(unittest.TestCase):
@@ -447,7 +447,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--clang-tidy-path', default='/opt/mongodbtoolchain/v4/bin/clang-tidy',
                         help="Path to clang-tidy binary.")
-    parser.add_argument('--mongo-tidy-module', default='build/install/lib/libmongo_tidy_checks.so',
+    parser.add_argument('--mongo-tidy-module', default='bazel-bin/install/lib/libmongo_tidy_checks.so',
                         help="Path to mongo tidy check library.")
     parser.add_argument(
         '--test-compiledbs', action='append', default=[],
@@ -462,7 +462,7 @@ if __name__ == '__main__':
     MongoTidyTests.COMPILE_COMMANDS_FILES = args.test_compiledbs
 
     # We need to validate the toolchain can support the load operation for our module.
-    cmd = [MongoTidyTests.TIDY_BIN, f'-load', MongoTidyTests.TIDY_MODULE, '--list-checks']
+    cmd = [MongoTidyTests.TIDY_BIN, '-load', MongoTidyTests.TIDY_MODULE, '--list-checks']
     p = subprocess.run(cmd, capture_output=True)
     if p.returncode != 0:
         print(f"Could not validate toolchain was able to load module {cmd}.")

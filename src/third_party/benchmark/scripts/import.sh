@@ -7,7 +7,7 @@ IFS=$'\n\t'
 
 NAME="benchmark"
 
-LIB_GIT_REV="mongo/v1.5.2"
+VERSION="mongo/v1.5.2"
 
 LIB_GIT_URL="https://github.com/mongodb-forks/benchmark.git"
 LIB_GIT_DIR=$(mktemp -d /tmp/import-benchmark.XXXXXX)
@@ -16,7 +16,7 @@ trap "rm -rf $LIB_GIT_DIR" EXIT
 
 DIST=$(git rev-parse --show-toplevel)/src/third_party/$NAME/dist
 git clone "$LIB_GIT_URL" $LIB_GIT_DIR
-git -C $LIB_GIT_DIR checkout $LIB_GIT_REV
+git -C $LIB_GIT_DIR checkout $VERSION
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME
 

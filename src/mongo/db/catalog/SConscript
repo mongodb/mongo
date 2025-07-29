@@ -613,7 +613,7 @@ env.Library(
 )
 
 env.Library(
-    target='import_collection_oplog_entry',
+    target='import_collection_oplog_entry_idl',
     source=[
         'import_collection_oplog_entry.idl',
     ],

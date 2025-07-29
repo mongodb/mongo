@@ -1,0 +1,272 @@
+load("@poetry//:dependencies.bzl", "dependency")
+load("@npm//:eslint/package_json.bzl", "bin")
+
+exports_files([
+    "candle_wrapper.py",
+    "cheetah_source_generator.py",
+    "clang_tidy_config_gen.py",
+    "jstoh.py",
+    "msitrim.py",
+    "pip_requirements.py",
+    "symbols.orderfile",
+    "symbols-al2023.orderfile",
+])
+
+py_binary(
+    name = "simple_report",
+    srcs = ["simple_report.py"],
+    main = "simple_report.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "click",
+            group = "evergreen",
+        ),
+        dependency(
+            "typing-extensions",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "mongosymb",
+    srcs = [
+        "build_system_options.py",
+        "mongosymb.py",
+    ],
+    main = "mongosymb.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "tenacity",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "resmoke",
+    srcs = ["resmoke.py"],
+    main = "resmoke.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "install_bazel",
+    srcs = [
+        "install_bazel.py",
+    ],
+    deps = [
+        dependency(
+            "retry",
+            group = "testing",
+        ),
+        "//buildscripts/s3_binary:download",
+    ],
+)
+
+py_library(
+    name = "unittest_grouper",
+    srcs = [
+        "unittest_grouper.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "install_bazel",
+        dependency(
+            "typing-extensions",
+            group = "core",
+        ),
+        dependency(
+            "retry",
+            group = "testing",
+        ),
+        "simple_report",
+    ],
+)
+
+py_library(
+    name = "download_buildifier",
+    srcs = [
+        "download_buildifier.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "retry",
+            group = "testing",
+        ),
+    ],
+)
+
+py_binary(
+    name = "buildifier",
+    srcs = [
+        "buildifier.py",
+    ],
+    main = "buildifier.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "download_buildifier",
+        "simple_report",
+        "unittest_grouper",
+    ],
+)
+
+sh_binary(
+    name = "shellscripts_linters",
+    srcs = ["shellscripts-linters.sh"],
+    data = [
+        "@shfmt",
+    ],
+    env = {
+        "SHFMT_PATH": "$(execpath @shfmt//:shfmt)",
+    },
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "mongo_toolchain",
+    srcs = [
+        "mongo_toolchain.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "clang_tidy_lib",
+    srcs = [
+        "apply_clang_tidy_fixes.py",
+        "clang_tidy.py",
+        "clang_tidy_vscode.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "mongo_toolchain",
+        "simple_report",
+    ],
+)
+
+py_binary(
+    name = "sbom_linter",
+    srcs = [
+        "sbom_linter.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "jsonschema",
+            group = "build-metrics",
+        ),
+    ],
+)
+
+bin.eslint_binary(
+    name = "eslint_binary",
+    # Allow the binary to be run outside bazel
+    # See more details about this by commenting this out and running `bazel run //:format`
+    env = {"BAZEL_BINDIR": "."},
+)
+
+sh_binary(
+    name = "auto_install_db_contrib_tool",
+    srcs = ["auto_install_db_contrib_tool.sh"],
+)
+
+sh_binary(
+    name = "setup_engflow_creds",
+    srcs = ["setup_engflow_creds.sh"],
+)
+
+sh_binary(
+    name = "consolidate_repos",
+    srcs = ["consolidate-repos.sh"],
+)
+
+sh_binary(
+    name = "consolidate_repos_enterprise",
+    srcs = ["consolidate-repos-enterprise.sh"],
+)
+
+sh_binary(
+    name = "poetry_sync",
+    srcs = ["poetry_sync.sh"],
+)
+
+sh_binary(
+    name = "mount_drives",
+    srcs = ["mount_drives.sh"],
+)
+
+sh_binary(
+    name = "setup_node_env",
+    srcs = ["setup_node_env.sh"],
+)
+
+py_binary(
+    name = "evergreen_task_timeout",
+    srcs = ["evergreen_task_timeout.py"],
+    main = "evergreen_task_timeout.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/ciconfig",
+        "//buildscripts/resmoke_proxy",
+        "//buildscripts/timeouts:all_python_files",
+        "//evergreen:all_python_files",
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+        dependency(
+            "pydantic",
+            group = "evergreen",
+        ),
+        dependency(
+            "inject",
+            group = "evergreen",
+        ),
+    ],
+)
+
+# TODO(SERVER-105817): The following library is autogenerated, please split these out into individual python targets
+py_library(
+    name = "all_python_files",
+    srcs = glob(["*.py"]),
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "gather_failed_unittests",
+    srcs = ["gather_failed_unittests.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)

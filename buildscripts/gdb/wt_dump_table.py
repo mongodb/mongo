@@ -1,9 +1,10 @@
-import gdb
-import bson
-import sys
 import os
-from pprint import pprint
+import sys
 from pathlib import Path
+from pprint import pprint
+
+import bson
+import gdb
 
 if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))

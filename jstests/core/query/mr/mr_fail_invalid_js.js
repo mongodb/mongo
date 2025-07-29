@@ -52,7 +52,6 @@ const outputColl = db.mr_fail_invalid_js_out;
     };
 
     assert.throws(() => {
-        // eslint-disable-next-line
         return coll.mapReduce(newMapFn, reduceFn, {out: {merge: outputColl.getName()}});
     }, [], "expected mapReduce to throw because map function references path that does not exist");
 

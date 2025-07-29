@@ -4,9 +4,12 @@ from typing import List, Optional
 import yaml
 from pydantic import BaseModel
 
-from buildscripts.resmokelib import configure_resmoke
-from buildscripts.resmokelib import suitesconfig
-from buildscripts.resmokelib.multiversion.multiversion_service import MultiversionService, MongoReleases, MongoVersion
+from buildscripts.resmokelib import configure_resmoke, suitesconfig
+from buildscripts.resmokelib.multiversion.multiversion_service import (
+    MongoReleases,
+    MongoVersion,
+    MultiversionService,
+)
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.testing.suite import Suite
 

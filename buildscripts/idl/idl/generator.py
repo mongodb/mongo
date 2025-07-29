@@ -36,10 +36,18 @@ import sys
 import textwrap
 from abc import ABCMeta, abstractmethod
 from enum import Enum
-from typing import Callable, Dict, List, Mapping, Optional, Tuple, Union, cast
+from typing import List, cast
 
-from . import (ast, bson, common, cpp_types, enum_types, generic_field_list_types, struct_types,
-               writer)
+from . import (
+    ast,
+    bson,
+    common,
+    cpp_types,
+    enum_types,
+    generic_field_list_types,
+    struct_types,
+    writer,
+)
 
 
 class _StructDataOwnership(Enum):
@@ -276,7 +284,7 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
     def add(self, field, bson_element_variable):
         # type: (ast.Field, str) -> None
         """Add a field to track."""
-        if not field in self._fields:
+        if field not in self._fields:
             self._fields.append(field)
 
         with writer.IndentedScopedBlock(

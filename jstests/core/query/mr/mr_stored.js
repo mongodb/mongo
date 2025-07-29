@@ -76,7 +76,6 @@ function assertCorrect(results) {
 assert.commandWorked(testDB.runCommand({
     mapReduce: coll.getName(),
     map: function() {
-        // eslint-disable-next-line
         mr_stored_map(this);
     },
     reduce: reduce,
@@ -92,7 +91,6 @@ assert.commandWorked(testDB.runCommand({
     mapReduce: coll.getName(),
     map: notStoredMap,
     reduce: function(k, v) {
-        // eslint-disable-next-line
         return mr_stored_reduce(k, v);
     },
     finalize: finalize,
@@ -108,7 +106,6 @@ assert.commandWorked(testDB.runCommand({
     map: notStoredMap,
     reduce: reduce,
     finalize: function(key, reducedValue) {
-        // eslint-disable-next-line
         return mr_stored_finalize(key, reducedValue);
     },
     out: "mr_stored_out"
@@ -121,15 +118,12 @@ out.drop();
 assert.commandWorked(testDB.runCommand({
     mapReduce: coll.getName(),
     map: function() {
-        // eslint-disable-next-line
         mr_stored_map(this);
     },
     reduce: function(k, v) {
-        // eslint-disable-next-line
         return mr_stored_reduce(k, v);
     },
     finalize: function(key, reducedValue) {
-        // eslint-disable-next-line
         return mr_stored_finalize(key, reducedValue);
     },
     out: "mr_stored_out"

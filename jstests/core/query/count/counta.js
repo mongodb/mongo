@@ -18,7 +18,6 @@ assert.throws(function() {
             if (this.a < 5) {
                 return true;
             } else {
-                // eslint-disable-next-line
                 f();
             }
         }

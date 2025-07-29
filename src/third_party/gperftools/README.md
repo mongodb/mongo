@@ -3,7 +3,7 @@
 Don't make manual changes to files in the dist/ or platform/ directories.
 Source code changes should be made in the mongodb-labs/gperftools repo.
 Tweaks or reconfigurations of our third-party installation have to be
-made in scripts/ or SConscript files, etc.
+made in scripts/ or BUILD.bazel files, etc.
 
 == contents ==
 

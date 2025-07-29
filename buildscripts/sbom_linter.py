@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import sys
+
 import jsonschema
 from referencing import Registry, Resource
 
@@ -147,6 +148,8 @@ def main() -> int:
     third_party_libs.remove("scripts")
     # wiredtiger will not be included in the sbom since it is considered part of the server
     third_party_libs.remove("wiredtiger")
+    # the only files in the sasl dir are BUILD files to setup the sasl library in Windows
+    third_party_libs.remove("sasl")
     errors = lint_sbom(input_file, output_file, third_party_libs, should_format)
 
     if errors:

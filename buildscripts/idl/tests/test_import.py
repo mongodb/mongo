@@ -32,18 +32,17 @@
 import io
 import textwrap
 import unittest
-from typing import Any, Dict
 
 # import package so that it works regardless of whether we run as a module or file
 if __package__ is None:
     import sys
     from os import path
     sys.path.append(path.dirname(path.abspath(__file__)))
-    from context import idl
     import testcase
+    from context import idl
 else:
-    from .context import idl
     from . import testcase
+    from .context import idl
 
 
 class DictionaryImportResolver(idl.parser.ImportResolverBase):
@@ -59,7 +58,7 @@ class DictionaryImportResolver(idl.parser.ImportResolverBase):
         # type: (str, str) -> str
         """Return the complete path to an imported file name."""
         # pylint: disable=unused-argument
-        if not imported_file_name in self._import_dict:
+        if imported_file_name not in self._import_dict:
             return None
 
         return "imported_%s" % (imported_file_name)

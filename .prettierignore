@@ -9,6 +9,8 @@
 # We are only going to do markdown file formatting for now
 # Hopefully we will use prettier for more file types in the future
 !*.md
+# TODO SERVER-106654
+docs/logging.md
 
 # Ignore all golden test output files
 jstests/*golden*/expected_output/*

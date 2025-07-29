@@ -1,0 +1,8 @@
+py_library(
+    name = "resmokelib",
+    srcs = glob([
+        "*.py",
+        "**/*.py",
+    ]),
+    visibility = ["//visibility:public"],
+)

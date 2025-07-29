@@ -1,4 +1,4 @@
-/* eslint-disable */
+
 function assert(b, m) {
     if (!b)
         alert(m);

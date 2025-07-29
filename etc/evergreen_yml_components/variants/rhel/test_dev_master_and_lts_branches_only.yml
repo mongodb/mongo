@@ -13,7 +13,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
   - name: version_gen
     variant: generate-tasks-for-version
@@ -53,12 +53,9 @@ buildvariants:
     test_flags: >-
       --storageEngine=inMemory
       --excludeWithAnyTags=requires_persistence,requires_journaling
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=on
+    bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --use_diagnostic_latches=True
     multiversion_platform: rhel80
     multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise

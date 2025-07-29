@@ -1,8 +1,9 @@
 from typing import Optional
+
 from opentelemetry.baggage import get_all as get_all_baggage
-from opentelemetry.trace import Span
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
+from opentelemetry.trace import Span
 
 
 class BatchedBaggageSpanProcessor(BatchSpanProcessor):

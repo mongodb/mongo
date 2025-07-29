@@ -1,12 +1,10 @@
 """Unit tests for buildscripts/resmokelib/testing/hooks/lifecycle.py."""
 
-import logging
 import os
 import unittest
 
 import mock
 
-from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
 
 # pylint: disable=protected-access

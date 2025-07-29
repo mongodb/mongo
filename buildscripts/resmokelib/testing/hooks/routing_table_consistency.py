@@ -2,7 +2,10 @@
 
 import os.path
 
-from buildscripts.resmokelib.testing.fixtures import multi_sharded_cluster, shardedcluster
+from buildscripts.resmokelib.testing.fixtures import (
+    multi_sharded_cluster,
+    shardedcluster,
+)
 from buildscripts.resmokelib.testing.hooks import jsfile
 
 

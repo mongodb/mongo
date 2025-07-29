@@ -1,0 +1,150 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "concurrency_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "thread_pool",
+    srcs = [
+        "//src/mongo/util/concurrency:thread_pool.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "thread_pool_test_fixture",
+    srcs = [
+        "//src/mongo/util/concurrency:thread_pool_test_common.cpp",
+        "//src/mongo/util/concurrency:thread_pool_test_fixture.cpp",
+    ],
+    deps = [
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "admission_context",
+    srcs = [
+        "//src/mongo/util/concurrency:admission_context.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "spin_lock",
+    srcs = [
+        "//src/mongo/util/concurrency:spin_lock.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "ticketholder_bm",
+    srcs = [
+        "//src/mongo/util/concurrency:ticketholder_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "lock_free_read_list_bm",
+    srcs = [
+        "//src/mongo/util/concurrency:lock_free_read_list_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/util:processinfo",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "lock_free_read_list_test",
+    srcs = [
+        "//src/mongo/util/concurrency:lock_free_read_list_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_second_group",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "util_concurrency_test",
+    srcs = [
+        "semaphore_ticketholder_test.cpp",
+        "spin_lock_test.cpp",
+        "thread_pool_test.cpp",
+        "ticketholder_test_fixture.cpp",
+        "with_lock_test.cpp",
+    ] + select({
+        "@platforms//os:linux": [
+            "priority_ticketholder_test.cpp",
+            "ticket_pool_test.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    tags = [
+        "convert_target",
+        "mongo_unittest_third_group",
+    ],
+    deps = [
+        ":spin_lock",
+        ":thread_pool",
+        ":thread_pool_test_fixture",
+        ":ticketholder",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+    ],
+)
+
+mongo_cc_library(
+    name = "ticketholder",
+    srcs = [
+        "semaphore_ticketholder.cpp",
+        "ticketholder.cpp",
+    ] + select({
+        "@platforms//os:linux": [
+            "priority_ticketholder.cpp",
+            "ticket_pool.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":admission_context",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/third_party/boost:boost_filesystem",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_iostreams",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_log",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_program_options",  # TODO(SERVER-93876): Remove.
+    ],
+)

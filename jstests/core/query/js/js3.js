@@ -31,7 +31,6 @@ for (let z = 0; z < 2; z++) {
 
     assert(2 == t.find({
                      $where: function() {
-                         // eslint-disable-next-line
                          return obj.i == 7 || obj.i == 8;
                      }
                  }).length());
@@ -42,7 +41,6 @@ for (let z = 0; z < 2; z++) {
     try {
         var x = t.find({
             $where: function() {
-                // eslint-disable-next-line
                 asdf.asdf.f.s.s();
             }
         });
@@ -61,7 +59,6 @@ for (let z = 0; z < 2; z++) {
 
     let arr = t.find({
                    $where: function() {
-                       // eslint-disable-next-line
                        return obj.i == 7 || obj.i == 8;
                    }
                }).toArray();

@@ -1,0 +1,10 @@
+test_kind: cpp_unit_test
+
+selector:
+  root: bazel-bin/install/install-mongo_unittest_eighth_group_test_list.txt
+
+  exclude_files:
+    - bazel-bin/**/s3_emit_operator_test*
+
+executor:
+  config: {}

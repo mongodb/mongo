@@ -3,9 +3,7 @@
 import os
 import os.path
 
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import core, errors, utils
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import globstar
 

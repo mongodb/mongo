@@ -1,7 +1,14 @@
 # Define supported build platforms.
-load("//bazel/platforms:remote_execution_containers.bzl", "REMOTE_EXECUTION_CONTAINERS")
+load("//bazel/platforms:platform_util.bzl", "setup_platform")
 
 package(default_visibility = ["//visibility:public"])
+
+constraint_setting(name = "mongo_toolchain")
+
+constraint_value(
+    name = "use_mongo_toolchain",
+    constraint_setting = ":mongo_toolchain",
+)
 
 constraint_setting(name = "tcmalloc_kernel_version")
 
@@ -40,27 +47,7 @@ constraint_setting(name = "distro")
 ]
 
 [
-    platform(
-        name = distro_or_os + "_" + arch + "_" + compiler,
-        constraint_values = [
-            "@platforms//os:linux",
-            "@platforms//cpu:arm64" if arch == "arm64" else "@platforms//cpu:x86_64",
-            "@bazel_tools//tools/cpp:" + compiler,
-            ":" + distro_or_os,
-            ":kernel_version_4_4_or_greater",  # remote execution platforms assume a given kernel version
-        ],
-        exec_properties = {
-            "container-image": REMOTE_EXECUTION_CONTAINERS[distro_or_os]["container-url"],
-            "dockerNetwork": "standard",
-
-            # EngFlow's "default" pool is ARM64
-            "Pool": "x86_64" if arch == "amd64" else "default",
-        },
-    )
-    for compiler in [
-        "clang",
-        "gcc",
-    ]
+    setup_platform(arch, distro_or_os, cache_silo)
     for arch in [
         "arm64",
         "amd64",
@@ -79,103 +66,101 @@ constraint_setting(name = "distro")
         "rhel9",
         "suse15",
     ]
+    for cache_silo in [
+        "",
+        "_cache_silo",
+    ]
 ]
 
+constraint_setting(name = "mongo_windows_toolchain_config")
+
+constraint_value(
+    name = "use_mongo_windows_toolchain_config",
+    constraint_setting = ":mongo_windows_toolchain_config",
+)
+
 platform(
-    name = "windows_amd64_msvc",
+    name = "windows_amd64",
     constraint_values = [
         "@platforms//cpu:x86_64",
         "@platforms//os:windows",
-        "@bazel_tools//tools/cpp:msvc",
     ],
 )
 
 platform(
-    name = "macos_arm64_clang",
+    name = "macos_arm64",
     constraint_values = [
         "@platforms//cpu:arm64",
         "@platforms//os:macos",
-        "@bazel_tools//tools/cpp:clang",
     ],
 )
 
 platform(
-    name = "macos_amd64_clang",
+    name = "macos_amd64",
     constraint_values = [
         "@platforms//cpu:x86_64",
         "@platforms//os:macos",
-        "@bazel_tools//tools/cpp:clang",
     ],
 )
 
 platform(
-    name = "linux_ppc64le_clang",
+    name = "linux_ppc64le",
     constraint_values = [
-        "@platforms//cpu:ppc64le",
+        "@platforms//cpu:ppc",
         "@platforms//os:linux",
-        "@bazel_tools//tools/cpp:clang",
     ],
 )
 
 platform(
-    name = "linux_ppc64le_gcc",
-    constraint_values = [
-        "@platforms//cpu:ppc64le",
-        "@platforms//os:linux",
-        "@bazel_tools//tools/cpp:gcc",
-    ],
-)
-
-platform(
-    name = "linux_s390x_clang",
+    name = "linux_s390x",
     constraint_values = [
         "@platforms//cpu:s390x",
         "@platforms//os:linux",
-        "@bazel_tools//tools/cpp:clang",
     ],
 )
 
 platform(
-    name = "linux_s390x_gcc",
+    name = "rhel8_ppc64le",
+    constraint_values = [
+        "@platforms//cpu:ppc",
+        "@platforms//os:linux",
+        ":use_mongo_toolchain",
+        ":rhel8",
+    ],
+)
+
+platform(
+    name = "rhel9_ppc64le",
+    constraint_values = [
+        "@platforms//cpu:ppc",
+        "@platforms//os:linux",
+        ":use_mongo_toolchain",
+        ":rhel9",
+    ],
+)
+
+platform(
+    name = "rhel8_s390x",
     constraint_values = [
         "@platforms//cpu:s390x",
         "@platforms//os:linux",
-        "@bazel_tools//tools/cpp:gcc",
+        ":use_mongo_toolchain",
+        ":rhel8",
     ],
 )
 
 platform(
-    name = "rhel8_ppc64le_clang",
-    constraint_values = [
-        "@platforms//cpu:ppc64le",
-        "@platforms//os:linux",
-        "@bazel_tools//tools/cpp:clang",
-    ],
-)
-
-platform(
-    name = "rhel8_ppc64le_gcc",
-    constraint_values = [
-        "@platforms//cpu:ppc64le",
-        "@platforms//os:linux",
-        "@bazel_tools//tools/cpp:gcc",
-    ],
-)
-
-platform(
-    name = "rhel8_s390x_clang",
+    name = "rhel9_s390x",
     constraint_values = [
         "@platforms//cpu:s390x",
         "@platforms//os:linux",
-        "@bazel_tools//tools/cpp:clang",
+        ":use_mongo_toolchain",
+        ":rhel9",
     ],
 )
 
-platform(
-    name = "rhel8_s390x_gcc",
-    constraint_values = [
-        "@platforms//cpu:s390x",
-        "@platforms//os:linux",
-        "@bazel_tools//tools/cpp:gcc",
-    ],
+py_binary(
+    name = "remote_execution_containers_generator",
+    srcs = ["remote_execution_containers_generator.py"],
+    visibility = ["//visibility:public"],
 )

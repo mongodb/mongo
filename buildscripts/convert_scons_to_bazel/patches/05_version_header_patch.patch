@@ -1,0 +1,13 @@
+diff --git a/.bazelrc b/.bazelrc
+index 8ef215fa734..b269f6daaa8 100644
+--- a/.bazelrc
++++ b/.bazelrc
+@@ -448,7 +448,7 @@ common:fission --remote_download_regex=.*\.dwo$
+ common --bes_upload_mode=fully_async
+ 
+ # Default Mongo Version if a version is not specified.
+-common --define=MONGO_VERSION=8.2.0-alpha
++common --define=MONGO_VERSION=8.0.6
+ 
+ # Default distmod if not specified.
+ common --define=MONGO_DISTMOD=""

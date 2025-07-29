@@ -53,34 +53,34 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsMaybeLockFree(
 
 The dimensions of this family of methods are:
 
--   Collection/View: Whether the caller is okay with the namespace potentially corresponding to a view or not.
--   Locks/MaybeLockFree: The "MaybeLockFree" variant will skip acquiring locks if it is allowed given the opCtx state. It must be only used for read operations. An operation is allowed to skip locks if all the following conditions are met:
+- Collection/View: Whether the caller is okay with the namespace potentially corresponding to a view or not.
+- Locks/MaybeLockFree: The "MaybeLockFree" variant will skip acquiring locks if it is allowed given the opCtx state. It must be only used for read operations. An operation is allowed to skip locks if all the following conditions are met:
 
-    -   (i) it's not part of a multi-document transaction,
-    -   (ii) it is not already holding write locks,
-    -   (iii) does not already have a non-lock-free storage transaction open.
+    - (i) it's not part of a multi-document transaction,
+    - (ii) it is not already holding write locks,
+    - (iii) does not already have a non-lock-free storage transaction open.
 
     The normal variant acquires locks.
 
--   One or multiple acquisitions: The "plural" variants allow acquiring multiple collections/views in a single call. Acquiring multiple collections in the same acquireCollections call prevents the global lock from getting recursively locked, which would impede yielding.
+- One or multiple acquisitions: The "plural" variants allow acquiring multiple collections/views in a single call. Acquiring multiple collections in the same acquireCollections call prevents the global lock from getting recursively locked, which would impede yielding.
 
 For each collection/view the caller desires to acquire, `CollectionAcquisitionRequest`/`CollectionOrViewAcquisitionRequest` represents the prerequisites for it, which are:
 
--   `nsOrUUID`: The NamespaceString or uuid of the desired collection/view.
--   `placementConcern`: The sharding placementConcern, also known as ShardVersion and DatabaseVersion, that the router attached.
--   `operationType`: Whether we are acquiring this collection for reading (`kRead`) or for writing (`kWrite`). `kRead` operations will keep the same orphan filter and range preserver across yields. This way, even if chunk migrations commit, the query plan is guaranteed to keep seeing the documents for the owned ranges at the time the query started.
--   Optionally, `expectedUUID`: for requests where `nsOrUUID` takes the NamespaceString form, this is the UUID we expect the collection to have.
+- `nsOrUUID`: The NamespaceString or uuid of the desired collection/view.
+- `placementConcern`: The sharding placementConcern, also known as ShardVersion and DatabaseVersion, that the router attached.
+- `operationType`: Whether we are acquiring this collection for reading (`kRead`) or for writing (`kWrite`). `kRead` operations will keep the same orphan filter and range preserver across yields. This way, even if chunk migrations commit, the query plan is guaranteed to keep seeing the documents for the owned ranges at the time the query started.
+- Optionally, `expectedUUID`: for requests where `nsOrUUID` takes the NamespaceString form, this is the UUID we expect the collection to have.
 
 If the prerequisites can be met, then the acquisition will succeed and one or multiple `CollectionAcquisition`/`ViewAcquisition` objects are returned. These objects are the entry point for accessing the catalog information, including:
 
--   CollectionPtr: The local catalog.
--   CollectionDescription: The sharding catalog.
--   ShardingOwnershipFilter: Used to filter out orphaned documents.
+- CollectionPtr: The local catalog.
+- CollectionDescription: The sharding catalog.
+- ShardingOwnershipFilter: Used to filter out orphaned documents.
 
 Additionally, these objects hold several resources during their lifetime:
 
--   For locked acquisitions, the locks.
--   For sharded collections, the _RangePreserver_, which prevents documents that became orphans after having established the collectionAcquisition from being deleted.
+- For locked acquisitions, the locks.
+- For sharded collections, the _RangePreserver_, which prevents documents that became orphans after having established the collectionAcquisition from being deleted.
 
 As an example:
 
@@ -117,8 +117,8 @@ shard_role.h provides primitives for yielding and restoring. There are two diffe
 
 The restore procedure checks that the acquisition prerequisites are still met, namely:
 
--   That the collection still exists and has not been renamed.
--   That the sharding placement concern can still be met. For `kWrite` acquisitions, this means that the shard version has not changed. This can be relaxed for `kRead` acquisitions: It is allowed that the shard version changes, because the RangePreserver guarantees that all documents corresponding to that placement version are still on the shard.
+- That the collection still exists and has not been renamed.
+- That the sharding placement concern can still be met. For `kWrite` acquisitions, this means that the shard version has not changed. This can be relaxed for `kRead` acquisitions: It is allowed that the shard version changes, because the RangePreserver guarantees that all documents corresponding to that placement version are still on the shard.
 
 ### Yield and restore to the same operation context
 

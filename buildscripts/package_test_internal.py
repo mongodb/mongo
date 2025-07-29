@@ -16,7 +16,6 @@ import sys
 import tarfile
 import time
 import traceback
-
 from logging.handlers import WatchedFileHandler
 from typing import Dict, List, Optional, Tuple, Union
 

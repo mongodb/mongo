@@ -57,7 +57,7 @@ assert.eq(typeof mystring, "string", "Checking that mystring round-tripped corre
 assert.eq(changeme, false, "Checking that global var was overwritten");
 
 // Make sure it works
-// eslint-disable-next-line
+
 x = myfunc();
 assert.eq(x, "myfunc", "Checking that myfunc() returns the correct value");
 
@@ -75,7 +75,7 @@ assert.eq(x, 4, "Should now be two functions in the system.js collection");
 // Load the new functions: test them as above
 testdb.loadServerScripts();
 assert.eq(typeof myfunc2, "function", "Checking that myfunc2() loaded correctly");
-// eslint-disable-next-line
+
 x = myfunc2();
 assert.eq(x, "myfunc2", "Checking that myfunc2() returns the correct value");
 

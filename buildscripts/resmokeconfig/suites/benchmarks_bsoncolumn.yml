@@ -2,11 +2,7 @@
 test_kind: benchmark_test
 
 selector:
-  root: build/benchmarks.txt
-  include_files:
-  # The trailing asterisk is for handling the .exe extension on Windows.
-  - build/install/bin/bsoncolumn_bm*
-  - build/install/bin/simple8b_bm*
+  root: bazel-bin/install/install-bsoncolumn_bm_test_list.txt
 
 executor:
   config: {}

@@ -6,16 +6,17 @@ import logging
 import os
 import re
 import sys
-import threading
 from typing import List
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-from buildscripts.linter import git  # pylint: disable=wrong-import-position
-from buildscripts.linter import parallel  # pylint: disable=wrong-import-position
-from buildscripts.linter import mongolint  # pylint: disable=wrong-import-position
+from buildscripts.linter import (
+    git,  # pylint: disable=wrong-import-position
+    mongolint,  # pylint: disable=wrong-import-position
+    parallel,  # pylint: disable=wrong-import-position
+)
 
 FILES_RE = re.compile('\\.(h|cpp)$')
 
@@ -27,6 +28,7 @@ def is_interesting_file(file_name: str) -> bool:
             and not file_name.startswith("src/mongo/gotools/")
             and not file_name.startswith("src/streams/third_party")
             and not file_name.startswith("src/mongo/db/modules/enterprise/src/streams/third_party")
+            and not file_name.endswith(".cstruct.h")
             # TODO SERVER-49805: These files should be generated at compile time.
             and not file_name == "src/mongo/db/cst/parser_gen.cpp") and FILES_RE.search(file_name)
 

@@ -3,15 +3,12 @@
 A hook to enable change stream in the replica set and the sharded cluster in the multi-tenant
 environment.
 """
-from time import sleep
-from bson.objectid import ObjectId
-from pymongo import MongoClient
 import os.path
-import json
+from time import sleep
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib.testing.hooks import interface
-from buildscripts.resmokelib.testing.hooks import jsfile
+from bson.objectid import ObjectId
+
+from buildscripts.resmokelib.testing.hooks import interface, jsfile
 
 
 class EnableChangeStream(interface.Hook):

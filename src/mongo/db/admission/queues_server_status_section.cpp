@@ -34,6 +34,8 @@
 #include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/transport_layer.h"
 
+#include "mongo/db/commands/server_status.h"
+
 namespace mongo {
 namespace admission {
 namespace {

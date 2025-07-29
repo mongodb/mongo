@@ -4,8 +4,7 @@ import unittest
 
 import mock
 
-from buildscripts.resmokelib import parser
-from buildscripts.resmokelib import suitesconfig
+from buildscripts.resmokelib import parser, suitesconfig
 
 parser.set_run_options()
 

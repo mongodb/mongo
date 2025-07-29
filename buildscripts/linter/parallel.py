@@ -4,7 +4,6 @@ import queue
 import threading
 import time
 from multiprocessing import cpu_count
-from typing import Any, Callable, List
 
 
 def parallel_process(items, func):

@@ -1,0 +1,35 @@
+diff --git a/src/mongo/db/modules/enterprise/src/fle/lib/mongo_crypt.cpp b/src/mongo/db/modules/enterprise/src/fle/lib/mongo_crypt.cpp
+index 15dd66fe721..5454574ba51 100644
+--- a/src/mongo/db/modules/enterprise/src/fle/lib/mongo_crypt.cpp
++++ b/src/mongo/db/modules/enterprise/src/fle/lib/mongo_crypt.cpp
+@@ -30,7 +30,6 @@
+ #include "mongo/rpc/op_msg_rpc_impls.h"
+ #include "mongo/util/assert_util.h"
+ #include "mongo/util/version.h"
+-#include "mongo/util/version_constants.h"
+
+ #if defined(_WIN32)
+ #define MONGO_API_CALL __cdecl
+@@ -296,9 +295,10 @@ BSONObj analyzeQuery(const BSONObj document, OperationContext* opCtx, const Name
+ }
+
+ uint64_t getMongoCryptVersion() {
+-    return (static_cast<uint64_t>(version::kMajorVersion) << 48) |
+-        (static_cast<uint64_t>(version::kMinorVersion) << 32) |
+-        (static_cast<uint64_t>(version::kPatchVersion) << 16);
++    const auto& ver = VersionInfoInterface::instance();
++    return (static_cast<uint64_t>(ver.majorVersion()) << 48) |
++        (static_cast<uint64_t>(ver.minorVersion()) << 32) |
++        (static_cast<uint64_t>(ver.patchVersion()) << 16);
+ }
+
+ #ifndef MONGO_DISTMOD
+@@ -306,6 +306,7 @@ uint64_t getMongoCryptVersion() {
+ #endif
+
+ const char* getMongoCryptVersionStr() {
+-    static const auto version = "mongo_crypt_v1-" MONGO_DISTMOD "-" + version::kVersion;
++    static const std::string version =
++        "mongo_crypt_v1-" MONGO_DISTMOD "-" + VersionInfoInterface::instance().version();
+     return version.c_str();
+ }

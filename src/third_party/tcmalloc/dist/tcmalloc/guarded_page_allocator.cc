@@ -29,6 +29,7 @@
 #include "absl/debugging/stacktrace.h"
 #include "absl/numeric/bits.h"
 #include "tcmalloc/common.h"
+#include "tcmalloc/global_stats.h"
 #include "tcmalloc/guarded_allocations.h"
 #include "tcmalloc/internal/allocation_guard.h"
 #include "tcmalloc/internal/config.h"
@@ -49,6 +50,7 @@ namespace tcmalloc_internal {
 const size_t GuardedPageAllocator::kMagicSize;  // NOLINT
 
 void GuardedPageAllocator::Init(size_t max_alloced_pages, size_t total_pages) {
+  TC_CHECK(!initialized_);
   TC_CHECK_GT(max_alloced_pages, 0);
   TC_CHECK_LE(max_alloced_pages, total_pages);
   TC_CHECK_LE(total_pages, kGpaMaxPages);
@@ -220,6 +222,16 @@ void GuardedPageAllocator::Deallocate(void* ptr) {
   }
 
   if (write_overflow_detected_ || double_free_detected_) {
+    {
+      TC_LOG("Detected an error in the GuardedPageAllocator-- dumping stats and then exiting");
+      const int kBufferSize = 64 << 10;
+      char* buffer = new char[kBufferSize];
+      Printer printer(buffer, kBufferSize);
+      DumpStats(&printer, 2);
+      (void)write(STDERR_FILENO, buffer, strlen(buffer));
+      delete[] buffer;
+    }
+
     *reinterpret_cast<char*>(ptr) = 'X';  // Trigger SEGV handler.
     TC_BUG("unreachable");
   }

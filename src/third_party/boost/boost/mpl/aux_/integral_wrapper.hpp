@@ -53,6 +53,15 @@ struct AUX_WRAPPER_NAME
     typedef AUX_WRAPPER_VALUE_TYPE value_type;
     typedef integral_c_tag tag;
 
+// MongoDB modification. This struct is used to wrap integral types and extend them to support
+// retrieval of predecessor and successor values using the <next> and <prior> typedefs. When it is
+// used to wrap enum types, a predecessor typedef is generated for the first enumerated value and a
+// successor typedef is generated for the last enumerated value. These generated values are
+// undefined for the enum, which means that the program is ill-formed. Clang 19 correctly diagnoses
+// this issue with -Wenum-constexpr-conversion.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wenum-constexpr-conversion"
+
 // have to #ifdef here: some compilers don't like the 'N + 1' form (MSVC),
 // while some other don't like 'value + 1' (Borland), and some don't like
 // either
@@ -72,6 +81,8 @@ struct AUX_WRAPPER_NAME
     typedef AUX_WRAPPER_INST( BOOST_MPL_AUX_STATIC_CAST(AUX_WRAPPER_VALUE_TYPE, (value + 1)) ) next;
     typedef AUX_WRAPPER_INST( BOOST_MPL_AUX_STATIC_CAST(AUX_WRAPPER_VALUE_TYPE, (value - 1)) ) prior;
 #endif
+
+#pragma clang diagnostic pop
 
     // enables uniform function call syntax for families of overloaded 
     // functions that return objects of both arithmetic ('int', 'long',

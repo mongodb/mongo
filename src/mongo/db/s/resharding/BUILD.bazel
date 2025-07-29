@@ -1,0 +1,165 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "resharding_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_idl_library(
+    name = "donor_document_idl",
+    src = "//src/mongo/db/s/resharding:donor_document.idl",
+    idl_deps = [
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/db:keypattern_idl_gen",
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "recipient_document_idl",
+    src = "recipient_document.idl",
+    idl_deps = [
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/db:keypattern_idl_gen",
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "donor_oplog_id_idl",
+    src = "donor_oplog_id.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "resharding_change_event_o2_field_idl",
+    src = "resharding_change_event_o2_field.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "resharding_oplog_applier_progress_idl",
+    src = "resharding_oplog_applier_progress.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/db/s/resharding:donor_oplog_id_idl_gen",
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+        "//src/mongo/db:keypattern_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/db/s/resharding:donor_oplog_id_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "resharding_server_parameters_idl",
+    src = "resharding_server_parameters.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_idl_library(
+    name = "coordinator_document_idl",
+    src = "coordinator_document.idl",
+    idl_deps = [
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/db:keypattern_idl_gen",
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "resharding_txn_cloner_progress_idl",
+    src = "resharding_txn_cloner_progress.idl",
+    idl_deps = [
+        "//src/mongo/db/session:logical_session_id_idl_gen",
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+        "//src/mongo/crypto:sha256_block_idl_gen",
+        "//src/mongo/db:keypattern_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/crypto:sha256_block_idl",
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/db/session:logical_session_id_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "recipient_resume_document_idl",
+    src = "recipient_resume_document.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+        "//src/mongo/util/net:hostandport_idl_gen",
+        "//src/mongo/db:keypattern_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+        "//src/mongo/util/net:hostandport_idl",
+    ],
+)

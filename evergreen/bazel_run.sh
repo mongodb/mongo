@@ -4,6 +4,8 @@
 # Required environment variables:
 # * ${target} - Build target
 # * ${args} - Extra command line args to pass to "bazel run"
+# * ${env} - Env variable string to set (ex. ENV_VAR_ABC=123)
+# * ${redact_args} - If set, redact the args in the report
 
 # Needed for evergreen scripts that use evergreen expansions and utility methods.
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
@@ -14,9 +16,12 @@ cd src
 set -o errexit
 set -o verbose
 
-# Use `eval` to force evaluation of the environment variables in the echo statement:
-eval echo "Execution environment: Args: ${args} Target: ${target}"
+activate_venv
 
+# Use `eval` to force evaluation of the environment variables in the echo statement:
+eval echo "Execution environment: Args: ${args} Target: ${target} Env: ${env} redact_args: ${redact_args}"
+
+source ./evergreen/bazel_utility_functions.sh
 source ./evergreen/bazel_RBE_supported.sh
 
 if bazel_rbe_supported; then
@@ -25,33 +30,48 @@ else
   LOCAL_ARG="--config=local"
 fi
 
-ARCH=$(uname -m)
-if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
-  ARCH="arm64"
-elif [[ "$ARCH" == "ppc64le" || "$ARCH" == "ppc64" || "$ARCH" == "ppc" || "$ARCH" == "ppcle" ]]; then
-  ARCH="ppc64le"
-elif [[ "$ARCH" == "s390x" || "$ARCH" == "s390" ]]; then
-  ARCH="s390x"
-else
-  ARCH="amd64"
+if [[ "${evergreen_remote_exec}" != "on" ]]; then
+  LOCAL_ARG="--config=local"
 fi
 
-# TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
-if [[ $ARCH == "ppc64le" ]] || [[ $ARCH == "s390x" ]]; then
-  BAZEL_BINARY=$TMPDIR/bazel
-else
-  BAZEL_BINARY=$TMPDIR/bazelisk
+REMOTE_EXEC_DISABLE=""
+if is_s390x_or_ppc64le; then
+  REMOTE_EXEC_DISABLE="$REMOTE_EXEC_DISABLE --remote_executor="
+elif [[ "$evergreen_remote_exec" != "on" ]]; then
+  REMOTE_EXEC_DISABLE="$REMOTE_EXEC_DISABLE --remote_executor="
 fi
 
-# Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
-if [[ $ARCH == "ppc64le" ]]; then
-  export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
-elif [[ $ARCH == "s390x" ]]; then
-  export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-11.0.11.0.9-0.el8_3.s390x"
+BAZEL_BINARY=$(bazel_get_binary_path)
+
+# AL2 stores certs in a nonstandard location
+if [[ -f /etc/os-release ]]; then
+  DISTRO=$(awk -F '[="]*' '/^PRETTY_NAME/ { print $2 }' < /etc/os-release)
+  if [[ $DISTRO == "Amazon Linux 2" ]]; then
+    export SSL_CERT_DIR=/etc/pki/tls/certs
+    export SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
+  elif [[ $DISTRO == "Red Hat Enterprise Linux"* ]]; then
+    export SSL_CERT_DIR=/etc/pki/ca-trust/extracted/pem
+    export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+  fi
+fi
+
+if [[ -n "$redact_args" ]]; then
+  INVOCATION_WITH_REDACTION="${target}"
+else
+  INVOCATION_WITH_REDACTION="${target} ${args}"
 fi
 
 # Print command being run to file that can be uploaded
-echo "$BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${args} ${target}" > bazel-invocation.txt
+echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
+echo "bazel run --verbose_failures ${bazel_compile_flags} ${task_compile_flags} ${LOCAL_ARG} ${INVOCATION_WITH_REDACTION} ${REMOTE_EXEC_DISABLE}" >> bazel-invocation.txt
 
-# Run bazel command
-eval $BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${args} ${target}
+# Run bazel command, retrying up to five times
+MAX_ATTEMPTS=5
+for ((i = 1; i <= $MAX_ATTEMPTS; i++)); do
+  eval $env $BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${target} ${args} ${REMOTE_EXEC_DISABLE} >> bazel_output.log 2>&1 && RET=0 && break || RET=$? && sleep 10
+  if [ $i -lt $MAX_ATTEMPTS ]; then echo "Bazel failed to execute, retrying ($(($i + 1)) of $MAX_ATTEMPTS attempts)... " >> bazel_output.log 2>&1; fi
+  $BAZEL_BINARY shutdown
+done
+
+$python ./buildscripts/simple_report.py --test-name "bazel run ${INVOCATION_WITH_REDACTION}" --log-file bazel_output.log --exit-code $RET
+exit $RET

@@ -1,7 +1,7 @@
 """Unit tests for the evergreen_task_timeout script."""
 import unittest
 
-from buildscripts.validate_commit_message import main, STATUS_OK, STATUS_ERROR
+from buildscripts.validate_commit_message import STATUS_ERROR, STATUS_OK, main
 
 
 class ValidateCommitMessageTest(unittest.TestCase):

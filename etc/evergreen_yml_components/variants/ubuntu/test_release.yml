@@ -14,13 +14,9 @@ buildvariants:
   # TODO SERVER-86538 see if we can use --allocator=tcmalloc-google on
   # new distributions and/or fix the current libfaketime issues
   expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu1804
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu1804
       --allocator=tcmalloc-gperf
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    scons_cache_scope: shared
     large_distro_name: ubuntu1804-large
     compile_variant: enterprise-ubuntu1804-64
   tasks:
@@ -43,12 +39,9 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu2204
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2204
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu2204
+      --build_enterprise=False
     test_flags: >-
       --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -59,7 +52,6 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu2204
     repo_edition: org
-    scons_cache_scope: shared
     large_distro_name: ubuntu2204-large
     compile_variant: ubuntu2204
   tasks:
@@ -77,7 +69,7 @@ buildvariants:
   display_name: Ubuntu 22.04 Powercycle
   tags: []
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: *ubuntu2204
   tasks:
   - name: .powercycle
@@ -93,12 +85,9 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu2004
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2004
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu2004
+      --build_enterprise=False
     test_flags: >-
       --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -109,7 +98,6 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu2004
     repo_edition: org
-    scons_cache_scope: shared
     large_distro_name: ubuntu2004-large
     compile_variant: ubuntu2004
   tasks:
@@ -134,12 +122,9 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu2404
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2404
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu2404
+      --build_enterprise=False
     test_flags: >-
       --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -150,7 +135,6 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu2404
     repo_edition: org
-    scons_cache_scope: shared
     large_distro_name: ubuntu2404-large
     compile_variant: ubuntu2404
   tasks:
@@ -174,7 +158,7 @@ buildvariants:
   display_name: Ubuntu 24.04 Powercycle
   tags: []
   depends_on:
-    - name: archive_dist_test_debug
+    - name: archive_dist_test
       variant: *ubuntu2404
   tasks:
     - name: .powercycle
@@ -196,14 +180,9 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu2004
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=ubuntu2004
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu2004
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: ubuntu2004
     multiversion_edition: enterprise
     has_packages: true
@@ -211,7 +190,6 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu2004
     repo_edition: enterprise
-    scons_cache_scope: shared
     large_distro_name: ubuntu2004-large
     compile_variant: enterprise-ubuntu2004-64
   tasks:
@@ -231,7 +209,7 @@ buildvariants:
   display_name: Enterprise Ubuntu 20.04 Security
   tags: []
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: *enterprise-ubuntu2004-64
   tasks:
   - name: external_auth_oidc
@@ -253,15 +231,9 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu2204
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2204
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu2204
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: ubuntu2204
     multiversion_edition: enterprise
     has_packages: true
@@ -269,7 +241,6 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu2204
     repo_edition: enterprise
-    scons_cache_scope: shared
     large_distro_name: ubuntu2204-large
     compile_variant: enterprise-ubuntu2204-64
   tasks:
@@ -293,12 +264,8 @@ buildvariants:
     - ubuntu2204-small
   stepback: false
   expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2204
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    scons_cache_scope: shared
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu2204
     large_distro_name: ubuntu2204-large
     compile_variant: enterprise-ubuntu2204-64
   tasks:
@@ -323,14 +290,9 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu2004
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=ubuntu2004
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu2004
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -340,7 +302,6 @@ buildvariants:
     multiversion_platform: ubuntu2004
     multiversion_architecture: aarch64
     multiversion_edition: enterprise
-    scons_cache_scope: shared
     compile_variant: enterprise-ubuntu2004-arm64
     large_distro_name: ubuntu2004-arm64-large
   tasks:
@@ -364,12 +325,9 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2004
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2004
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu2004
+      --build_enterprise=False
     test_flags: >-
       --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -382,7 +340,6 @@ buildvariants:
     multiversion_platform: ubuntu2004
     multiversion_architecture: aarch64
     multiversion_edition: targeted
-    scons_cache_scope: shared
     compile_variant: ubuntu2004-arm64
     large_distro_name: ubuntu2004-arm64-large
   tasks:
@@ -407,9 +364,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    bazel_compile_flags: --define=MONGO_DISTMOD=ubuntu2204
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -419,7 +375,6 @@ buildvariants:
     multiversion_platform: ubuntu2204
     multiversion_architecture: aarch64
     multiversion_edition: enterprise
-    scons_cache_scope: shared
     compile_variant: enterprise-ubuntu2204-arm64
     large_distro_name: ubuntu2204-arm64-large
   tasks:
@@ -446,11 +401,9 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2204
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=ubuntu2204
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu2204
+      --build_enterprise=False
     test_flags: >-
       --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -463,7 +416,6 @@ buildvariants:
     multiversion_platform: ubuntu2204
     multiversion_architecture: aarch64
     multiversion_edition: targeted
-    scons_cache_scope: shared
     compile_variant: ubuntu2204-arm64
     large_distro_name: ubuntu2204-arm64-large
   tasks:
@@ -491,15 +443,9 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu2404
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=ubuntu2404
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu2404
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
     multiversion_platform: ubuntu2404
     multiversion_edition: enterprise
     has_packages: true
@@ -507,7 +453,6 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu2404
     repo_edition: enterprise
-    scons_cache_scope: shared
     large_distro_name: ubuntu2404-large
     compile_variant: enterprise-ubuntu2404-64
   tasks:
@@ -540,11 +485,9 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2404
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=ubuntu2404
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=ubuntu2404
+      --build_enterprise=False
     test_flags: >-
       --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -557,7 +500,6 @@ buildvariants:
     multiversion_platform: ubuntu2404
     multiversion_architecture: aarch64
     multiversion_edition: targeted
-    scons_cache_scope: shared
     compile_variant: ubuntu2404-arm64
     large_distro_name: ubuntu2404-arm64-large
   tasks:
@@ -588,9 +530,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu2404
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2404 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    bazel_compile_flags: --define=MONGO_DISTMOD=ubuntu2404
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -600,7 +541,6 @@ buildvariants:
     multiversion_platform: ubuntu2404
     multiversion_architecture: aarch64
     multiversion_edition: enterprise
-    scons_cache_scope: shared
     compile_variant: enterprise-ubuntu2404-arm64
     large_distro_name: ubuntu2404-arm64-large
   tasks:

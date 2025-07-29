@@ -1,8 +1,9 @@
-import unittest
 import os
 import sys
 import tempfile
 import traceback
+import unittest
+
 from buildscripts import sync_repo_with_copybara
 
 

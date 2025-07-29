@@ -1,0 +1,281 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel/config:generate_config_header.bzl", "generate_config_header")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "mongo_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+generate_config_header(
+    name = "mongo_config_header",
+    checks = "mongo_config_header.py",
+    extra_definitions = select({
+        "//bazel/config:use_wiredtiger_enabled": {
+            "MONGO_CONFIG_WIREDTIGER_ENABLED": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:build_grpc_enabled": {
+            "MONGO_CONFIG_GRPC": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:build_otel_enabled": {
+            "MONGO_CONFIG_OTEL": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:tcmalloc_google_enabled": {
+            "MONGO_CONFIG_TCMALLOC_GOOGLE": "1",
+        },
+        "//bazel/config:tcmalloc_gperf_enabled": {
+            "MONGO_CONFIG_TCMALLOC_GPERF": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:libunwind_enabled": {
+            "MONGO_CONFIG_USE_LIBUNWIND": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:opt_any": {
+            "MONGO_CONFIG_OPTIMIZED_BUILD": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:dbg_enabled": {
+            "MONGO_CONFIG_DEBUG_BUILD": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:streams_release_build_required_setting": {
+            "MONGO_CONFIG_STREAMS": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:posix": {
+            "MONGO_CONFIG_HAVE_HEADER_UNISTD_H": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:ssl_enabled": {
+            "MONGO_CONFIG_SSL": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "@platforms//os:windows": {
+            "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_WINDOWS",
+        },
+        "@platforms//os:macos": {
+            "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_APPLE",
+        },
+        "//bazel/config:ssl_enabled_linux": {
+            "MONGO_CONFIG_SSL_PROVIDER": "MONGO_CONFIG_SSL_PROVIDER_OPENSSL",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:use_ocsp_stapling_enabled": {
+            "MONGO_CONFIG_OCSP_STAPLING_ENABLED": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:use_tracing_profiler_enabled": {
+            "MONGO_CONFIG_USE_TRACING_PROFILER": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:use_diagnostic_latches_disabled": {
+            "MONGO_CONFIG_USE_RAW_LATCHES": "1",
+        },
+        "//conditions:default": {},
+    }),
+    logfile = "mongo_config.log",
+    output = "config.h",
+    template = "config.h.in",
+)
+
+# DO NOT ADD TO THIS UNLESS ABSOLUTELY NECESSARY TO UNBLOCK WORK!!
+# This library is added as a global dependency to anything in the src/mongo tree
+# and is used as a workaround for any headers added that will require a significant
+# refactor to get working (ex. many hours of work). This work needs to be done eventually,
+# but if resolving a header cycle is blocking critical work this list can be used to
+# defer the refactor until later.
+#
+# Any header added to this list must reference its own TODO ticket to refactor
+# the header graph to not require it to be added globally.
+#
+# If modifying this list please add the Build team as a reviewer to make sure that
+# the header can't be used normally without a large refactor.
+#
+# This list is an absolute last resort; do not add to this list unless you've put
+# significant effort into trying to use a header reference without it.
+mongo_cc_library(
+    name = "_global_header_bypass",
+    hdrs = [
+        "_bypass_header_example.h",
+    ],
+)
+
+mongo_cc_library(
+    name = "base",
+    srcs = [
+        "//src/mongo/base:data_range.cpp",
+        "//src/mongo/base:data_range_cursor.cpp",
+        "//src/mongo/base:data_type.cpp",
+        "//src/mongo/base:data_type_string_data.cpp",
+        "//src/mongo/base:data_type_terminated.cpp",
+        "//src/mongo/base:dependency_graph.cpp",
+        "//src/mongo/base:error_codes.cpp",
+        "//src/mongo/base:error_extra_info.cpp",
+        "//src/mongo/base:init.cpp",
+        "//src/mongo/base:initializer.cpp",
+        "//src/mongo/base:parse_number.cpp",
+        "//src/mongo/base:shim.cpp",
+        "//src/mongo/base:status.cpp",
+        "//src/mongo/base:string_data.cpp",
+        "//src/mongo/base:string_data_comparator.cpp",
+        "//src/mongo/base:validate_locale.cpp",
+        "//src/mongo/bson:bson_comparator_interface_base.cpp",
+        "//src/mongo/bson:bson_depth.cpp",
+        "//src/mongo/bson:bsonelement.cpp",
+        "//src/mongo/bson:bsonelementvalue.cpp",
+        "//src/mongo/bson:bsonmisc.cpp",
+        "//src/mongo/bson:bsonobj.cpp",
+        "//src/mongo/bson:bsonobjbuilder.cpp",
+        "//src/mongo/bson:bsontypes.cpp",
+        "//src/mongo/bson:json.cpp",
+        "//src/mongo/bson:oid.cpp",
+        "//src/mongo/bson:simple_bsonelement_comparator.cpp",
+        "//src/mongo/bson:simple_bsonobj_comparator.cpp",
+        "//src/mongo/bson:timestamp.cpp",
+        "//src/mongo/bson/util:builder.cpp",
+        "//src/mongo/logv2:attributes.cpp",
+        "//src/mongo/logv2:bson_formatter.cpp",
+        "//src/mongo/logv2:console.cpp",
+        "//src/mongo/logv2:file_rotate_sink.cpp",
+        "//src/mongo/logv2:json_formatter.cpp",
+        "//src/mongo/logv2:log_component.cpp",
+        "//src/mongo/logv2:log_component_settings.cpp",
+        "//src/mongo/logv2:log_detail.cpp",
+        "//src/mongo/logv2:log_domain.cpp",
+        "//src/mongo/logv2:log_domain_global.cpp",
+        "//src/mongo/logv2:log_domain_internal.cpp",
+        "//src/mongo/logv2:log_manager.cpp",
+        "//src/mongo/logv2:log_service.cpp",
+        "//src/mongo/logv2:log_severity.cpp",
+        "//src/mongo/logv2:log_tag.cpp",
+        "//src/mongo/logv2:log_util.cpp",
+        "//src/mongo/logv2:plain_formatter.cpp",
+        "//src/mongo/logv2:ramlog.cpp",
+        "//src/mongo/logv2:redaction.cpp",
+        "//src/mongo/logv2:shared_access_fstream.cpp",
+        "//src/mongo/logv2:text_formatter.cpp",
+        "//src/mongo/platform:decimal128.cpp",
+        "//src/mongo/platform:int128.cpp",
+        "//src/mongo/platform:mutex.cpp",
+        "//src/mongo/platform:posix_fadvise.cpp",
+        "//src/mongo/platform:process_id.cpp",
+        "//src/mongo/platform:random.cpp",
+        "//src/mongo/platform:rwmutex.cpp",
+        "//src/mongo/platform:shared_library.cpp",
+        "//src/mongo/platform:stack_locator.cpp",
+        "//src/mongo/platform:strcasestr.cpp",
+        "//src/mongo/platform:strnlen.cpp",
+        "//src/mongo/platform:waitable_atomic.cpp",
+        "//src/mongo/util:allocator.cpp",
+        "//src/mongo/util:assert_util.cpp",
+        "//src/mongo/util:base64.cpp",
+        "//src/mongo/util:boost_assert_impl.cpp",
+        "//src/mongo/util:chunked_memory_aggregator.cpp",
+        "//src/mongo/util:concurrent_memory_aggregator.cpp",
+        "//src/mongo/util:duration.cpp",
+        "//src/mongo/util:errno_util.cpp",
+        "//src/mongo/util:exception_filter_win32.cpp",
+        "//src/mongo/util:exit.cpp",
+        "//src/mongo/util:file.cpp",
+        "//src/mongo/util:hex.cpp",
+        "//src/mongo/util:itoa.cpp",
+        "//src/mongo/util:platform_init.cpp",
+        "//src/mongo/util:quick_exit.cpp",
+        "//src/mongo/util:shared_buffer_fragment_builder.cpp",
+        "//src/mongo/util:shell_exec.cpp",
+        "//src/mongo/util:signal_handlers_synchronous.cpp",
+        "//src/mongo/util:stacktrace.cpp",
+        "//src/mongo/util:stacktrace_somap.cpp",
+        "//src/mongo/util:stacktrace_threads.cpp",
+        "//src/mongo/util:str.cpp",
+        "//src/mongo/util:str_escape.cpp",
+        "//src/mongo/util:system_clock_source.cpp",
+        "//src/mongo/util:system_tick_source.cpp",
+        "//src/mongo/util:testing_proctor.cpp",
+        "//src/mongo/util:text.cpp",
+        "//src/mongo/util:thread_safety_context.cpp",
+        "//src/mongo/util:time_support.cpp",
+        "//src/mongo/util:timer.cpp",
+        "//src/mongo/util:uuid.cpp",
+        "//src/mongo/util:version.cpp",
+        "//src/mongo/util/concurrency:idle_thread_block.cpp",
+        "//src/mongo/util/concurrency:thread_name.cpp",
+    ] + select({
+        "//bazel/config:posix": ["//src/mongo/util:stacktrace_posix.cpp"],
+        "@platforms//os:windows": ["//src/mongo/util:stacktrace_windows.cpp"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:posix": ["//src/mongo/platform:shared_library_posix.cpp"],
+        "@platforms//os:windows": ["//src/mongo/platform:shared_library_windows.cpp"],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:linux": ["//src/mongo/platform:stack_locator_linux.cpp"],
+        "@platforms//os:macos": ["//src/mongo/platform:stack_locator_osx.cpp"],
+        "@platforms//os:windows": ["//src/mongo/platform:stack_locator_windows.cpp"],
+        "//conditions:default": [],
+    }),
+    hdrs = [
+        "//src/mongo/platform:stack_locator_pthread_getattr_np.cpp",
+    ],
+    linkopts = select({
+        "//bazel/config:ssl_enabled_linux": ["-lcrypto"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:posix": ["-ldl"],
+        "//conditions:default": [],
+    }),
+    local_defines = select({
+        "//bazel/config:gcov_enabled": ["MONGO_GCOV"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:pgo_profile_enabled": ["MONGO_PGO_PROFILE"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/stdx",
+        "//src/mongo/util:boost_assert_shim",
+        "//src/mongo/util:debugger",
+        "//src/third_party/IntelRDFPMathLib20U1:intel_decimal128",
+        "//src/third_party/abseil-cpp:absl_city",
+        "//src/third_party/abseil-cpp:absl_hash",
+        "//src/third_party/abseil-cpp:absl_int128",
+        "//src/third_party/abseil-cpp:absl_low_level_hash",
+        "//src/third_party/abseil-cpp:absl_raw_hash_set",
+        "//src/third_party/boost:boost_filesystem",
+        "//src/third_party/boost:boost_iostreams",
+        "//src/third_party/boost:boost_log",
+        "//src/third_party/boost:boost_program_options",
+        "//src/third_party/pcre2",
+    ],
+)

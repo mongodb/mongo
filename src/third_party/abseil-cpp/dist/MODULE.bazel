@@ -1,0 +1,8 @@
+"""Module definition for Abseil LTS 20230802.1."""
+
+module(
+    name = "abseil-cpp",
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.4.1")
+bazel_dep(name = "platforms", version = "0.0.7")

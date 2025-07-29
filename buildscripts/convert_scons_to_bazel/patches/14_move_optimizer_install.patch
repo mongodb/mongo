@@ -1,0 +1,13 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 5e3a07fc867..deec32d6ead 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -265,7 +265,7 @@ mongo_install(
+         "//src/mongo/db:mongod",
+         "//src/mongo/db:mongotrafficreader",
+         "//src/mongo/db/query/search/mongotmock",
+-        "//src/mongo/db/query/stage_builder/sbe/abt:optimizer_gdb_test_program",
++       "//src/mongo/db/query/optimizer:optimizer_gdb_test_program",
+         "//src/mongo/db/storage:ksdecode",
+         "//src/mongo/s:mongos",
+         "//src/mongo/shell:mongo",

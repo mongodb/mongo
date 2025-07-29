@@ -68,11 +68,39 @@ mongo_cc_library(
         "//conditions:default": [],
     }) + select({
         "@platforms//os:windows": [
+            "/W3",
             "/wd4141",
             "/wd4305",
             "/wd4003",
+            "/wd4005",
         ],
-        "//conditions:default": ["-Wno-unused-result"],
+        "//conditions:default": [
+            "-Wno-unused-result",
+            "-Wno-deprecated-volatile",
+            "-Wno-sign-compare",
+        ],
+    }),
+    features = select({
+        "//bazel/config:compiler_type_gcc": ["no_volatile"],
+        "//conditions:default": [],
+    }),
+    includes = select({
+        "@//bazel/config:linux_aarch64": [
+            "platform/linux_aarch64/include",
+        ],
+        "@//bazel/config:linux_x86_64": [
+            "platform/linux_x86_64/include",
+        ],
+        "@//bazel/config:linux_ppc64le": [
+            "platform/linux_ppc64le/include",
+        ],
+        "@//bazel/config:linux_s390x": [
+            "platform/linux_s390x/include",
+        ],
+        "@//bazel/config:windows_x86_64": [
+            "platform/windows_x86_64/include",
+        ],
+        "//conditions:default": [],
     }),
     local_defines = [
         "NO_HEAP_CHECK",
@@ -96,11 +124,15 @@ mongo_cc_library(
         "@platforms//cpu:ppc": ["__linux"],
         "//conditions:default": [],
     }),
+    skip_global_deps = [
+        # This is a globally injected dependency.
+        # Skip depending on all globally injected dependencies to avoid circular dependencies.
+        "allocator",
+        "libunwind",
+    ],
     target_compatible_with = select({
-        "@platforms//os:linux": [],
-        "@platforms//os:windows": [],
+        # Only enable on Windows & Linux, and only when selected.
+        "//bazel/config:tcmalloc_gperf_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
 )
-
-# TODO(SERVER-80619): conditionally inject gperftools/platform/$os_$arch/include to dependents.

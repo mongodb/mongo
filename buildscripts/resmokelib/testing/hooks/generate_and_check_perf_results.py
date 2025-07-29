@@ -3,9 +3,9 @@
 import collections
 import datetime
 import json
-from typing import List, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, List
 
 import yaml
 

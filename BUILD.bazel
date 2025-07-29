@@ -1,16 +1,450 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@aspect_rules_js//npm:defs.bzl", "npm_link_package")
+load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS", "mongo_install")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary")
+load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
+load("//bazel/config:render_template.bzl", "render_template")
+load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
+load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
+load("@npm//:prettier/package_json.bzl", prettier = "bin")
+load("@aspect_bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 
-package(default_visibility = ["//visibility:public"])
+package(
+    default_visibility = ["//visibility:public"],
+)
 
 exports_files([
-    "buildscripts/idl",
+    ".prettierrc",
     "pyproject.toml",
     "poetry.lock",
 ])
 
 npm_link_all_packages(name = "node_modules")
 
+npm_link_package(
+    name = "node_modules/eslint-plugin-mongodb",
+    src = "//buildscripts/eslint-plugin-mongodb:npm_package",
+)
+
+mongo_js_library(
+    name = "eslintrc",
+    srcs = ["eslint.config.mjs"],
+    deps = [
+        ":node_modules/@eslint/eslintrc",
+        ":node_modules/@eslint/js",
+        ":node_modules/eslint-plugin-mongodb",
+        ":node_modules/globals",
+    ],
+)
+
+eslint_bin.eslint_binary(
+    name = "eslint",
+    data = [
+        "//:eslintrc",
+    ],
+)
+
+prettier.prettier_binary(
+    name = "prettier",
+    # Include this js_library and its dependencies in the runfiles (runtime dependencies)
+    data = ["//:.prettierrc"],
+    # Allow the binary to be run outside bazel
+    # See more details about this by commenting this out and running `bazel run //:format`
+    env = {"BAZEL_BINDIR": "."},
+    fixed_args = [
+        # `require` statements in the config file will be resolved relative to its location
+        # Therefore to make it hermetic, prettier must be pointed at the copy of the config file
+        # in the runfiles folder rather than the one in the source folder.
+        "--config=\"$$JS_BINARY__RUNFILES\"/$(rlocationpath //:.prettierrc)",
+        # default log level is "log" which spams on success
+        # https://prettier.io/docs/en/cli.html#--log-level
+        # NB: prettier 2 names this loglevel, in prettier 3 it's renamed log-level, see
+        # https://prettier.io/blog/2023/07/05/3.0.0.html#cli-1
+        "--log-level=warn",
+        # Speed this up a little bit with caching
+        "--cache",
+    ],
+)
+
 alias(
     name = "format",
-    actual = "//bazel/format",
+    actual = "//bazel/format:rules_lint_format_wrapper",
+)
+
+alias(
+    name = "lint",
+    actual = "//bazel:lint",
+)
+
+alias(
+    name = "codeowners",
+    actual = "@bazel_rules_mongo//codeowners:codeowners",
+)
+
+alias(
+    name = "engflow_auth",
+    actual = "@bazel_rules_mongo//engflow_auth:engflow_auth",
+)
+
+alias(
+    name = "mongo-tidy-test",
+    actual = "//src/mongo/tools/mongo_tidy_checks/tests:MongoTidyCheck_unittest",
+)
+
+setup_mongo_toolchain_aliases()
+
+render_template(
+    name = "clang_tidy_config",
+    srcs = [
+        ".clang-tidy.in",
+        "//buildscripts:clang_tidy_config_gen.py",
+    ],
+    cmd = [
+        "$(location //buildscripts:clang_tidy_config_gen.py)",
+        "--input=$(location .clang-tidy.in)",
+        "--output=$(location .clang-tidy)",
+    ],
+    output = ".clang-tidy",
+)
+
+render_template(
+    name = "clang_tidy_config_strict",
+    srcs = [
+        ".clang-tidy.in",
+        "//buildscripts:clang_tidy_config_gen.py",
+    ],
+    cmd = [
+        "$(location //buildscripts:clang_tidy_config_gen.py)",
+        "--input=$(location .clang-tidy.in)",
+        "--output=$(location .clang-tidy.strict)",
+        "--warnings-as-errors",
+    ],
+    output = ".clang-tidy.strict",
+)
+
+genrule(
+    name = "compiledb",
+    srcs = ["compile_commands.json"],
+    outs = ["compile_commands_done"],
+    cmd = "echo noop > $(location :compile_commands_done)",
+)
+
+# This sets up targets for install-wiredtiger and archive-wiredtiger
+mongo_install(
+    name = "wiredtiger",
+    srcs = [
+        "//src/third_party/wiredtiger:wt",
+    ],
+)
+
+# This sets up targets for install-mongod and archive-mongod
+mongo_install(
+    name = "mongod",
+    srcs = [
+        "//src/mongo/db:mongod",
+    ] + select({
+        "@platforms//os:windows": ["@windows_sasl//:bins"],
+        "//conditions:default": [],
+    }),
+)
+
+# This sets up targets for install-mongos and archive-mongos
+mongo_install(
+    name = "mongos",
+    srcs = [
+        "//src/mongo/s:mongos",
+    ],
+)
+
+# This sets up targets for install-mongo and archive-mongo
+mongo_install(
+    name = "mongo",
+    srcs = [
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+# This sets up targets for install-core and archive-core
+mongo_install(
+    name = "core",
+    srcs = [],
+    deps = [
+        "mongod",
+        "mongos",
+    ],
+)
+
+# This sets up targets for install-devcore and archive-devcore
+mongo_install(
+    name = "devcore",
+    srcs = [],
+    deps = [
+        "mongo",
+        "mongod",
+        "mongos",
+    ],
+)
+
+# This sets up targets for install-mongocryptd and archive-mongocryptd
+mongo_install(
+    name = "mongocryptd",
+    srcs = [],
+    deps = [
+        "//src/mongo/db/modules/enterprise:mongocryptd",
+    ],
+)
+
+# This reflects the package that actually gets released during packaging. Be careful
+# when changing this definition
+# This sets up targets for install-dist and archive-dist
+mongo_install(
+    name = "dist",
+    srcs = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/installer/compass:compass_files",
+        "//src/mongo/s:mongos",
+    ] + select({
+        "@platforms//os:windows": ["@local_windows_msvc//:vc_redist_x64"],
+        "//conditions:default": [],
+    }),
+    package_extract_name = select({
+        "//bazel/config:build_enterprise_linux_enabled": "mongodb-linux-{TARGET_CPU}-enterprise-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//bazel/config:build_enterprise_linux_disabled": "mongodb-linux-{TARGET_CPU}-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//bazel/config:build_enterprise_windows_enabled": "mongodb-win32-{TARGET_CPU}-enterprise-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//bazel/config:build_enterprise_windows_disabled": "mongodb-win32-{TARGET_CPU}-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//bazel/config:build_enterprise_mac_enabled": "mongodb-macos-{TARGET_CPU}-enterprise-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//bazel/config:build_enterprise_mac_disabled": "mongodb-macos-{TARGET_CPU}-{MONGO_DISTMOD}-{MONGO_VERSION}",
+        "//conditions:default": "mongodb-{TARGET_CPU}-{MONGO_DISTMOD}-{MONGO_VERSION}",
+    }),
+    publish_debug_in_stripped = select({
+        "@platforms//os:windows": True,
+        "//conditions:default": False,
+    }),
+    deps = [
+        "//src/mongo/db/modules/enterprise:dist",
+    ],
+)
+
+filegroup(
+    name = "archive_license_files",
+    srcs = [
+        "//distsrc:mpl",
+        "//distsrc:readme",
+        "//distsrc:third_party_notices",
+    ] + select({
+        "//bazel/config:build_enterprise_enabled": ["//src/mongo/db/modules/enterprise/distsrc:enterprise_license"],
+        "//conditions:default": ["//distsrc:community_license"],
+    }) + select({
+        "//bazel/config:build_enterprise_windows_enabled": ["//src/mongo/db/modules/enterprise/distsrc:windows_notices"],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:macos": ["//etc:mac_plist"],
+        "//conditions:default": [],
+    }),
+)
+
+copy_to_directory(
+    name = "mongot_folder",
+    srcs = select({
+        "//bazel/config:include_mongot_enabled": ["@mongot_localdev//:mongot_binaries"],
+        "//conditions:default": [],
+    }),
+    out = "mongot-localdev",
+    include_external_repositories = ["mongot_localdev"],
+    tags = [
+        "local",
+        "no-cache",
+    ],
+)
+
+# This sets up targets for install-dist-test and archive-dist-test
+mongo_install(
+    name = "dist-test",
+    srcs = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db:mongotrafficreader",
+        "//src/mongo/db/query/optimizer:optimizer_gdb_test_program",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/db/storage:ksdecode",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
+        "//src/mongo/util:pretty_printer_test_program",
+        "//src/third_party/wiredtiger:wt",
+    ] + select({
+        "@platforms//os:windows": ["@windows_sasl//:bins"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:include_mongot_enabled": ["//:mongot_folder"],
+        "//conditions:default": [],
+    }),
+    pretty_printer_tests = {
+        "//src/mongo/util:pretty_printer_test.py": "//src/mongo/util:pretty_printer_test_program",
+        "//src/mongo/db/concurrency:lock_gdb_test.py": "//src/mongo/db:mongod",
+        "//src/mongo/db/query/optimizer:optimizer_gdb_test.py": "//src/mongo/db/query/optimizer:optimizer_gdb_test_program",
+    },
+    deps = [
+        "//src/mongo/db/modules/enterprise:dist-test",
+    ],
+)
+
+# This sets up targets for install-mongo_crypt and archive-mongo_crypt
+mongo_install(
+    name = "mongo_crypt",
+    srcs = [],
+    package_extract_name = "/",
+    deps = [
+        "//src/mongo/db/modules/enterprise:mongo_crypt",
+    ],
+)
+
+# This sets up targets for install-mongo_crypt_shlib_test and archive-mongo_crypt_shlib_test
+mongo_install(
+    name = "mongo_crypt_shlib_test",
+    srcs = [],
+    deps = [
+        "//src/mongo/db/modules/enterprise:mongo_crypt_shlib_test",
+    ],
+)
+
+# This sets up targets for install-dbtest and archive-dbtest
+mongo_install(
+    name = "dbtest",
+    srcs = [
+        "//src/mongo/dbtests:dbtest",
+    ] + select({
+        "@platforms//os:windows": ["@windows_sasl//:bins"],
+        "//conditions:default": [],
+    }),
+)
+
+# This sets up targets for install-sdam_json_test and archive-sdam_json_test
+mongo_install(
+    name = "sdam_json_test",
+    srcs = [
+        "//src/mongo/client/sdam:sdam_json_test",
+    ],
+)
+
+# This sets up targets for install-server_selection_json_test and archive-server_selection_json_test
+mongo_install(
+    name = "server_selection_json_test",
+    srcs = [
+        "//src/mongo/client/sdam:server_selection_json_test",
+    ],
+)
+
+# This is because the install system hardlinks files so permission changes end up
+# being reflected on the source code version without this copy
+copy_file(
+    name = "stitch_header",
+    src = "//src/mongo/embedded/stitch_support:stitch_support.h",
+    out = "copied_files/stitch_support.h",
+)
+
+# This sets up targets for install-stitch_support and archive-stitch_support
+mongo_install(
+    name = "stitch_support",
+    srcs = ["//src/mongo/embedded/stitch_support"],
+    package_extract_name = "/",
+    root_files = {
+        "stitch_header": "include/stitch_support/v1/stitch_support",
+    },
+)
+
+# This sets up targets for install-stitch_support_test and archive-stitch_support_test
+mongo_install(
+    name = "stitch_support_test",
+    testonly = True,
+    srcs = [
+        "//src/mongo/embedded/stitch_support:stitch_support_test",
+    ],
+)
+
+# This sets up targets for install-compass and archive-compass
+mongo_install(
+    name = "compass",
+    srcs = ["//src/mongo/installer/compass:compass_files"],
+)
+
+[
+    mongo_install(
+        name = target_name,
+        testonly = True,
+        srcs = select({
+            "//bazel/config:include_autogenerated_targets_enabled": ["//src/mongo/db/modules/enterprise/autogenerated_targets:" + target_name],
+            "//conditions:default": [],
+        }) + select({
+            "@platforms//os:windows": ["@windows_sasl//:bins"],
+            "//conditions:default": [],
+        }),
+    )
+    for target_name in TEST_TAGS.keys()
+    if target_name != "mongo_integration_test"
+]
+
+# This sets up targets for install-mongo_integration_test and archive-mongo_integration_test
+mongo_install(
+    name = "mongo_integration_test",
+    testonly = True,
+    srcs = select({
+        "//bazel/config:include_autogenerated_targets_enabled": [
+            "//src/mongo/db:mongod",
+            "//src/mongo/db/modules/enterprise/autogenerated_targets:mongo_integration_test",
+            "//src/mongo/s:mongos",
+            "//src/mongo/shell:mongo",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+# This sets up targets for install-mongotmock and archive-mongotmock
+mongo_install(
+    name = "mongotmock",
+    srcs = [
+        "//src/mongo/db/query/search/mongotmock",
+    ],
+)
+
+# Pre-built binaries downloaded from an archive-dist-test task.
+filegroup(
+    name = "installed-dist-test",
+    srcs = glob([
+        "dist-test/**",
+    ]),
+)
+
+# Jstests generated by jstestfuzz or downloaded from an Evergreen task.
+filegroup(
+    name = "jstestfuzz_generated_tests",
+    srcs = glob([
+        "jstestfuzz/out/*.js",
+    ]),
+)
+
+# Multiversion binaries downloaded using db-contrib-tool, setting --linkDir to this directory.
+filegroup(
+    name = "multiversion_binaries",
+    srcs = glob([
+        "multiversion_binaries/**",
+    ]),
+)
+
+sh_binary(
+    name = "scip-clang",
+    srcs = ["//bazel:run_under_working_dir.sh"],
+    data = ["@scip-clang//file"],
+    env = {
+        "BINARY_PATH": "$(location @scip-clang//file)",
+    },
+)
+
+sh_binary(
+    name = "scip-src",
+    srcs = ["//bazel:run_under_working_dir.sh"],
+    data = ["@scip-src//file"],
+    env = {
+        "BINARY_PATH": "$(location @scip-src//file)",
+    },
 )

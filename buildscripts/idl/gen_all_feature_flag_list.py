@@ -32,7 +32,6 @@ Used by resmoke.py to run only feature flag tests.
 
 import os
 import sys
-
 from typing import List
 
 import yaml

@@ -1,7 +1,6 @@
 """Base class and support functions for linters."""
 
 from abc import ABCMeta, abstractmethod
-from typing import Dict, List, Optional
 
 
 class LinterBase(object, metaclass=ABCMeta):

@@ -49,7 +49,7 @@ rules:
   # built assets).
   - rule: "dependency-for-func"
     dependencies:
-      generate resmoke tasks: ["version_gen", "archive_dist_test_debug"]
+      generate resmoke tasks: ["version_gen", "archive_dist_test"]
 
   - rule: "enforce-tags-for-tasks"
     tag_groups:

@@ -15,9 +15,9 @@ For details on the server-internal _FailPoint_ pattern, see [this document][fail
 
 When writing asynchronous code, we often schedule code or operations to run at some point in the future, in a different execution context. Sometimes, we want to cancel that scheduled work - to stop it from ever running if it hasn't yet run, and possibly to interrupt its execution if it is safe to do so. For example, in the MongoDB server, we might want to:
 
--   Cancel work scheduled on executors
--   Cancel asynchronous work chained as continuations on futures
--   Write and use services that asynchronously perform cancelable work for consumers in the background
+- Cancel work scheduled on executors
+- Cancel asynchronous work chained as continuations on futures
+- Write and use services that asynchronously perform cancelable work for consumers in the background
 
 In the MongoDB server, we have two types that together make it easy to manage the cancellation of this sort of asynchronous work: CancellationSources and CancellationTokens.
 
@@ -29,11 +29,11 @@ A `CancellationSource` can be used to produce associated CancellationTokens with
 
 When passed a `CancellationToken`, asynchronous operations are able to handle the cancellation of the `CancellationSource` associated with that `CancellationToken` in two ways:
 
--   The `CancellationToken::isCanceled()` member function can be used to check at any point in time if the `CancellationSource` the `CancellationToken` was obtained from has been canceled. The code implementing the asynchronous operation can therefore check the value of this member function at appropriate points and, if the `CancellationSource` has been canceled, refuse to run the work or stop running work if it is ongoing.
+- The `CancellationToken::isCanceled()` member function can be used to check at any point in time if the `CancellationSource` the `CancellationToken` was obtained from has been canceled. The code implementing the asynchronous operation can therefore check the value of this member function at appropriate points and, if the `CancellationSource` has been canceled, refuse to run the work or stop running work if it is ongoing.
 
--   The `CancellationToken:onCancel()` member function returns a `SemiFuture` that will be resolved successfully when the underlying `CancellationSource` has been canceled or resolved with an error if it is destructed before being canceled. Continuations can therefore be chained on this future that will run when the associated `CancellationSource` has been canceled. Importantly, because `CancellationToken:onCancel()` returns a `SemiFuture`, implementors of asynchronous operations must provide an execution context in which they want their chained continuation to run. Normally, this continuation should be scheduled to run on an executor, by passing one to `SemiFuture::thenRunOn()`.
+- The `CancellationToken:onCancel()` member function returns a `SemiFuture` that will be resolved successfully when the underlying `CancellationSource` has been canceled or resolved with an error if it is destructed before being canceled. Continuations can therefore be chained on this future that will run when the associated `CancellationSource` has been canceled. Importantly, because `CancellationToken:onCancel()` returns a `SemiFuture`, implementors of asynchronous operations must provide an execution context in which they want their chained continuation to run. Normally, this continuation should be scheduled to run on an executor, by passing one to `SemiFuture::thenRunOn()`.
 
-    -   Alternatively, the continuation can be forced to run inline by transforming the `SemiFuture` into an inline future, by using `SemiFuture::unsafeToInlineFuture()`. This should be used very cautiously. When a continuation is chained to the `CancellationToken:onCancel()` future via `SemiFuture::unsafeToInlineFuture()`, the thread that calls `CancellationSource::cancel()` will be forced to run the continuation inline when it makes that call. Note that this means if a service chains many continuations in this way on `CancellationToken`s obtained from the same `CancellationSource`, then whatever thread calls`CancellationSource::cancel()` on that source will be forced to run all of those continuations potentially blocking that thread from making further progress for a non-trivial amount of time. Do not use `SemiFuture::unsafeToInlineFuture()` in this way unless you are sure you can block the thread that cancels the underlying `CancellationSource` until cancellation is complete. Additionally, remember that because the `SemiFuture` returned by `CancellationToken::onCancel()` is resolved as soon as that `CancellationToken` is canceled, if you attempt to chain a continuation on that future when the `CancellationToken` has _already_ been canceled, that continuation will be ready to run right away. Ordinarily, this just means the continuation will immediately be scheduled on the provided executor, but if `SemiFuture::unsafeToInlineFuture` is used to force the continuation to run inline, it will run inline immediately, potentially leading to deadlocks if you're not careful.
+    - Alternatively, the continuation can be forced to run inline by transforming the `SemiFuture` into an inline future, by using `SemiFuture::unsafeToInlineFuture()`. This should be used very cautiously. When a continuation is chained to the `CancellationToken:onCancel()` future via `SemiFuture::unsafeToInlineFuture()`, the thread that calls `CancellationSource::cancel()` will be forced to run the continuation inline when it makes that call. Note that this means if a service chains many continuations in this way on `CancellationToken`s obtained from the same `CancellationSource`, then whatever thread calls`CancellationSource::cancel()` on that source will be forced to run all of those continuations potentially blocking that thread from making further progress for a non-trivial amount of time. Do not use `SemiFuture::unsafeToInlineFuture()` in this way unless you are sure you can block the thread that cancels the underlying `CancellationSource` until cancellation is complete. Additionally, remember that because the `SemiFuture` returned by `CancellationToken::onCancel()` is resolved as soon as that `CancellationToken` is canceled, if you attempt to chain a continuation on that future when the `CancellationToken` has _already_ been canceled, that continuation will be ready to run right away. Ordinarily, this just means the continuation will immediately be scheduled on the provided executor, but if `SemiFuture::unsafeToInlineFuture` is used to force the continuation to run inline, it will run inline immediately, potentially leading to deadlocks if you're not careful.
 
 ### Example of a Service Performing Cancelable, Asynchronous Work
 
@@ -178,9 +178,9 @@ future_util::withCancellation(requestFuture, token)
 
 ### Links to Relevant Code + Example Tests
 
--   [CancellationSource/CancellationToken implementations](https://github.com/mongodb/mongo/blob/master/src/mongo/util/cancellation.h)
--   [CancellationSource/CancellationToken unit tests](https://github.com/mongodb/mongo/blob/master/src/mongo/util/cancellation_test.cpp)
--   [CancelableExecutor implementation](https://github.com/mongodb/mongo/blob/master/src/mongo/executor/cancelable_executor.h)
--   [CancelableExecutor unit tests](https://github.com/mongodb/mongo/blob/master/src/mongo/executor/cancelable_executor_test.cpp)
--   [future_util::withCancellation implementation](https://github.com/mongodb/mongo/blob/99d28dd184ada37720d0dae1f3d8c35fec85bd4b/src/mongo/util/future_util.h#L658)
--   [future_util::withCancellation unit tests](https://github.com/mongodb/mongo/blob/99d28dd184ada37720d0dae1f3d8c35fec85bd4b/src/mongo/util/future_util_test.cpp#L1268-L1343)
+- [CancellationSource/CancellationToken implementations](https://github.com/mongodb/mongo/blob/master/src/mongo/util/cancellation.h)
+- [CancellationSource/CancellationToken unit tests](https://github.com/mongodb/mongo/blob/master/src/mongo/util/cancellation_test.cpp)
+- [CancelableExecutor implementation](https://github.com/mongodb/mongo/blob/master/src/mongo/executor/cancelable_executor.h)
+- [CancelableExecutor unit tests](https://github.com/mongodb/mongo/blob/master/src/mongo/executor/cancelable_executor_test.cpp)
+- [future_util::withCancellation implementation](https://github.com/mongodb/mongo/blob/99d28dd184ada37720d0dae1f3d8c35fec85bd4b/src/mongo/util/future_util.h#L658)
+- [future_util::withCancellation unit tests](https://github.com/mongodb/mongo/blob/99d28dd184ada37720d0dae1f3d8c35fec85bd4b/src/mongo/util/future_util_test.cpp#L1268-L1343)

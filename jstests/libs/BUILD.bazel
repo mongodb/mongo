@@ -1,0 +1,45 @@
+load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_js_library(
+    name = "all_javascript_files",
+    srcs = glob([
+        "*.js",
+    ]),
+)
+
+exports_files(
+    glob([
+        "*.pem",
+    ]),
+)
+
+filegroup(
+    name = "test_pem_files",
+    srcs = glob([
+        "*.pem",
+    ]),
+)
+
+filegroup(
+    name = "test_crt_files",
+    srcs = glob([
+        "*.crt",
+    ]),
+)
+
+filegroup(
+    name = "mock_krb5",
+    srcs = [
+        "mockkrb5.conf",
+    ],
+)
+
+filegroup(
+    name = "mock_keytabs",
+    srcs = [
+        "mockservice.keytab",
+        "mockuser.keytab",
+    ],
+)

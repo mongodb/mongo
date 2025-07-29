@@ -1,0 +1,201 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "ftdc_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "ftdc",
+    srcs = [
+        "//src/mongo/db/ftdc:block_compressor.cpp",
+        "//src/mongo/db/ftdc:collector.cpp",
+        "//src/mongo/db/ftdc:compressor.cpp",
+        "//src/mongo/db/ftdc:controller.cpp",
+        "//src/mongo/db/ftdc:decompressor.cpp",
+        "//src/mongo/db/ftdc:file_manager.cpp",
+        "//src/mongo/db/ftdc:file_reader.cpp",
+        "//src/mongo/db/ftdc:file_writer.cpp",
+        "//src/mongo/db/ftdc:metadata_compressor.cpp",
+        "//src/mongo/db/ftdc:util.cpp",
+        "//src/mongo/db/ftdc:varint.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/third_party/s2",
+        "//src/third_party/zlib",
+    ],
+)
+
+mongo_cc_library(
+    name = "ftdc_commands",
+    srcs = [
+        "//src/mongo/db/ftdc:ftdc_commands.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/auth:security_token",
+        "//src/mongo/db/ftdc:ftdc_commands_idl",
+        "//src/mongo/db/ftdc:ftdc_server",
+    ],
+)
+
+mongo_cc_library(
+    name = "ftdc_mongod",
+    srcs = [
+        "//src/mongo/db/ftdc:ftdc_mongod.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/auth:security_token",
+        "//src/mongo/db/ftdc:ftdc_commands",
+        "//src/mongo/db/ftdc:ftdc_mongod_idl",
+        "//src/mongo/db/ftdc:ftdc_mongos",
+        "//src/mongo/db/ftdc:ftdc_server",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:repl_settings",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/rpc:message",
+        "//src/mongo/s:common_s",
+    ],
+)
+
+mongo_cc_library(
+    name = "ftdc_mongos",
+    srcs = [
+        "//src/mongo/db/ftdc:ftdc_mongos.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/ftdc:ftdc_commands",
+        "//src/mongo/db/ftdc:ftdc_server",
+        "//src/mongo/executor:task_executor_pool",
+        "//src/mongo/s:common_s",
+        "//src/mongo/s:grid",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_ftdc_test",
+    srcs = [
+        "//src/mongo/db/ftdc:collector_test.cpp",
+        "//src/mongo/db/ftdc:compressor_test.cpp",
+        "//src/mongo/db/ftdc:controller_test.cpp",
+        "//src/mongo/db/ftdc:file_manager_test.cpp",
+        "//src/mongo/db/ftdc:file_writer_test.cpp",
+        "//src/mongo/db/ftdc:ftdc_prctl_test.cpp",
+        "//src/mongo/db/ftdc:ftdc_test.cpp",
+        "//src/mongo/db/ftdc:ftdc_util_test.cpp",
+        "//src/mongo/db/ftdc:metadata_compressor_test.cpp",
+        "//src/mongo/db/ftdc:varint_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_second_group",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/ftdc",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_library(
+    name = "ftdc_server",
+    srcs = [
+        "ftdc_server.cpp",
+        "ftdc_system_stats.cpp",
+    ] + select({
+        config: [
+            "ftdc_system_stats_{}.cpp".format(os_file_suffix),
+        ]
+        for config, os_file_suffix in {
+            "@platforms//os:windows": "windows",
+            "@platforms//os:linux": "linux",
+            "@platforms//os:macos": "osx",
+        }.items()
+    }),
+    hdrs = [
+        "ftdc_server.h",
+        "ftdc_system_stats.h",
+        "//src/mongo/db:mirror_maestro.h",
+        "//src/mongo/transport:transport_layer_ftdc_collector.h",
+    ],
+    deps = [
+        ":ftdc",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/ftdc:ftdc_server_idl",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:repl_settings",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/rpc:message",
+        "//src/mongo/s:common_s",
+        "//src/mongo/util:processinfo",
+    ] + select({
+        "@platforms//os:linux": ["//src/mongo/util:procparser"],
+        "@platforms//os:windows": ["//src/mongo/util:perfctr_collect"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_idl_library(
+    name = "ftdc_commands_idl",
+    src = "ftdc_commands.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "ftdc_mongod_idl",
+    src = "ftdc_mongod.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "ftdc_server_idl",
+    src = "ftdc_server.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)

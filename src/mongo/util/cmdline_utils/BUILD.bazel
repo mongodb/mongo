@@ -1,0 +1,32 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "cmdline_utils_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "cmdline_utils",
+    srcs = [
+        "//src/mongo/util/cmdline_utils:censor_cmdline.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/options_parser",
+    ],
+)

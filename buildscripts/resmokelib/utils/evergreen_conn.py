@@ -2,15 +2,15 @@
 import os
 import pathlib
 from collections import deque
-from typing import Deque, Iterator, Optional, List, Set, Union
 from pathlib import Path
+from typing import Deque, Iterator, List, Optional, Set, Union
+
 import requests
 import structlog
 from requests import HTTPError
 
-from evergreen import RetryingEvergreenApi, Patch, Version, Task
-
 from buildscripts.resmokelib.setup_multiversion.config import SetupMultiversionConfig
+from evergreen import Patch, RetryingEvergreenApi, Task, Version
 
 EVERGREEN_HOST = "https://evergreen.mongodb.com"
 EVERGREEN_CONFIG_LOCATIONS = (
@@ -277,6 +277,10 @@ def _filter_successful_tasks(evg_api: RetryingEvergreenApi,
                 "compile", "archive_dist_test",
                 "archive_dist_test_future_git_tag_multiversion") and compile_task is None:
             compile_task = evg_task.get_execution_or_self(0)
+            # archive_dist_test_debug might not be in the dep chain
+            # it should always be in the same build variant as the compile task
+            evg_tasks.extend(evg_api.tasks_by_build(compile_task.build_id))
+
         elif evg_task.display_name == "push":
             push_task = evg_task.get_execution_or_self(0)
         elif evg_task.display_name in ("archive_dist_test_debug",

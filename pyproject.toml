@@ -68,6 +68,8 @@ PyYAML = "^6.0.2"
 types-PyYAML = "^6.0.12.20240808"
 requests = "^2.32.3"
 typing-extensions = "^4.12.2"
+tenacity = "^9.0.0"
+typer = "^0.12.3"
 
 [tool.poetry.group.export.dependencies]
 pipx = "1.4.3"
@@ -76,11 +78,11 @@ pipx = "1.4.3"
 poetry = "2.0.0"
 
 [tool.poetry.group.evergreen.dependencies]
-click = "^7.1.2"
+click = "^8.1.7"
 inject = "^5"
 GitPython = "^3.1.7"
 pydantic = "*"
-structlog = "^23.1.0"
+structlog = "^24.4.0"
 
 [tool.poetry.group.external-auth.dependencies]
 # These are the dependencies of ldaptor
@@ -110,7 +112,7 @@ PyJWT = "^2.4.0"
 GitPython = "~3.1.7"
 mypy = "~1.3.0"
 pydocstyle = "6.3.0"
-structlog = "~23.1.0"
+structlog = "^24.4.0"
 yamllint = "1.32.0"
 yapf = "0.26.0"              # latest is 0.40.1, but that causes CI failures
 types-setuptools = "57.4.12" # latest is 68.0.0.0, but that causes pip install requirements to fail
@@ -187,6 +189,30 @@ oldcrypt = []
 # Currently this does nothing
 [project.scripts]
 resmoke = "buildscripts.resmoke:entrypoint"
+
+[tool.ruff.lint]
+extend-select = [
+    "I",   # isort
+]
+ignore = [
+    "E402", # module-import-not-at-top-of-file
+    "E721", # type-comparison
+    "E722", # bare-except
+    "E741", # ambiguous-variable-name
+    "F402", # import-shadowed-by-loop-var
+    "F403", # undefined-local-with-import-star
+    "F405", # undefined-local-with-import-star-usage
+    "F811", # redefined-while-unused
+    "F821", # undefined-name
+    "F822", # undefined-export
+    # TODO SERVER-106607 fix python linter errors disabled below:
+    "E712",
+    "F401",
+    "E731",
+    ]
+
+[tool.ruff.lint.isort]
+known-first-party = ["buildscripts", "buildscripts/idl", "evergreen"]
 
 [build-system]
 requires = ["poetry-core"]

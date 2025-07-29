@@ -1,0 +1,149 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "catalog_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "sharding_catalog_client",
+    srcs = [
+        "//src/mongo/s/catalog:sharding_catalog_client.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:keys_collection_document_idl",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "sharding_catalog_client_impl",
+    srcs = [
+        "//src/mongo/s/catalog:sharding_catalog_client_impl.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/query:projection_ast",
+        "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/db/session:logical_session_id_helpers",
+        "//src/mongo/db/storage:duplicate_key_error_info",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/s:common_s",
+        "//src/mongo/s:grid",
+        "//src/mongo/s/catalog:sharding_catalog_client",
+        "//src/mongo/s/client:sharding_client",
+        "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_library(
+    name = "sharding_catalog_client_mock",
+    srcs = [
+        "//src/mongo/s/catalog:sharding_catalog_client_mock.cpp",
+    ],
+    deps = [
+        "//src/mongo/s/catalog:sharding_catalog_client",
+        "//src/mongo/s/client:shard_interface",
+    ],
+)
+
+mongo_idl_library(
+    name = "type_chunk_base_idl",
+    src = "type_chunk_base.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/s:sharding_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "type_database_idl",
+    src = "type_database.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/s:sharding_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "type_namespace_placement_idl",
+    src = "type_namespace_placement.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/s:sharding_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "type_remove_shard_event_idl",
+    src = "type_remove_shard_event.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "type_collection_idl",
+    src = "type_collection.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/db:keypattern_idl_gen",
+        "//src/mongo/s:chunk_version_idl_gen",
+        "//src/mongo/s/resharding:type_collection_fields_idl_gen",
+        "//src/mongo/s:type_collection_common_types_idl_gen",
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/db/timeseries:timeseries_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/db/timeseries:timeseries_idl",
+        "//src/mongo/s:chunk_version_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s:type_collection_common_types_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+        "//src/mongo/s/resharding:type_collection_fields_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "type_index_catalog_idl",
+    src = "type_index_catalog.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)

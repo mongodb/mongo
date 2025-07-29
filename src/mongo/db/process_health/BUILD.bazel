@@ -1,0 +1,103 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "process_health_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "fault_manager",
+    srcs = [
+        "//src/mongo/db/process_health:dns_health_observer.cpp",
+        "//src/mongo/db/process_health:fault.cpp",
+        "//src/mongo/db/process_health:fault_facet_impl.cpp",
+        "//src/mongo/db/process_health:fault_manager.cpp",
+        "//src/mongo/db/process_health:fault_manager_config.cpp",
+        "//src/mongo/db/process_health:health_monitoring_server_parameters.cpp",
+        "//src/mongo/db/process_health:health_monitoring_server_status_section.cpp",
+        "//src/mongo/db/process_health:health_observer_base.cpp",
+        "//src/mongo/db/process_health:health_observer_registration.cpp",
+        "//src/mongo/db/process_health:progress_monitor.cpp",
+        "//src/mongo/db/process_health:test_health_observer.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/process_health:health_monitoring_server_parameters_idl",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/s:grid",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_library(
+    name = "config_server_health_observer",
+    srcs = [
+        "//src/mongo/db/process_health:config_server_health_observer.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/process_health:fault_manager",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/s:grid",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "fault_base_classes_test",
+    srcs = [
+        "//src/mongo/db/process_health:fault_facet_test.cpp",
+        "//src/mongo/db/process_health:fault_manager_test.cpp",
+        "//src/mongo/db/process_health:fault_state_machine_test.cpp",
+        "//src/mongo/db/process_health:fault_test.cpp",
+        "//src/mongo/db/process_health:health_observer_test.cpp",
+        "//src/mongo/db/process_health:state_machine_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_sixth_group",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/process_health:fault_manager",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:task_executor_test_fixture",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_idl_library(
+    name = "health_monitoring_server_parameters_idl",
+    src = "health_monitoring_server_parameters.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)

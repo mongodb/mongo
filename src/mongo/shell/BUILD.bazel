@@ -1,0 +1,461 @@
+load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+load("//bazel/config:render_template.bzl", "render_template")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "shell_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "benchrun",
+    srcs = [
+        "//src/mongo/shell:bench.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/scripting:bson_template_evaluator",
+        "//src/mongo/util:pcre_util",
+        "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongojs",
+    srcs = [
+        "//src/mongo/shell:mongojs.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "shell_options_storage",
+    srcs = [
+        "//src/mongo/shell:shell_options_storage.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/util/cmdline_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "program_runner",
+    srcs = [
+        "//src/mongo/shell:program_runner.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/base:environment_buffer",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "shell_utils",
+    srcs = [
+        "//src/mongo/shell:mongo-server.cpp",
+        "//src/mongo/shell:named_pipe_test_helper.cpp",
+        "//src/mongo/shell:shell_options.cpp",
+        "//src/mongo/shell:shell_utils.cpp",
+        "//src/mongo/shell:shell_utils_extended.cpp",
+        "//src/mongo/shell:shell_utils_launcher.cpp",
+    ],
+    deps = [
+        "//src/mongo/base:environment_buffer",
+        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db:traffic_reader",
+        "//src/mongo/db/auth:security_token_auth",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/scripting",
+        "//src/mongo/shell:benchrun",
+        "//src/mongo/shell:program_runner",
+        "//src/mongo/shell:shell_options_storage",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/unittest:golden_test_base",
+        "//src/mongo/util:password",
+    ],
+)
+
+mongo_cc_library(
+    name = "linenoise_utf8",
+    srcs = [
+        "//src/mongo/shell:linenoise_utf8.cpp",
+    ],
+)
+
+mongo_cc_library(
+    name = "linenoise",
+    srcs = [
+        "//src/mongo/shell:linenoise.cpp",
+        "//src/mongo/shell:mk_wcwidth.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/shell:linenoise_utf8",
+    ],
+)
+
+mongo_cc_library(
+    name = "kms",
+    srcs = [
+        "//src/mongo/shell:kms.cpp",
+        "//src/mongo/shell:kms_local.cpp",
+    ],
+    deps = [
+        ":kms_idl",
+        "//src/mongo:base",
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/crypto:aead_encryption",
+        "//src/mongo/db/commands:test_commands_enabled",
+    ],
+)
+
+mongo_cc_library(
+    name = "kms_shell",
+    srcs = [
+        "//src/mongo/shell:kms_shell.cpp",
+    ],
+    deps = [
+        "//src/mongo/shell:kms",
+        "//src/mongo/shell:shell_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongo_main",
+    srcs = [
+        "//src/mongo/shell:mongo_main.cpp",
+    ],
+    deps = [
+        "//src/mongo/s:grid",
+        "//src/mongo/s/write_ops:batch_write_types",
+        "//src/mongo/shell:linenoise",
+        "//src/mongo/shell:mongo_initializers",
+        "//src/mongo/shell:program_runner",
+        "//src/mongo/shell:shell_utils",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:allocator_thread",
+        "//src/mongo/util:pcre_wrapper",
+        "//src/mongo/util:periodic_runner_factory",
+        "//src/mongo/util:signal_handlers",
+        "//src/mongo/util/net:ssl_manager",
+    ],
+)
+
+mongo_cc_library(
+    name = "encrypted_dbclient",
+    srcs = [
+        "//src/mongo/shell:encrypted_dbclient_base.cpp",
+    ],
+    copts = select({
+        "@platforms//os:windows": [
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "//bazel/config:js_engine_mozjs": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/crypto:aead_encryption",
+        "//src/mongo/crypto:encrypted_field_config",
+        "//src/mongo/crypto:fle_crypto",
+        "//src/mongo/crypto:fle_fields",
+        "//src/mongo/crypto:symmetric_crypto",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/scripting",
+        "//src/mongo/shell:kms",
+        "//src/mongo/shell:shell_options_register",
+        "//src/third_party/mozjs",
+    ],
+)
+
+mongo_cc_library(
+    name = "shell_options_register",
+    srcs = [],
+    deps = [
+        "shell_options_idl",
+        "shell_options_storage",
+        "//src/mongo:base",
+        "//src/mongo/client:native_sasl_client",
+        "//src/mongo/util/options_parser",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": ["shell_options_grpc_idl"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "shell_test_dependencies",
+    srcs = [],
+    deps = [
+        ":shell_options_register",
+        ":shell_utils",
+        "//src/mongo/util:signal_handlers",
+    ] + select({
+        "//bazel/config:ssl_enabled": [":kms"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "shell_test",
+    srcs = [
+        "shell_utils_test.cpp",
+    ] + select({
+        "//bazel/config:ssl_enabled": ["kms_test.cpp"],
+        "//conditions:default": ["shell_options_test.cpp"],
+    }),
+    tags = [
+        "convert_target",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = ["shell_test_dependencies"],
+)
+
+# Files added here need to be added in scripting/engine.cpp and buildscripts/vcxproj.header as well.
+render_template(
+    name = "error_codes_js",
+    srcs = [
+        "error_codes.tpl.js",
+        "//src/mongo/base:error_codes.yml",
+        "//src/mongo/base:generate_error_codes.py",
+    ],
+    cmd = [
+        "$(location //src/mongo/base:generate_error_codes.py)",
+        "$(location //src/mongo/base:error_codes.yml)",
+        "$(location error_codes.tpl.js)",
+        "$(location error_codes.js)",
+    ],
+    output = "error_codes.js",
+    python_libs = [
+        dependency(
+            "cheetah3",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+MONGOJS_CPP_JSFILES = [
+    "assert.js",
+    "bulk_api.js",
+    "check_log.js",
+    "collection.js",
+    "crud_api.js",
+    "db.js",
+    "error_codes_js",
+    "explainable.js",
+    "explain_query.js",
+    "mongo.js",
+    "query.js",
+    "session.js",
+    "types.js",
+    "utils_auth.js",
+    "utils.js",
+    "utils_sh.js",
+]
+
+render_template(
+    name = "mongojs_cpp",
+    srcs = [
+        "//buildscripts:jstoh.py",
+    ] + MONGOJS_CPP_JSFILES,
+    cmd = [
+        "$(location //buildscripts:jstoh.py)",
+        "$(location mongojs.cpp)",
+    ] + [
+        "$(location {})".format(file)
+        for file in MONGOJS_CPP_JSFILES
+    ],
+    output = "mongojs.cpp",
+)
+
+MONGO_SERVER_CPP_JS_FILES = [
+    "servers.js",
+    "shardingtest.js",
+    "servers_misc.js",
+    "replsettest.js",
+    "data_consistency_checker.js",
+    "bridge.js",
+    "keyvault.js",
+    "feature_compatibility_version.js",
+]
+
+render_template(
+    name = "mongo_server_cpp",
+    srcs = [
+        "//buildscripts:jstoh.py",
+    ] + MONGO_SERVER_CPP_JS_FILES,
+    cmd = [
+        "$(location //buildscripts:jstoh.py)",
+        "$(location mongo-server.cpp)",
+    ] + [
+        "$(location {})".format(file)
+        for file in MONGO_SERVER_CPP_JS_FILES
+    ],
+    output = "mongo-server.cpp",
+)
+
+mongo_cc_library(
+    name = "mongo_initializers",
+    srcs = [
+        "mongodbcr.cpp",
+        "shell_options_init.cpp",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:js_engine_mozjs": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        # NOTE: If you need to add a static or mongo initializer to mongo startup,
+        # please add that library here, as a private library dependency.
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db/catalog:index_key_validate",
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db/pipeline:change_stream_error_extra_info",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/session:logical_session_id_helpers",
+        "//src/mongo/db/storage:duplicate_key_error_info",
+        "//src/mongo/db/timeseries:bucket_compression_failure",
+        "//src/mongo/db:traffic_reader",
+        "//src/mongo/db/views:resolved_view",
+        "//src/mongo/executor:async_rpc_error_info",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/rpc:message",
+        "//src/mongo/scripting",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:message_compressor_options_client_idl",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util/net:http_client_impl",
+        "//src/mongo/util/net:network",
+        "//src/mongo/util/options_parser:options_parser_init",
+        "//src/mongo/util:password",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util:signal_handlers",
+        "//src/mongo/util:version_impl",
+        "benchrun",
+        "mongojs",
+        "shell_options_register",
+        "shell_utils",
+    ] + select({
+        "//bazel/config:enterprise_feature_fle_and_js_engine_enabled": [
+            "//src/mongo/db/modules/enterprise/src/fips:fips_mode_client",
+            "//src/mongo/db/modules/enterprise/src/fle/shell:implicit_encrypted_dbclient",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:use_sasl_client_required_settings": [
+            "//src/mongo/client:cyrus_sasl_client",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:ssl_enabled": [
+            "encrypted_dbclient",
+            "kms_shell",
+            "//src/mongo/util/net:ssl_options_client",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_binary(
+    name = "mongo",
+    srcs = [
+        "mongo.cpp",
+    ],
+    linkopts = select({
+        "@platforms//os:linux": [
+            "-ldl",
+            "-lrt",
+        ],
+        "@platforms//os:windows": [
+            "winmm.lib",
+        ],
+        "//conditions:default": [],
+    }),
+    tags = [
+        "devcore",
+        "dist_test",
+        "jstestshell",
+    ],
+    #+ env.WindowsResourceFile("mongo.rc"),
+    deps = [
+        # NOTE: Do not add new deps here unless required by the linker to
+        # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongos, please add that library as a
+        # dep of mongos_initializers.
+        "mongo_main",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_idl_library(
+    name = "shell_options_grpc_idl",
+    src = "shell_options_grpc.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "kms_idl",
+    src = "kms.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_idl_library(
+    name = "shell_options_idl",
+    src = "shell_options.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)

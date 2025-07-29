@@ -1,0 +1,5 @@
+py_binary(
+    name = "mongo_toolchain_version_generator",
+    srcs = ["mongo_toolchain_version_generator.py"],
+    visibility = ["//visibility:public"],
+)

@@ -2,7 +2,6 @@
 """Activate an evergreen task in the existing build."""
 import os
 import sys
-from typing import List, Optional
 
 import click
 import structlog

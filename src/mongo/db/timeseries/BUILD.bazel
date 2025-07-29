@@ -1,0 +1,216 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "timeseries_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "timeseries_options",
+    srcs = [
+        "//src/mongo/db/timeseries:timeseries_global_options.cpp",
+        "//src/mongo/db/timeseries:timeseries_options.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/query_shape",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/timeseries:timeseries_idl",
+        "//src/mongo/util:processinfo",
+    ],
+)
+
+mongo_cc_library(
+    name = "bucket_compression",
+    srcs = [
+        "//src/mongo/db/timeseries:bucket_compression.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "bucket_compression_failure",
+    srcs = [
+        "//src/mongo/db/timeseries:bucket_compression_failure.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "catalog_helper",
+    srcs = [
+        "//src/mongo/db/timeseries:catalog_helper.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/timeseries:timeseries_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_conversion_util",
+    srcs = [
+        "//src/mongo/db/timeseries:timeseries_commands_conversion_helper.cpp",
+        "//src/mongo/db/timeseries:timeseries_dotted_path_support.cpp",
+        "//src/mongo/db/timeseries:timeseries_index_schema_conversion_functions.cpp",
+        "//src/mongo/db/timeseries:timeseries_update_delete_util.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/db:coll_mod_idl",
+        "//src/mongo/db:index_commands_idl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/exec:bucket_unpacker",
+        "//src/mongo/db/ops:write_ops_parsers",
+        "//src/mongo/db/query:bucket_predicate_generator",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/timeseries:bucket_compression",
+        "//src/mongo/db/timeseries:timeseries_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_collmod",
+    srcs = [
+        "//src/mongo/db/timeseries:timeseries_collmod.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db:coll_mod_idl",
+        "//src/mongo/db:index_commands_idl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/exec:bucket_unpacker",
+        "//src/mongo/db/timeseries:catalog_helper",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/timeseries:timeseries_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_write_util",
+    srcs = [
+        "//src/mongo/db/timeseries:timeseries_write_util.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_crud",
+        "//src/mongo/db/catalog:collection_query_info",
+        "//src/mongo/db/catalog:document_validation",
+        "//src/mongo/db/ops:delete_request_idl",
+        "//src/mongo/db/ops:write_ops_exec_util",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/repl:tenant_migration_decoration",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/timeseries:bucket_compression",
+        "//src/mongo/db/timeseries:bucket_compression_failure",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries/bucket_catalog",
+        "//src/mongo/db/update:update_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_extended_range",
+    srcs = [
+        "//src/mongo/db/timeseries:timeseries_extended_range.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/timeseries:timeseries_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_metadata",
+    srcs = [
+        "//src/mongo/db/timeseries:metadata.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_timeseries_test",
+    srcs = [
+        "//src/mongo/db/timeseries:bucket_compression_test.cpp",
+        "//src/mongo/db/timeseries:timeseries_dotted_path_support_test.cpp",
+        "//src/mongo/db/timeseries:timeseries_extended_range_test.cpp",
+        "//src/mongo/db/timeseries:timeseries_index_schema_conversion_functions_test.cpp",
+        "//src/mongo/db/timeseries:timeseries_options_test.cpp",
+        "//src/mongo/db/timeseries:timeseries_update_delete_util_test.cpp",
+        "//src/mongo/db/timeseries:timeseries_write_util_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_sixth_group",
+    ],
+    deps = [
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/catalog:collection_crud",
+        "//src/mongo/db/timeseries:bucket_compression",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/timeseries:timeseries_extended_range",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries:timeseries_write_util",
+        "//src/mongo/db/timeseries/bucket_catalog",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_op_observer",
+    srcs = [
+        "//src/mongo/db/timeseries:timeseries_op_observer.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/timeseries:timeseries_extended_range",
+        "//src/mongo/db/timeseries/bucket_catalog",
+    ],
+)
+
+mongo_idl_library(
+    name = "timeseries_idl",
+    src = "timeseries.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)

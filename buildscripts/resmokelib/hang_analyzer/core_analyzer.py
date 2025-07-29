@@ -4,8 +4,10 @@ import logging
 import os
 import sys
 from typing import Optional
+
 from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
+
 from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib.hang_analyzer import dumper
 from buildscripts.resmokelib.hang_analyzer.extractor import download_task_artifacts

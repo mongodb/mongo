@@ -3,9 +3,8 @@ import json
 import os.path
 import shutil
 
+from buildscripts.resmokelib import mongo_fuzzer_configs, utils
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
-from buildscripts.resmokelib import mongo_fuzzer_configs
-from buildscripts.resmokelib import utils
 
 _HELP = """
 Generate a mongod.conf and mongos.conf using config fuzzer.

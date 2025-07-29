@@ -1,5 +1,5 @@
 # All backports must be approved by the server release team
-* @10gen/server-release
+* @10gen/devprod-build
 
 # Exclude some test files and READMEs from the backport approvals
 /etc/backports_required_for_multiversion_tests.yml

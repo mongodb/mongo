@@ -221,7 +221,7 @@ if (FixtureHelpers.isMongos(dbTest)) {
             "The value of the field 'balancingEnabled' doesn't match with the expected one when `noBalance`=" +
                 noBalance + ", and `permitMigrations`=" + permitMigrations);
 
-        const expectedEnableBalancing = !noBalance ?? true;
+        const expectedEnableBalancing = !(noBalance ?? false);
         assert.eq(expectedEnableBalancing,
                   result[0].balancingEnabledReason.enableBalancing,
                   "The value of the field 'balancingEnabledReason.enableBalancing' (" +

@@ -16,10 +16,12 @@ import yaml
 
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
 from buildscripts.resmokelib import config, core, suitesconfig
-from buildscripts.resmokelib.hang_analyzer.attach_core_analyzer_task import \
-    matches_generated_task_pattern
-from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import \
-    get_generated_task_name
+from buildscripts.resmokelib.hang_analyzer.attach_core_analyzer_task import (
+    matches_generated_task_pattern,
+)
+from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import (
+    get_generated_task_name,
+)
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
 
 

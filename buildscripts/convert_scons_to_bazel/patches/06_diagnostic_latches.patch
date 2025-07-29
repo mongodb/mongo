@@ -1,0 +1,65 @@
+diff --git a/bazel/config/BUILD.bazel b/bazel/config/BUILD.bazel
+index d71189aca60..ea45f7bbcb7 100644
+--- a/bazel/config/BUILD.bazel
++++ b/bazel/config/BUILD.bazel
+@@ -49,6 +49,7 @@ load(
+     "thin_lto",
+     "tsan",
+     "ubsan",
++    "use_diagnostic_latches",
+     "use_disable_ref_track",
+     "use_gdbserver",
+     "use_glibcxx_debug",
+@@ -2771,6 +2772,29 @@ selects.config_setting_group(
+     ],
+ )
+ 
++# --------------------------------------
++# use_diagnostic_latches options
++# --------------------------------------
++
++use_diagnostic_latches(
++    name = "use_diagnostic_latches",
++    build_setting_default = True,
++)
++
++config_setting(
++    name = "use_diagnostic_latches_enabled",
++    flag_values = {
++        "//bazel/config:use_diagnostic_latches": "True",
++    },
++)
++
++config_setting(
++    name = "use_diagnostic_latches_disabled",
++    flag_values = {
++        "//bazel/config:use_diagnostic_latches": "False",
++    },
++)
++
+ string_flag(
+     name = "win_min_version",
+     build_setting_default = "10",
+diff --git a/bazel/config/configs.bzl b/bazel/config/configs.bzl
+index 8d22a4a9925..6b4c056ac91 100644
+--- a/bazel/config/configs.bzl
++++ b/bazel/config/configs.bzl
+@@ -721,3 +721,17 @@ create_dwp = rule(
+     implementation = lambda ctx: create_dwp_provider(enabled = ctx.build_setting_value),
+     build_setting = config.bool(flag = True),
+ )
++
++# =========
++# use-diagnostic-latches
++# =========
++
++use_diagnostic_latches_provider = provider(
++    doc = "Enable annotated Mutex types.",
++    fields = ["enabled"],
++)
++
++use_diagnostic_latches = rule(
++    implementation = lambda ctx: use_diagnostic_latches_provider(enabled = ctx.build_setting_value),
++    build_setting = config.bool(flag = True),
++)
+\ No newline at end of file

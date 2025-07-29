@@ -11,9 +11,9 @@ A reader-writer mutex type that assumes frequent reads and almost no writes. Wri
 lock this mutex type. However, that is considered a very rare exception. Under the hood, it is very
 similar to a hazard pointer, where:
 
--   There are per-thread lists that record shared lock acquisitions.
--   A writer will go through these per-thread lists and block until the mutex is not referenced by any
-    list.
+- There are per-thread lists that record shared lock acquisitions.
+- A writer will go through these per-thread lists and block until the mutex is not referenced by any
+  list.
 
 This design allows read locks to be very cheap (i.e. tens of nanoseconds), and linearly scalable
 with the number of cores. However, the cost of acquiring a write lock increases with the number of

@@ -20,16 +20,11 @@ variables:
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-x86-dynamic-enterprise-compile-expansions
-  scons_cache_scope: shared
-  scons_cache_mode: all
   has_packages: false
-  compile_flags: >-
-    --ssl
-    MONGO_DISTMOD=rhel88
-    -j$(grep -c ^processor /proc/cpuinfo)
-    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    --link-model=dynamic
-    --use-diagnostic-latches=on
+  bazel_compile_flags: >-
+    --define=MONGO_DISTMOD=rhel88
+    --linkstatic=False
+    --use_diagnostic_latches=True
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
@@ -39,7 +34,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
   - name: version_gen
     variant: generate-tasks-for-version
@@ -62,7 +57,6 @@ variables:
   repo_edition: enterprise
   large_distro_name: rhel8.8-medium
   core_analyzer_distro_name: rhel8.8-xlarge
-  num_scons_link_jobs_available: 0.99
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
 # THIS HAS COPIES IN:
@@ -72,8 +66,6 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &enterprise-rhel-8-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions
-  scons_cache_scope: shared
-  scons_cache_mode: all
   has_packages: false
   jstestfuzz_num_generated_files: 40
   jstestfuzz_concurrent_num_files: 10
@@ -90,7 +82,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_debug_aubsan_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: &linux_debug_aubsan_compile_variant_name linux-debug-aubsan-compile-required
   - name: version_gen
     variant: generate-tasks-for-version
@@ -124,13 +116,10 @@ variables:
   resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
   hang_analyzer_dump_core: false
   max_sub_suites: 3
-  num_scons_link_jobs_available: 0.99
   large_distro_name: rhel8.8-large
   multiversion_platform: rhel80
   multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
-  gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
-
 
 buildvariants:
 - <<: *linux-x86-dynamic-compile-params
@@ -141,8 +130,7 @@ buildvariants:
     <<: *linux-x86-dynamic-enterprise-compile-expansions
     compile_variant: *linux-x86-dynamic-compile
   tasks:
-    - name: compile_ninja_quick_TG
-    - name: compile_test_parallel_unittest_stream_TG
+    - name: run_unit_tests_TG
     - name: compile_test_parallel_core_stream_TG
     - name: compile_test_parallel_dbtest_stream_TG
     - name: compile_integration_and_test_parallel_stream_TG
@@ -160,7 +148,7 @@ buildvariants:
   expansions:
     <<: *enterprise-rhel-8-64-bit-dynamic-expansions
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: *linux_x86_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
@@ -191,7 +179,7 @@ buildvariants:
     - name: version_burn_in_gen
       variant: generate-tasks-for-version
       omit_generated_tasks: true
-    - name: archive_dist_test_debug
+    - name: archive_dist_test
       variant: *linux_x86_dynamic_compile_variant_name
   - name: jsCore
   - name: multiversion_gen
@@ -269,7 +257,7 @@ buildvariants:
       --excludeWithAnyTags=featureFlagSbeFull
     large_distro_name: rhel8.8-medium
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: *linux_x86_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
@@ -319,7 +307,7 @@ buildvariants:
     - name: version_burn_in_gen
       variant: generate-tasks-for-version
       omit_generated_tasks: true
-    - name: archive_dist_test_debug
+    - name: archive_dist_test
       variant: *linux_x86_dynamic_compile_variant_name
   - name: check_feature_flag_tags
   - name: check_for_todos

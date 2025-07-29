@@ -1,0 +1,67 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "boolean_simplification_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "boolean_simplification",
+    srcs = [
+        "//src/mongo/db/query/boolean_simplification:bitset_algebra.cpp",
+        "//src/mongo/db/query/boolean_simplification:bitset_tree.cpp",
+        "//src/mongo/db/query/boolean_simplification:petrick.cpp",
+        "//src/mongo/db/query/boolean_simplification:quine_mccluskey.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:mongohasher",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "boolean_simplification_test",
+    srcs = [
+        "//src/mongo/db/query/boolean_simplification:bitset_algebra_test.cpp",
+        "//src/mongo/db/query/boolean_simplification:bitset_tree_test.cpp",
+        "//src/mongo/db/query/boolean_simplification:petrick_test.cpp",
+        "//src/mongo/db/query/boolean_simplification:quine_mccluskey_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_first_group",
+    ],
+    deps = [
+        "//src/mongo/db/query/boolean_simplification",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "quine_mccluskey_bm",
+    srcs = [
+        "//src/mongo/db/query/boolean_simplification:bitset_algebra_bm.cpp",
+        "//src/mongo/db/query/boolean_simplification:dynamic_bitset_bm.cpp",
+        "//src/mongo/db/query/boolean_simplification:match_expression_bm.cpp",
+        "//src/mongo/db/query/boolean_simplification:petrick_bm.cpp",
+        "//src/mongo/db/query/boolean_simplification:quine_mccluskey_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
+    deps = [
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/query/boolean_simplification",
+    ],
+)

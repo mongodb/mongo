@@ -1,17 +1,12 @@
 """Facade wrapping the resmokelib dependencies used by fixtures."""
-from logging import Logger, Handler
+from logging import Handler, Logger
 from typing import Dict
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
-from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import config, core, errors, logging, utils
 from buildscripts.resmokelib.core import network
+from buildscripts.resmokelib.testing.fixtures import _builder
 from buildscripts.resmokelib.utils.dictionary import merge_dicts
 from buildscripts.resmokelib.utils.history import make_historic as _make_historic
-from buildscripts.resmokelib.testing.fixtures import _builder
-from buildscripts.resmokelib.testing.retry import with_naive_retry
 
 
 class FixtureLib:
@@ -123,7 +118,12 @@ class _FixtureConfig(object):
 
     def __init__(self):
         """Initialize FixtureConfig, setting values."""
-        from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOD_BINARY, LAST_LTS_MONGOS_BINARY, LAST_CONTINUOUS_MONGOD_BINARY, LAST_CONTINUOUS_MONGOS_BINARY
+        from buildscripts.resmokelib.multiversionconstants import (
+            LAST_CONTINUOUS_MONGOD_BINARY,
+            LAST_CONTINUOUS_MONGOS_BINARY,
+            LAST_LTS_MONGOD_BINARY,
+            LAST_LTS_MONGOS_BINARY,
+        )
 
         # pylint: disable=invalid-name
         self.MONGOD_EXECUTABLE = config.MONGOD_EXECUTABLE

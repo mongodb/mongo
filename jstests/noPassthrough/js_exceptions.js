@@ -33,7 +33,6 @@ let tests = [
     },
     {
         callback: function() {
-            // eslint-disable-next-line
             foo.bar();
         },
         match: "uncaught exception: ReferenceError: foo is not defined :",

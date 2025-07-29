@@ -33,11 +33,9 @@ Represents the derived IDL specification after type resolution in the binding pa
 This is a lossy translation from the IDL Syntax tree as the IDL AST only contains information about
 the enums and structs that need code generated for them, and just enough information to do that.
 """
-from abc import ABCMeta, abstractmethod
 import enum
-from typing import Any, Dict, List, Optional
 
-from . import common, errors
+from . import common
 
 
 class IDLBoundSpec(object):

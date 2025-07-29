@@ -1,0 +1,56 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_idl_library")
+load("//bazel/config:render_template.bzl", "render_template")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "mozjs_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+render_template(
+    name = "mongohelpers_js_cpp",
+    srcs = [
+        "mongohelpers.js",
+        "//buildscripts:jstoh.py",
+    ],
+    cmd = [
+        "$(location //buildscripts:jstoh.py)",
+        "$(location mongohelpers_js.cpp)",
+        "$(location mongohelpers.js)",
+    ],
+    output = "mongohelpers_js.cpp",
+)
+
+exports_files(glob([
+    "*.defs",
+]))
+
+mongo_idl_library(
+    name = "scripting_util_idl",
+    src = "scripting_util.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "engine_idl",
+    src = "engine.idl",
+)

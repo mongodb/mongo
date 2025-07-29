@@ -1,20 +1,16 @@
 """The unittest.TestCase for JavaScript tests."""
-import unittest
 
 import copy
 import os
 import os.path
-import sys
 import shutil
+import sys
 import threading
 import uuid
+
 from bson.objectid import ObjectId
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import logging
-from buildscripts.resmokelib import utils
-from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import config, core, errors, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import registry
 

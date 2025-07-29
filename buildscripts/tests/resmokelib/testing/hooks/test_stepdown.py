@@ -1,14 +1,13 @@
 """Unit tests for buildscripts/resmokelib/testing/hooks/stepdown.py."""
 
 import logging
-import os
 import unittest
 
 import mock
 
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing.hooks import stepdown as _stepdown
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
+from buildscripts.resmokelib.testing.hooks import stepdown as _stepdown
 
 # pylint: disable=protected-access
 

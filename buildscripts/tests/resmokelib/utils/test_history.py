@@ -1,6 +1,5 @@
 """Unit tests for buildscripts/resmokelib/utils/history.py."""
 
-import sched
 import unittest
 
 from buildscripts.resmokelib.utils.history import HistoryDict, make_historic
@@ -198,5 +197,5 @@ History:
         self.assertTrue(test_dict.write_equals(second_dict))
 
         # Reads aren't counted
-        gotten_value = second_dict["foo"]  # pylint: disable=unused-variable
+        second_dict["foo"]
         self.assertTrue(test_dict.write_equals(second_dict))

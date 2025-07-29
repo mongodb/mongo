@@ -19,10 +19,10 @@ buildvariants:
       macos-debug-suggested
       enterprise-rhel-8-64-bit-dynamic-embedded-router
     burn_in_tag_include_build_variants:
-    burn_in_tag_compile_task_dependency: archive_dist_test_debug
+    burn_in_tag_compile_task_dependency: archive_dist_test
     compile_variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: *amazon_linux2_arm64_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
@@ -58,114 +58,3 @@ buildvariants:
   tasks:
   - name: sync_repo_with_copybara
     priority: 50
-
-- name: enterprise-windows-ninja
-  display_name: "Ninja Build: Enterprise Windows Server 2022"
-  tags: []
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=windows
-      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-      --win-version-min=win10
-    compile_variant: enterprise-windows-ninja
-  tasks:
-  - name: compile_ninja_next_TG
-    distros:
-    - windows-2022-xlarge
-  - name: compile_ninja_TG
-    distros:
-    - windows-2022-xlarge
-
-- name: macos-arm-ninja-build-profiles
-  display_name: "Ninja Build Profiles: macOS ARM"
-  tags: []
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - macos-14-arm64
-  expansions:
-    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++
-  tasks:
-  - name: compile_ninja_default_profile_TG
-  - name: compile_ninja_opt_profile_TG
-  - name: compile_ninja_fast_profile_TG
-  - name: compile_ninja_compiledb_profile_TG
-
-- name: windows-ninja-build-profiles
-  display_name: "Ninja Build Profiles: Windows Server 2022"
-  tags: []
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=windows
-      CPPPATH="c:/sasl/include c:/snmp/include"
-      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-      LIBPATH="c:/sasl/lib c:/snmp/lib"
-      --win-version-min=win10
-  tasks:
-  - name: compile_ninja_default_profile_TG
-    distros:
-    - windows-2022-xlarge
-  - name: compile_ninja_opt_profile_TG
-    distros:
-    - windows-2022-xlarge
-  - name: compile_ninja_fast_profile_TG
-    distros:
-    - windows-2022-xxlarge
-  - name: compile_ninja_compiledb_profile_TG
-    distros:
-    - windows-2022-xxlarge
-
-- name: ubuntu1804-ninja-build-profiles
-  display_name: "Ninja Build Profiles: Ubuntu 18.04"
-  tags: []
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu1804-small
-  stepback: false
-  expansions:
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo)
-    repo_edition: enterprise
-    has_packages: false
-    compile_variant: ubuntu1804-ninja-build-profiles
-  tasks:
-  - name: compile_ninja_default_profile_linux_TG
-    distros:
-    - ubuntu1804-xlarge
-  - name: compile_ninja_opt_profile_TG
-    distros:
-    - ubuntu1804-xlarge
-  - name: compile_ninja_san_profile_TG
-    distros:
-    - ubuntu1804-xlarge
-  - name: compile_ninja_fast_profile_TG
-    distros:
-    - ubuntu1804-xlarge
-  - name: compile_ninja_compiledb_profile_TG
-    distros:
-    - ubuntu1804-xlarge
-
-- name: enterprise-rhel-8-64-bit-dynamic-ninja
-  display_name: "Ninja Build: Enterprise RHEL 8"
-  tags: []
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel8.8-small
-  expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-    has_packages: false
-  tasks:
-  - name: compile_ninja_next_TG
-    distros:
-    - rhel8.8-xlarge
-  - name: compile_ninja_TG
-    distros:
-    - rhel8.8-xlarge

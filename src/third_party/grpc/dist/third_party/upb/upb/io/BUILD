@@ -53,8 +53,8 @@ cc_library(
     ],
     deps = [
         ":zero_copy_stream",
-        "//:upb",
         "//:port",
+        "//:upb",
     ],
 )
 
@@ -78,11 +78,11 @@ cc_test(
         ":string",
         ":tokenizer",
         ":zero_copy_stream",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "//:upb",
         "//:lex",
         "//:port",
+        "//:upb",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "@com_google_googletest//:gtest_main",
     ],
 )

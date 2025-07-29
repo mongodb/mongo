@@ -10,11 +10,9 @@ import os
 import pathlib
 import sys
 import textwrap
-
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
-
 from git import Repo
 
 mongo_dir = os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
@@ -23,8 +21,11 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(mongo_dir)
 
 from buildscripts.linter import git
-from buildscripts.patch_builds.change_data import (RevisionMap, find_changed_files_in_repos,
-                                                   generate_revision_map)
+from buildscripts.patch_builds.change_data import (
+    RevisionMap,
+    find_changed_files_in_repos,
+    generate_revision_map,
+)
 
 
 # Console renderer for structured logging

@@ -1,8 +1,6 @@
 """The unittest.TestCase for mongos --test."""
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import config, core, utils
 from buildscripts.resmokelib.testing.testcases import interface
 
 

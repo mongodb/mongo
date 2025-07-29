@@ -1,0 +1,5 @@
+py_library(
+    name = "all_python_files",
+    srcs = glob(["*.py"]),
+    visibility = ["//visibility:public"],
+)

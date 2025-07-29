@@ -1,0 +1,431 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_fuzzer_test", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "net_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "network",
+    srcs = [
+        "//src/mongo/util/net:cidr.cpp",
+        "//src/mongo/util/net:hostandport.cpp",
+        "//src/mongo/util/net:hostname_canonicalization.cpp",
+        "//src/mongo/util/net:sockaddr.cpp",
+        "//src/mongo/util/net:socket_exception.cpp",
+        "//src/mongo/util/net:socket_utils.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util:winutil",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/net:hostandport_idl",
+    ],
+)
+
+mongo_cc_library(
+    name = "ssl_options",
+    srcs = [
+        "//src/mongo/util/net:ssl_options.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "ssl_options_client",
+    srcs = [
+        "//src/mongo/util/net:ssl_options_client.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/net:ssl_options",
+        "//src/mongo/util/net:ssl_options_client_idl",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "ssl_options_server",
+    srcs = [
+        "//src/mongo/util/net:ssl_options_server.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:auth_options_idl",
+        "//src/mongo/db/auth:cluster_auth_mode",
+        "//src/mongo/util/net:ssl_options",
+        "//src/mongo/util/net:ssl_options_server_idl",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "ssl_types",
+    srcs = [
+        "//src/mongo/util/net:ssl_types.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/net:ssl_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "http_client",
+    srcs = [
+        "//src/mongo/util/net:http_client.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands:test_commands_enabled",
+    ],
+)
+
+mongo_cc_library(
+    name = "mock_http_client",
+    srcs = [
+        "//src/mongo/util/net:http_client_mock.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "util_net_test",
+    srcs = [
+        "//src/mongo/util/net:cidr_test.cpp",
+        "//src/mongo/util/net:hostandport_test.cpp",
+        "//src/mongo/util/net:http_client_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_second_group",
+    ],
+    deps = [
+        "//src/mongo/util/net:http_client",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "ssl_util",
+    srcs = [
+        "//src/mongo/util/net:ssl_util.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "network_interface_ssl_test",
+    srcs = [
+        "//src/mongo/util/net:network_interface_ssl_test.cpp",
+    ],
+    tags = ["convert_target"],
+    deps = [
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db/auth:builtin_roles",
+        "//src/mongo/db/auth:user",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_fixture",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+config_setting(
+    name = "http_client_enabled_windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//bazel/config:http_client": "True",
+    },
+)
+
+mongo_cc_library(
+    name = "http_client_impl",
+    srcs = select({
+        "//bazel/config:http_client_enabled": [
+            "http_client_options.cpp",
+        ],
+        "//conditions:default": [
+            "http_client_none.cpp",
+        ],
+    }) + select({
+        ":http_client_enabled_windows": [
+            "http_client_winhttp.cpp",
+        ],
+        "//bazel/config:http_client_enabled": [
+            "http_client_curl.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = [
+        "//src/mongo/util:strong_weak_finish_line.h",
+    ] + select({
+        "//bazel/config:http_client_enabled": [
+            "http_client_options.h",
+        ],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        ":http_client_enabled_windows": [
+            "winhttp.lib",
+        ],
+        "//bazel/config:http_client_enabled": [
+            "-lcurl",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":http_client",
+        "//src/mongo:base",
+    ] + select({
+        "//bazel/config:http_client_enabled": [
+            ":http_client_options_idl",
+            ":network",
+            "//src/mongo/executor:connection_pool_executor",
+            "//src/mongo/util:alarm",
+            "//src/mongo/util/concurrency:thread_pool",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "ssl_parameters_auth",
+    srcs = select({
+        "//bazel/config:ssl_enabled": [
+            "ssl_parameters_auth.cpp",
+        ],
+        "//conditions:default": [
+            "ssl_parameters_auth_none.cpp",
+        ],
+    }),
+    deps = select({
+        "//bazel/config:ssl_enabled": [
+            "ssl_parameters_auth_idl",
+            ":ssl_options",  # TODO(SERVER-93876): Remove.
+            "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+            "//src/mongo/client:authentication",
+            "//src/mongo/db/auth:cluster_auth_mode",  # TODO(SERVER-93876): Remove.
+        ],
+        "//conditions:default": [
+            "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        ],
+    }),
+)
+
+# TODO(SERVER-94377): Rework this.
+filegroup(
+    name = "ssl_manager_file",
+    srcs = select({
+        "//bazel/config:ssl_provider_{}".format(ssl_provider): [
+            "ssl_manager_{}.cpp".format(ssl_provider),
+        ]
+        for ssl_provider in [
+            "apple",
+            "openssl",
+            "windows",
+            "none",
+        ]
+    } | {
+        # Intentionally blank.
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "ssl_manager",
+    srcs = [
+        "sock.cpp",
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            ":ssl_manager_file",
+            "//src/mongo/util/net/private:ssl_expiration.cpp",
+            "ssl_manager.cpp",
+            "ssl_parameters.cpp",
+            "ssl_stream.cpp",
+            "//src/mongo/util/net/ssl",
+            "ssl_peer_info.cpp",
+            "//src/mongo/util/net/ocsp:ocsp_manager.cpp",
+        ],
+    } | {
+        "//conditions:default": ["ssl_manager_none.cpp"],
+    }),
+    deps = [
+        "network",
+        "ssl_options",
+        "//src/mongo:base",
+        "//src/mongo/util:background_job",
+        "//src/mongo/util:fail_point",
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            "ssl_parameters_idl",
+            ":http_client",
+            ":ssl_types",
+            ":ssl_util",
+            "//src/mongo/base:secure_allocator",
+            "//src/mongo/client:internal_auth",
+            "//src/mongo/crypto:sha_block",
+            "//src/mongo/db:connection_health_metrics_parameter_idl",
+            "//src/mongo/db:server_base",
+            "//src/mongo/db:server_feature_flags_idl",
+            "//src/mongo/db:service_context",
+            "//src/mongo/db/auth",
+            "//src/mongo/db/auth:cluster_auth_mode",
+            "//src/mongo/util:caching",
+            "//src/mongo/util:icu",
+            "//src/mongo/util:winutil",
+            "//src/mongo/util/concurrency:thread_pool",
+            "//src/third_party/asio-master:asio",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:ssl_provider_openssl": [":openssl_init"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "openssl_init",
+    srcs = [
+        "openssl_init.cpp",
+    ],
+    linkopts = [
+        "-lssl",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:mongo_crypto_openssl": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":ssl_options",
+        "//src/mongo:base",
+        "//src/mongo/crypto:symmetric_crypto",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "util_net_ssl_test",
+    srcs = [
+        "//src/mongo/util/net:sock_test.cpp",
+        "//src/mongo/util/net:sock_test_utils.cpp",
+        "//src/mongo/util/net:ssl_manager_test.cpp",
+        "//src/mongo/util/net:ssl_options_test.cpp",
+    ],
+    data = [
+        "//jstests/libs:test_pem_files",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_second_group",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:ssl_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db:server_options_servers",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/s:sharding_catalog_manager",
+        "//src/mongo/transport:transport_layer",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util/cmdline_utils",
+        "//src/mongo/util/net:network",
+        "//src/mongo/util/net:ssl_manager",
+        "//src/mongo/util/net:ssl_options_server",
+        "//src/mongo/util/net:ssl_types",
+    ],
+)
+
+mongo_idl_library(
+    name = "ssl_parameters_idl",
+    src = "ssl_parameters.idl",
+    idl_deps = [
+        "//src/mongo/crypto:sha256_block_idl_gen",
+        "//src/mongo/db/auth:auth_types_idl_gen",
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/crypto:sha256_block_idl",
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db/auth:auth_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "ssl_parameters_auth_idl",
+    src = "ssl_parameters_auth.idl",
+)
+
+mongo_idl_library(
+    name = "http_client_options_idl",
+    src = "http_client_options.idl",
+)
+
+mongo_idl_library(
+    name = "ssl_options_server_idl",
+    src = "ssl_options_server.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "hostandport_idl",
+    src = "hostandport.idl",
+)
+
+mongo_idl_library(
+    name = "ssl_options_client_idl",
+    src = "ssl_options_client.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "asn1_parser_fuzzer",
+    srcs = [
+        "asn1_parser_fuzzer.cpp",
+    ],
+    deps = [
+        ":ssl_manager",
+        "//src/mongo:base",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/transport:transport_layer_common",
+    ],
+)

@@ -59,7 +59,7 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
     shellStr += `const maxTimeMS = ${maxTimeMS};`;
     shellStr += `const whenMatched = ${tojson(whenMatched)};`;
     shellStr += `const whenNotMatched = '${whenNotMatched}';`;
-    /* eslint-disable */
+
     const runAggregate = function() {
         const pipeline = [{
             $merge:
@@ -70,7 +70,7 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
                 pipeline, {maxTimeMS: maxTimeMS, $readPreference: {mode: "secondary"}}));
         assert.eq(err.code, ErrorCodes.MaxTimeMSExpired, "expected aggregation to fail");
     };
-    /* eslint-enable */
+
     shellStr += `(${runAggregate.toString()})();`;
     const awaitShell = startParallelShell(shellStr, conn.port);
 

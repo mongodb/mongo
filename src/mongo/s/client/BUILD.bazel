@@ -1,0 +1,56 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "client_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "sharding_client",
+    srcs = [
+        "//src/mongo/s/client:num_hosts_targeted_metrics.cpp",
+        "//src/mongo/s/client:shard_remote.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:fetcher",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/executor:hedging_metrics",
+        "//src/mongo/executor:task_executor_pool",
+        "//src/mongo/s:grid",
+        "//src/mongo/s/client:shard_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "shard_interface",
+    srcs = [
+        "//src/mongo/s/client:shard.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:remote_command_retry_scheduler",
+        "//src/mongo/db:server_base",
+        "//src/mongo/s/client:shard_idl",
+        "//src/mongo/s/write_ops:batch_write_types",
+    ],
+)
+
+mongo_idl_library(
+    name = "shard_idl",
+    src = "shard.idl",
+)

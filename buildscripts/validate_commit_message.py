@@ -28,9 +28,9 @@
 #
 """Validate that the commit message is ok."""
 import argparse
+import logging
 import re
 import sys
-import logging
 
 LOGGER = logging.getLogger(__name__)
 

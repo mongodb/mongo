@@ -1,0 +1,189 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "index_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_benchmark(
+    name = "key_gen_bm",
+    srcs = [
+        "//src/mongo/db/index:key_gen_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query:sort_pattern",
+    ],
+)
+
+mongo_cc_library(
+    name = "expression_params",
+    srcs = [
+        "//src/mongo/db/index:expression_params.cpp",
+        "//src/mongo/db/index:s2_common.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/geo:geometry",
+        "//src/mongo/db/geo:geoparser",
+        "//src/mongo/db/query/collation:collator_interface",
+        "//src/mongo/db/storage:key_string",
+        "//src/third_party/s2",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_access_method",
+    srcs = [
+        "//src/mongo/db/index:2d_access_method.cpp",
+        "//src/mongo/db/index:btree_access_method.cpp",
+        "//src/mongo/db/index:btree_key_generator.cpp",
+        "//src/mongo/db/index:column_key_generator.cpp",
+        "//src/mongo/db/index:columns_access_method.cpp",
+        "//src/mongo/db/index:duplicate_key_tracker.cpp",
+        "//src/mongo/db/index:expression_keys_private.cpp",
+        "//src/mongo/db/index:fts_access_method.cpp",
+        "//src/mongo/db/index:hash_access_method.cpp",
+        "//src/mongo/db/index:index_access_method.cpp",
+        "//src/mongo/db/index:index_build_interceptor.cpp",
+        "//src/mongo/db/index:index_descriptor.cpp",
+        "//src/mongo/db/index:multikey_paths.cpp",
+        "//src/mongo/db/index:s2_access_method.cpp",
+        "//src/mongo/db/index:skipped_record_tracker.cpp",
+        "//src/mongo/db/index:sort_key_generator.cpp",
+        "//src/mongo/db/index:wildcard_access_method.cpp",
+        "//src/mongo/db/index:wildcard_key_generator.cpp",
+        "//src/mongo/db/index:wildcard_validation.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db:multi_key_path_tracker",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:resumable_index_builds_idl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/bson:dotted_path_support",
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/exec:projection_executor",
+        "//src/mongo/db/exec:working_set",
+        "//src/mongo/db/fts:base_fts",
+        "//src/mongo/db/geo:geoparser",
+        "//src/mongo/db/index:column_store_index",
+        "//src/mongo/db/index:expression_params",
+        "//src/mongo/db/index:index_build_interceptor_idl",
+        "//src/mongo/db/pipeline:document_path_support",
+        "//src/mongo/db/query:projection_ast",
+        "//src/mongo/db/query:sort_pattern",
+        "//src/mongo/db/query:spill_util",
+        "//src/mongo/db/query/collation:collator_factory_interface",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/sorter:sorter_base",
+        "//src/mongo/db/sorter:sorter_stats",
+        "//src/mongo/db/storage:encryption_hooks",
+        "//src/mongo/db/storage:execution_context",
+        "//src/mongo/db/storage:index_entry_comparison",
+        "//src/mongo/db/storage:key_string",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage:write_unit_of_work",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/util:progress_meter",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/third_party/s2",
+        "//src/third_party/snappy",
+    ],
+)
+
+mongo_cc_library(
+    name = "column_store_index",
+    srcs = [
+        "//src/mongo/db/index:column_cell.cpp",
+        "//src/mongo/db/index:column_store_sorter.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query:spill_util",
+        "//src/mongo/db/sorter:sorter_base",
+        "//src/mongo/db/sorter:sorter_stats",
+        "//src/mongo/db/storage:encryption_hooks",
+        "//src/mongo/db/storage:storage_options",
+        "//src/third_party/snappy",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_index_test",
+    srcs = [
+        "//src/mongo/db/index:2d_key_generator_test.cpp",
+        "//src/mongo/db/index:btree_key_generator_test.cpp",
+        "//src/mongo/db/index:column_cell_test.cpp",
+        "//src/mongo/db/index:column_key_generator_test.cpp",
+        "//src/mongo/db/index:column_store_sorter_test.cpp",
+        "//src/mongo/db/index:columns_access_method_test.cpp",
+        "//src/mongo/db/index:hash_key_generator_test.cpp",
+        "//src/mongo/db/index:index_build_interceptor_test.cpp",
+        "//src/mongo/db/index:multikey_paths_test.cpp",
+        "//src/mongo/db/index:s2_bucket_key_generator_test.cpp",
+        "//src/mongo/db/index:s2_key_generator_test.cpp",
+        "//src/mongo/db/index:sort_key_generator_test.cpp",
+        "//src/mongo/db/index:wildcard_key_generator_test.cpp",
+        "//src/mongo/db/index:wildcard_validation_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_third_group",
+    ],
+    deps = [
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/exec:working_set",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/index:column_store_index",
+        "//src/mongo/db/index:expression_params",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query:sort_pattern",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/sorter:sorter_stats",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_idl_library(
+    name = "index_build_interceptor_idl",
+    src = "index_build_interceptor.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)

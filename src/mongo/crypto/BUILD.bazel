@@ -1,0 +1,387 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "crypto_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "sha1_block",
+    srcs = [
+        "//src/mongo/crypto:sha1_block.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util:secure_compare_memory",
+    ],
+)
+
+mongo_cc_library(
+    name = "sha256_block",
+    srcs = [
+        "//src/mongo/crypto:sha256_block.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util:secure_compare_memory",
+    ],
+)
+
+mongo_cc_library(
+    name = "aead_encryption",
+    srcs = [
+        "//src/mongo/crypto:aead_encryption.cpp",
+    ],
+    deps = [
+        "//src/mongo/crypto:fle_fields",
+        "//src/mongo/crypto:sha_block",
+        "//src/mongo/crypto:symmetric_crypto",
+    ],
+)
+
+mongo_cc_library(
+    name = "fle_crypto",
+    srcs = [
+        "//src/mongo/crypto:encryption_fields_util.cpp",
+        "//src/mongo/crypto:fle_crypto.cpp",
+        "//src/mongo/crypto:fle_stats.cpp",
+        "//src/mongo/crypto:fle_tags.cpp",
+    ],
+    deps = [
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/crypto:aead_encryption",
+        "//src/mongo/crypto:encrypted_field_config",
+        "//src/mongo/crypto:fle_fields",
+        "//src/mongo/crypto:fle_options_idl",
+        "//src/mongo/crypto:fle_stats_idl",
+        "//src/mongo/crypto:fle_tokens_idl",
+        "//src/mongo/crypto:sha_block",
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/idl:cluster_server_parameter_idl",
+        "//src/mongo/shell:kms_idl",
+        "//src/mongo/util:testing_options",
+        "//src/third_party/libmongocrypt:mongocrypt",
+    ],
+)
+
+mongo_cc_library(
+    name = "fle_fields",
+    srcs = [
+        "//src/mongo/crypto:fle_fields_util.cpp",
+    ],
+    deps = [
+        "//src/mongo/crypto:encrypted_field_config",
+        "//src/mongo/crypto:fle_field_schema_idl",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "crypto_bm",
+    srcs = [
+        "//src/mongo/crypto:crypto_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
+    deps = [
+        "//src/mongo/crypto:fle_crypto",
+        "//src/mongo/crypto:sha_block",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/transport:transport_layer_common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "jws_validator_test",
+    srcs = [
+        "//src/mongo/crypto:jws_validated_token_test.cpp",
+        "//src/mongo/crypto:jws_validator_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fourth_group",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/crypto:jwt",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/util/net:openssl_init",
+    ],
+)
+
+mongo_cc_library(
+    name = "sha_block",
+    srcs = select({
+        "//bazel/config:mongo_crypto_{}".format(mongo_crypto): [
+            "hash_block.cpp",
+            "sha_block_{}.cpp".format(mongo_crypto),
+        ]
+        for mongo_crypto in [
+            "windows",
+            "apple",
+            "openssl",
+            "tom",
+        ]
+    } | {
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    local_defines = select({
+        "//bazel/config:mongo_crypto_tom": ["LTC_NO_PROTOTYPES"],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "//bazel/config:mongo_crypto_{}".format(mongo_crypto): []
+        for mongo_crypto in [
+            "windows",
+            "apple",
+            "openssl",
+            "tom",
+        ]
+    } | {
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":sha1_block",
+        ":sha256_block",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "symmetric_crypto",
+    srcs = [
+        "symmetric_crypto.cpp",
+        "symmetric_key.cpp",
+    ] + select({
+        "//bazel/config:mongo_crypto_{}".format(mongo_crypto): ["symmetric_crypto_{}.cpp".format(mongo_crypto)]
+        for mongo_crypto in [
+            "windows",
+            "apple",
+            "openssl",
+            "tom",
+        ]
+    } | {
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/util:secure_zero_memory",
+    ],
+)
+
+mongo_cc_library(
+    name = "jwt",
+    srcs = [
+        "jwk_manager.cpp",
+        "jwks_fetcher_impl.cpp",
+        "jws_validated_token.cpp",
+    ] + select({
+        "//bazel/config:ssl_provider_{}".format(provider): [
+            "jws_validator_{}.cpp".format(provider),
+        ]
+        for provider in [
+            "apple",
+            "openssl",
+            "windows",
+            "none",
+        ]
+    }),
+    deps = [
+        ":jwt_types_idl",
+        "//src/mongo:base",
+        "//src/mongo/client:native_sasl_client",
+        "//src/mongo/db/auth:oidc_protocol",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/util/net:http_client_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "encrypted_field_config",
+    srcs = [
+        "//src/mongo/crypto:encryption_fields_validation.cpp",
+        "//src/mongo/crypto:fle_numeric.cpp",
+    ],
+    deps = [
+        "//src/mongo/crypto:encryption_fields_idl",
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags_idl",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/pipeline:value_idl",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "crypto_test",
+    srcs = [
+        "aead_encryption_test.cpp",
+        "encryption_fields_util_test.cpp",
+        "encryption_fields_validation_test.cpp",
+        "fle_crypto_test.cpp",
+        "fle_crypto_test_vectors.cpp",
+        "fle_stats_test.cpp",
+        "mechanism_scram_test.cpp",
+        "sha1_block_test.cpp",
+        "sha256_block_test.cpp",
+        "sha512_block_test.cpp",
+        "symmetric_crypto_test.cpp",
+        "//src/mongo/crypto/test_vectors:edges_decimal128.cstruct.h",
+        "//src/mongo/crypto/test_vectors:edges_double.cstruct.h",
+        "//src/mongo/crypto/test_vectors:edges_int32.cstruct.h",
+        "//src/mongo/crypto/test_vectors:edges_int64.cstruct.h",
+        "//src/mongo/crypto/test_vectors:mincover_decimal128.cstruct.h",
+        "//src/mongo/crypto/test_vectors:mincover_decimal128_precision.cstruct.h",
+        "//src/mongo/crypto/test_vectors:mincover_double.cstruct.h",
+        "//src/mongo/crypto/test_vectors:mincover_double_precision.cstruct.h",
+        "//src/mongo/crypto/test_vectors:mincover_int32.cstruct.h",
+        "//src/mongo/crypto/test_vectors:mincover_int64.cstruct.h",
+    ] + select({
+        "//bazel/config:mongo_crypto_openssl": ["jwt_test.cpp"],
+        "//conditions:default": [],
+    }),
+    tags = [
+        "convert_target",
+        "mongo_unittest_eighth_group",
+    ],
+    deps = [
+        ":aead_encryption",
+        ":encrypted_field_config",
+        ":fle_crypto",
+        ":jwt",
+        ":sha_block",
+        "//src/mongo:base",
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/s:sharding_catalog_manager",
+        "//src/mongo/shell:kms_idl",
+        "//src/mongo/util:testing_options",
+        "//src/mongo/util/net:http_client_impl",
+        "//src/mongo/util/net:openssl_init",
+    ],
+)
+
+mongo_idl_library(
+    name = "jwt_types_idl",
+    src = "jwt_types.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "fle_field_schema_idl",
+    src = "fle_field_schema.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/crypto:encryption_fields_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/crypto:encryption_fields_idl",
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "fle_stats_idl",
+    src = "fle_stats.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "fle_tokens_idl",
+    src = "fle_tokens.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "sha1_block_idl",
+    src = "sha1_block.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "sha512_block_idl",
+    src = "sha512_block.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "sha256_block_idl",
+    src = "sha256_block.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "encryption_fields_idl",
+    src = "encryption_fields.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "fle_options_idl",
+    src = "fle_options.idl",
+    idl_deps = [
+        "//src/mongo/idl:cluster_server_parameter_idl_gen",
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/idl:cluster_server_parameter_idl",
+    ],
+)

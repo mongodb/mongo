@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Generate a task to run core analysis on uploaded core dumps in evergreen."""
 import argparse
+import json
 import os
 import pathlib
 import random
@@ -9,17 +10,18 @@ import string
 import sys
 from typing import List
 
-from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, Task
+from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, Task, TaskDependency
 from shrub.v2.command import BuiltInCommand
+
 from buildscripts.resmokelib.hang_analyzer import dumper
 
 mongo_path = pathlib.Path(__file__).parents[3]
 sys.path.append(mongo_path)
 
 # pylint: disable=wrong-import-position
+from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.util.fileops import write_file
 from buildscripts.util.read_config import read_config_file
-from buildscripts.resmokelib.utils import evergreen_conn
 
 GENERATED_TASK_PREFIX = "core_analysis"
 RANDOM_STRING_LENGTH = 5
@@ -115,6 +117,7 @@ def generate(expansions_file: str = "../expansions.yml",
     gdb_index_cache = "off" if expansions.get("core_analyzer_gdb_index_cache") == "off" else "on"
     build_variant_name = expansions.get("build_variant")
     core_analyzer_results_url = expansions.get("core_analyzer_results_url")
+    compile_variant = expansions.get("compile_variant")
 
     try:
         evg_api = evergreen_conn.get_evergreen_api()
@@ -179,7 +182,9 @@ def generate(expansions_file: str = "../expansions.yml",
     commands = get_core_analyzer_commands(task_id, execution, core_analyzer_results_url,
                                           gdb_index_cache)
 
-    sub_tasks = set([Task(get_generated_task_name(current_task_name, execution), commands)])
+    deps = {TaskDependency("archive_dist_test_debug", compile_variant)}
+    # TODO SERVER-92571 add archive_jstestshell_debug dep for variants that have it.
+    sub_tasks = set([Task(get_generated_task_name(current_task_name, execution), commands, deps)])
 
     if display_task_name:
         # If the task is already in a display task add the new task to the current display task
@@ -190,7 +195,16 @@ def generate(expansions_file: str = "../expansions.yml",
     shrub_project = ShrubProject.empty()
     shrub_project.add_build_variant(build_variant)
 
-    write_file(output_file, shrub_project.json())
+    # shrub.py currently does not support adding task deps that override the variant deps
+    output_dict = shrub_project.as_dict()
+    deps_list = []
+    for dep in deps:
+        deps_list.append(dep.as_dict())
+    for variant in output_dict["buildvariants"]:
+        for task in variant["tasks"]:
+            task["depends_on"] = deps_list
+
+    write_file(output_file, json.dumps(output_dict))
 
 
 if __name__ == '__main__':

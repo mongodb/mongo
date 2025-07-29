@@ -4,11 +4,9 @@ import hashlib
 import threading
 import uuid
 
-from buildscripts.resmokelib.testing.testcases import interface
-from buildscripts.resmokelib.testing.testcases import jsrunnerfile
-from buildscripts.resmokelib.testing.testcases import jstest
-from buildscripts.resmokelib.utils import registry
 from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.testing.testcases import interface, jsrunnerfile, jstest
+from buildscripts.resmokelib.utils import registry
 
 
 class _SingleFSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):

@@ -286,13 +286,15 @@ buildozer
 .bazelrc.bazelisk
 *.bazel_info_for_ninja.txt
 .ninja_last_command_line_targets.txt
-
+.bazelrc.common_bes
+.bazelrc.sync
 bazel/coverity/analysis/BUILD.bazel
 .bazel_include_info.json
 .bazel_header_list_cache
 .bazel_real
-MODULE.bazel
-MODULE.bazel.lock
+.compiledb
+.mongo_checks_module_path
+
 # generated configs for external fixture suites
 docker_compose/
 

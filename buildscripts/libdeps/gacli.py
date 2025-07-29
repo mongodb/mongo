@@ -28,15 +28,14 @@ A Command line interface to the graph analysis module.
 """
 
 import argparse
-import textwrap
-import sys
-from pathlib import Path
 import copy
-
-import networkx
+import sys
+import textwrap
+from pathlib import Path
 
 import libdeps.analyzer as libdeps_analyzer
-from libdeps.graph import LibdepsGraph, CountTypes, LinterTypes
+import networkx
+from libdeps.graph import CountTypes, LibdepsGraph, LinterTypes
 
 
 class LinterSplitArgs(argparse.Action):

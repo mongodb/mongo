@@ -2,8 +2,8 @@
 
 import os
 import shutil
-import unittest
 import sys
+import unittest
 
 from buildscripts import sbom_linter
 

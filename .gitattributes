@@ -1,3 +1,13 @@
 *.vcproj -crlf -diff -merge
 *.pbxproj -crlf -diff -merge
 *.sh text eol=lf
+**/third_party/**/* rules-lint-ignored=true
+**/third_party/**/BUILD.bazel rules-lint-ignored=false
+external rules-lint-ignored=true
+**/*.tpl.h rules-lint-ignored=true
+**/*.tpl.cpp rules-lint-ignored=true
+src/mongo/bson/util/bson_column_compressed_data.inl rules-lint-ignored=true
+src/mongo/bson/util/simple8b.inl rules-lint-ignored=true
+*.idl linguist-language=yaml
+
+MODULE.bazel.lock rules-lint-ignored=true linguist-generated

@@ -1,0 +1,34 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "schema_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_idl_library(
+    name = "encrypt_schema_idl",
+    src = "//src/mongo/db/matcher/schema:encrypt_schema.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/crypto:encryption_fields_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/crypto:encryption_fields_idl",
+        "//src/mongo/db:basic_types_idl",
+    ],
+)

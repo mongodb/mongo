@@ -1,14 +1,14 @@
 import base64
 import json
 import os
-from typing import Optional, Callable, Sequence
-from os import linesep
 from logging import getLogger
+from os import linesep
+from typing import Callable, Optional, Sequence
 
 from google.protobuf.json_format import MessageToDict
 from opentelemetry.exporter.otlp.proto.common.trace_encoder import encode_spans
-from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
 logger = getLogger(__name__)
 

@@ -22,8 +22,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             var res =
                 db[collName].explain('executionStats').remove({i: {$lte: this.nInserted / 2}});
             assert.commandWorked(res);
-            assert.eq(this.nInserted / 2 + 1,
-                      explain.executionStats.totalDocsExamined);  // eslint-disable-line
+            assert.eq(this.nInserted / 2 + 1, explain.executionStats.totalDocsExamined);
             // no documents should have been deleted
             assert.eq(this.nInserted, db[collName].itcount());
         }

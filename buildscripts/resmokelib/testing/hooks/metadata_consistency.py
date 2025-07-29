@@ -4,11 +4,16 @@ import os.path
 import sys
 
 import buildscripts.util.testname as testname_utils
-
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing.fixtures import multi_sharded_cluster, shardedcluster
+from buildscripts.resmokelib.testing.fixtures import (
+    multi_sharded_cluster,
+    shardedcluster,
+)
 from buildscripts.resmokelib.testing.hooks import jsfile
-from buildscripts.resmokelib.testing.hooks.background_job import _BackgroundJob, _ContinuousDynamicJSTestCase
+from buildscripts.resmokelib.testing.hooks.background_job import (
+    _BackgroundJob,
+    _ContinuousDynamicJSTestCase,
+)
 
 _IS_WINDOWS = (sys.platform == "win32")
 
@@ -21,9 +26,9 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
     # The 'CheckMetadataConsistency' hook relies on the 'isMaster' command to asses if the fixture cluster is sharded.
     SKIP_TESTS = [
         # Skip tests that set a failPoint to make the 'isMaster' command unconditionally fail.
-        "build/install/bin/executor_integration_test",
-        "build/install/bin/rpc_integration_test",
-        "build/install/bin/transport_integration_test",
+        "bazel-bin/install/executor_integration_test",
+        "bazel-bin/install/rpc_integration_test",
+        "bazel-bin/install/transport_integration_test",
         # Skip tests that update the internalDocumentSourceGroupMaxMemoryBytes parameter and make
         # checkMetadataConsistency fail with QueryExceededMemoryLimitNoDiskUseAllowed error.
         "jstests/aggregation/sources/unionWith/unionWith.js"

@@ -2,6 +2,7 @@
 
 import copy
 import os.path
+
 import pymongo
 
 from buildscripts.resmokelib.testing.fixtures import interface

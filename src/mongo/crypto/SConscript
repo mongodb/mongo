@@ -9,7 +9,7 @@ Import([
 env = env.Clone()
 
 env.Library(
-    'sha1_block',
+    target='sha1_block',
     source=['sha1_block.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -18,7 +18,7 @@ env.Library(
 )
 
 env.Library(
-    'sha256_block',
+    target='sha256_block',
     source=['sha256_block.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

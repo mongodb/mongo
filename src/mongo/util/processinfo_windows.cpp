@@ -35,7 +35,6 @@
 #include <boost/optional.hpp>
 #include <iostream>
 #include <psapi.h>
-#include <winsock2.h>
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/processinfo.h"

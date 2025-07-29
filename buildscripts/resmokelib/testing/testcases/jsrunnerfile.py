@@ -1,8 +1,6 @@
 """The unittest.TestCase for tests with a static JavaScript runner file."""
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import config, core, utils
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import registry
 

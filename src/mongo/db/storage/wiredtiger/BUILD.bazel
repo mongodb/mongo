@@ -1,0 +1,287 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "wiredtiger_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "storage_wiredtiger_customization_hooks",
+    srcs = [
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_customization_hooks.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_extensions.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_wiredtiger_core",
+    srcs = [
+        "//src/mongo/db/storage/wiredtiger:oplog_truncate_markers_server_status_section.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_begin_transaction_block.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_column_store.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_compiled_configuration.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_cursor.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_cursor_helpers.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_global_options.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_index.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_index_util.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_kv_engine.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_oplog_manager.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_parameters.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_prepare_conflict.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_recovery_unit.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_session_cache.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_size_storer.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_snapshot_manager.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_stats.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_util.cpp",
+    ],
+    deps = [
+        ":oplog_truncate_marker_parameters_idl",
+        "//src/mongo/db:global_settings",
+        "//src/mongo/db:mongod_options",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:prepare_conflict_tracker",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:server_options_servers",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db:snapshot_window_options_idl",
+        "//src/mongo/db/bson:dotted_path_support",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/catalog:health_log_interface",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/repl:repl_settings",
+        "//src/mongo/db/stats:resource_consumption_metrics",
+        "//src/mongo/db/storage:backup_block",
+        "//src/mongo/db/storage:capped_snapshots",
+        "//src/mongo/db/storage:index_entry_comparison",
+        "//src/mongo/db/storage:key_string",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:recovery_unit_base",
+        "//src/mongo/db/storage:storage_file_util",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage:storage_repair_observer",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger_customization_hooks",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_parameters_idl",
+        "//src/mongo/util:elapsed_tracker",
+        "//src/mongo/util:log_and_backoff",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/concurrency:ticketholder",
+        "//src/mongo/util/options_parser",
+        "//src/third_party/snappy",
+        "//src/third_party/wiredtiger",
+        "//src/third_party/zlib",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "storage_wiredtiger_test",
+    srcs = [
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_c_api_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_init_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_kv_engine_no_fixture_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_kv_engine_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_prepare_conflict_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_recovery_unit_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_session_cache_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_size_storer_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_stats_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_util_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_eighth_group",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:snapshot_window_options_idl",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/storage:checkpointer",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:recovery_unit_test_harness",
+        "//src/mongo/db/storage:storage_engine_common",
+        "//src/mongo/db/storage:storage_engine_metadata",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage/kv:kv_engine_test_harness",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger_core",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_library(
+    name = "wiredtiger_record_store_test_harness",
+    srcs = [
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test_harness.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:record_store_test_harness",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger_core",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_library(
+    name = "wiredtiger_index_test_harness",
+    srcs = [
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_index_test_harness.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/storage:sorted_data_interface_test_harness",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger_core",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_wiredtiger_import",
+    srcs = [
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_import.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/repl:tenant_migration_access_blocker",
+        "//src/mongo/db/storage:bson_collection_catalog_entry",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger_core",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "storage_wiredtiger_record_store_and_index_test",
+    srcs = [
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_column_store_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_index_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_standard_index_test.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_standard_record_store_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_sixth_group",
+    ],
+    deps = [
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:sorted_data_interface_tests",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger_core",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_index_test_harness",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test_harness",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "storage_wiredtiger_record_store_and_index_bm",
+    srcs = [
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_index_bm.cpp",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:record_store_bm",
+        "//src/mongo/db/storage:sorted_data_interface_bm",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_index_test_harness",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test_harness",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "storage_wiredtiger_begin_transaction_block_bm",
+    srcs = [
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_begin_transaction_block_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
+    deps = [
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger_core",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_wiredtiger",
+    srcs = [
+        "wiredtiger_init.cpp",
+        "wiredtiger_options_init.cpp",
+        "wiredtiger_server_status.cpp",
+    ],
+    deps = [
+        "storage_wiredtiger_core",
+        "storage_wiredtiger_customization_hooks",
+        "wiredtiger_global_options_idl",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/storage:storage_engine_common",
+        "//src/mongo/db/storage:storage_engine_impl",
+        "//src/mongo/db/storage:storage_engine_lock_file",
+        "//src/mongo/db/storage:storage_engine_metadata",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_idl_library(
+    name = "wiredtiger_parameters_idl",
+    src = "wiredtiger_parameters.idl",
+    deps = [
+        "//src/third_party/wiredtiger",
+    ],
+)
+
+mongo_idl_library(
+    name = "wiredtiger_global_options_idl",
+    src = "wiredtiger_global_options.idl",
+)
+
+mongo_idl_library(
+    name = "oplog_truncate_marker_parameters_idl",
+    src = "oplog_truncate_marker_parameters.idl",
+)

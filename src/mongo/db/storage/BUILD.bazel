@@ -1,0 +1,695 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_fuzzer_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "storage_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "index_entry_comparison",
+    srcs = [
+        "//src/mongo/db/storage:index_entry_comparison.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:duplicate_key_error_info",
+        "//src/mongo/db/storage:key_string",
+    ],
+)
+
+mongo_cc_library(
+    name = "snapshot_helper",
+    srcs = [
+        "//src/mongo/db/storage:snapshot_helper.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/storage:recovery_unit_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "duplicate_key_error_info",
+    srcs = [
+        "//src/mongo/db/storage:duplicate_key_error_info.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "recovery_unit_base",
+    srcs = [
+        "//src/mongo/db/storage:recovery_unit.cpp",
+        "//src/mongo/db/storage:recovery_unit_noop.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "key_string",
+    srcs = [
+        "//src/mongo/db/storage:key_string.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)
+
+mongo_cc_library(
+    name = "execution_context",
+    srcs = [
+        "//src/mongo/db/storage:execution_context.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage:key_string",
+    ],
+)
+
+mongo_cc_library(
+    name = "capped_snapshots",
+    srcs = [
+        "//src/mongo/db/storage:capped_snapshots.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/storage:recovery_unit_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "bson_collection_catalog_entry",
+    srcs = [
+        "//src/mongo/db/storage:bson_collection_catalog_entry.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:common",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/catalog:collection_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_control",
+    srcs = [
+        "//src/mongo/db/storage:durable_history_pin.cpp",
+        "//src/mongo/db/storage/control:storage_control.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/storage:checkpointer",
+        "//src/mongo/db/storage:journal_flusher",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "oplog_cap_maintainer_thread",
+    srcs = [
+        "//src/mongo/db/storage:oplog_cap_maintainer_thread.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/catalog:local_oplog_info",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/util:background_job",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "journal_flusher",
+    srcs = [
+        "//src/mongo/db/storage/control:journal_flusher.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util:background_job",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_options",
+    srcs = [
+        "//src/mongo/db/storage:storage_options.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:storage_parameters_idl",
+    ],
+)
+
+mongo_cc_library(
+    name = "encryption_hooks",
+    srcs = [
+        "//src/mongo/db/storage:encryption_hooks.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "backup_cursor_hooks",
+    srcs = [
+        "//src/mongo/db/storage:backup_cursor_hooks.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "sorted_data_interface_test_harness",
+    srcs = [
+        "//src/mongo/db/storage:sorted_data_interface_test_harness.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/storage:index_entry_comparison",
+        "//src/mongo/db/storage:key_string",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "sorted_data_interface_tests",
+    srcs = [
+        "//src/mongo/db/storage:sorted_data_interface_test_bulkbuilder.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_cursor.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_cursor_advanceto.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_cursor_end_position.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_cursor_locate.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_cursor_saverestore.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_cursor_seek_exact.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_dupkeycheck.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_fullvalidate.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_insert.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_isempty.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_key_value_view.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_keyformat_string.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_rollback.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_spaceused.cpp",
+        "//src/mongo/db/storage:sorted_data_interface_test_unindex.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/storage:sorted_data_interface_test_harness",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "sorted_data_interface_bm",
+    srcs = [
+        "//src/mongo/db/storage:sorted_data_interface_bm_cursor.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/storage:sorted_data_interface_test_harness",
+        "//src/third_party/benchmark",
+    ],
+)
+
+mongo_cc_library(
+    name = "record_store_bm",
+    srcs = [
+        "//src/mongo/db/storage:record_store_bm_cursor.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/storage:record_store_test_harness",
+        "//src/third_party/benchmark",
+    ],
+)
+
+mongo_cc_library(
+    name = "record_store_test_harness",
+    srcs = [
+        "//src/mongo/db/storage:record_store_test_datafor.cpp",
+        "//src/mongo/db/storage:record_store_test_datasize.cpp",
+        "//src/mongo/db/storage:record_store_test_deleterecord.cpp",
+        "//src/mongo/db/storage:record_store_test_harness.cpp",
+        "//src/mongo/db/storage:record_store_test_insertrecord.cpp",
+        "//src/mongo/db/storage:record_store_test_oplog.cpp",
+        "//src/mongo/db/storage:record_store_test_randomiter.cpp",
+        "//src/mongo/db/storage:record_store_test_recorditer.cpp",
+        "//src/mongo/db/storage:record_store_test_recordstore.cpp",
+        "//src/mongo/db/storage:record_store_test_storagesize.cpp",
+        "//src/mongo/db/storage:record_store_test_truncate.cpp",
+        "//src/mongo/db/storage:record_store_test_updaterecord.cpp",
+        "//src/mongo/db/storage:record_store_test_updatewithdamages.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/catalog:health_log_interface",
+        "//src/mongo/db/catalog:health_log_mock",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/update:update_document_diff",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "recovery_unit_test_harness",
+    srcs = [
+        "//src/mongo/db/storage:recovery_unit_test_harness.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_engine_common",
+    srcs = [
+        "//src/mongo/db/storage:storage_engine_change_context.cpp",
+        "//src/mongo/db/storage:storage_engine_init.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/exec:scoped_timer",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage:storage_engine_lock_file",
+        "//src/mongo/db/storage:storage_engine_metadata",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage:storage_repair_observer",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_init_d",
+    srcs = [
+        "//src/mongo/db/storage:storage_init.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/storage:backup_cursor_hooks",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "write_unit_of_work",
+    srcs = [
+        "//src/mongo/db/storage:write_unit_of_work.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage:recovery_unit_base",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_engine_metadata",
+    srcs = [
+        "//src/mongo/db/storage:storage_engine_metadata.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/bson:dotted_path_support",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_file_util",
+    srcs = [
+        "//src/mongo/db/storage:storage_file_util.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "disk_space_util",
+    srcs = [
+        "//src/mongo/db/storage:disk_space_util.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_repair_observer",
+    srcs = [
+        "//src/mongo/db/storage:storage_repair_observer.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/repl:replica_set_messages",
+        "//src/mongo/db/repl:storage_interface",
+        "//src/mongo/db/storage:journal_flusher",
+        "//src/mongo/db/storage:storage_file_util",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "storage_key_string_bm",
+    srcs = [
+        "//src/mongo/db/storage:key_string_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage:key_string",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "storage_record_id_bm",
+    srcs = [
+        "//src/mongo/db/storage:record_id_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
+    deps = [
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/transport:transport_layer_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "remove_saver",
+    srcs = [
+        "//src/mongo/db/storage:remove_saver.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:encryption_hooks",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "flow_control",
+    srcs = [
+        "//src/mongo/db/storage:flow_control.cpp",
+    ],
+    deps = [
+        ":flow_control_parameters_idl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/util:background_job",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_storage_test",
+    srcs = [
+        "//src/mongo/db/storage:collection_truncate_markers_test.cpp",
+        "//src/mongo/db/storage:disk_space_monitor_test.cpp",
+        "//src/mongo/db/storage:external_record_store_test.cpp",
+        "//src/mongo/db/storage:flow_control_test.cpp",
+        "//src/mongo/db/storage:index_entry_comparison_test.cpp",
+        "//src/mongo/db/storage:key_string_test.cpp",
+        "//src/mongo/db/storage:storage_engine_lock_file_test.cpp",
+        "//src/mongo/db/storage:storage_engine_metadata_test.cpp",
+        "//src/mongo/db/storage:storage_repair_observer_test.cpp",
+        "//src/mongo/db/storage/kv:durable_catalog_test.cpp",
+        "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper_test.cpp",
+        "//src/mongo/db/storage/kv:storage_engine_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_first_group",
+    ],
+    deps = [
+        ":flow_control_parameters_idl",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/catalog:catalog_impl",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:topology_coordinator",
+        "//src/mongo/db/storage:disk_space_monitor",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:flow_control",
+        "//src/mongo/db/storage:key_string",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage:storage_engine_common",
+        "//src/mongo/db/storage:storage_engine_impl",
+        "//src/mongo/db/storage:storage_engine_lock_file",
+        "//src/mongo/db/storage:storage_engine_metadata",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage:storage_repair_observer",
+        "//src/mongo/db/storage/devnull:storage_devnull_core",
+        "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/util:periodic_runner_factory",
+    ],
+)
+
+mongo_cc_library(
+    name = "durable_catalog",
+    srcs = [
+        "//src/mongo/db/storage:durable_catalog.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/storage:bson_collection_catalog_entry",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_util",
+    srcs = [
+        "//src/mongo/db/storage:storage_util.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
+    ],
+)
+
+mongo_cc_library(
+    name = "disk_space_monitor",
+    srcs = [
+        "//src/mongo/db/storage:disk_space_monitor.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/storage:disk_space_util",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "checkpointer",
+    srcs = [
+        "//src/mongo/db/storage:checkpointer.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util:background_job",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "backup_block",
+    srcs = [
+        "//src/mongo/db/storage:backup_block.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_engine_impl",
+    srcs = [
+        "//src/mongo/db/storage:deferred_drop_record_store.cpp",
+        "//src/mongo/db/storage:storage_engine_impl.cpp",
+    ],
+    deps = [
+        ":two_phase_index_build_knobs_idl",
+        "//src/mongo/db:audit",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:resumable_index_builds_idl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db/catalog:catalog_control",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/storage:backup_block",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage:storage_repair_observer",
+        "//src/mongo/db/storage:storage_util",
+        "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
+    ],
+)
+
+mongo_cc_library(
+    name = "record_store_base",
+    srcs = [
+        "collection_truncate_markers.cpp",
+        "external_record_store.cpp",
+        "multi_bson_stream_cursor.cpp",
+        "record_store.cpp",
+    ] + select({
+        "@platforms//os:windows": ["named_pipe_windows.cpp"],
+        "//conditions:default": ["named_pipe_posix.cpp"],
+    }),
+    deps = [
+        "storage_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util:fail_point",
+    ] + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["//src/mongo/db/query:query_knobs"],
+    }),
+)
+
+mongo_cc_library(
+    name = "storage_engine_lock_file",
+    srcs = [
+        "//src/mongo/db/storage:storage_engine_lock_file.cpp",
+    ] + select({
+        "@platforms//os:windows": ["storage_engine_lock_file_windows.cpp"],
+        "//conditions:default": ["storage_engine_lock_file_posix.cpp"],
+    }),
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_binary(
+    name = "ksdecode",
+    srcs = [
+        "key_string_decode.cpp",
+    ],
+    tags = [
+        "dist_test",
+    ],
+    deps = [
+        "key_string",
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_idl_library(
+    name = "storage_parameters_idl",
+    src = "storage_parameters.idl",
+)
+
+mongo_idl_library(
+    name = "two_phase_index_build_knobs_idl",
+    src = "two_phase_index_build_knobs.idl",
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_idl_library(
+    name = "flow_control_parameters_idl",
+    src = "flow_control_parameters.idl",
+)
+
+mongo_cc_fuzzer_test(
+    name = "key_string_to_bson_fuzzer",
+    srcs = [
+        "key_string_to_bson_fuzzer.cpp",
+    ],
+    deps = [
+        ":key_string",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)

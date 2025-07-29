@@ -1,0 +1,20 @@
+diff --git a/bazel/mongo_src_rules.bzl b/bazel/mongo_src_rules.bzl
+index f9750d17214..87216a1b5f9 100644
+--- a/bazel/mongo_src_rules.bzl
++++ b/bazel/mongo_src_rules.bzl
+@@ -1370,6 +1370,7 @@ def mongo_idl_library(
+         idl_deps = [],
+         idl_hdrs = [],
+         deps = [],
++        no_undefined_ref_DO_NOT_USE = False,
+         **kwargs):
+     """
+     Args:
+@@ -1392,6 +1393,7 @@ def mongo_idl_library(
+         name = name,
+         srcs = [idl_gen_name],
+         deps = deps,
++        no_undefined_ref_DO_NOT_USE = no_undefined_ref_DO_NOT_USE,
+         **kwargs
+     )
+ 

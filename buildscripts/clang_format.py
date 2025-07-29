@@ -22,7 +22,6 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
-
 from optparse import OptionParser
 
 import structlog

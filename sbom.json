@@ -1247,37 +1247,6 @@
     },
     {
       "supplier": {
-        "name": "Organization: github"
-      },
-      "name": "SCons - a Software Construction tool",
-      "version": "4.9.1",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "purl": "pkg:github/SCons/scons@4.9.1",
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Build"
-        }
-      ],
-      "type": "library",
-      "bom-ref": "144a085e-96cd-4061-acf6-262fd1b69abe",
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/scons-4.9.1"
-          }
-        ]
-      },
-      "scope": "required"
-    },
-    {
-      "supplier": {
         "name": ""
       },
       "name": "smhasher",
@@ -1570,7 +1539,7 @@
         "name": "Organization: github"
       },
       "name": "zlib",
-      "version": "v1.3",
+      "version": "v1.3.1",
       "licenses": [
         {
           "license": {
@@ -1578,7 +1547,7 @@
           }
         }
       ],
-      "purl": "pkg:github/madler/zlib@v1.3",
+      "purl": "pkg:github/madler/zlib@v1.3.1",
       "properties": [
         {
           "name": "internal:team_responsible",

@@ -7,10 +7,10 @@ threads and through the _Waitable_ interface, move the execution of scheduled
 tasks out of the line, potentially hiding the execution cost from the critical
 path. A total of four baton classes are available today:
 
--   [Baton][baton]
--   [DefaultBaton][defaultBaton]
--   [NetworkingBaton][networkingBaton]
--   [AsioNetworkingBaton][asioNetworkingBaton]
+- [Baton][baton]
+- [DefaultBaton][defaultBaton]
+- [NetworkingBaton][networkingBaton]
+- [AsioNetworkingBaton][asioNetworkingBaton]
 
 ## Baton Hierarchy
 

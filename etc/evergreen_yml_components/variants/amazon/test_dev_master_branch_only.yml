@@ -20,16 +20,10 @@ variables:
 # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-arm64-dynamic-enterprise-compile-expansions
-  scons_cache_scope: shared
-  scons_cache_mode: all
   has_packages: false
-  compile_flags: >-
-    --ssl
-    MONGO_DISTMOD=amazon2
-    -j$(grep -c ^processor /proc/cpuinfo)
-    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    --link-model=dynamic
-    --use-diagnostic-latches=on
+  bazel_compile_flags: >-
+    --config=evg
+    --use_diagnostic_latches=True
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -37,7 +31,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &amazon_linux2_arm64_dynamic_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
   - name: version_gen
     variant: generate-tasks-for-version
@@ -81,97 +75,9 @@ buildvariants:
   expansions:
     <<: *linux-arm64-dynamic-enterprise-compile-expansions
     compile_variant: *amazon-linux2-arm64-stitch-compile
+    evergreen_remote_exec: on
   tasks:
     - name: .stitch
-
-- <<: *linux-arm64-dynamic-compile-params
-  name: &amazon-linux2-arm64-dev-compile amazon-linux2-arm64-dev-compile
-  display_name: "* Amazon Linux 2 arm64 Enterprise Dev Compile"
-  tags: ["suggested"]
-  expansions:
-    <<: *linux-arm64-dynamic-enterprise-compile-expansions
-    compile_variant: *amazon-linux2-arm64-dev-compile
-  tasks:
-    - name: scons_compile_smoke_test_TG
-    - name: ninja_compile_smoke_test_TG
-
-# Caching is purposefully disabled on this variant so we can benchmark consistent build times.
-- name: &amazon-linux2-arm64-local-compile amazon-linux2-arm64-local-compile
-  display_name: "Amazon Linux 2 arm64 Local Compile"
-  tags: []
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - amazon2-arm64-latest-large
-  expansions:
-    scons_cache_scope: none
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-      --use-diagnostic-latches=on
-      BAZEL_FLAGS=--config=local
-    compile_variant: *amazon-linux2-arm64-local-compile
-  tasks:
-    - name: compile_test_parallel_unittest_stream_TG
-    - name: compile_test_parallel_core_stream_TG
-
-# Note that this task is currently optional;
-# This will eventually become suggested, then required.
-- name: &amazon-linux-2023-arm64-bazel-compile amazon-linux-2023-arm64-bazel-compile
-  display_name: "Amazon Linux 2023 Enterprise arm64 Bazel Compile"
-  tags: ["bazel_check"]
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - amazon2023.3-arm64-small
-  stepback: false
-  expansions:
-    compile_variant: *amazon-linux-2023-arm64-bazel-compile
-  tasks:
-    - name: compile_bazel_TG
-    - name: compile_bazel_sanitize_TG
-    - name: compile_bazel_ninja_TG
-
-# Note that this task is currently optional;
-# This will eventually become suggested, then required.
-- name: &rhel81-ppc64le-bazel-compile rhel81-ppc64le-bazel-compile
-  display_name: "RHEL 8.1 PPC64LE Bazel Compile"
-  tags: ["bazel_check"]
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel81-power8-small
-  stepback: false
-  expansions:
-    compile_variant: *rhel81-ppc64le-bazel-compile
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel81
-      -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-  tasks:
-    - name: compile_bazel_TG
-
-# Note that this task is currently optional;
-# This will eventually become suggested, then required.
-- name: &rhel83-s390x-bazel-compile rhel83-s390x-bazel-compile
-  display_name: "RHEL 8.3 S390X Bazel Compile"
-  tags: ["bazel_check"]
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel83-zseries-small
-  stepback: false
-  expansions:
-    compile_variant: *rhel83-s390x-bazel-compile
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel83
-      -j3
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --linker=gold
-  tasks:
-    - name: compile_bazel_TG
-
 
 - &enterprise-amazon-linux2-arm64-all-feature-flags-template
   <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
@@ -184,8 +90,6 @@ buildvariants:
   stepback: true
   expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
     <<: *amazon_linux2_arm64_dynamic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
@@ -224,12 +128,11 @@ buildvariants:
   run_on:
   - amazon2023.3-arm64-large
   expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    scons_cache_scope: shared
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
+      --dbg_level=1
+      --separate_debug=False
+    evergreen_remote_exec: on
     compile_variant: *al2023-arm64-sep-benchmark
   tasks:
   - name: compile_upload_benchmarks_TG

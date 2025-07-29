@@ -1,7 +1,5 @@
 """Class to support running various linters in a common framework."""
 
-from typing import Dict, List, Optional
-
 import difflib
 import logging
 import os
@@ -10,6 +8,7 @@ import site
 import subprocess
 import sys
 import threading
+
 import pkg_resources
 
 from . import base

@@ -33,15 +33,10 @@ Only validates the document is syntatically correct, not semantically.
 """
 
 from abc import ABCMeta, abstractmethod
-import io
-from typing import Any, Callable, Dict, List, Set, Tuple, Union
-import yaml
-from yaml import nodes
 
-from . import common
-from . import cpp_types
-from . import errors
-from . import syntax
+import yaml
+
+from . import common, cpp_types, errors, syntax
 
 
 class _RuleDesc(object):

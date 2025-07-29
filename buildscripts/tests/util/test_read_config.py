@@ -1,6 +1,7 @@
 """Unit tests for the util/read_config.py file."""
 
 import unittest
+
 import mock
 
 from buildscripts.util import read_config

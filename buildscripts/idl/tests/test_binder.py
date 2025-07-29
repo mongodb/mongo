@@ -37,11 +37,11 @@ if __package__ is None:
     import sys
     from os import path
     sys.path.append(path.dirname(path.abspath(__file__)))
-    from context import idl
     import testcase
+    from context import idl
 else:
-    from .context import idl
     from . import testcase
+    from .context import idl
 
 # All YAML tests assume 4 space indent
 INDENT_SPACE_COUNT = 4

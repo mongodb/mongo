@@ -358,13 +358,13 @@ of the `$indexStats` operator. The following is a sample test output from
 The `CollectionCatalog` class holds in-memory state about all collections in all databases and is a
 cache of the [durable catalog](#durable-catalog) state. It provides the following functionality:
 
--   Register new `Collection` objects, taking ownership of them.
--   Lookup `Collection` objects by their `UUID` or `NamespaceString`.
--   Iterate over `Collection` objects in a database in `UUID` order.
--   Deregister individual dropped `Collection` objects, releasing ownership.
--   Allow closing/reopening the catalog while still providing limited `UUID` to `NamespaceString`
-    lookup to support rollback to a point in time.
--   Ensures `Collection` objects are in-sync with opened storage snapshots.
+- Register new `Collection` objects, taking ownership of them.
+- Lookup `Collection` objects by their `UUID` or `NamespaceString`.
+- Iterate over `Collection` objects in a database in `UUID` order.
+- Deregister individual dropped `Collection` objects, releasing ownership.
+- Allow closing/reopening the catalog while still providing limited `UUID` to `NamespaceString`
+  lookup to support rollback to a point in time.
+- Ensures `Collection` objects are in-sync with opened storage snapshots.
 
 ### Synchronization
 
@@ -399,21 +399,21 @@ points in time to use different `Collection` objects.
 
 Notable properties of `Collection` objects are:
 
--   catalog ID - to look up or change information from the DurableCatalog.
--   UUID - Identifier that remains for the lifetime of the underlying MongoDb collection, even across
-    DDL operations such as renames, and is consistent between different nodes and shards in a
-    cluster.
--   NamespaceString - The current name associated with the collection.
--   Collation and validation properties.
--   Decorations that are either `Collection` instance specific or shared between all `Collection`
-    objects over the lifetime of the collection.
+- catalog ID - to look up or change information from the DurableCatalog.
+- UUID - Identifier that remains for the lifetime of the underlying MongoDb collection, even across
+  DDL operations such as renames, and is consistent between different nodes and shards in a
+  cluster.
+- NamespaceString - The current name associated with the collection.
+- Collation and validation properties.
+- Decorations that are either `Collection` instance specific or shared between all `Collection`
+  objects over the lifetime of the collection.
 
 In addition `Collection` objects have shared ownership of:
 
--   An [`IndexCatalog`](#index-catalog) - an in-memory structure representing the `md.indexes` data
-    from the durable catalog.
--   A `RecordStore` - an interface to access and manipulate the documents in the collection as stored
-    by the storage engine.
+- An [`IndexCatalog`](#index-catalog) - an in-memory structure representing the `md.indexes` data
+  from the durable catalog.
+- A `RecordStore` - an interface to access and manipulate the documents in the collection as stored
+  by the storage engine.
 
 A writable `Collection` may only be requested in an active [WriteUnitOfWork](#WriteUnitOfWork). The
 new `Collection` instance is installed in the catalog when the storage transaction commits as the
@@ -501,21 +501,21 @@ With lock-free reads there may be ongoing concurrent DDL operations. In order to
 `CollectionCatalog` that's consistent with the snapshot, the following is performed when setting up
 a lock-free read:
 
--   Get the latest version of the `CollectionCatalog`.
--   Open a snapshot.
--   Get the latest version of the `CollectionCatalog` and check if it matches the one obtained
-    earlier. If not, we need to retry this. Otherwise we'd have a `CollectionCatalog` that's
-    inconsistent with the opened snapshot.
+- Get the latest version of the `CollectionCatalog`.
+- Open a snapshot.
+- Get the latest version of the `CollectionCatalog` and check if it matches the one obtained
+  earlier. If not, we need to retry this. Otherwise we'd have a `CollectionCatalog` that's
+  inconsistent with the opened snapshot.
 
 ## Collection Catalog and Multi-document Transactions
 
--   When we start the transaction we open a storage snapshot and stash a CollectionCatalog instance
-    similar to a regular lock-free read (but holding the RSTL as opposed to lock-free reads).
--   User reads within this transaction lock the namespace and ensures we have a Collection instance
-    consistent with the snapshot (same as above).
--   User writes do an additional step after locking to check if the collection instance obtained is
-    the latest instance in the CollectionCatalog, if it is not we treat this as a WriteConflict so the
-    transaction is retried.
+- When we start the transaction we open a storage snapshot and stash a CollectionCatalog instance
+  similar to a regular lock-free read (but holding the RSTL as opposed to lock-free reads).
+- User reads within this transaction lock the namespace and ensures we have a Collection instance
+  consistent with the snapshot (same as above).
+- User writes do an additional step after locking to check if the collection instance obtained is
+  the latest instance in the CollectionCatalog, if it is not we treat this as a WriteConflict so the
+  transaction is retried.
 
 The `CollectionCatalog` contains a mapping of `Namespace` and `UUID` to the `catalogId` for
 timestamps back to the oldest timestamp. These are used for efficient lookups into the durable
@@ -563,15 +563,15 @@ and prevents the reaper from dropping the collection and index tables during the
 
 _Code spelunking starting points:_
 
--   [_The KVDropPendingIdentReaper
-    class_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/kv/kv_drop_pending_ident_reaper.h)
-    -   Handles the second phase of collection/index drop. Runs when notified.
--   [_The TimestampMonitor and TimestampListener
-    classes_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.h#L178-L313)
-    -   The TimestampMonitor starts a periodic job to notify the reaper of the latest timestamp that is
-        okay to reap.
--   [_Code that signals the reaper with a
-    timestamp_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L932-L949)
+- [_The KVDropPendingIdentReaper
+  class_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/kv/kv_drop_pending_ident_reaper.h)
+    - Handles the second phase of collection/index drop. Runs when notified.
+- [_The TimestampMonitor and TimestampListener
+  classes_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.h#L178-L313)
+    - The TimestampMonitor starts a periodic job to notify the reaper of the latest timestamp that is
+      okay to reap.
+- [_Code that signals the reaper with a
+  timestamp_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L932-L949)
 
 # Storage Transactions
 
@@ -762,8 +762,8 @@ the state from changing.
 When setting up the read, `AutoGetCollectionForRead` will trigger the instantiation of a
 `Collection` object when either:
 
--   Reading at an earlier time than the minimum valid snapshot of the matching `Collection` from the `CollectionCatalog`.
--   No matching `Collection` is found in the `CollectionCatalog`.
+- Reading at an earlier time than the minimum valid snapshot of the matching `Collection` from the `CollectionCatalog`.
+- No matching `Collection` is found in the `CollectionCatalog`.
 
 In versions earlier than v7.0 this would error with `SnapshotUnavailable`.
 
@@ -791,9 +791,9 @@ access to any collection.
 
 _Code spelunking starting points:_
 
--   [_AutoGetCollectionForReadLockFree preserves an immutable CollectionCatalog_](https://github.com/mongodb/mongo/blob/dcf844f384803441b5393664e500008fc6902346/src/mongo/db/db_raii.cpp#L141)
--   [_AutoGetCollectionForReadLockFree returns early if already running lock-free_](https://github.com/mongodb/mongo/blob/dcf844f384803441b5393664e500008fc6902346/src/mongo/db/db_raii.cpp#L108-L112)
--   [_The lock-free operation flag on the OperationContext_](https://github.com/mongodb/mongo/blob/dcf844f384803441b5393664e500008fc6902346/src/mongo/db/operation_context.h#L298-L300)
+- [_AutoGetCollectionForReadLockFree preserves an immutable CollectionCatalog_](https://github.com/mongodb/mongo/blob/dcf844f384803441b5393664e500008fc6902346/src/mongo/db/db_raii.cpp#L141)
+- [_AutoGetCollectionForReadLockFree returns early if already running lock-free_](https://github.com/mongodb/mongo/blob/dcf844f384803441b5393664e500008fc6902346/src/mongo/db/db_raii.cpp#L108-L112)
+- [_The lock-free operation flag on the OperationContext_](https://github.com/mongodb/mongo/blob/dcf844f384803441b5393664e500008fc6902346/src/mongo/db/operation_context.h#L298-L300)
 
 ## Secondary Reads
 
@@ -998,11 +998,11 @@ field(s).
 
 To convert a regular index to unique, one has to follow the two-step process:
 
--   The index has to be first set to `prepareUnique` state using `collMod` command with the index
-    option `prepareUnique: true`. In this state, the index will start rejecting writes introducing
-    duplicate keys.
--   The `collMod` command with the index option `unique: true` will then check for the uniqueness
-    constraint and finally update the index spec in the catalog under a collection `MODE_X` lock.
+- The index has to be first set to `prepareUnique` state using `collMod` command with the index
+  option `prepareUnique: true`. In this state, the index will start rejecting writes introducing
+  duplicate keys.
+- The `collMod` command with the index option `unique: true` will then check for the uniqueness
+  constraint and finally update the index spec in the catalog under a collection `MODE_X` lock.
 
 If the index already has duplicate keys, the conversion in step two will fail and return all
 violating documents' ids grouped by the keys. Step two can be retried to finish the conversion after
@@ -1041,19 +1041,19 @@ index must correctly map keys to all documents.
 At a high level, omitting details that will be elaborated upon in further sections, index builds
 have the following procedure:
 
--   While holding a collection X lock, write a new index entry to the array of indexes included as
-    part of a durable catalog entry. This entry has a `ready: false` component. See [Durable
-    Catalog](#durable-catalog).
--   Downgrade to a collection IX lock.
--   Scan all documents on the collection to be indexed
-    -   Generate [KeyString](#keystring) keys for the indexed fields for each document
-    -   Periodically yield locks and storage engine snapshots
-    -   Insert the generated keys into the [external sorter](#the-external-sorter)
--   Read the sorted keys from the external sorter and [bulk
-    load](http://source.wiredtiger.com/3.2.1/tune_bulk_load.html) into the storage engine index.
-    Bulk-loading requires keys to be inserted in sorted order, but builds a B-tree structure that is
-    more efficiently filled than with random insertion.
--   While holding a collection X lock, make a final `ready: true` write to the durable catalog.
+- While holding a collection X lock, write a new index entry to the array of indexes included as
+  part of a durable catalog entry. This entry has a `ready: false` component. See [Durable
+  Catalog](#durable-catalog).
+- Downgrade to a collection IX lock.
+- Scan all documents on the collection to be indexed
+    - Generate [KeyString](#keystring) keys for the indexed fields for each document
+    - Periodically yield locks and storage engine snapshots
+    - Insert the generated keys into the [external sorter](#the-external-sorter)
+- Read the sorted keys from the external sorter and [bulk
+  load](http://source.wiredtiger.com/3.2.1/tune_bulk_load.html) into the storage engine index.
+  Bulk-loading requires keys to be inserted in sorted order, but builds a B-tree structure that is
+  more efficiently filled than with random insertion.
+- While holding a collection X lock, make a final `ready: true` write to the durable catalog.
 
 ## Hybrid Index Builds
 
@@ -1077,11 +1077,11 @@ a deletion of the key `1` and an insertion of the key `2`.
 Once the collection scan and bulk-load phases of the index build are complete, these intercepted
 keys are applied directly to the index in three phases:
 
--   While holding a collection IX lock to allow concurrent reads and writes
-    -   Because writes are still accepted, new keys may appear at the end of the _side-writes_ table.
-        They will be applied in subsequent steps.
--   While holding a collection S lock to block concurrent writes, but not reads
--   While holding a collection X lock to block all reads and writes
+- While holding a collection IX lock to allow concurrent reads and writes
+    - Because writes are still accepted, new keys may appear at the end of the _side-writes_ table.
+      They will be applied in subsequent steps.
+- While holding a collection S lock to block concurrent writes, but not reads
+- While holding a collection X lock to block all reads and writes
 
 See
 [IndexBuildInterceptor::sideWrite](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/index/index_build_interceptor.cpp#L403)
@@ -1151,13 +1151,13 @@ Manual](https://docs.mongodb.com/master/core/index-creation/#index-builds-in-rep
 
 Server 7.1 introduces the following improvements:
 
--   Index builds abort immediately after detecting errors other than duplicate key
-    violations. Before 7.1, index builds aborted the index build close to
-    completion, potentially long after detection.
--   A secondary member can abort a two-phase index build. Before 7.1, a secondary was forced
-    to crash instead. See the [Voting for Abort](#voting-for-abort) section.
--   Index builds are cancelled if there isn't enough storage space available. See the
-    [Disk Space](#disk-space) section.
+- Index builds abort immediately after detecting errors other than duplicate key
+  violations. Before 7.1, index builds aborted the index build close to
+  completion, potentially long after detection.
+- A secondary member can abort a two-phase index build. Before 7.1, a secondary was forced
+  to crash instead. See the [Voting for Abort](#voting-for-abort) section.
+- Index builds are cancelled if there isn't enough storage space available. See the
+  [Disk Space](#disk-space) section.
 
 ### Commit Quorum
 
@@ -1224,15 +1224,15 @@ which defaults to 500MB.
 On clean shutdown, index builds save their progress in internal idents that will be used for resuming
 the index builds when the server starts up. The persisted information includes:
 
--   [Phase of the index build](https://github.com/mongodb/mongo/blob/0d45dd9d7ba9d3a1557217a998ad31c68a897d47/src/mongo/db/resumable_index_builds.idl#L43) when it was interrupted for shutdown:
-    -   initialized
-    -   collection scan
-    -   bulk load
-    -   drain writes
--   Information relevant to the phase for reconstructing the internal state of the index build at
-    startup. This may include:
-    -   The internal state of the external sorter.
-    -   Idents for side writes, duplicate keys, and skipped records.
+- [Phase of the index build](https://github.com/mongodb/mongo/blob/0d45dd9d7ba9d3a1557217a998ad31c68a897d47/src/mongo/db/resumable_index_builds.idl#L43) when it was interrupted for shutdown:
+    - initialized
+    - collection scan
+    - bulk load
+    - drain writes
+- Information relevant to the phase for reconstructing the internal state of the index build at
+  startup. This may include:
+    - The internal state of the external sorter.
+    - Idents for side writes, duplicate keys, and skipped records.
 
 During [startup recovery](#startup-recovery), the persisted information is used to reconstruct the
 in-memory state for the index build and resume from the phase that we left off in. If we fail to
@@ -1242,10 +1242,10 @@ Not all incomplete index builds are resumable upon restart. The current criteria
 resumability can be found in [IndexBuildsCoordinator::isIndexBuildResumable()](https://github.com/mongodb/mongo/blob/0d45dd9d7ba9d3a1557217a998ad31c68a897d47/src/mongo/db/index_builds_coordinator.cpp#L375). Generally,
 index builds are resumable under the following conditions:
 
--   Storage engine is configured to be persistent with encryption disabled.
--   The index build is running on a voting member of the replica set with the default [commit quorum](#commit-quorum)
-    `"votingMembers"`.
--   Majority read concern is enabled.
+- Storage engine is configured to be persistent with encryption disabled.
+- The index build is running on a voting member of the replica set with the default [commit quorum](#commit-quorum)
+  `"votingMembers"`.
+- Majority read concern is enabled.
 
 The [Recover To A Timestamp (RTT) rollback algorithm](https://github.com/mongodb/mongo/blob/04b12743cbdcfea11b339e6ad21fc24dec8f6539/src/mongo/db/repl/README.md#rollback) supports
 resuming index builds interrupted at any phase. On entering rollback, the resumable
@@ -1290,9 +1290,9 @@ To make these comparisons fast, there exists a 1:1 mapping between `BSONObj` and
 `KeyString` is [binary comparable](#glossary). So, for a transformation function `t` converting
 `BSONObj` to `KeyString` and two `BSONObj` values `x` and `y`, the following holds:
 
--   `x < y` ⇔ `memcmp(t(x),t(y)) < 0`
--   `x > y` ⇔ `memcmp(t(x),t(y)) > 0`
--   `x = y` ⇔ `memcmp(t(x),t(y)) = 0`
+- `x < y` ⇔ `memcmp(t(x),t(y)) < 0`
+- `x > y` ⇔ `memcmp(t(x),t(y)) > 0`
+- `x = y` ⇔ `memcmp(t(x),t(y)) = 0`
 
 ## Ordering
 
@@ -1341,16 +1341,16 @@ validation to check if there are keys in the old format in unique secondary inde
 
 There are three kinds of builders for constructing `KeyString` values:
 
--   `key_string::Builder`: starts building using a small allocation on the stack, and
-    dynamically switches to allocating memory from the heap. This is generally preferable if the value
-    is only needed in the scope where it was created.
--   `key_string::HeapBuilder`: always builds using dynamic memory allocation. This has advantage that
-    calling the `release` method can transfer ownership of the memory without copying.
--   `key_string::PooledBuilder`: This class allow building many `KeyString` values tightly packed into
-    larger blocks. The advantage is fewer, larger memory allocations and no wasted space due to
-    internal fragmentation. This is a good approach when a large number of values is needed, such as
-    for index building. However, memory for a block is only released after _no_ references to that
-    block remain.
+- `key_string::Builder`: starts building using a small allocation on the stack, and
+  dynamically switches to allocating memory from the heap. This is generally preferable if the value
+  is only needed in the scope where it was created.
+- `key_string::HeapBuilder`: always builds using dynamic memory allocation. This has advantage that
+  calling the `release` method can transfer ownership of the memory without copying.
+- `key_string::PooledBuilder`: This class allow building many `KeyString` values tightly packed into
+  larger blocks. The advantage is fewer, larger memory allocations and no wasted space due to
+  internal fragmentation. This is a good approach when a large number of values is needed, such as
+  for index building. However, memory for a block is only released after _no_ references to that
+  block remain.
 
 The `key_string::Value` class holds a reference to a `SharedBufferFragment` with the `KeyString` and
 its `TypeBits` if any and can be used for passing around values.
@@ -1381,7 +1381,7 @@ iterator and maximum value 1MB.
 
 _Code spelunking starting points:_
 
--   [_The External Sorter Classes_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/sorter/sorter.h)
+- [_The External Sorter Classes_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/sorter/sorter.h)
 
 # The TTLMonitor
 
@@ -1393,17 +1393,17 @@ The TTLMonitor exhibits different behavior pending on whether batched deletes ar
 
 If ['ttlMonitorBatchDeletes'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L48) is specified, the TTLMonitor will batch deletes and provides fair TTL deletion as follows:
 
--   The TTL pass consists of one or more subpasses.
--   Each subpass refreshes its view of TTL indexes in the system. It removes documents on each TTL index in a round-robin fashion until there are no more expired documents or ['ttlMonitorSubPassTargetSecs'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L58) is reached.
-    -   The delete on each TTL index removes up to ['ttlIndexDeleteTargetDocs'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L84) or runs up to ['ttlIndexDeleteTargetTimeMS'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L72), whichever target is met first. The same TTL index can be queued up to be revisited in the same subpass if there are outstanding deletions.
-    -   A TTL index is not visited any longer in a subpass once all documents are deleted.
--   If there are outstanding deletions by the end of the subpass for any TTL index, a new subpass starts immediately within the same pass.
+- The TTL pass consists of one or more subpasses.
+- Each subpass refreshes its view of TTL indexes in the system. It removes documents on each TTL index in a round-robin fashion until there are no more expired documents or ['ttlMonitorSubPassTargetSecs'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L58) is reached.
+    - The delete on each TTL index removes up to ['ttlIndexDeleteTargetDocs'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L84) or runs up to ['ttlIndexDeleteTargetTimeMS'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L72), whichever target is met first. The same TTL index can be queued up to be revisited in the same subpass if there are outstanding deletions.
+    - A TTL index is not visited any longer in a subpass once all documents are deleted.
+- If there are outstanding deletions by the end of the subpass for any TTL index, a new subpass starts immediately within the same pass.
 
 _Code spelunking starting points:_
 
--   [_The TTLMonitor Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.h)
--   [_The TTLCollectionCache Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl_collection_cache.h)
--   [_ttl.idl_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl)
+- [_The TTLMonitor Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.h)
+- [_The TTLCollectionCache Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl_collection_cache.h)
+- [_ttl.idl_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl)
 
 # Repair
 
@@ -1414,30 +1414,30 @@ power outages.
 MongoDB provides a command-line `--repair` utility that attempts to recover as much data as possible
 from an installation that fails to start up due to data corruption.
 
--   [Types of Corruption](#types-of-corruption)
--   [Repair Procedure](#repair-procedure)
+- [Types of Corruption](#types-of-corruption)
+- [Repair Procedure](#repair-procedure)
 
 ## Types of Corruption
 
 MongoDB repair attempts to address the following forms of corruption:
 
--   Corrupt WiredTiger data files
-    -   Includes all collections, `_mdb_catalog`, and `sizeStorer`
--   Missing WiredTiger data files
-    -   Includes all collections, `_mdb_catalog`, and `sizeStorer`
--   Index inconsistencies
-    -   Validate [repair mode](#repair-mode) attempts to fix index inconsistencies to avoid a full index
-        rebuild.
-    -   Indexes are rebuilt on collections after they have been salvaged or if they fail validation and
-        validate repair mode is unable to fix all errors.
--   Unsalvageable collection data files
--   Corrupt metadata
-    -   `WiredTiger.wt`, `WiredTiger.turtle`, and WT journal files
--   “Orphaned” data files
-    -   Collection files missing from the `WiredTiger.wt` metadata
-    -   Collection files missing from the `_mdb_catalog` table
-    -   We cannot support restoring orphaned files that are missing from both metadata sources
--   Missing `featureCompatibilityVersion` document
+- Corrupt WiredTiger data files
+    - Includes all collections, `_mdb_catalog`, and `sizeStorer`
+- Missing WiredTiger data files
+    - Includes all collections, `_mdb_catalog`, and `sizeStorer`
+- Index inconsistencies
+    - Validate [repair mode](#repair-mode) attempts to fix index inconsistencies to avoid a full index
+      rebuild.
+    - Indexes are rebuilt on collections after they have been salvaged or if they fail validation and
+      validate repair mode is unable to fix all errors.
+- Unsalvageable collection data files
+- Corrupt metadata
+    - `WiredTiger.wt`, `WiredTiger.turtle`, and WT journal files
+- “Orphaned” data files
+    - Collection files missing from the `WiredTiger.wt` metadata
+    - Collection files missing from the `_mdb_catalog` table
+    - We cannot support restoring orphaned files that are missing from both metadata sources
+- Missing `featureCompatibilityVersion` document
 
 ## Repair Procedure
 
@@ -1498,14 +1498,14 @@ MongoDB repair attempts to address the following forms of corruption:
 
 Additionally:
 
--   When repair starts, it creates a temporary file, `_repair_incomplete` that is only removed when
-    repair completes. The server [will not start up
-    normally](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_init.cpp#L82-L86)
-    as long as this file is present.
--   Repair [will restore a
-    missing](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L434)
-    `featureCompatibilityVersion` document in the `admin.system.version` to the lower FCV version
-    available.
+- When repair starts, it creates a temporary file, `_repair_incomplete` that is only removed when
+  repair completes. The server [will not start up
+  normally](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_init.cpp#L82-L86)
+  as long as this file is present.
+- Repair [will restore a
+  missing](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L434)
+  `featureCompatibilityVersion` document in the `admin.system.version` to the lower FCV version
+  available.
 
 # Startup Recovery
 
@@ -1535,13 +1535,13 @@ startup recovery.
 
 The second step of recovering the catalog is [reconciling unfinished index builds](https://github.com/mongodb/mongo/blob/6c9adc9a2d518fa046c7739e043a568f9bee6931/src/mongo/db/storage/storage_engine_impl.cpp#L695-L699 "Github"), that could have different outcomes:
 
--   An [index build with a UUID](https://github.com/mongodb/mongo/blob/6c9adc9a2d518fa046c7739e043a568f9bee6931/src/mongo/db/storage/storage_engine_impl.cpp#L748-L751 "Github")
-    is an unfinished two-phase build and must be restarted, unless we are
-    [resuming it](#resumable-index-builds). This resume information is stored in an internal ident
-    written at (clean) shutdown. If we fail to resume the index build, we will clean up the internal
-    ident and restart the index build in the background.
--   An [unfinished index build on standalone](https://github.com/mongodb/mongo/blob/6c9adc9a2d518fa046c7739e043a568f9bee6931/src/mongo/db/storage/storage_engine_impl.cpp#L792-L794 "Github")
-    will be discarded (no oplog entry was ever written saying the index exists).
+- An [index build with a UUID](https://github.com/mongodb/mongo/blob/6c9adc9a2d518fa046c7739e043a568f9bee6931/src/mongo/db/storage/storage_engine_impl.cpp#L748-L751 "Github")
+  is an unfinished two-phase build and must be restarted, unless we are
+  [resuming it](#resumable-index-builds). This resume information is stored in an internal ident
+  written at (clean) shutdown. If we fail to resume the index build, we will clean up the internal
+  ident and restart the index build in the background.
+- An [unfinished index build on standalone](https://github.com/mongodb/mongo/blob/6c9adc9a2d518fa046c7739e043a568f9bee6931/src/mongo/db/storage/storage_engine_impl.cpp#L792-L794 "Github")
+  will be discarded (no oplog entry was ever written saying the index exists).
 
 After storage completes its recovery, control is passed to [replication
 recovery](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/README.md#startup-recovery "Github"). While storage recovery is responsible for recovering the oplog to meet durability
@@ -1633,13 +1633,13 @@ the data files.
 To avoid taking unnecessary checkpoints on an idle server, WiredTiger will only take checkpoints for
 the following scenarios:
 
--   When the [stable timestamp](../repl/README.md#replication-timestamp-glossary) is greater than or
-    equal to the [initial data timestamp](../repl/README.md#replication-timestamp-glossary), we take a
-    stable checkpoint, which is a durable view of the data at a particular timestamp. This is for
-    steady-state replication.
--   The [initial data timestamp](../repl/README.md#replication-timestamp-glossary) is not set, so we
-    must take a full checkpoint. This is when there is no consistent view of the data, such as during
-    initial sync.
+- When the [stable timestamp](../repl/README.md#replication-timestamp-glossary) is greater than or
+  equal to the [initial data timestamp](../repl/README.md#replication-timestamp-glossary), we take a
+  stable checkpoint, which is a durable view of the data at a particular timestamp. This is for
+  steady-state replication.
+- The [initial data timestamp](../repl/README.md#replication-timestamp-glossary) is not set, so we
+  must take a full checkpoint. This is when there is no consistent view of the data, such as during
+  initial sync.
 
 Not only does checkpointing provide us with durability for the database, but it also enables us to
 take [backups of the data](#file-system-backups).
@@ -1680,14 +1680,14 @@ apply (or not apply) T10 through T20.
 
 _Code spelunking starting points:_
 
--   [_The JournalFlusher class_](https://github.com/mongodb/mongo/blob/767494374cf12d76fc74911d1d0fcc2bbce0cd6b/src/mongo/db/storage/control/journal_flusher.h)
-    -   Perioidically and upon request flushes the journal to disk.
--   [_Code that ultimately calls flush journal on WiredTiger_](https://github.com/mongodb/mongo/blob/767494374cf12d76fc74911d1d0fcc2bbce0cd6b/src/mongo/db/storage/wiredtiger/wiredtiger_session_cache.cpp#L241-L362)
-    -   Skips flushing if ephemeral mode engine; may do a journal flush or take a checkpoint depending
-        on server settings.
--   [_Control of whether journaling is enabled_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h#L451)
-    -   'durable' confusingly means journaling is enabled.
--   [_Whether WT journals a collection_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L560-L580)
+- [_The JournalFlusher class_](https://github.com/mongodb/mongo/blob/767494374cf12d76fc74911d1d0fcc2bbce0cd6b/src/mongo/db/storage/control/journal_flusher.h)
+    - Perioidically and upon request flushes the journal to disk.
+- [_Code that ultimately calls flush journal on WiredTiger_](https://github.com/mongodb/mongo/blob/767494374cf12d76fc74911d1d0fcc2bbce0cd6b/src/mongo/db/storage/wiredtiger/wiredtiger_session_cache.cpp#L241-L362)
+    - Skips flushing if ephemeral mode engine; may do a journal flush or take a checkpoint depending
+      on server settings.
+- [_Control of whether journaling is enabled_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h#L451)
+    - 'durable' confusingly means journaling is enabled.
+- [_Whether WT journals a collection_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L560-L580)
 
 # Global Lock Admission Control
 
@@ -1708,9 +1708,9 @@ Flow Control is only concerned whether an operation is 'immediate' priority and 
 
 **AdmissionContext::Priority**
 
--   `kExempt` - Reserved for operations critical to availability (e.g replication workers), or observability (e.g. FTDC), and any operation releasing resources (e.g. committing or aborting prepared transactions).
--   `kNormal` - An operation that should be throttled when the server is under load. If an operation is throttled, it will not affect availability or observability. Most operations, both user and internal, should use this priority unless they qualify as 'kLow' or 'kExempt' priority.
--   `kLow` - Reserved for background tasks that have no other operations dependent on them. The operation will be throttled under load and make significantly less progress compared to operations of higher priorities in the Execution Control.
+- `kExempt` - Reserved for operations critical to availability (e.g replication workers), or observability (e.g. FTDC), and any operation releasing resources (e.g. committing or aborting prepared transactions).
+- `kNormal` - An operation that should be throttled when the server is under load. If an operation is throttled, it will not affect availability or observability. Most operations, both user and internal, should use this priority unless they qualify as 'kLow' or 'kExempt' priority.
+- `kLow` - Reserved for background tasks that have no other operations dependent on them. The operation will be throttled under load and make significantly less progress compared to operations of higher priorities in the Execution Control.
 
 [See AdmissionContext::Priority for more details](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/util/concurrency/admission_context.h#L45-L67).
 
@@ -1738,11 +1738,11 @@ unbounded collection growth. To remedy this issue, TTL deletes on a collection [
 
 Examples of Deprioritized Operations:
 
--   [TTL deletes](https://github.com/mongodb/mongo/blob/0ceb784512f81f77f0bc55001f83ca77d1aa1d84/src/mongo/db/ttl.cpp#L488)
--   [Persisting sampled queries for analyze shard key](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/commands/write_commands.cpp#L295)
--   [Unbounded Index Scans](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_access.cpp#L1913)
--   [Unbounded Collection Scans](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_analysis.cpp#L1254)
--   Index Builds [(1)](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3064), [(2)](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3105)
+- [TTL deletes](https://github.com/mongodb/mongo/blob/0ceb784512f81f77f0bc55001f83ca77d1aa1d84/src/mongo/db/ttl.cpp#L488)
+- [Persisting sampled queries for analyze shard key](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/commands/write_commands.cpp#L295)
+- [Unbounded Index Scans](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_access.cpp#L1913)
+- [Unbounded Collection Scans](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_analysis.cpp#L1254)
+- Index Builds [(1)](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3064), [(2)](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3105)
 
 ## Execution Control
 
@@ -1864,125 +1864,125 @@ informs us whether there’s any data corruption present in the collection at th
 
 There are two forms of validation, foreground and background.
 
--   Foreground validation requires exclusive access to the collection which prevents CRUD operations
-    from running. The benefit of this is that we're not validating a potentially stale snapshot and that
-    allows us to perform corrective operations such as fixing the collection's fast count.
+- Foreground validation requires exclusive access to the collection which prevents CRUD operations
+  from running. The benefit of this is that we're not validating a potentially stale snapshot and that
+  allows us to perform corrective operations such as fixing the collection's fast count.
 
--   Background validation runs lock-free on the collection and reads using a timestamp in
-    order to have a consistent view across the collection and its indexes. This mode allows CRUD
-    operations to be performed without being blocked.
+- Background validation runs lock-free on the collection and reads using a timestamp in
+  order to have a consistent view across the collection and its indexes. This mode allows CRUD
+  operations to be performed without being blocked.
 
 Additionally, users can specify that they'd like to perform a `full` validation.
 
--   Storage engines run custom validation hooks on the
-    [RecordStore](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/record_store.h#L445-L451)
-    and
-    [SortedDataInterface](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/sorted_data_interface.h#L130-L135)
-    as part of the storage interface.
--   These hooks enable storage engines to perform internal data structure checks that MongoDB would
-    otherwise not be able to perform.
--   More comprehensive and time-consuming checks will run to detect more types of non-conformant BSON
-    documents with duplicate field names, invalid UTF-8 characters, and non-decompressible BSON
-    Columns.
--   Full validations are not compatible with background validation.
+- Storage engines run custom validation hooks on the
+  [RecordStore](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/record_store.h#L445-L451)
+  and
+  [SortedDataInterface](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/sorted_data_interface.h#L130-L135)
+  as part of the storage interface.
+- These hooks enable storage engines to perform internal data structure checks that MongoDB would
+  otherwise not be able to perform.
+- More comprehensive and time-consuming checks will run to detect more types of non-conformant BSON
+  documents with duplicate field names, invalid UTF-8 characters, and non-decompressible BSON
+  Columns.
+- Full validations are not compatible with background validation.
 
 [Public docs on how to run validation and interpret the results.](https://docs.mongodb.com/manual/reference/command/validate/)
 
 ## Types of Validation
 
--   Verifies the collection's durable catalog entry and in-memory state match.
--   Indexes are marked as [multikey](#multikey-indexes) correctly.
--   Index [multikey](#multikey-indexes) paths cover all of the records in the `RecordStore`.
--   Indexes are not missing [multikey](#multikey-indexes) metadata information.
--   Index entries are in increasing order if the sort order is ascending.
--   Index entries are in decreasing order if the sort order is descending.
--   Unique indexes do not have duplicate keys.
--   Documents in the collection are valid and conformant `BSON`.
--   Fast count matches the number of records in the `RecordStore`.
-    -   For foreground validation only.
--   The number of \_id index entries always matches the number of records in the `RecordStore`.
--   The number of index entries for each index is not greater than the number of records in the record
-    store.
-    -   Not checked for indexed arrays and wildcard indexes.
--   The number of index entries for each index is not less than the number of records in the record
-    store.
-    -   Not checked for sparse and partial indexes.
--   Time-series bucket collections are valid.
+- Verifies the collection's durable catalog entry and in-memory state match.
+- Indexes are marked as [multikey](#multikey-indexes) correctly.
+- Index [multikey](#multikey-indexes) paths cover all of the records in the `RecordStore`.
+- Indexes are not missing [multikey](#multikey-indexes) metadata information.
+- Index entries are in increasing order if the sort order is ascending.
+- Index entries are in decreasing order if the sort order is descending.
+- Unique indexes do not have duplicate keys.
+- Documents in the collection are valid and conformant `BSON`.
+- Fast count matches the number of records in the `RecordStore`.
+    - For foreground validation only.
+- The number of \_id index entries always matches the number of records in the `RecordStore`.
+- The number of index entries for each index is not greater than the number of records in the record
+  store.
+    - Not checked for indexed arrays and wildcard indexes.
+- The number of index entries for each index is not less than the number of records in the record
+  store.
+    - Not checked for sparse and partial indexes.
+- Time-series bucket collections are valid.
 
 ## Validation Procedure
 
--   Instantiates the objects used throughout the validation procedure.
-    -   [ValidateState](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_state.h)
-        maintains the state for the collection being validated, such as locking, cursor management
-        for the collection and each index, data throttling (for background validation), and general
-        information about the collection.
-    -   [IndexConsistency](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.h)
-        descendents keep track of the number of keys detected in the record store and indexes. Detects when there
-        are index inconsistencies and maintains the information about the inconsistencies for
-        reporting.
-    -   [ValidateAdaptor](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.h)
-        used to traverse the record store and indexes. Validates that the records seen are valid
-        `BSON` conformant to most [BSON specifications](https://bsonspec.org/spec.html). In `full`
-        and `checkBSONConformance` validation modes, all `BSON` checks, including the time-consuming
-        ones, will be enabled.
--   If a `full` validation was requested, we run the storage engines validation hooks at this point to
-    allow a more thorough check to be performed.
--   Validates the [collection’s in-memory](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection.h)
-    state with the [durable catalog](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/durable_catalog.h#L242-L243)
-    entry information to ensure there are [no mismatches](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection_validation.cpp#L363-L425)
-    between the two.
--   [Initializes all the cursors](https://github.com/mongodb/mongo/blob/07765dda62d4709cddc9506ea378c0d711791b57/src/mongo/db/catalog/validate_state.cpp#L144-L205)
-    on the `RecordStore` and `SortedDataInterface` of each index in the `ValidateState` object.
-    -   We choose a read timestamp (`ReadSource`) based on the validation mode: `kNoTimestamp`
-        for foreground validation and `kProvided` for background validation.
--   Traverses the `RecordStore` using the `ValidateAdaptor` object.
-    -   [Validates each record and adds the document's index key set to the IndexConsistency objects](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L61-L140)
-        for consistency checks at later stages.
-        -   In an effort to reduce the memory footprint of validation, the `IndexConsistency` objects
-            [hashes](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L307-L309)
-            the keys (or paths) passed in to one of many buckets.
-        -   Document keys (or paths) will
-            [increment](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L204-L214)
-            the respective bucket.
-        -   Index keys (paths) will
-            [decrement](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L239-L248)
-            the respective bucket.
-    -   Checks that the `RecordId` is in [increasing order](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L305-L308).
-    -   [Adjusts the fast count](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L348-L353)
-        stored in the `RecordStore` (when performing a foreground validation only).
--   Traverses the index entries for each index in the collection.
-    -   [Validates the index key order to ensure that index entries are in increasing or decreasing order](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L144-L188).
-    -   Adds the index key to the `IndexConsistency` objects for consistency checks at later stages.
--   After the traversals are finished, the `IndexConsistency` objects are checked to detect any
-    inconsistencies between the collection and indexes.
-    -   If a bucket has a `value of 0`, then there are no inconsistencies for the keys that hashed
-        there.
-    -   If a bucket has a `value greater than 0`, then we are missing index entries.
-    -   If a bucket has a `value less than 0`, then we have extra index entries.
--   Upon detection of any index inconsistencies, the [second phase of validation](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection_validation.cpp#L186-L240)
-    is executed. If no index inconsistencies were detected, we’re finished and we report back to the
-    user.
-    -   The second phase of validation re-runs the first phase and expands its memory footprint by
-        recording the detailed information of the keys that were inconsistent during the first phase
-        of validation (keys that hashed to buckets where the value was not 0 in the end).
-    -   This is used to [pinpoint exactly where the index inconsistencies were detected](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L109-L202)
-        and to report them.
+- Instantiates the objects used throughout the validation procedure.
+    - [ValidateState](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_state.h)
+      maintains the state for the collection being validated, such as locking, cursor management
+      for the collection and each index, data throttling (for background validation), and general
+      information about the collection.
+    - [IndexConsistency](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.h)
+      descendents keep track of the number of keys detected in the record store and indexes. Detects when there
+      are index inconsistencies and maintains the information about the inconsistencies for
+      reporting.
+    - [ValidateAdaptor](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.h)
+      used to traverse the record store and indexes. Validates that the records seen are valid
+      `BSON` conformant to most [BSON specifications](https://bsonspec.org/spec.html). In `full`
+      and `checkBSONConformance` validation modes, all `BSON` checks, including the time-consuming
+      ones, will be enabled.
+- If a `full` validation was requested, we run the storage engines validation hooks at this point to
+  allow a more thorough check to be performed.
+- Validates the [collection’s in-memory](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection.h)
+  state with the [durable catalog](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/durable_catalog.h#L242-L243)
+  entry information to ensure there are [no mismatches](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection_validation.cpp#L363-L425)
+  between the two.
+- [Initializes all the cursors](https://github.com/mongodb/mongo/blob/07765dda62d4709cddc9506ea378c0d711791b57/src/mongo/db/catalog/validate_state.cpp#L144-L205)
+  on the `RecordStore` and `SortedDataInterface` of each index in the `ValidateState` object.
+    - We choose a read timestamp (`ReadSource`) based on the validation mode: `kNoTimestamp`
+      for foreground validation and `kProvided` for background validation.
+- Traverses the `RecordStore` using the `ValidateAdaptor` object.
+    - [Validates each record and adds the document's index key set to the IndexConsistency objects](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L61-L140)
+      for consistency checks at later stages.
+        - In an effort to reduce the memory footprint of validation, the `IndexConsistency` objects
+          [hashes](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L307-L309)
+          the keys (or paths) passed in to one of many buckets.
+        - Document keys (or paths) will
+          [increment](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L204-L214)
+          the respective bucket.
+        - Index keys (paths) will
+          [decrement](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L239-L248)
+          the respective bucket.
+    - Checks that the `RecordId` is in [increasing order](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L305-L308).
+    - [Adjusts the fast count](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L348-L353)
+      stored in the `RecordStore` (when performing a foreground validation only).
+- Traverses the index entries for each index in the collection.
+    - [Validates the index key order to ensure that index entries are in increasing or decreasing order](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L144-L188).
+    - Adds the index key to the `IndexConsistency` objects for consistency checks at later stages.
+- After the traversals are finished, the `IndexConsistency` objects are checked to detect any
+  inconsistencies between the collection and indexes.
+    - If a bucket has a `value of 0`, then there are no inconsistencies for the keys that hashed
+      there.
+    - If a bucket has a `value greater than 0`, then we are missing index entries.
+    - If a bucket has a `value less than 0`, then we have extra index entries.
+- Upon detection of any index inconsistencies, the [second phase of validation](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection_validation.cpp#L186-L240)
+  is executed. If no index inconsistencies were detected, we’re finished and we report back to the
+  user.
+    - The second phase of validation re-runs the first phase and expands its memory footprint by
+      recording the detailed information of the keys that were inconsistent during the first phase
+      of validation (keys that hashed to buckets where the value was not 0 in the end).
+    - This is used to [pinpoint exactly where the index inconsistencies were detected](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L109-L202)
+      and to report them.
 
 ## Repair Mode
 
 Validate accepts a RepairMode flag that instructs it to attempt to fix certain index
 inconsistencies. Repair mode can fix inconsistencies by applying the following remediations:
 
--   Missing index entries
-    -   Missing keys are inserted into the index
--   Extra index entries
-    -   Extra keys are removed from the index
--   Multikey documents are found for an index that is not marked multikey
-    -   The index is marked as multikey
--   Multikey documents are found that are not covered by an index's multikey paths
-    -   The index's multikey paths are updated
--   Corrupt documents
-    -   Documents with invalid BSON are removed
+- Missing index entries
+    - Missing keys are inserted into the index
+- Extra index entries
+    - Extra keys are removed from the index
+- Multikey documents are found for an index that is not marked multikey
+    - The index is marked as multikey
+- Multikey documents are found that are not covered by an index's multikey paths
+    - The index's multikey paths are updated
+- Corrupt documents
+    - Documents with invalid BSON are removed
 
 Repair mode is used by startup repair to avoid rebuilding indexes. Repair mode may also be used on
 standalone nodes by passing `{ repair: true }` to the validate command.
@@ -2040,21 +2040,21 @@ A new truncate marker is created when either:
 
 CollectionTruncateMarkers support collections that meet the following requirements:
 
--   Insert and truncate only. No updates or individual document deletes.
--   [Clustered](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/catalog/README.md#clustered-collections) with no secondary indexes.
--   RecordId's in Timestamp order.
--   Deletion of content follows RecordId ordering.
-    -   This is a general property of clustered capped collections.
+- Insert and truncate only. No updates or individual document deletes.
+- [Clustered](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/catalog/README.md#clustered-collections) with no secondary indexes.
+- RecordId's in Timestamp order.
+- Deletion of content follows RecordId ordering.
+    - This is a general property of clustered capped collections.
 
 Collections who use CollectionTruncateMarkers share the following properties:
 
--   Fast counts aren't expected to be accurate.
-    -   Truncates don't track the count and size of documents truncated in exchange for performance gains.
-    -   Markers are a best effort way to keep track of the size metrics and when to truncate expired data.
--   Collections aren't expected to be consistent between replica set members.
-    -   Truncates are unreplicated, and nodes may truncate ranges at different times.
--   No snapshot read concern support (ex: [SERVER-78296](https://jira.mongodb.org/browse/SERVER-78296)).
-    -   Deleting with untimestamped, unreplicated range truncation means point-in-time reads may see inconsistent data.
+- Fast counts aren't expected to be accurate.
+    - Truncates don't track the count and size of documents truncated in exchange for performance gains.
+    - Markers are a best effort way to keep track of the size metrics and when to truncate expired data.
+- Collections aren't expected to be consistent between replica set members.
+    - Truncates are unreplicated, and nodes may truncate ranges at different times.
+- No snapshot read concern support (ex: [SERVER-78296](https://jira.mongodb.org/browse/SERVER-78296)).
+    - Deleting with untimestamped, unreplicated range truncation means point-in-time reads may see inconsistent data.
 
 Each collection utilizing CollectionTruncateMarkers must implement its [own policy](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/collection_truncate_markers.h#L277) to determine when there are excess markers and it is time for truncation.
 
@@ -2064,16 +2064,16 @@ At or shortly after startup, an initial set of CollectionTruncateMarkers are cre
 
 ### Collections that use CollectionTruncateMarkers
 
--   [The oplog](#oplog-truncation) - `OplogTruncateMarkers`
--   [Change stream change collections](#change-collection-truncation) - `ChangeCollectionTruncateMarkers`
--   [Change stream pre images collections](#pre-images-collection-truncation) - `PreImagesTruncateMarkersPerNsUUID`
+- [The oplog](#oplog-truncation) - `OplogTruncateMarkers`
+- [Change stream change collections](#change-collection-truncation) - `ChangeCollectionTruncateMarkers`
+- [Change stream pre images collections](#pre-images-collection-truncation) - `PreImagesTruncateMarkersPerNsUUID`
 
 ### Change Stream Collection Truncation
 
 Change stream collections which use CollectionTruncateMarkers
 
--   change collection: `<tenantId>_config.system.change_collection`, exclusive to serverless environments.
--   pre-images: `<tenantId>_config.system.preimages` in serverless, `config.system.preimages` in dedicated environments.
+- change collection: `<tenantId>_config.system.change_collection`, exclusive to serverless environments.
+- pre-images: `<tenantId>_config.system.preimages` in serverless, `config.system.preimages` in dedicated environments.
 
 Both change stream collections have a periodic remover thread ([ChangeStreamExpiredPreImagesRemover](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_expired_pre_image_remover.cpp#L71), [ChangeCollectionExpiredDocumentsRemover](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_collection_expired_documents_remover.cpp)).
 Each remover thread:
@@ -2108,16 +2108,16 @@ For each tenant, `ChangeStreamExpiredPreImagesRemover` iterates over each set of
 
 ### Code spelunking starting points:
 
--   [The CollectionTruncateMarkers class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/collection_truncate_markers.h#L78)
-    -   The main api for CollectionTruncateMarkers.
--   [The OplogTruncateMarkers class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h)
-    -   Oplog specific truncate markers.
--   [The ChangeCollectionTruncateMarkers class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_collection_truncate_markers.h#L47)
-    -   Change stream change collection specific truncate markers.
--   [The PreImagesTruncateMarkersPerNsUUID class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h#L62)
-    -   Truncate markers for a given nsUUID captured within a pre-images collection.
--   [The PreImagesTruncateManager class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_manager.h#L70)
-    -   Manages pre image truncate markers for each tenant.
+- [The CollectionTruncateMarkers class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/collection_truncate_markers.h#L78)
+    - The main api for CollectionTruncateMarkers.
+- [The OplogTruncateMarkers class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h)
+    - Oplog specific truncate markers.
+- [The ChangeCollectionTruncateMarkers class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_collection_truncate_markers.h#L47)
+    - Change stream change collection specific truncate markers.
+- [The PreImagesTruncateMarkersPerNsUUID class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h#L62)
+    - Truncate markers for a given nsUUID captured within a pre-images collection.
+- [The PreImagesTruncateManager class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_manager.h#L70)
+    - Manages pre image truncate markers for each tenant.
 
 # Oplog Collection
 
@@ -2252,21 +2252,21 @@ pipeline stage or restarting the process.
 
 Metrics are not collected for all operations. The following limitations apply:
 
--   Only operations from user connections collect metrics. For example, internal connections from
-    other replica set members do not collect metrics.
--   Metrics are only collected for a specific set of commands. Those commands override the function
-    `Command::collectsResourceConsumptionMetrics()`.
--   Metrics for write operations are only collected on primary nodes.
-    -   This includes TTL index deletions.
--   All attempted write operations collect metrics. This includes writes that fail or retry internally
-    due to write conflicts.
--   Read operations are attributed to the replication state of a node. Read metrics are broken down
-    into whether they occurred in the primary or secondary replication states.
--   Index builds collect metrics. Because index builds survive replication state transitions, they
-    only record aggregated metrics if the node is currently primary when the index build completes.
--   Metrics are not collected on `mongos` and are not supported or tested in sharded environments.
--   Storage engines other than WiredTiger do not implement metrics collection.
--   Metrics are not adjusted after replication rollback.
+- Only operations from user connections collect metrics. For example, internal connections from
+  other replica set members do not collect metrics.
+- Metrics are only collected for a specific set of commands. Those commands override the function
+  `Command::collectsResourceConsumptionMetrics()`.
+- Metrics for write operations are only collected on primary nodes.
+    - This includes TTL index deletions.
+- All attempted write operations collect metrics. This includes writes that fail or retry internally
+  due to write conflicts.
+- Read operations are attributed to the replication state of a node. Read metrics are broken down
+  into whether they occurred in the primary or secondary replication states.
+- Index builds collect metrics. Because index builds survive replication state transitions, they
+  only record aggregated metrics if the node is currently primary when the index build completes.
+- Metrics are not collected on `mongos` and are not supported or tested in sharded environments.
+- Storage engines other than WiredTiger do not implement metrics collection.
+- Metrics are not adjusted after replication rollback.
 
 ## Document and Index Entry Units
 
@@ -2373,11 +2373,11 @@ key must currently be `{_id: 1}` and unique.
 Clustered collections may be created with the `clusteredIndex` collection creation option. The
 `clusteredIndex` option accepts the following formats:
 
--   A document that specifies the clustered index configuration.
+- A document that specifies the clustered index configuration.
     ```
     {clusteredIndex: {key: {_id: 1}, unique: true}}
     ```
--   A legacy boolean parameter for backwards compatibility with 5.0 time-series collections.
+- A legacy boolean parameter for backwards compatibility with 5.0 time-series collections.
     ```
     {clusteredIndex: true}
     ```
@@ -2503,30 +2503,30 @@ indistinguishable from the creation case, establishing a strong invariant.
 
 ## Cherry-picked WT log Details
 
--   The WT log is a write ahead log. Before a [transaction commit](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a712226eca5ade5bd123026c624468fa2 "WiredTiger Docs") returns to the application, logged writes
-    must have their log entry bytes written into WiredTiger's log buffer. Depending on `sync` setting,
-    those bytes may or may not be on disk.
--   MongoDB only chooses to log writes to a subset of WT's tables (e.g: the oplog).
--   MongoDB does not `sync` the log on transaction commit. But rather uses the [log
-    flush](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a1843292630960309129dcfe00e1a3817 "WiredTiger Docs") API. This optimization is two-fold. Writes that do not require to be
-    persisted do not need to wait for durability on disk. Second, this pattern allows for batching
-    of writes to go to disk for improved throughput.
--   WiredTiger's log is similar to MongoDB's oplog in that multiple writers can concurrently copy
-    their bytes representing a log record into WiredTiger's log buffer similar to how multiple
-    MongoDB writes can concurrently generate oplog entries.
--   MongoDB's optime generator for the oplog is analogous to WT's LSN (log sequence number)
-    generator. Both are a small critical section to ensure concurrent writes don't get the same
-    timestamp key/memory address to write an oplog entry value/log bytes into.
--   While MongoDB's oplog writes are logical (the key is a timestamp), WT's are obviously more
-    physical (the key is a memory->disk location). WiredTiger is writing to a memory buffer. Thus before a
-    transaction commit can go to the log buffer to "request a slot", it must know how many bytes it's
-    going to write. Compare this to a multi-statement transaction replicating as a single applyOps
-    versus each statement generating an individual oplog entry for each write that's part of the
-    transaction.
--   MongoDB testing sometimes uses a [WT debugging
-    option](https://github.com/mongodb/mongo/blob/a7bd84dc5ad15694864526612bceb3877672d8a9/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L601 "Github") that will write "no-op" log entries for other operations performed on a
-    transaction. Such as setting a timestamp or writing to a table that is not configured to be
-    written to WT's log (e.g: a typical user collection and index).
+- The WT log is a write ahead log. Before a [transaction commit](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a712226eca5ade5bd123026c624468fa2 "WiredTiger Docs") returns to the application, logged writes
+  must have their log entry bytes written into WiredTiger's log buffer. Depending on `sync` setting,
+  those bytes may or may not be on disk.
+- MongoDB only chooses to log writes to a subset of WT's tables (e.g: the oplog).
+- MongoDB does not `sync` the log on transaction commit. But rather uses the [log
+  flush](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a1843292630960309129dcfe00e1a3817 "WiredTiger Docs") API. This optimization is two-fold. Writes that do not require to be
+  persisted do not need to wait for durability on disk. Second, this pattern allows for batching
+  of writes to go to disk for improved throughput.
+- WiredTiger's log is similar to MongoDB's oplog in that multiple writers can concurrently copy
+  their bytes representing a log record into WiredTiger's log buffer similar to how multiple
+  MongoDB writes can concurrently generate oplog entries.
+- MongoDB's optime generator for the oplog is analogous to WT's LSN (log sequence number)
+  generator. Both are a small critical section to ensure concurrent writes don't get the same
+  timestamp key/memory address to write an oplog entry value/log bytes into.
+- While MongoDB's oplog writes are logical (the key is a timestamp), WT's are obviously more
+  physical (the key is a memory->disk location). WiredTiger is writing to a memory buffer. Thus before a
+  transaction commit can go to the log buffer to "request a slot", it must know how many bytes it's
+  going to write. Compare this to a multi-statement transaction replicating as a single applyOps
+  versus each statement generating an individual oplog entry for each write that's part of the
+  transaction.
+- MongoDB testing sometimes uses a [WT debugging
+  option](https://github.com/mongodb/mongo/blob/a7bd84dc5ad15694864526612bceb3877672d8a9/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L601 "Github") that will write "no-op" log entries for other operations performed on a
+  transaction. Such as setting a timestamp or writing to a table that is not configured to be
+  written to WT's log (e.g: a typical user collection and index).
 
 The most important WT log entry for MongoDB is one that represents an insert into the
 oplog.
@@ -2558,26 +2558,26 @@ oplog.
   }
 ```
 
--   `lsn` is a log sequence number. The WiredTiger log files are named with numbers as a
-    suffix, e.g: `WiredTigerLog.0000000001`. In this example, the LSN's first value `1` maps to log
-    file `0000000001`. The second value `57984` is the byte offset in the file.
--   `hdr_flags` stands for header flags. Think HTTP headers. MongoDB configures WiredTiger to use
-    snappy compression on its journal entries. Small journal entries (< 128 bytes?) won't be
-    compressed.
--   `rec_len` is the number of bytes for the record
--   `type` is...the type of journal entry. The type will be `commit` for application's committing a
-    transaction. Other types are typically for internal WT operations. Examples include `file_sync`,
-    `checkpoint` and `system`.
--   `txnid` is WT's transaction id associated with the log record.
--   `ops` is a list of operations that are part of the transaction. A transaction that inserts two
-    documents and removes a third will see three entries. Two `row_put` operations followed by a
-    `row_remove`.
--   `ops.fileid` refers to the WT table that the operation is performed against. The fileid mapping
-    is held in the `WiredTiger.wt` file (a table within itself). This value is faked for WT's
-    logging debug mode for tables which MongoDB is not logging.
--   `ops.key` and `ops.value` are the binary representations of the inserted document (`value` is omitted
-    for removal).
--   `ops.key-hex` and `ops.value-bson` are specific to the pretty printing tool used.
+- `lsn` is a log sequence number. The WiredTiger log files are named with numbers as a
+  suffix, e.g: `WiredTigerLog.0000000001`. In this example, the LSN's first value `1` maps to log
+  file `0000000001`. The second value `57984` is the byte offset in the file.
+- `hdr_flags` stands for header flags. Think HTTP headers. MongoDB configures WiredTiger to use
+  snappy compression on its journal entries. Small journal entries (< 128 bytes?) won't be
+  compressed.
+- `rec_len` is the number of bytes for the record
+- `type` is...the type of journal entry. The type will be `commit` for application's committing a
+  transaction. Other types are typically for internal WT operations. Examples include `file_sync`,
+  `checkpoint` and `system`.
+- `txnid` is WT's transaction id associated with the log record.
+- `ops` is a list of operations that are part of the transaction. A transaction that inserts two
+  documents and removes a third will see three entries. Two `row_put` operations followed by a
+  `row_remove`.
+- `ops.fileid` refers to the WT table that the operation is performed against. The fileid mapping
+  is held in the `WiredTiger.wt` file (a table within itself). This value is faked for WT's
+  logging debug mode for tables which MongoDB is not logging.
+- `ops.key` and `ops.value` are the binary representations of the inserted document (`value` is omitted
+  for removal).
+- `ops.key-hex` and `ops.value-bson` are specific to the pretty printing tool used.
 
 [copy-on-write]: https://en.wikipedia.org/wiki/Copy-on-write
 [Multiversion concurrency control]: https://en.wikipedia.org/wiki/Multiversion_concurrency_control

@@ -42,19 +42,19 @@ some assertions, even when running a mixture of different workloads together.
 There are three assertion levels: `ALWAYS`, `OWN_COLL`, and `OWN_DB`. They can
 be thought of as follows:
 
--   `ALWAYS`: A statement that remains unequivocally true, regardless of what
-    another workload might be doing to the collection I was given (hint: think
-    defensively). Examples include "1 = 1" or inserting a document into a
-    collection (disregarding any unique indices).
+- `ALWAYS`: A statement that remains unequivocally true, regardless of what
+  another workload might be doing to the collection I was given (hint: think
+  defensively). Examples include "1 = 1" or inserting a document into a
+  collection (disregarding any unique indices).
 
--   `OWN_COLL`: A statement that is true only if I am the only workload operating
-    on the collection I was given. Examples include counting the number of
-    documents in a collection or updating a previously inserted document.
+- `OWN_COLL`: A statement that is true only if I am the only workload operating
+  on the collection I was given. Examples include counting the number of
+  documents in a collection or updating a previously inserted document.
 
--   `OWN_DB`: A statement that is true only if I am the only workload operating on
-    the database I was given. Examples include renaming a collection or verifying
-    that a collection is capped. The workload typically relies on the use of
-    another collection aside from the one given.
+- `OWN_DB`: A statement that is true only if I am the only workload operating on
+  the database I was given. Examples include renaming a collection or verifying
+  that a collection is capped. The workload typically relies on the use of
+  another collection aside from the one given.
 
 ## Creating your own workload
 
@@ -361,10 +361,10 @@ is explained in the other components section below. Execution options for
 runWorkloads functions, the third argument, can contain the following options
 (some depend on the run mode):
 
--   `numSubsets` - Not available in serial mode, determines how many subsets of
-    workloads to execute in parallel mode
--   `subsetSize` - Not available in serial mode, determines how large each subset of
-    workloads executed is
+- `numSubsets` - Not available in serial mode, determines how many subsets of
+  workloads to execute in parallel mode
+- `subsetSize` - Not available in serial mode, determines how large each subset of
+  workloads executed is
 
 #### fsm_all.js
 
@@ -446,16 +446,16 @@ use of the shell's built-in cluster test helpers like `ShardingTest` and
 `ReplSetTest`. clusterOptions are passed to cluster.js for initialization.
 clusterOptions include:
 
--   `replication`: boolean, whether or not to use replication in the cluster
--   `sameCollection`: boolean, whether or not all workloads are passed the same
-    collection
--   `sameDB`: boolean, whether or not all workloads are passed the same DB
--   `setupFunctions`: object, containing at most two functions under the keys
-    'mongod' and 'mongos'. This allows you to run a function against all mongod or
-    mongos nodes in the cluster as part of the cluster initialization. Each
-    function takes a single argument, the db object against which configuration
-    can be run (will be set for each mongod/mongos)
--   `sharded`: boolean, whether or not to use sharding in the cluster
+- `replication`: boolean, whether or not to use replication in the cluster
+- `sameCollection`: boolean, whether or not all workloads are passed the same
+  collection
+- `sameDB`: boolean, whether or not all workloads are passed the same DB
+- `setupFunctions`: object, containing at most two functions under the keys
+  'mongod' and 'mongos'. This allows you to run a function against all mongod or
+  mongos nodes in the cluster as part of the cluster initialization. Each
+  function takes a single argument, the db object against which configuration
+  can be run (will be set for each mongod/mongos)
+- `sharded`: boolean, whether or not to use sharding in the cluster
 
 Note that sameCollection and sameDB can increase contention for a resource, but
 will also decrease the strength of the assertions by ruling out the use of OwnDB
@@ -463,12 +463,12 @@ and OwnColl assertions.
 
 ### Miscellaneous Execution Notes
 
--   A `CountDownLatch` (exposed through the v8-based mongo shell, as of MongoDB 3.0)
-    is used as a synchronization primitive by the ThreadManager to wait until all
-    spawned threads have finished being spawned before starting workload
-    execution.
--   If more than 20% of the threads fail while spawning, we abort the test. If
-    fewer than 20% of the threads fail while spawning we allow the non-failed
-    threads to continue with the test. The 20% threshold is somewhat arbitrary;
-    the goal is to abort if "mostly all" of the threads failed but to tolerate "a
-    few" threads failing.
+- A `CountDownLatch` (exposed through the v8-based mongo shell, as of MongoDB 3.0)
+  is used as a synchronization primitive by the ThreadManager to wait until all
+  spawned threads have finished being spawned before starting workload
+  execution.
+- If more than 20% of the threads fail while spawning, we abort the test. If
+  fewer than 20% of the threads fail while spawning we allow the non-failed
+  threads to continue with the test. The 20% threshold is somewhat arbitrary;
+  the goal is to abort if "mostly all" of the threads failed but to tolerate "a
+  few" threads failing.

@@ -11,7 +11,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &windows_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: &windows_compile_variant_name windows-compile-required
   - name: version_gen
     variant: generate-tasks-for-version
@@ -59,22 +59,16 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      msi
+      //src/mongo/installer/msi:mongodb-win32-x86_64-windows
     content_type: application/zip
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=windows
-      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-      --win-version-min=win10
-      --use-diagnostic-latches=on
-    num_scons_link_jobs_available: 0.1
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=windows
+      --use_diagnostic_latches=True
     python: '/cygdrive/c/python/python310/python.exe'
-    scons_cache_scope: shared
     compile_variant: *windows-compile-required
   tasks:
-  - name: compile_ninja_quick_TG
   - name: compile_test_parallel_core_stream_TG
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_no_sandbox_TG
   - name: compile_test_parallel_dbtest_stream_TG
   - name: compile_build_tools_next_TG
   - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.stitch

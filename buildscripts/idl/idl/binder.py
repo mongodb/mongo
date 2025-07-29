@@ -30,14 +30,9 @@
 import collections
 import re
 import typing
-from typing import Type, TypeVar, cast, List, Set, Union, Optional
+from typing import cast
 
-from . import ast
-from . import bson
-from . import common
-from . import enum_types
-from . import errors
-from . import syntax
+from . import ast, bson, common, enum_types, errors, syntax
 
 
 def _validate_single_bson_type(ctxt, idl_type, syntax_type):
@@ -200,7 +195,7 @@ def _validate_type_properties(ctxt, idl_type, syntax_type):
                 ctxt.add_missing_ast_required_field_error(idl_type, syntax_type, idl_type.name,
                                                           "deserializer")
 
-        elif not bson_type in ["array", "object", "bindata"]:
+        elif bson_type not in ["array", "object", "bindata"]:
             if idl_type.deserializer is None:
                 ctxt.add_missing_ast_required_field_error(idl_type, syntax_type, idl_type.name,
                                                           "deserializer")

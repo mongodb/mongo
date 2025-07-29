@@ -1,17 +1,17 @@
 # Updating abseil
 
-The SConscript file for the abseil build is parsed via the generated ninja 
+The BUILD.bazel file for the abseil build is parsed via the generated ninja 
 file from the native abseil cmake build. The parse_libs_from_ninja.py will 
-perform the parsing and generation of the SConscript file. 
+perform the parsing and generation of the BUILD.bazel file. 
 
 To update abseil you should:
 
 1. update the version/repo information in the import.py script
 2. remove the existing abseil-cpp/dist directory
-3. run the import.py script
+3. run the import.sh script
 4. run the parse_libs_from_ninja.py
 
-# Updating the SConscript generated libraries
+# Updating the BUILD.bazel generated libraries
 
 The parse_libs_from_ninja.py will extract specifically requested libraries 
 from the native abseil build. This list of libraries should be a python list 

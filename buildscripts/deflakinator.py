@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import subprocess
 import uuid
-import json
 
 _MAX_RUNS = 1000
 

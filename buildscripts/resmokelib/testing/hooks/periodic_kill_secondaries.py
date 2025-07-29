@@ -9,12 +9,14 @@ import pymongo.errors
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface as fixture
 from buildscripts.resmokelib.testing.fixtures import replicaset
-from buildscripts.resmokelib.testing.hooks import dbhash
-from buildscripts.resmokelib.testing.hooks import interface
-from buildscripts.resmokelib.testing.hooks import oplog
-from buildscripts.resmokelib.testing.hooks import preimages_consistency
-from buildscripts.resmokelib.testing.hooks import change_collection_consistency
-from buildscripts.resmokelib.testing.hooks import validate
+from buildscripts.resmokelib.testing.hooks import (
+    change_collection_consistency,
+    dbhash,
+    interface,
+    oplog,
+    preimages_consistency,
+    validate,
+)
 
 
 class PeriodicKillSecondaries(interface.Hook):

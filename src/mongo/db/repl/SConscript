@@ -959,7 +959,7 @@ env.Library(
 )
 
 env.Library(
-    'read_concern_args',
+    target='read_concern_args',
     source=[
         'read_concern_args.cpp',
     ],
@@ -970,7 +970,7 @@ env.Library(
 )
 
 env.Library(
-    'speculative_majority_read_info',
+    target='speculative_majority_read_info',
     source=[
         'speculative_majority_read_info.cpp',
     ],

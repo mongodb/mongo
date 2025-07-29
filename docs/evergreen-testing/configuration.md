@@ -32,19 +32,19 @@ Performance unittests, used mainly for validating areas related to the Query sys
 
 The above Evergreen projects are defined in the following files:
 
--   `etc/evergreen_yml_components/**.yml`. YAML files containing definitions for tasks, functions, buildvariants, etc.
-    They are copied from the existing evergreen.yml file.
+- `etc/evergreen_yml_components/**.yml`. YAML files containing definitions for tasks, functions, buildvariants, etc.
+  They are copied from the existing evergreen.yml file.
 
--   `etc/evergreen.yml`. Imports components from above and serves as the project config for mongodb-mongo-master,
-    containing all build variants for development, including all feature-specific, patch build required, and suggested
-    variants.
+- `etc/evergreen.yml`. Imports components from above and serves as the project config for mongodb-mongo-master,
+  containing all build variants for development, including all feature-specific, patch build required, and suggested
+  variants.
 
--   `etc/evergreen_nightly.yml`. The project configuration for mongodb-mongo-master-nightly, containing only build
-    variants for public nightly builds, imports similar components as evergreen.yml to ensure consistency.
+- `etc/evergreen_nightly.yml`. The project configuration for mongodb-mongo-master-nightly, containing only build
+  variants for public nightly builds, imports similar components as evergreen.yml to ensure consistency.
 
--   `etc/sys_perf.yml`. Configuration file for the system performance project.
+- `etc/sys_perf.yml`. Configuration file for the system performance project.
 
--   `etc/perf.yml`. Configuration for the microbenchmark project.
+- `etc/perf.yml`. Configuration for the microbenchmark project.
 
 ## Release Branching Process
 

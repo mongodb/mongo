@@ -23,36 +23,36 @@ of `dbtest,java,mongo,mongod,mongos,python,_test`.
 In all other scenarios, including local use of the hang-analyzer, an interesting
 process is any of:
 
--   process that starts with `python` or `live-record`
--   one which has been spawned as a child process of resmoke.
+- process that starts with `python` or `live-record`
+- one which has been spawned as a child process of resmoke.
 
 The resmoke subcommand `hang-analyzer` will send SIGUSR1/use SetEvent to signal
 resmoke to:
 
--   Print stack traces for all python threads
--   Collect core dumps and other information for any non-python child
-    processes, see `Data Collection` below
--   Re-signal any python child processes to do the same
+- Print stack traces for all python threads
+- Collect core dumps and other information for any non-python child
+  processes, see `Data Collection` below
+- Re-signal any python child processes to do the same
 
 ## Data Collection
 
 Data collection occurs in the following sequence:
 
--   Pause all non-python processes
--   Grab debug symbols on non-Sanitizer builds
--   Signal python Processes
--   Dump cores of as many processes as possible, until the disk quota is exceeded.
-    The default quota is 90% of total volume space.
+- Pause all non-python processes
+- Grab debug symbols on non-Sanitizer builds
+- Signal python Processes
+- Dump cores of as many processes as possible, until the disk quota is exceeded.
+  The default quota is 90% of total volume space.
 
--   Collect additional, non-core data. Ideally:
-    -   Print C++ Stack traces
-    -   Print MozJS Stack Traces
-    -   Dump locks/mutexes info
-    -   Dump Server Sessions
-    -   Dump Recovery Units
-    -   Dump Storage engine info
--   Dump java processes (Jepsen tests) with jstack
--   SIGABRT (Unix)/terminate (Windows) go processes
+- Collect additional, non-core data. Ideally:
+    - Print C++ Stack traces
+    - Print MozJS Stack Traces
+    - Dump locks/mutexes info
+    - Dump Server Sessions
+    - Dump Recovery Units
+    - Dump Storage engine info
+- Dump java processes (Jepsen tests) with jstack
+- SIGABRT (Unix)/terminate (Windows) go processes
 
 Note that the list of non-core data collected is only accurate on Linux. Other
 platforms only perform a subset of these operations.
@@ -67,7 +67,7 @@ timeout, and the hang analyzer may ironically hang indefinitely.
 Platform-specific concerns for data collection are handled by dumper objects in
 `buildscripts/resmokelib/hang_analyzer/dumper.py`.
 
--   Linux: See `GDBDumper`
--   MacOS: See `LLDBDumper`
--   Windows: See `WindowsDumper` and `JstackWindowsDumper`
--   Java (non-Windows): `JstackDumper`
+- Linux: See `GDBDumper`
+- MacOS: See `LLDBDumper`
+- Windows: See `WindowsDumper` and `JstackWindowsDumper`
+- Java (non-Windows): `JstackDumper`

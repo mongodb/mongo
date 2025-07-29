@@ -35,13 +35,8 @@ import io
 import logging
 import os
 import platform
-from typing import Any, List
 
-from . import binder
-from . import errors
-from . import generator
-from . import parser
-from . import syntax
+from . import binder, errors, generator, parser, syntax
 
 
 class CompilerArgs(object):
@@ -181,7 +176,7 @@ def compile_idl(args):
         logging.error("File '%s' not found", args.input_file)
 
     if args.output_source is None:
-        if not '.' in args.input_file:
+        if '.' not in args.input_file:
             logging.error("File name '%s' must be end with a filename extension, such as '%s.idl'",
                           args.input_file, args.input_file)
             return False

@@ -7,8 +7,8 @@ import re
 import shlex
 import subprocess
 import sys
-import time
 import textwrap
+import time
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:

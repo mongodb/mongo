@@ -1,0 +1,214 @@
+# Apple cc toolchain needs to be loaded before regular cc toolchain or else Apple will just use regular cc toolchain
+bazel_dep(name = "apple_support", version = "1.17.1", repo_name = "build_bazel_apple_support")
+bazel_dep(name = "bazel_features", version = "1.10.0")
+single_version_override(
+    module_name = "bazel_features",
+    version = "1.10.0",
+)
+
+bazel_features_deps = use_extension("//bazel:bzlmod.bzl", "bazel_features_deps")
+use_repo(bazel_features_deps, "bazel_features_globals", "bazel_features_version")
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+http_archive(
+    name = "bazel_clang_tidy",
+    integrity = "sha256-A+TGGfuHdS7vWT20eyAEiA3u4YXFtuzsJDcpTEmDMS0=",
+    strip_prefix = "bazel_clang_tidy-10c4bf70a8946789e3932f30e29dfba2dfb78e67",
+    urls = [
+        # Implements retry by relisting each url multiple times to be used as a failover.
+        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/10c4bf70a8946789e3932f30e29dfba2dfb78e67.tar.gz",
+    ] * 5,
+)
+
+# SourceGraph indexer
+http_file(
+    name = "scip-clang",
+    executable = True,
+    sha256 = "9fc7d1c309f8adee1b8663efa802efa7363ef22ee06f4711117535e406690689",
+    urls = [
+        # Implements retry by relisting each url multiple times to be used as a failover.
+        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
+        "https://github.com/sourcegraph/scip-clang/releases/download/v0.3.2/scip-clang-x86_64-linux",
+    ] * 5,
+)
+
+# SourceGraph CLI
+http_file(
+    name = "scip-src",
+    executable = True,
+    sha256 = "eb3d627c4dad56b9f5d06634b90384104db065d410c4b338fa5e6558be4f3ad9",
+    urls = [
+        # Implements retry by relisting each url multiple times to be used as a failover.
+        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
+        "https://github.com/sourcegraph/src-cli/releases/download/6.4.0/src_linux_amd64",
+    ] * 5,
+)
+
+bazel_dep(name = "platforms", version = "0.0.9")
+single_version_override(
+    module_name = "platforms",
+    version = "0.0.9",
+)
+
+# TODO move over from WORKSPACE
+# buf does not support s390x
+#bazel_dep(name = "aspect_rules_lint", version = "1.1.0")
+#single_version_override(
+#    module_name = "aspect_rules_lint",
+#    version = "1.1.0",
+#)
+
+bazel_dep(name = "rules_multirun", version = "0.9.0")
+bazel_dep(name = "aspect_bazel_lib", version = "2.13.0")
+single_version_override(
+    module_name = "aspect_bazel_lib",
+    version = "2.13.0",
+)
+
+bazel_dep(name = "aspect_rules_js", version = "2.1.3")
+single_version_override(
+    module_name = "aspect_rules_js",
+    version = "2.1.3",
+)
+
+bazel_dep(name = "rules_nodejs", version = "6.3.0")
+single_version_override(
+    module_name = "rules_nodejs",
+    version = "6.3.0",
+)
+
+bazel_dep(name = "rules_poetry", version = "")
+git_override(
+    module_name = "rules_poetry",
+    commit = "917630033c736c188605cf0f558c34afc1eca540",
+    patches = ["//bazel/rules_poetry:rules_poetry.patch"],
+    remote = "https://github.com/mongodb-forks/rules_poetry",
+)
+
+#
+## We need skylib to be able to use config_setting_group in rule_poetry below
+## https://github.com/bazelbuild/bazel-skylib/blob/main/docs/selects_doc.md#selectsconfig_setting_group
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+single_version_override(
+    module_name = "bazel_skylib",
+    version = "1.7.1",
+)
+
+bazel_dep(name = "rules_pkg", version = "1.0.1")
+bazel_dep(name = "zlib", version = "1.3.1")
+single_version_override(
+    module_name = "zlib",
+    version = "1.3.1",
+)
+
+bazel_dep(name = "abseil-cpp", version = "", repo_name = "com_google_absl")
+local_path_override(
+    module_name = "abseil-cpp",
+    path = "src/third_party/abseil-cpp/dist",
+)
+
+bazel_dep(name = "protobuf", version = "", repo_name = "com_google_protobuf")
+local_path_override(
+    module_name = "protobuf",
+    path = "src/third_party/protobuf/dist",
+)
+
+bazel_dep(name = "grpc", version = "", repo_name = "com_github_grpc_grpc")
+local_path_override(
+    module_name = "grpc",
+    path = "src/third_party/grpc/dist",
+)
+
+bazel_dep(name = "buildifier_prebuilt", version = "6.4.0", dev_dependency = True)
+single_version_override(
+    module_name = "buildifier_prebuilt",
+    version = "6.4.0",
+)
+
+bazel_dep(name = "rules_multitool", version = "0.4.0")
+
+multitool = use_extension("@rules_multitool//multitool:extension.bzl", "multitool")
+multitool.hub(lockfile = "//tools/lint:multitool.lock.json")
+use_repo(multitool, "multitool")
+
+# TODO port over from WORKSPACE
+# currently breaks pyright
+##node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
+##node.toolchain(node_version = "18.20.4")
+
+##
+##npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependency = True)
+##npm.npm_translate_lock(
+##    name = "npm",
+##    npmrc = "//:.npmrc",
+##    pnpm_lock = "//:pnpm-lock.yaml",
+##    verify_node_modules_ignored = "//:.bazelignore",
+##)
+##use_repo(npm, "npm")
+##
+##pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
+##use_repo(pnpm, "pnpm")
+#
+setup_local_config_platform = use_repo_rule("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
+
+setup_local_config_platform(name = "internal_platforms_do_not_use")
+
+register_execution_platforms("@internal_platforms_do_not_use//host:host")
+
+# TODO port over from WORKSPACE
+# cannot be moved without changing the path or creating a symlink
+# to _main~setup_mongo_toolchains~mongo_toolchain_v4 and _main~setup_mongo_toolchains~mongo_toolchain_v5
+##setup_mongo_toolchains_extension = use_extension("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchains_extension")
+##use_repo(
+##    setup_mongo_toolchains_extension,
+##    "mongo_toolchain_v4",
+##    "mongo_toolchain_v5",
+##)
+#
+setup_mongo_apple_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl", "setup_mongo_apple_toolchain_extension")
+use_repo(setup_mongo_apple_toolchains_extension, "mongo_apple_toolchain")
+
+register_toolchains(
+    "@mongo_apple_toolchain//...",
+)
+
+setup_mongo_python_toolchains = use_extension("//bazel:bzlmod.bzl", "setup_mongo_python_toolchains")
+use_repo(
+    setup_mongo_python_toolchains,
+    "py_host",
+    "py_linux_arm64",
+    "py_linux_ppc64le",
+    "py_linux_s390x",
+    "py_linux_x86_64",
+    "py_macos_arm64",
+    "py_macos_x86_64",
+    "py_windows_x86_64",
+)
+
+register_toolchains(
+    "@py_linux_arm64//:python_toolchain",
+    "@py_linux_ppc64le//:python_toolchain",
+    "@py_linux_s390x//:python_toolchain",
+    "@py_linux_x86_64//:python_toolchain",
+    "@py_macos_arm64//:python_toolchain",
+    "@py_macos_x86_64//:python_toolchain",
+    "@py_windows_x86_64//:python_toolchain",
+)
+
+# broken on windows currently
+setup_local_host_values = use_repo_rule("//bazel/platforms:local_host_values.bzl", "setup_local_host_values")
+
+setup_local_host_values(name = "local_host_values")
+
+setup_evergreen_variables = use_repo_rule("//bazel/repository_rules:evergreen_variables.bzl", "setup_evergreen_variables")
+
+setup_evergreen_variables(name = "evergreen_variables")
+
+setup_mongo_windows_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_windows:mongo_toolchain.bzl", "setup_mongo_windows_toolchain_extension")
+use_repo(setup_mongo_windows_toolchains_extension, "mongo_windows_toolchain")
+
+register_toolchains("@mongo_windows_toolchain//...")

@@ -207,14 +207,14 @@ To create a new topology for Antithesis testing is easy & requires a few simple 
 
 These are the required updates to `evergreen/antithesis_image_build.sh`:
 
--   Add the following command for each of your `mongos` and `mongod` containers in your topology to
-    create your log directories.
+- Add the following command for each of your `mongos` and `mongod` containers in your topology to
+  create your log directories.
 
 ```shell
 mkdir -p antithesis/topologies/[topology_name]/{logs,data}/[container_name]
 ```
 
--   Build an image for your new topology ending in `-config`
+- Build an image for your new topology ending in `-config`
 
 ```shell
 cd [your_topology_dir]
@@ -224,7 +224,7 @@ sudo docker build . -t [your-topology-name]-config:$tag
 
 These are the required updates to `evergreen/antithesis_image_push.sh`:
 
--   Push your new image to the Antithesis Docker registry
+- Push your new image to the Antithesis Docker registry
 
 ```shell
 sudo docker tag "[your-topology-name]-config:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/[your-topology-name]-config:$tag"

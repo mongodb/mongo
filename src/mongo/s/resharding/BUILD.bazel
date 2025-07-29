@@ -1,0 +1,76 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "resharding_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+# need to name this lib a bit different to not conflict with other libs named the exact same
+mongo_idl_library(
+    name = "resharding_resume_token_idl",
+    src = "//src/mongo/s/resharding:resume_token.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "resharding_common_types_idl",
+    src = "common_types.idl",
+    idl_deps = [
+        "//src/mongo/db:keypattern_idl_gen",
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/s:sharding_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "resharding_feature_flag_idl",
+    src = "resharding_feature_flag.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "type_collection_fields_idl",
+    src = "type_collection_fields.idl",
+    idl_deps = [
+        "//src/mongo/db:keypattern_idl_gen",
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+    ],
+)

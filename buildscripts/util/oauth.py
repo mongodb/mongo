@@ -1,4 +1,5 @@
 """Helper tools to get OAuth credentials using the PKCE flow."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -15,6 +16,7 @@ from pkce import generate_pkce_pair
 from pydantic import ValidationError
 from pydantic.main import BaseModel
 from requests_oauthlib import OAuth2Session
+
 from buildscripts.util.fileops import read_yaml_file
 
 AUTH_HANDLER_RESPONSE = """\
@@ -37,16 +39,20 @@ AUTH_HANDLER_RESPONSE = """\
 class Configs:
     """Collect configurations necessary for authentication process."""
 
-    # pylint: disable=invalid-name
-
     AUTH_DOMAIN = "corp.mongodb.com/oauth2/aus4k4jv00hWjNnps297"
     CLIENT_ID = "0oa5zf9ps4N3JKWIJ297"
     REDIRECT_PORT = 8989
     SCOPE = "kanopy+openid+profile"
 
-    def __init__(self, client_credentials_scope: str = None,
-                 client_credentials_user_name: str = None, auth_domain: str = None,
-                 client_id: str = None, redirect_port: int = None, scope: str = None):
+    def __init__(
+            self,
+            client_credentials_scope: str = None,
+            client_credentials_user_name: str = None,
+            auth_domain: str = None,
+            client_id: str = None,
+            redirect_port: int = None,
+            scope: str = None,
+    ):
         """Initialize configs instance."""
 
         self.AUTH_DOMAIN = auth_domain or self.AUTH_DOMAIN
@@ -123,8 +129,6 @@ class _RedirectServer(HTTPServer):
 class _Handler(BaseHTTPRequestHandler):
     """Request handler class to use when trying to get OAuth credentials."""
 
-    # pylint: disable=invalid-name
-
     server: _RedirectServer
 
     def _set_response(self) -> None:
@@ -133,7 +137,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-type", "text/html")
         self.end_headers()
 
-    def log_message(self, log_format: Any, *args: Any) -> None:  # pylint: disable=unused-argument,arguments-differ
+    def log_message(self, log_format: Any, *args: Any) -> None:
         """
         Log HTTP Server internal messages.
 
@@ -262,8 +266,12 @@ def get_oauth_credentials(configs: Configs, print_auth_url: bool = False) -> OAu
     :param print_auth_url: Whether to print the auth url to the console instead of opening it.
     :return: OAuth credentials for the given user.
     """
-    oauth_tools = PKCEOauthTools(auth_domain=configs.AUTH_DOMAIN, client_id=configs.CLIENT_ID,
-                                 redirect_port=configs.REDIRECT_PORT, scope=configs.SCOPE)
+    oauth_tools = PKCEOauthTools(
+        auth_domain=configs.AUTH_DOMAIN,
+        client_id=configs.CLIENT_ID,
+        redirect_port=configs.REDIRECT_PORT,
+        scope=configs.SCOPE,
+    )
     credentials = oauth_tools.get_pkce_credentials(print_auth_url)
     return credentials
 

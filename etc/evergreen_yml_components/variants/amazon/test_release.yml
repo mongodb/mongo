@@ -18,13 +18,10 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-amazon2
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
-      --modules=
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2
+      --use_diagnostic_latches=False
+      --build_enterprise=False
     multiversion_platform: amazon2
     multiversion_edition: targeted
     has_packages: true
@@ -32,7 +29,6 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: amazon2
     repo_edition: org
-    scons_cache_scope: shared
     large_distro_name: amazon2-latest-large
     compile_variant: amazon2
   tasks:
@@ -66,15 +62,11 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-amazon2
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2
+      --use_diagnostic_latches=False
+    compile_all_but_not_unittests_flags: >-
+      --linkopt=-s
     multiversion_platform: amazon2
     multiversion_edition: enterprise
     has_packages: true
@@ -82,7 +74,6 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: amazon2
     repo_edition: enterprise
-    scons_cache_scope: shared
     compile_variant: enterprise-amazon2
     core_analyzer_distro_name: amazon2-latest-large
   tasks:
@@ -111,13 +102,12 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-amazon2
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
-      --modules=
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2
+      --use_diagnostic_latches=False
+      --build_enterprise=False
+    compile_all_but_not_unittests_flags: >-
+      --linkopt=-s
     test_flags: >-
           --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
           --enableEnterpriseTests=off
@@ -157,12 +147,12 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-amazon2023
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --modules=
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
+      --use_diagnostic_latches=False
+      --build_enterprise=False
+    compile_all_but_not_unittests_flags: >-
+      --linkopt=-s
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -171,7 +161,6 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: amazon2023
     repo_edition: org
-    scons_cache_scope: shared
     large_distro_name: amazon2023.3-large
     compile_variant: amazon2023
   tasks:
@@ -202,12 +191,11 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-amazon2023
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
+      --use_diagnostic_latches=False
+    compile_all_but_not_unittests_flags: >-
+      --linkopt=-s
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2023
@@ -217,7 +205,6 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: amazon2023
     repo_edition: enterprise
-    scons_cache_scope: shared
     compile_variant: enterprise-amazon2023
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
@@ -235,53 +222,6 @@ buildvariants:
     distros:
     - amazon2023.3-large
 
-  # TODO(SERVER-85904): Enable when Bazel supports --link-model=object.
-  # This variant is a special variant to test Link Time Optimization (LTO).
-  # - name: enterprise-amazon2023-lto
-  #   display_name: "Enterprise Amazon Linux 2023 LTO"
-  #   tags: []
-  #   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  #   run_on:
-  #     - amazon2023.3-small
-  #   expansions:
-  #     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-  #     compile_flags: >-
-  #       --ssl
-  #       MONGO_DISTMOD=amazon2023
-  #       -j$(grep -c ^processor /proc/cpuinfo)
-  #       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-  #       --lto
-  #       --linker=gold
-  #       --link-model=object
-  #     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-  #     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
-  #     has_packages: true
-  #     packager_script: packager_enterprise.py
-  #     packager_arch: x86_64
-  #     packager_distro: amazon2023
-  #     multiversion_platform: amazon2023
-  #     multiversion_edition: enterprise
-  #     multiversion_architecture: x86_64
-  #     repo_edition: enterprise
-  #     scons_cache_scope: shared
-  #     compile_variant: enterprise-amazon2023-lto
-  #     large_distro_name: amazon2023.3-large
-  #   tasks:
-  #     - name: compile_test_and_package_serial_lto_no_unittests_TG
-  #       distros:
-  #         - amazon2023.3-large
-  #     # TODO: SERVER-79886 Fix broken test_packages task
-  #     # - name: test_packages
-  #     #   distros:
-  #     #   - amazon2023.3-large
-  #     - name: .development_critical !.requires_large_host
-  #     - name: .development_critical .requires_large_host
-  #       distros:
-  #         - amazon2023.3-large
-  #     - name: .release_critical !.requires_large_host !publish_packages !push !crypt_push
-  #     - name: .release_critical .requires_large_host !publish_packages !push !crypt_push
-  #       distros:
-  #         - amazon2023.3-large
 
 - name: amazon2023-arm64
   display_name: "Amazon Linux 2023 arm64"
@@ -294,13 +234,12 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-amazon2023
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug"
-      --modules=
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
+      --use_diagnostic_latches=False
+      --build_enterprise=False
+    compile_all_but_not_unittests_flags: >-
+      --linkopt=-s
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -335,13 +274,12 @@ buildvariants:
   run_on:
   - amazon2023-arm64-latest-small-m8g
   expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug"
-      --modules=
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
+      --use_diagnostic_latches=True
+      --build_enterprise=False
+    compile_all_but_not_unittests_flags: >-
+      --linkopt=-s
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -376,13 +314,11 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-amazon2023
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
+      --use_diagnostic_latches=True
+    compile_all_but_not_unittests_flags: >-
+      --linkopt=-s
     has_packages: true
     multiversion_platform: amazon2023
     multiversion_edition: enterprise
@@ -391,7 +327,6 @@ buildvariants:
     packager_arch: aarch64
     packager_distro: amazon2023
     repo_edition: enterprise
-    scons_cache_scope: shared
     compile_variant: enterprise-amazon2023-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
@@ -417,12 +352,10 @@ buildvariants:
   - amazon2023-arm64-latest-small-m8g
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
+    compile_all_but_not_unittests_flags: >-
+      --linkopt=-s
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: false
     multiversion_platform: amazon2023
@@ -446,55 +379,6 @@ buildvariants:
     distros:
     - amazon2023-arm64-latest-large-m8g
 
-  # TODO(SERVER-85904): Enable when Bazel supports --link-model=object.
-  # This variant is a special variant to test Link Time Optimization (LTO).
-  # - name: enterprise-amazon2023-arm64-lto
-  #   display_name: "Enterprise Amazon Linux 2023 arm64 LTO"
-  #   tags: []
-  #   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  #   activate: false
-  #   run_on:
-  #     - amazon2023.3-arm64-small
-  #   expansions:
-  #     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-  #     compile_flags: >-
-  #       --ssl
-  #       MONGO_DISTMOD=amazon2023
-  #       -j$(grep -c ^processor /proc/cpuinfo)
-  #       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-  #       --lto
-  #       --linker=gold
-  #       --link-model=object
-  #     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-  #     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
-  #     has_packages: true
-  #     multiversion_platform: amazon2023
-  #     multiversion_edition: enterprise
-  #     multiversion_architecture: aarch64
-  #     packager_script: packager_enterprise.py
-  #     packager_arch: aarch64
-  #     packager_distro: amazon2023
-  #     repo_edition: enterprise
-  #     scons_cache_scope: shared
-  #     compile_variant: enterprise-amazon2023-arm64-lto
-  #     large_distro_name: amazon2023.3-arm64-large
-  #   tasks:
-  #     - name: compile_test_and_package_serial_lto_no_unittests_TG
-  #       distros:
-  #         - amazon2023.3-arm64-large
-  #     # TODO: SERVER-79886 Fix broken test_packages task
-  #     # - name: test_packages
-  #     #   distros:
-  #     #   - ubuntu2204-arm64-large
-  #     - name: .development_critical !.requires_large_host
-  #     - name: .development_critical .requires_large_host
-  #       distros:
-  #         - amazon2023.3-arm64-large
-  #     - name: .release_critical !.requires_large_host !publish_packages !push !crypt_push
-  #     - name: .release_critical .requires_large_host !publish_packages !push !crypt_push
-  #       distros:
-  #         - amazon2023.3-arm64-large
-
 - name: enterprise-amazon2-arm64
   display_name: "Enterprise Amazon Linux 2 arm64"
   tags: []
@@ -509,15 +393,9 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-amazon2
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2
+      --use_diagnostic_latches=False
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2
@@ -527,7 +405,6 @@ buildvariants:
     packager_arch: aarch64
     packager_distro: amazon2
     repo_edition: enterprise
-    scons_cache_scope: shared
     compile_variant: enterprise-amazon2-arm64
     core_analyzer_distro_name: amazon2-arm64-latest-xlarge
   tasks:
@@ -559,22 +436,15 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2
+      --use_diagnostic_latches=False
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: false
     multiversion_platform: amazon2
     multiversion_edition: enterprise
     multiversion_architecture: aarch64
     repo_edition: enterprise
-    scons_cache_scope: shared
     compile_variant: enterprise-amazon2-arm64-grav4
     core_analyzer_distro_name: amazon2-arm64-latest-xlarge-m8g
   tasks:
@@ -600,7 +470,7 @@ buildvariants:
       # This is added because of EVG-18211.
       # Without this we are adding extra dependencies on evergreen and it is causing strain
       omit_generated_tasks: true
-    - name: archive_dist_test_debug
+    - name: archive_dist_test
       variant: enterprise-amazon2023-arm64
   tasks:
     - name: .aggfuzzer !.multiversion

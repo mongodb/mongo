@@ -7,8 +7,8 @@
     exclude_files:
       # TODO: SERVER-87011 Revisist all the tests excluded here.
       # due to error: 'timeseries' is not allowed with 'recordIdsReplicated'
-      - jstests/core/timeseries/*.*
-      - jstests/core/txns/timeseries/*.*
+      - jstests/core/timeseries/*.js
+      - jstests/core/txns/timeseries/*.js
       - jstests/core/administrative/validate_db_metadata_command.js
       - jstests/core/catalog/list_catalog.js
       - jstests/core/catalog/agg_internal_list_collections_stage.js
@@ -23,7 +23,7 @@
       - jstests/core/version_api_v1_command_coverage.js
       - jstests/core/api/*.js
       # due to error: Error: [0] != [1] are not equal : encountered an error in the parallel shell
-      - jstests/core/query/distinct/*.*
+      - jstests/core/query/distinct/*.js
       - jstests/core/query/cursor/cursora.js
       - jstests/core/write/delete/removeb.js
       - jstests/core/write/delete/removec.js
@@ -34,9 +34,10 @@
       - jstests/core/loadserverscripts.js
       - jstests/core/shell/shellstartparallel.js
       # due to error: "Transaction with { txnNumber: 0 } has been aborted."
-      # TODO: Revisit them when working on SERVER-87012 Handle renameCollection / creating collections in txns
-      #       for recordIdsReplicated:true passthroughs
-      - jstests/core/txns/*.*
+      # The overrides don't work with renaming collections in general.
+      # And the overrides don't work with creating collections in txns, because the override doesn't handle
+      # the case of a transaction aborting.
+      - jstests/core/txns/*.js
       # due to error: "enableLatchAnalysis not found"
       - jstests/core/latch_analyzer.js
       # due to error: "currentOpSpawnsThreadWaitingForLatch not found"

@@ -2,8 +2,8 @@
 
 import os
 
-from buildscripts.resmokelib.powercycle.lib import PowercycleCommand
 from buildscripts.resmokelib.powercycle import powercycle_constants
+from buildscripts.resmokelib.powercycle.lib import PowercycleCommand
 from buildscripts.resmokelib.powercycle.lib.remote_operations import SSHOperation
 
 

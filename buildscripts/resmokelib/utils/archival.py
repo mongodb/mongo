@@ -2,6 +2,7 @@
 
 import collections
 import json
+import math
 import os
 import queue
 import sys
@@ -9,8 +10,6 @@ import tarfile
 import tempfile
 import threading
 import time
-
-import math
 
 from buildscripts.resmokelib import config
 

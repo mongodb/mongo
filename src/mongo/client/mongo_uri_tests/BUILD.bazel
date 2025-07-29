@@ -1,0 +1,14 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "test_data",
+    srcs = [
+        "mongo-uri-host-identifiers.json",
+        "mongo-uri-invalid.json",
+        "mongo-uri-options.json",
+        "mongo-uri-unix-sockets-absolute.json",
+        "mongo-uri-unix-sockets-relative.json",
+        "mongo-uri-valid-auth.json",
+        "mongo-uri-warnings.json",
+    ],
+)

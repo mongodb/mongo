@@ -1,0 +1,13 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "test_data",
+    srcs = [
+        "dirNullByte.conf",
+        "empty.json",
+        "endStringNull.conf",
+        "good.conf",
+        "good.json",
+        "nullByte.conf",
+    ],
+)

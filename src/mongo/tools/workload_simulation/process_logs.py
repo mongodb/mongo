@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-import sys
-import json
-from os.path import abspath
 import argparse
+import json
+import sys
+
 import matplotlib.pyplot as pyplot
 
 LOG_ID_WORKLOAD_NAME = 7782100

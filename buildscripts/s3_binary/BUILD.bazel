@@ -1,0 +1,28 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "hashes",
+    srcs = ["hashes.py"],
+)
+
+py_binary(
+    name = "upload",
+    srcs = ["upload.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        "hashes",
+    ],
+)
+
+py_library(
+    name = "download",
+    srcs = ["download.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "hashes",
+    ],
+)

@@ -1,0 +1,103 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel/config:render_template.bzl", "render_template")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "unicode_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "unicode",
+    srcs = [
+        "//src/mongo/db/fts/unicode:codepoints_casefold.cpp",
+        "//src/mongo/db/fts/unicode:codepoints_delimiter_list.cpp",
+        "//src/mongo/db/fts/unicode:codepoints_diacritic_list.cpp",
+        "//src/mongo/db/fts/unicode:codepoints_diacritic_map.cpp",
+        "//src/mongo/db/fts/unicode:string.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/shell:linenoise_utf8",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_fts_unicode_test",
+    srcs = [
+        "//src/mongo/db/fts/unicode:byte_vector_test.cpp",
+        "//src/mongo/db/fts/unicode:codepoints_test.cpp",
+        "//src/mongo/db/fts/unicode:string_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fourth_group",
+    ],
+    deps = [
+        "//src/mongo/db/fts/unicode",
+    ],
+)
+
+render_template(
+    name = "codepoints_casefold_gen",
+    srcs = [
+        "gen_casefold_map.py",
+        "gen_helper.py",
+        "//src/third_party/unicode-8.0.0:CaseFolding.txt",
+    ],
+    cmd = [
+        "$(location gen_casefold_map.py)",
+        "$(location //src/third_party/unicode-8.0.0:CaseFolding.txt)",
+        "$(location codepoints_casefold.cpp)",
+    ],
+    output = "codepoints_casefold.cpp",
+)
+
+render_template(
+    name = "codepoints_delimiter_list_gen",
+    srcs = [
+        "gen_delimiter_list.py",
+        "gen_helper.py",
+        "//src/third_party/unicode-8.0.0:PropList.txt",
+    ],
+    cmd = [
+        "$(location gen_delimiter_list.py)",
+        "$(location //src/third_party/unicode-8.0.0:PropList.txt)",
+        "$(location codepoints_delimiter_list.cpp)",
+    ],
+    output = "codepoints_delimiter_list.cpp",
+)
+
+render_template(
+    name = "codepoints_diacritic_list_gen",
+    srcs = [
+        "gen_diacritic_list.py",
+        "gen_helper.py",
+        "//src/third_party/unicode-8.0.0:PropList.txt",
+    ],
+    cmd = [
+        "$(location gen_diacritic_list.py)",
+        "$(location //src/third_party/unicode-8.0.0:PropList.txt)",
+        "$(location codepoints_diacritic_list.cpp)",
+    ],
+    output = "codepoints_diacritic_list.cpp",
+)
+
+py_binary(
+    name = "gen_diacritic_map",
+    srcs = ["gen_diacritic_map.py"],
+)

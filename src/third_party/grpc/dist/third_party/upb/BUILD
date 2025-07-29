@@ -23,6 +23,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load(
     "//bazel:build_defs.bzl",
     "UPB_DEFAULT_COPTS",
@@ -34,7 +35,6 @@ load(
     "upb_proto_library_copts",
     "upb_proto_reflection_library",
 )
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load(
     "//upbc:bootstrap_compiler.bzl",
     "bootstrap_cc_library",
@@ -49,13 +49,14 @@ load(
 # load("//tools/build_defs/license:license.bzl", "license")
 # end:google_only
 
+load("@rules_pkg//:mappings.bzl", "pkg_files")
+# end:github_only
+
 # begin:github_only
 load(
     "//bazel:amalgamation.bzl",
     "upb_amalgamation",
 )
-load("@rules_pkg//:mappings.bzl", "pkg_files")
-# end:github_only
 
 # begin:google_only
 # package(default_applicable_licenses = ["//:license"])
@@ -1141,23 +1142,22 @@ filegroup(
     visibility = ["//cmake:__pkg__"],
 )
 
-
 pkg_files(
-   name = "upb_source_files",
-   srcs = glob(
-       [
-           "upb/**/*.c",
-           "upb/**/*.h",
-           "upb/**/*.hpp",
-           "upb/**/*.inc",
-      ],
-       exclude = [
-           "upb/**/conformance_upb.c",
-           "upb/reflection/stage0/**/*",
-       ],
-   ),
-   strip_prefix = "",
-   visibility = ["//python/dist:__pkg__"],
+    name = "upb_source_files",
+    srcs = glob(
+        [
+            "upb/**/*.c",
+            "upb/**/*.h",
+            "upb/**/*.hpp",
+            "upb/**/*.inc",
+        ],
+        exclude = [
+            "upb/**/conformance_upb.c",
+            "upb/reflection/stage0/**/*",
+        ],
+    ),
+    strip_prefix = "",
+    visibility = ["//python/dist:__pkg__"],
 )
 
 # end:github_only

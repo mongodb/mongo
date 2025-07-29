@@ -1,129 +1,138 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
-load("//bazel/toolchains:mongo_toolchain.bzl", "toolchain_download")
-
-setup_local_config_platform(name = "local_config_platform")
-
-toolchain_download(name = "mongo_toolchain")
-
-register_toolchains("@mongo_toolchain//:mongo_toolchain")
-
-load("//bazel/toolchains:python_toolchain.bzl", "setup_mongo_python_toolchains")
-
-[register_toolchains(toolchain) for toolchain in setup_mongo_python_toolchains()]
+load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchains")
+load("//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl", "gdb_download")
 
 http_archive(
-    name = "rules_python",
-    sha256 = "8c8fe44ef0a9afc256d1e75ad5f448bb59b81aba149b8958f02f7b3a98f5d9b4",
-    strip_prefix = "rules_python-0.13.0",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.13.0.tar.gz",
-        "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.13.0.tar.gz",
-        "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.13.0.tar.gz",
-        "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.13.0.tar.gz",
-        "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.13.0.tar.gz",
-    ],
+    name = "aspect_rules_lint",
+    sha256 = "f60e4a737a5e09402f5fa3bd182efa80dac5523ca4b9bc5c6fa8c06fbfb46630",
+    strip_prefix = "rules_lint-1.1.0",
+    url = "https://github.com/aspect-build/rules_lint/releases/download/v1.1.0/rules_lint-v1.1.0.tar.gz",
+)
+
+setup_mongo_toolchains()
+
+gdb_download(
+    name = "gdb",
+    version = "v5",
 )
 
 http_archive(
-    name = "platforms",
-    sha256 = "8150406605389ececb6da07cbcb509d5637a3ab9a24bc69b1101531367d89d74",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-        "https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
-    ],
+    name = "windows_sasl",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "includes",
+    srcs = select({
+        "@platforms//os:windows": glob(["include/**/*.h"]),
+        "//conditions:default": [],
+    }),
 )
 
-# We need skylib to be able to use config_setting_group in rule_poetry below
-# https://github.com/bazelbuild/bazel-skylib/blob/main/docs/selects_doc.md#selectsconfig_setting_group
+filegroup(
+    name = "libraries",
+    srcs = select({
+        "@platforms//os:windows": glob(["lib/**/*"]),
+        "//conditions:default": [],
+    }),
+)
+
+filegroup(
+    name = "bins",
+    srcs = select({
+        "@platforms//os:windows": glob(["bin/**/*"]),
+        "//conditions:default": [],
+    }),
+)
+    """,
+    sha256 = "3e22e2b16f802277123590f64dfda44f1c9c8a2b7e758180cd956d8ab0965817",
+    urls = [
+        "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip",
+    ] * 5,
+)
+
 http_archive(
-    name = "bazel_skylib",
-    sha256 = "cd55a062e763b9349921f0f5db8c3933288dc8ba4f76dd9416aac68acee3cb94",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
-    ],
+    name = "wix_toolset",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "wix_binaries",
+    srcs = select({
+        "@platforms//os:windows": glob(["*"]),
+        "//conditions:default": [],
+    }),
 )
 
-# Poetry rules for managing Python dependencies
-http_archive(
-    name = "rules_poetry",
-    sha256 = "59b6f654885059465880d641dbf45a1babad512c6ae7347b01ad03eebd615e0a",
-    strip_prefix = "rules_poetry-fc645faf7fb2e7f6c8fce968801e2a63dc1332bb",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/mongodb-forks/rules_poetry/archive/fc645faf7fb2e7f6c8fce968801e2a63dc1332bb.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/fc645faf7fb2e7f6c8fce968801e2a63dc1332bb.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/fc645faf7fb2e7f6c8fce968801e2a63dc1332bb.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/fc645faf7fb2e7f6c8fce968801e2a63dc1332bb.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/fc645faf7fb2e7f6c8fce968801e2a63dc1332bb.tar.gz",
-    ],
+filegroup(
+    name = "candle",
+    srcs = select({
+        "@platforms//os:windows": ["candle.exe"],
+        "//conditions:default": [],
+    }),
+    data = select({
+        "@platforms//os:windows": [":wix_binaries"],
+        "//conditions:default": [],
+    }),
 )
 
-load("@rules_poetry//rules_poetry:defs.bzl", "poetry_deps")
+filegroup(
+    name = "light",
+    srcs = select({
+        "@platforms//os:windows": ["light.exe"],
+        "//conditions:default": [],
+    }),
+    data = select({
+        "@platforms//os:windows": [":wix_binaries"],
+        "//conditions:default": [],
+    }),
+)
+    """,
+    sha256 = "6ac824e1642d6f7277d0ed7ea09411a508f6116ba6fae0aa5f2c7daa2ff43d31",
+    urls = [
+        "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip",
+    ] * 5,
+)
 
-poetry_deps()
+load("//bazel/install_rules:windows_msvc.bzl", "windows_msvc")
+
+windows_msvc(
+    name = "local_windows_msvc",
+)
+
+load("//bazel/coverity:coverity_toolchain.bzl", "coverity_toolchain")
+
+coverity_toolchain(
+    name = "rules_coverity",
+)
+
+load("@rules_coverity//coverity:repositories.bzl", "rules_coverity_toolchains")
+
+rules_coverity_toolchains()
 
 load("@rules_poetry//rules_poetry:poetry.bzl", "poetry")
 
 poetry(
     name = "poetry",
+    excludes = [
+        "mdit-py-plugins",  # plugins for markdown-it-py. Introduces an optional circular dependency that bazel does not like.
+    ],
     lockfile = "//:poetry.lock",
     pyproject = "//:pyproject.toml",
-    python_interpreter_target_default = "@py_host//:bin/python3",
-    python_interpreter_target_mac = "@py_host//:bin/python3",
-    python_interpreter_target_win = "@py_host//:python.exe",
+    python_interpreter_target_default = "@py_host//:dist/bin/python3",
+    python_interpreter_target_mac = "@py_host//:dist/bin/python3",
+    python_interpreter_target_win = "@py_host//:dist/python.exe",
 )
 
-http_archive(
-    name = "aspect_rules_js",
-    sha256 = "630a71aba66c4023a5b16ab3efafaeed8b1a2865ccd168a34611eb73876b3fc4",
-    strip_prefix = "rules_js-1.37.1",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/aspect-build/rules_js/releases/download/v1.37.1/rules_js-v1.37.1.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v1.37.1/rules_js-v1.37.1.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v1.37.1/rules_js-v1.37.1.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v1.37.1/rules_js-v1.37.1.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v1.37.1/rules_js-v1.37.1.tar.gz",
-    ],
-)
+load("@aspect_rules_js//js:toolchains.bzl", "DEFAULT_NODE_VERSION", "rules_js_register_toolchains")
 
-load("@aspect_rules_js//js:repositories.bzl", "rules_js_dependencies")
-
-rules_js_dependencies()
-
-load("@rules_nodejs//nodejs:repositories.bzl", "DEFAULT_NODE_VERSION", "nodejs_register_toolchains")
-
-nodejs_register_toolchains(
-    name = "nodejs",
-    node_version = DEFAULT_NODE_VERSION,
-)
+rules_js_register_toolchains(node_version = DEFAULT_NODE_VERSION)
 
 load("@aspect_rules_js//npm:repositories.bzl", "npm_translate_lock")
 
 npm_translate_lock(
     name = "npm",
+    npmrc = "//:.npmrc",
     pnpm_lock = "//:pnpm-lock.yaml",
     verify_node_modules_ignored = "//:.bazelignore",
 )
@@ -132,20 +141,74 @@ load("@npm//:repositories.bzl", "npm_repositories")
 
 npm_repositories()
 
-# TODO: This comes with a lot of built in formatters
-# Since we are only using prettier for now we do not use the others
-# See https://github.com/aspect-build/rules_lint/releases/tag/v0.11.0 for all supported formatters
-http_archive(
-    name = "aspect_rules_lint",
-    sha256 = "41fad363f11ccab46a244f93f8ccb0f442bc235e606d2fad87801987ad0759b1",
-    strip_prefix = "rules_lint-0.12.0",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/aspect-build/rules_lint/releases/download/v0.12.0/rules_lint-v0.12.0.tar.gz",
-        "https://github.com/aspect-build/rules_lint/releases/download/v0.12.0/rules_lint-v0.12.0.tar.gz",
-        "https://github.com/aspect-build/rules_lint/releases/download/v0.12.0/rules_lint-v0.12.0.tar.gz",
-        "https://github.com/aspect-build/rules_lint/releases/download/v0.12.0/rules_lint-v0.12.0.tar.gz",
-        "https://github.com/aspect-build/rules_lint/releases/download/v0.12.0/rules_lint-v0.12.0.tar.gz",
-    ],
+# Sub in the system openssl for boringssl since we don't want two implementations of
+# ssl in the same address space.
+new_local_repository(
+    name = "boringssl",
+    build_file_content = """
+cc_library(
+  name = "crypto",
+  linkopts = ["-lcrypto"],
+  visibility = ["//visibility:public"],
 )
+cc_library(
+  name = "ssl",
+  linkopts = ["-lssl"],
+  visibility = ["//visibility:public"],
+)
+""",
+    path = "bazel/_openssl_placeholder_for_grpc",
+)
+
+# Overloads for the vendored repositories.
+#
+# WARNING: Don't change the order of the deps() calls and local_repositories.
+#          They're read linearly dependencies that come first override later
+#          ones. Dependency updates might change the correct order, though it's
+#          unlikely. This is obviously a temporary solution and will no longer
+#          be necessary once migration to bzlmod is complete.
+
+# Note: rules_python is implicitly loaded with a grpc-compatible version.
+
+load("//bazel/install_rules:pigz.bzl", "setup_pigz")
+
+setup_pigz(
+    name = "pigz",
+)
+
+# This repository is normally created by db-contrib-tool or manually extracting the binaries at the proper location
+new_local_repository(
+    name = "mongot_localdev",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+filegroup(
+    name = "mongot_binaries",
+    srcs = glob(["**"], exclude = ["BUILD.bazel", "WORKSPACE", "MODULE.bazel", "MODULE.bazel.lock"]),
+)
+""",
+    path = "mongot-localdev",
+)
+
+local_repository(
+    name = "bazel_rules_mongo",
+    path = "buildscripts/bazel_rules_mongo",
+    repo_mapping = {"@poetry": "@poetry_bazel_rules_mongo"},
+)
+
+load("@bazel_rules_mongo//codeowners:codeowners_validator.bzl", "codeowners_validator")
+
+codeowners_validator()
+
+load("@bazel_rules_mongo//codeowners:codeowners_binary.bzl", "codeowners_binary")
+
+codeowners_binary()
+
+poetry(
+    name = "poetry_bazel_rules_mongo",
+    lockfile = "@bazel_rules_mongo//:poetry.lock",
+    pyproject = "@bazel_rules_mongo//:pyproject.toml",
+)
+
+load("//bazel/format:shfmt.bzl", "shfmt")
+
+shfmt()

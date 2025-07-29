@@ -1,0 +1,11 @@
+"""Definition of the formatter binary
+
+This is in its own package because it has so many loading-time symbols,
+we don't want to trigger eager fetches of these for builds that don't want to run format.
+"""
+
+load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
+
+package(default_visibility = ["//visibility:public"])
+
+eslint_bin.eslint_binary(name = "eslint")

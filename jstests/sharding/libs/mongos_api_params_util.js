@@ -1469,6 +1469,7 @@ export let MongosAPIParametersUtil = (function() {
         // mongos command, and that the test cases are well formed.
         for (const command of Object.keys(listCommandsRes.commands)) {
             const matchingCases = testCases.filter(elem => elem.commandName === command);
+            // eslint-disable-next-line
             assert(matchingCases !== [],
                    "coverage failure: must define a test case for " + command);
             for (const testCase of matchingCases) {

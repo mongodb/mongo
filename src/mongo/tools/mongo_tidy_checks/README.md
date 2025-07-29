@@ -8,7 +8,7 @@ The basics of implementing a check are in the [clang docs](https://releases.llvm
 
 #### Basic usage of the custom checks
 
-The current directory contains the individual check source files, the main `MongoTidyModule.cpp` source file which registers the checks, and the SConscript responsible for building the check library module. The module will be installed into the DESTDIR, by default `build/install/lib/libmongo_tidy_checks.so`.
+The current directory contains the individual check source files, the main `MongoTidyModule.cpp` source file which registers the checks, and the SConscript responsible for building the check library module. The module will be installed into the DESTDIR, by default `bazel-bin/install/lib/libmongo_tidy_checks.so`.
 
 Our internal `buildscripts/clang_tidy.py` will automatically check this location and attempt to load the module if it exists. If it is installed to a non-default location you will need to supply the `--check-module` argument with the location to the module.
 

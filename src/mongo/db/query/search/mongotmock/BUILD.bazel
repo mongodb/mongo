@@ -1,0 +1,76 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "mongotmock_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "mongotmock_core",
+    srcs = [
+        "//src/mongo/db/query/search/mongotmock:mongotmock_buildinfo.cpp",
+        "//src/mongo/db/query/search/mongotmock:mongotmock_commands.cpp",
+        "//src/mongo/db/query/search/mongotmock:mongotmock_ismaster.cpp",
+        "//src/mongo/db/query/search/mongotmock:mongotmock_options_init.cpp",
+        "//src/mongo/db/query/search/mongotmock:mongotmock_state.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:api_parameters",
+        "//src/mongo/db:server_options_servers",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:authserver",
+        "//src/mongo/db/commands:core",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/pipeline:sharded_agg_helpers",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query/search:search_index_common",
+        "//src/mongo/util:version_impl",
+        "//src/mongo/util/net:ssl_options_server",
+    ],
+)
+
+# Found target mongotmock with complex inputs: src/mongo/db/query/search/mongotmock/SConscript:Attribute(
+#     value=Name(
+#         id='env',
+#         ctx=Load(),
+#         lineno=32,
+#         col_offset=13,
+#         end_lineno=32,
+#         end_col_offset=16),
+#     attr='Program',
+#     ctx=Load(),
+#     lineno=32,
+#     col_offset=13,
+#     end_lineno=32,
+#     end_col_offset=24)
+
+mongo_cc_binary(
+    name = "mongotmock",
+    srcs = [
+        "mongotmock_main_shim.cpp",
+    ],
+    tags = [
+        "dist_test",
+    ],
+    deps = [
+        "mongotmock_core",
+        "//src/mongo/db/query:plan_executor",
+        "//src/mongo/util/cryptd:mongocryptd_core",
+    ],
+)

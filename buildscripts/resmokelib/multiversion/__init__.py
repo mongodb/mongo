@@ -6,8 +6,11 @@ import yaml
 from pydantic import BaseModel
 
 from buildscripts.resmokelib import configure_resmoke
-from buildscripts.resmokelib.multiversion.multiversion_service import (MongoReleases, MongoVersion,
-                                                                       MultiversionService)
+from buildscripts.resmokelib.multiversion.multiversion_service import (
+    MongoReleases,
+    MongoVersion,
+    MultiversionService,
+)
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 MULTIVERSION_SUBCOMMAND = "multiversion-config"

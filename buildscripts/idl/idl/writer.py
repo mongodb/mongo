@@ -27,9 +27,6 @@
 #
 """Text Writing Utilites."""
 
-import io
-from typing import Callable, List, Mapping
-
 from . import common
 
 # Number of spaces to indent code
@@ -328,6 +325,7 @@ def gen_trie(words, writer, callback):
     Takes a callback function that can used to generate code that processes a specific word in the trie.
     i.e. for ["abc", "def"], then callback() will be called twice, once for each string.
     """
+    words = sorted(words)
 
     _gen_trie('', words, writer, callback)
 
@@ -404,10 +402,10 @@ def _gen_trie(prefix, words, writer, callback):
         return
 
     # Handle the main case for the trie
-    # We have a list of non-empty words with no common prefix between them, all the first letters
-    # are distinct
+    # We have a list of non-empty words with no common prefix between them,
+    # the first letters among the words may contain duplicates
     sorted_words = sorted(words)
-    first_letters = {w[0] for w in sorted_words}
+    first_letters = sorted(list({w[0] for w in sorted_words}))
     min_len = len(prefix) + min([len(w) for w in sorted_words])
 
     with IndentedScopedBlock(writer, f'if (fieldName.size() >= {min_len}) {{', "}"):

@@ -29,12 +29,8 @@
 
 import textwrap
 from abc import ABCMeta, abstractmethod
-from typing import Optional, List
 
-from . import ast
-from . import common
-from . import cpp_types
-from . import writer
+from . import ast, common, cpp_types
 
 
 def _is_required_constructor_arg(field):

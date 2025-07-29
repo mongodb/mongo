@@ -1,0 +1,221 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "query_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "cluster_query",
+    srcs = [
+        "//src/mongo/s/query:cluster_client_cursor_impl.cpp",
+        "//src/mongo/s/query:cluster_client_cursor_params.cpp",
+        "//src/mongo/s/query:cluster_find.cpp",
+        "//src/mongo/s/query:store_possible_cursor.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:curop_failpoint_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_common",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/s/query:async_results_merger",
+        "//src/mongo/s/query:cluster_cursor_cleanup_job",
+        "//src/mongo/s/query:cluster_cursor_manager",
+        "//src/mongo/s/query:cluster_query_knobs_idl",
+        "//src/mongo/s/query:router_exec_stage",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_aggregate",
+    srcs = [
+        "//src/mongo/s/query:cluster_aggregate.cpp",
+        "//src/mongo/s/query:cluster_aggregation_planner.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:fle_crud",
+        "//src/mongo/db:shared_request_handling",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:sharded_agg_helpers",
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
+        "//src/mongo/db/query/query_settings:utils",
+        "//src/mongo/db/query/query_shape",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/views",
+        "//src/mongo/db/views:view_catalog_helpers",
+        "//src/mongo/s/query:async_results_merger",
+        "//src/mongo/s/query:cluster_query",
+        "//src/mongo/s/query:cqf_utils",
+        "//src/mongo/s/query:router_exec_stage",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "router_exec_stage",
+    srcs = [
+        "//src/mongo/s/query:document_source_merge_cursors.cpp",
+        "//src/mongo/s/query:router_stage_limit.cpp",
+        "//src/mongo/s/query:router_stage_mock.cpp",
+        "//src/mongo/s/query:router_stage_pipeline.cpp",
+        "//src/mongo/s/query:router_stage_queued_data.cpp",
+        "//src/mongo/s/query:router_stage_remove_metadata_fields.cpp",
+        "//src/mongo/s/query:router_stage_skip.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline",
+        "//src/mongo/s:resource_yielders",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/s/query:async_results_merger",
+    ],
+)
+
+mongo_cc_library(
+    name = "cqf_utils",
+    srcs = [
+        "//src/mongo/s/query:cqf_utils.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline",
+        "//src/mongo/s/query:router_exec_stage",
+    ],
+)
+
+mongo_cc_library(
+    name = "async_results_merger",
+    srcs = [
+        "//src/mongo/s/query:async_results_merger.cpp",
+        "//src/mongo/s/query:blocking_results_merger.cpp",
+        "//src/mongo/s/query:establish_cursors.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_common",
+        "//src/mongo/executor:async_multicaster",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/s/client:sharding_client",
+        "//src/mongo/s/query:async_results_merger_params_idl",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_cursor_manager",
+    srcs = [
+        "//src/mongo/s/query:cluster_cursor_manager.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:generic_cursor",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/session:kill_sessions",
+        "//src/mongo/db/session:logical_session_cache",
+        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_cursor_cleanup_job",
+    srcs = [
+        "//src/mongo/s/query:cluster_cursor_cleanup_job.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:cursor_server_params",
+        "//src/mongo/s:grid",
+        "//src/mongo/util:background_job",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "s_query_test",
+    srcs = [
+        "//src/mongo/s/query:async_results_merger_test.cpp",
+        "//src/mongo/s/query:blocking_results_merger_test.cpp",
+        "//src/mongo/s/query:cluster_client_cursor_impl_test.cpp",
+        "//src/mongo/s/query:cluster_client_cursor_mock.cpp",
+        "//src/mongo/s/query:cluster_cursor_manager_test.cpp",
+        "//src/mongo/s/query:cluster_exchange_test.cpp",
+        "//src/mongo/s/query:establish_cursors_test.cpp",
+        "//src/mongo/s/query:results_merger_test_fixture.cpp",
+        "//src/mongo/s/query:router_stage_limit_test.cpp",
+        "//src/mongo/s/query:router_stage_remove_metadata_fields_test.cpp",
+        "//src/mongo/s/query:router_stage_skip_test.cpp",
+        "//src/mongo/s/query:store_possible_cursor_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:shared_request_handling",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:saslauth",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/s:sharding_mongos_test_fixture",
+        "//src/mongo/s/commands:cluster_commands",
+        "//src/mongo/s/commands:cluster_commands_common",
+        "//src/mongo/s/query:async_results_merger",
+        "//src/mongo/s/query:cluster_aggregate",
+        "//src/mongo/s/query:cluster_cursor_manager",
+        "//src/mongo/s/query:cluster_query",
+        "//src/mongo/s/query:router_exec_stage",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_idl_library(
+    name = "cluster_query_knobs_idl",
+    src = "cluster_query_knobs.idl",
+)
+
+mongo_idl_library(
+    name = "async_results_merger_params_idl",
+    src = "async_results_merger_params.idl",
+    idl_deps = [
+        "//src/mongo/db/session:logical_session_id_idl_gen",
+        "//src/mongo/db/query:tailable_mode_idl_gen",
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/util/net:hostandport_idl_gen",
+        "//src/mongo/crypto:sha256_block_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/crypto:sha256_block_idl",
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db/query:tailable_mode_idl",
+        "//src/mongo/db/session:logical_session_id_idl",
+        "//src/mongo/util/net:hostandport_idl",
+    ],
+)

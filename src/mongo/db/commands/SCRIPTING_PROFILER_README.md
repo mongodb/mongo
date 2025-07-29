@@ -37,13 +37,13 @@ db.adminCommand(
 
 Parameters
 
--   filename: The output file of linux-perf without suffix
-    -   type: `string`
-    -   default value: `perf`
--   mode: The profiling mode
-    -   type: `string`
-    -   possible values: `record` or `counters`
-    -   default value: `record`
+- filename: The output file of linux-perf without suffix
+    - type: `string`
+    - default value: `perf`
+- mode: The profiling mode
+    - type: `string`
+    - possible values: `record` or `counters`
+    - default value: `record`
 
 Response
 
@@ -64,9 +64,9 @@ db.adminCommand(
 
 Parameters:
 
--   pid: This is the perf process pid, it is returned when profiler is started.
-    -   type: `integer`
-    -   required: `true`
+- pid: This is the perf process pid, it is returned when profiler is started.
+    - type: `integer`
+    - required: `true`
 
 ## Example
 

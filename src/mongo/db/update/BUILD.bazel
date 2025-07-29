@@ -1,0 +1,199 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "update_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "pattern_cmp",
+    srcs = [
+        "//src/mongo/db/update:pattern_cmp.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db:common",
+        "//src/mongo/db/bson:dotted_path_support",
+        "//src/mongo/db/exec/document_value",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_common",
+    srcs = [
+        "//src/mongo/db/update:field_checker.cpp",
+        "//src/mongo/db/update:path_support.cpp",
+        "//src/mongo/db/update:storage_validation.cpp",
+        "//src/mongo/db/update:update_oplog_entry_serialization.cpp",
+        "//src/mongo/db/update:v2_log_builder.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db:common",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/update:pattern_cmp",
+        "//src/mongo/db/update:update_document_diff",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_nodes",
+    srcs = [
+        "//src/mongo/db/update:addtoset_node.cpp",
+        "//src/mongo/db/update:arithmetic_node.cpp",
+        "//src/mongo/db/update:array_culling_node.cpp",
+        "//src/mongo/db/update:bit_node.cpp",
+        "//src/mongo/db/update:compare_node.cpp",
+        "//src/mongo/db/update:current_date_node.cpp",
+        "//src/mongo/db/update:modifier_node.cpp",
+        "//src/mongo/db/update:modifier_table.cpp",
+        "//src/mongo/db/update:pop_node.cpp",
+        "//src/mongo/db/update:pull_node.cpp",
+        "//src/mongo/db/update:pullall_node.cpp",
+        "//src/mongo/db/update:push_node.cpp",
+        "//src/mongo/db/update:rename_node.cpp",
+        "//src/mongo/db/update:set_node.cpp",
+        "//src/mongo/db/update:unset_node.cpp",
+        "//src/mongo/db/update:update_array_node.cpp",
+        "//src/mongo/db/update:update_internal_node.cpp",
+        "//src/mongo/db/update:update_leaf_node.cpp",
+        "//src/mongo/db/update:update_node.cpp",
+        "//src/mongo/db/update:update_object_node.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:update_index_data",
+        "//src/mongo/db:vector_clock_mutable",
+        "//src/mongo/db/update:update_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "update",
+    srcs = [
+        "//src/mongo/db/update:delta_executor.cpp",
+        "//src/mongo/db/update:object_replace_executor.cpp",
+        "//src/mongo/db/update:object_transform_executor.cpp",
+        "//src/mongo/db/update:pipeline_executor.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/update:update_common",
+        "//src/mongo/db/update:update_document_diff",
+        "//src/mongo/db/update:update_nodes",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_driver",
+    srcs = [
+        "//src/mongo/db/update:update_driver.cpp",
+        "//src/mongo/db/update:update_util.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:common",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/ops:write_ops_parsers",
+        "//src/mongo/db/query:canonical_query",
+        "//src/mongo/db/update",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_test_helpers",
+    srcs = [
+        "//src/mongo/db/update:document_diff_test_helpers.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/update",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_document_diff",
+    srcs = [
+        "//src/mongo/db/update:document_diff_applier.cpp",
+        "//src/mongo/db/update:document_diff_calculator.cpp",
+        "//src/mongo/db/update:document_diff_serialization.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db:common",
+        "//src/mongo/db:update_index_data",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_update_test",
+    srcs = [
+        "//src/mongo/db/update:addtoset_node_test.cpp",
+        "//src/mongo/db/update:arithmetic_node_test.cpp",
+        "//src/mongo/db/update:bit_node_test.cpp",
+        "//src/mongo/db/update:compare_node_test.cpp",
+        "//src/mongo/db/update:current_date_node_test.cpp",
+        "//src/mongo/db/update:delta_executor_test.cpp",
+        "//src/mongo/db/update:document_diff_applier_test.cpp",
+        "//src/mongo/db/update:document_diff_calculator_test.cpp",
+        "//src/mongo/db/update:document_diff_serialization_test.cpp",
+        "//src/mongo/db/update:document_diff_test.cpp",
+        "//src/mongo/db/update:field_checker_test.cpp",
+        "//src/mongo/db/update:modifier_table_test.cpp",
+        "//src/mongo/db/update:object_replace_executor_test.cpp",
+        "//src/mongo/db/update:object_transform_executor_test.cpp",
+        "//src/mongo/db/update:path_support_test.cpp",
+        "//src/mongo/db/update:pattern_cmp_test.cpp",
+        "//src/mongo/db/update:pipeline_executor_test.cpp",
+        "//src/mongo/db/update:pop_node_test.cpp",
+        "//src/mongo/db/update:pull_node_test.cpp",
+        "//src/mongo/db/update:pullall_node_test.cpp",
+        "//src/mongo/db/update:push_node_test.cpp",
+        "//src/mongo/db/update:rename_node_test.cpp",
+        "//src/mongo/db/update:set_node_test.cpp",
+        "//src/mongo/db/update:unset_node_test.cpp",
+        "//src/mongo/db/update:update_array_node_test.cpp",
+        "//src/mongo/db/update:update_driver_test.cpp",
+        "//src/mongo/db/update:update_object_node_test.cpp",
+        "//src/mongo/db/update:update_oplog_entry_serialization_test.cpp",
+        "//src/mongo/db/update:update_serialization_test.cpp",
+        "//src/mongo/db/update:v2_log_builder_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/bson/mutable:mutable_bson_test_utils",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:vector_clock_trivial",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/update",
+        "//src/mongo/db/update:update_common",
+        "//src/mongo/db/update:update_driver",
+        "//src/mongo/db/update:update_test_helpers",
+    ],
+)

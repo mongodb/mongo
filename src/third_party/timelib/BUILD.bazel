@@ -1,0 +1,58 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "timelib",
+    srcs = [
+        "dist/astro.c",
+        "dist/astro.h",
+        "dist/dow.c",
+        "dist/fallbackmap.h",
+        "dist/interval.c",
+        "dist/parse_date.c",
+        "dist/parse_iso_intervals.c",
+        "dist/parse_posix.c",
+        "dist/parse_tz.c",
+        "dist/parse_zoneinfo.c",
+        "dist/timelib.c",
+        "dist/timelib_private.h",
+        "dist/timezonedb.h",
+        "dist/timezonemap.h",
+        "dist/tm2unixtime.c",
+        "dist/unixtime2tm.c",
+    ],
+    hdrs = [
+        "dist/timelib.h",
+    ] + select({
+        "@platforms//os:windows": [
+            "dist/win_dirent.h",
+        ],
+        "//conditions:default": [],
+    }),
+    copts = [
+        "-DHAVE_GETTIMEOFDAY",
+        "-DHAVE_STRING_H",
+    ] + select({
+        "@platforms//os:windows": [
+            "-DHAVE_IO_H",
+            "-DHAVE_WINSOCK2_H",
+            "/wd4067",
+            "/wd4996",
+        ],
+        "@platforms//os:macos": [
+            "-DHAVE_DIRENT_H",
+            "-DHAVE_SYS_TIME_H",
+            "-DHAVE_UNISTD_H",
+            "-Wno-implicit-fallthrough",
+        ],
+        "//conditions:default": [
+            "-DHAVE_DIRENT_H",
+            "-DHAVE_SYS_TIME_H",
+            "-DHAVE_UNISTD_H",
+            "-D_GNU_SOURCE",
+            "-Wno-implicit-fallthrough",
+        ],
+    }),
+    includes = ["dist"],
+)

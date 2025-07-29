@@ -2,29 +2,29 @@
 
 MongoDB code uses the following types of assertions that are available for use:
 
--   `uassert` and `iassert`
-    -   Checks for per-operation user errors. Operation-fatal.
--   `tassert`
-    -   Like uassert in that it checks for per-operation user errors, but inhibits clean shutdown
-        in tests. Operation-fatal, but process-fatal in testing environments during shutdown.
--   `massert`
-    -   Checks per-operation invariants. Operation-fatal.
--   `fassert`
-    -   Checks fatal process invariants. Process-fatal. Use to detect unexpected situations (such
-        as a system function returning an unexpected error status).
--   `invariant`
-    -   Checks process invariant. Process-fatal. Use to detect code logic errors ("pointer should
-        never be null", "we should always be locked").
+- `uassert` and `iassert`
+    - Checks for per-operation user errors. Operation-fatal.
+- `tassert`
+    - Like uassert in that it checks for per-operation user errors, but inhibits clean shutdown
+      in tests. Operation-fatal, but process-fatal in testing environments during shutdown.
+- `massert`
+    - Checks per-operation invariants. Operation-fatal.
+- `fassert`
+    - Checks fatal process invariants. Process-fatal. Use to detect unexpected situations (such
+      as a system function returning an unexpected error status).
+- `invariant`
+    - Checks process invariant. Process-fatal. Use to detect code logic errors ("pointer should
+      never be null", "we should always be locked").
 
 **Note**: Calling C function `assert` is not allowed. Use one of the above instead.
 
 The following types of assertions are deprecated:
 
--   `MONGO_verify`
-    -   Checks per-operation invariants. A synonym for massert but doesn't require an error code.
-        Process fatal in debug mode. Do not use for new code; use invariant or fassert instead.
--   `dassert`
-    -   Calls `invariant` but only in debug mode. Do not use!
+- `MONGO_verify`
+    - Checks per-operation invariants. A synonym for massert but doesn't require an error code.
+      Process fatal in debug mode. Do not use for new code; use invariant or fassert instead.
+- `dassert`
+    - Calls `invariant` but only in debug mode. Do not use!
 
 MongoDB uses a series of `ErrorCodes` (defined in [mongo/base/error_codes.yml][error_codes_yml]) to
 identify and categorize error conditions. `ErrorCodes` are defined in a YAML file and converted to
@@ -39,19 +39,19 @@ proper usage of these constructs is described below.
 Some assertions will increment an assertion counter. The `serverStatus` command will generate an
 "asserts" section including these counters:
 
--   `regular`
-    -   Incremented by `MONGO_verify`.
--   `warning`
-    -   Always 0. Nothing increments this anymore.
--   `msg`
-    -   Incremented by `massert`.
--   `user`
-    -   Incremented by `uassert`.
--   `tripwire`
-    -   Incremented by `tassert`.
--   `rollovers`
-    -   When any counter reaches a value of `1 << 30`, all of the counters are reset and
-        the "rollovers" counter is incremented.
+- `regular`
+    - Incremented by `MONGO_verify`.
+- `warning`
+    - Always 0. Nothing increments this anymore.
+- `msg`
+    - Incremented by `massert`.
+- `user`
+    - Incremented by `uassert`.
+- `tripwire`
+    - Incremented by `tassert`.
+- `rollovers`
+    - When any counter reaches a value of `1 << 30`, all of the counters are reset and
+      the "rollovers" counter is incremented.
 
 ## Considerations
 
@@ -104,11 +104,11 @@ verified at compile time with a [python script][errorcodes_py].
 A failed operation-fatal assertion throws an `AssertionException` or a child of that.
 The inheritance hierarchy resembles:
 
--   `std::exception`
-    -   `mongo::DBException`
-        -   `mongo::AssertionException`
-            -   `mongo::UserException`
-            -   `mongo::MsgAssertionException`
+- `std::exception`
+    - `mongo::DBException`
+        - `mongo::AssertionException`
+            - `mongo::UserException`
+            - `mongo::MsgAssertionException`
 
 See util/assert_util.h.
 
@@ -158,13 +158,13 @@ could lead to the wrong error being propagated.
 
 Gotchas to watch out for:
 
--   Generally, do not throw an `AssertionException` directly. Functions like `uasserted()` do work
-    beyond just that. In particular, it makes sure that the `getLastError` structures are set up
-    properly.
--   Think about the location of your asserts in constructors, as the destructor would not be
-    called. But at a minimum, use `wassert` a lot therein, we want to know if something is wrong.
--   Do **not** throw in destructors or allow exceptions to leak out (if you call a function that
-    may throw).
+- Generally, do not throw an `AssertionException` directly. Functions like `uasserted()` do work
+  beyond just that. In particular, it makes sure that the `getLastError` structures are set up
+  properly.
+- Think about the location of your asserts in constructors, as the destructor would not be
+  called. But at a minimum, use `wassert` a lot therein, we want to know if something is wrong.
+- Do **not** throw in destructors or allow exceptions to leak out (if you call a function that
+  may throw).
 
 [raii]: https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization
 [error_codes_yml]: ../src/mongo/base/error_codes.yml

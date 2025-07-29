@@ -23,7 +23,6 @@ assert.commandWorked(coll.insert([
 
 const mapFn = function() {
     this.tags.forEach(tag => {
-        // eslint-disable-next-line
         emit(tag, {count: xx.val});
     });
 };

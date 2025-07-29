@@ -1,12 +1,12 @@
 """GDB commands for MongoDB."""
 
 import datetime
+import glob
 import json
 import os
 import re
-import sys
-import glob
 import subprocess
+import sys
 import warnings
 from pathlib import Path
 
@@ -14,7 +14,11 @@ import gdb
 
 if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-    from buildscripts.gdb.mongo_printers import absl_get_nodes, get_unique_ptr, get_unique_ptr_bytes
+    from buildscripts.gdb.mongo_printers import (
+        absl_get_nodes,
+        get_unique_ptr,
+        get_unique_ptr_bytes,
+    )
 
 
 def detect_toolchain(progspace):
@@ -85,8 +89,8 @@ def load_libstdcxx_printers(progspace):
         try:
             sys.path.insert(0, stdcxx_printer_toolchain_paths[progspace])
             global stdlib_printers  # pylint: disable=invalid-name,global-variable-not-assigned
-            from libstdcxx.v6 import register_libstdcxx_printers
             from libstdcxx.v6 import printers as stdlib_printers
+            from libstdcxx.v6 import register_libstdcxx_printers
             register_libstdcxx_printers(progspace)
             print(
                 f"Loaded libstdc++ pretty printers from '{stdcxx_printer_toolchain_paths[progspace]}'"
@@ -121,7 +125,7 @@ else:
 
 try:
     import bson
-except ImportError as err:
+except ImportError:
     print("Warning: Could not load bson library for Python '" + str(sys.version) + "'.")
     print("Check with the pip command if pymongo 3.x is installed.")
     bson = None

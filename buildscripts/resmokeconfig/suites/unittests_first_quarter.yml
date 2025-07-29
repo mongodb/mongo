@@ -1,7 +1,0 @@
-test_kind: cpp_unit_test
-
-selector:
-  root: build/first_quarter_unittests.txt
-
-executor:
-  config: {}

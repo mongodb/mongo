@@ -5,7 +5,6 @@ to include its version) into an install directory and symlinks the binaries
 with versions to another directory. This script supports community and
 enterprise builds.
 """
-from itertools import chain
 import argparse
 import logging
 import os
@@ -14,12 +13,11 @@ import re
 import subprocess
 import sys
 import time
-from typing import Optional, Dict, Any, List, NamedTuple
+from itertools import chain
+from typing import Any, Dict, List, NamedTuple, Optional
 
 import distro
-import structlog
 import yaml
-
 from requests.exceptions import HTTPError
 
 from buildscripts.resmokelib import multiversionsetupconstants
@@ -400,8 +398,11 @@ class SetupMultiversion(Subcommand):
             if url is not None:
 
                 def try_download(download_url):
+                    self.logger.info("Downloading '%s'", download_url)
                     tarball = download.download_from_s3(download_url)
+                    self.logger.info("Extracting '%s' in '%s' folder", tarball, install_dir)
                     download.extract_archive(tarball, install_dir)
+                    self.logger.info("Removing tarball '%s'", tarball)
                     os.remove(tarball)
 
                 try:

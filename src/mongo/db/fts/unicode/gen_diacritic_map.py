@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import sys
-from unicodedata import normalize, category, unidata_version
+from unicodedata import normalize, unidata_version
 
-from gen_helper import getCopyrightNotice, openNamespaces, closeNamespaces, \
-    include
+from gen_helper import closeNamespaces, getCopyrightNotice, include, openNamespaces
 
 diacritics = set()
 

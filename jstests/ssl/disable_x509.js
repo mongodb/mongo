@@ -29,7 +29,6 @@ if (cmdOut.ok) {
 
     // Localhost exception should not be in place anymore
     assert.throws(function() {
-        // eslint-disable-next-line
         test.foo.findOne();
     }, [], "read without login");
 

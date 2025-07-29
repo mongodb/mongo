@@ -51,7 +51,6 @@ function makeParallelShellFunctionString(cursorId, getMoreErrCodes, useSession, 
     }
 
     const runGetMore = function() {
-        // eslint-disable-next-line
         let getMoreCmd = {getMore: cursorId, collection: collName, batchSize: 4};
 
         if (useSession) {

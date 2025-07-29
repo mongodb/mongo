@@ -1,0 +1,35 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "zlib",
+    srcs = [
+        "adler32.c",
+        "compress.c",
+        "crc32.c",
+        "deflate.c",
+        "infback.c",
+        "inffast.c",
+        "inflate.c",
+        "inftrees.c",
+        "trees.c",
+        "uncompr.c",
+        "zutil.c",
+    ],
+    hdrs = glob(["*.h"]),
+    copts = select({
+        "@//bazel/config:not_windows": [
+            "-Wno-implicit-fallthrough",
+        ],
+        "//conditions:default": [],
+    }),
+    includes = ["."],
+    local_defines = select({
+        "@platforms//os:windows": ["HAVE_STDARG_H"],
+        "//conditions:default": [
+            "HAVE_STDARG_H",
+            "HAVE_UNISTD_H",
+        ],
+    }),
+)

@@ -34,17 +34,17 @@ type in their respective "shape component" classes, whose purpose is to determin
 are relevant and should be included for determining the shape for specific type of command. The
 structure is as follows:
 
--   [`CmdSpecificShapeComponents`](query_shape.h#L65)
-    -   [`LetShapeComponent`](cmd_with_let_shape.h#L48)
-        -   [`AggCmdShapeComponents`](agg_cmd_shape.h#L82)
-        -   [`FindCmdShapeComponents`](find_cmd_shape.h#L48)
+- [`CmdSpecificShapeComponents`](query_shape.h#L65)
+    - [`LetShapeComponent`](cmd_with_let_shape.h#L48)
+        - [`AggCmdShapeComponents`](agg_cmd_shape.h#L82)
+        - [`FindCmdShapeComponents`](find_cmd_shape.h#L48)
 
 See more information for the different shapes in their respective classes, structured as follows:
 
--   [`Shape`](query_shape.h)
-    -   [`CmdWithLetShape`](cmd_with_let_shape.h)
-        -   [`AggCmdShape`](agg_cmd_shape.h)
-        -   [`FindCmdShape`](find_cmd_shape.h)
+- [`Shape`](query_shape.h)
+    - [`CmdWithLetShape`](cmd_with_let_shape.h)
+        - [`AggCmdShape`](agg_cmd_shape.h)
+        - [`FindCmdShape`](find_cmd_shape.h)
 
 ## Serialization Options
 
@@ -52,15 +52,15 @@ See more information for the different shapes in their respective classes, struc
 
 There are 3 different serialization options:
 
--   `kUnchanged`: literals are serialized unmodified
-    -   `{x: 5, y: "hello"}` -> `{x: 5, y: "hello"}`
--   `kToDebugTypeString`: human readable format, type string of the literal is serialized
-    -   `{x: 5, y: "hello"}` -> `{x: "?number", y: "?string"}`
--   `kToRepresentativeParseableValue`: literal serialized to one canonical value for given type, which
-    must be parseable - `{x: 5, y: "hello"}` -> `{x: 1, y: "?"}` - An example of a query which is serialized differently due to the parseable requirement is `{x:
+- `kUnchanged`: literals are serialized unmodified
+    - `{x: 5, y: "hello"}` -> `{x: 5, y: "hello"}`
+- `kToDebugTypeString`: human readable format, type string of the literal is serialized
+    - `{x: 5, y: "hello"}` -> `{x: "?number", y: "?string"}`
+- `kToRepresentativeParseableValue`: literal serialized to one canonical value for given type, which
+  must be parseable - `{x: 5, y: "hello"}` -> `{x: 1, y: "?"}` - An example of a query which is serialized differently due to the parseable requirement is `{x:
 {$regex: "^p.*"}}`. If we serialized the pattern as if it were a normal string we would end up
-    with `{x: {$regex: "?"}}` however `"?"` is not a valid regex pattern, so this would fail
-    parsing. Instead we will serialize it this way to maintain parseability, `{x: {$regex:
+  with `{x: {$regex: "?"}}` however `"?"` is not a valid regex pattern, so this would fail
+  parsing. Instead we will serialize it this way to maintain parseability, `{x: {$regex:
 "\\?"}}`, since `"\\?"` is valid regex.
 
 See [serialization_options.h](serialization_options.h) for more details.

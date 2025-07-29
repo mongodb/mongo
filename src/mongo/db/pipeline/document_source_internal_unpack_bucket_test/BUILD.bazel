@@ -1,0 +1,11 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+]))
+
+filegroup(
+    name = "document_source_internal_unpack_bucket_test_global_hdrs",
+    srcs = glob(["*.h"]),
+)

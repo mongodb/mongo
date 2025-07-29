@@ -27,23 +27,21 @@ Flask backend web server.
 The backend interacts with the graph_analyzer to perform queries on various libdeps graphs.
 """
 
-from pathlib import Path
-from collections import namedtuple, OrderedDict
-
-import time
-import threading
 import gc
+import threading
+import time
+from collections import OrderedDict, namedtuple
+from pathlib import Path
 
-import flask
-import networkx
 import cxxfilt
-from pympler.asizeof import asizeof
+import flask
+import libdeps.analyzer
+import libdeps.graph
+import networkx
+from flask import request
 from flask_cors import CORS
 from lxml import etree
-from flask import request
-
-import libdeps.graph
-import libdeps.analyzer
+from pympler.asizeof import asizeof
 
 
 class BackendServer:

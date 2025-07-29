@@ -1,9 +1,11 @@
 """Command-line entry-point into resmoke."""
 
-from datetime import datetime
-import time
 import os
+import time
+from datetime import datetime
+
 import psutil
+
 from buildscripts.resmokelib import parser
 
 

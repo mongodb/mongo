@@ -28,17 +28,18 @@
 """A/B performance test to compare plans produced by different sets of cost model coefficients."""
 
 from __future__ import annotations
+
 import asyncio
 import logging
 from dataclasses import asdict, dataclass
 from typing import Sequence
-from scipy import stats
-import bson.json_util as json
-from config import BenchmarkConfig
 
-from database_instance import DatabaseInstance, Pipeline, get_database_parameter
-import physical_tree
+import bson.json_util as json
 import execution_tree
+import physical_tree
+from config import BenchmarkConfig
+from database_instance import DatabaseInstance, Pipeline, get_database_parameter
+from scipy import stats
 
 
 @dataclass

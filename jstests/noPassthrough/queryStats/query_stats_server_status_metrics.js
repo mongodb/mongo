@@ -122,7 +122,7 @@ function countRateLimitedRequestsTest(conn, testDB, coll, testOptions) {
 }
 
 function queryStatsStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
-    assert.eq(testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes, 0);
+    const startingSize = testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
     let halfWayPointSize;
     // Only using three digit numbers (eg 100, 101) means the string length will be the same for all
     // entries and therefore the key size will be the same for all entries, which makes predicting
@@ -135,10 +135,13 @@ function queryStatsStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
         }
     }
     // Confirm that queryStats store has grown and size is non-zero.
-    assert.gt(halfWayPointSize, 0);
-    const fullSize = testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
+    assert.gt(halfWayPointSize, startingSize);
+    let fullSize = testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
     assert.gt(fullSize, 0);
-    // Make sure the final queryStats store size is twice as much as the halfway point size (+/- 5%)
+    // Make sure the final queryStats store size is twice as much as the halfway point size (+/-
+    // 5%). First subtract starting size so that internal queries don't skew our comparisons.
+    halfWayPointSize -= startingSize;
+    fullSize -= startingSize;
     assert(fullSize >= halfWayPointSize * 1.95 && fullSize <= halfWayPointSize * 2.05,
            tojson({fullSize, halfWayPointSize}));
 }
@@ -151,7 +154,6 @@ function queryStatsStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
     }
 
     const errorsBefore = testDB.serverStatus().metrics.queryStats.numQueryStatsStoreWriteErrors;
-    assert.eq(errorsBefore, 0);
     for (let i = 0; i < 5; i++) {
         // Command should succeed and record the error.
         let query = {};
@@ -160,7 +162,8 @@ function queryStatsStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
     }
 
     // Make sure that we recorded a write error for each run.
-    assert.eq(testDB.serverStatus().metrics.queryStats.numQueryStatsStoreWriteErrors, 5);
+    assert.eq(testDB.serverStatus().metrics.queryStats.numQueryStatsStoreWriteErrors,
+              errorsBefore + 5);
 }
 
 /**
@@ -168,12 +171,13 @@ function queryStatsStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
  * serverStatus counters (whichever is applicable).
  */
 function queryStatsAggregationStageTest(conn, testDB, coll) {
-    // First, ensure that the query stats store is empty.
-    assert.eq(testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes, 0);
+    assert.gte(testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes, 0);
     assert.eq(testDB.serverStatus().metrics.queryStats.numEvicted, 0);
 
-    // Insert some query stats data and capture "before" serverStatus metrics.
-    for (let i = 100; i < 200; i++) {
+    // Insert some query stats data and capture "before" serverStatus metrics. It doesn't matter how
+    // many we insert as long as it fits in one batch (so that the $queryStats cursor is exhausted
+    // on the first call).
+    for (let i = 100; i < 150; i++) {
         coll.aggregate([{$match: {["foo" + i]: "bar"}}]).itcount();
     }
 

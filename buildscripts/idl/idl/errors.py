@@ -35,7 +35,7 @@ Common error handling code for IDL compiler.
 import inspect
 import os
 import sys
-from typing import List, Union
+
 import yaml
 
 from . import common
@@ -370,7 +370,7 @@ class ParserContext(object):
         if not self._is_node_type(node, node_name, "scalar"):
             return False
 
-        if not node.value in ["true", "false"]:
+        if node.value not in ["true", "false"]:
             self._add_node_error(
                 node, ERROR_ID_IS_NODE_VALID_BOOL,
                 "Illegal bool value for '%s', expected either 'true' or 'false'." % node_name)

@@ -1,0 +1,77 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+NO_WARN_COPTS = select({
+    "@platforms//os:windows": [
+        "/W0",
+        "/wd9025",
+    ],
+    "//conditions:default": [
+        "-Wno-error",
+    ],
+})
+
+mongo_cc_library(
+    name = "tomcrypt_deps",
+    srcs = [
+        "src/misc/compare_testvector.c",
+        "src/misc/crypt/crypt_argchk.c",
+    ],
+    hdrs = glob([
+        "src/headers/*.h",
+    ]),
+    copts = NO_WARN_COPTS,
+    includes = [
+        "src/headers",
+    ],
+)
+
+mongo_cc_library(
+    name = "tomcrypt",
+    srcs = [
+        "src/ciphers/aes/aes.c",
+        "src/ciphers/aes/aes_tab.c",
+        "src/hashes/helper/hash_memory.c",
+        "src/hashes/sha1.c",
+        "src/hashes/sha2/sha256.c",
+        "src/hashes/sha2/sha512.c",
+        "src/mac/hmac/hmac_done.c",
+        "src/mac/hmac/hmac_init.c",
+        "src/mac/hmac/hmac_memory.c",
+        "src/mac/hmac/hmac_process.c",
+        "src/misc/crypt/crypt_cipher_descriptor.c",
+        "src/misc/crypt/crypt_cipher_is_valid.c",
+        "src/misc/crypt/crypt_find_cipher.c",
+        "src/misc/crypt/crypt_find_hash.c",
+        "src/misc/crypt/crypt_hash_descriptor.c",
+        "src/misc/crypt/crypt_hash_is_valid.c",
+        "src/misc/crypt/crypt_register_cipher.c",
+        "src/misc/crypt/crypt_register_hash.c",
+        "src/misc/zeromem.c",
+        "src/modes/cbc/cbc_decrypt.c",
+        "src/modes/cbc/cbc_done.c",
+        "src/modes/cbc/cbc_encrypt.c",
+        "src/modes/cbc/cbc_start.c",
+        "src/modes/ctr/ctr_decrypt.c",
+        "src/modes/ctr/ctr_done.c",
+        "src/modes/ctr/ctr_encrypt.c",
+        "src/modes/ctr/ctr_start.c",
+    ],
+    hdrs = [
+        # needed in header as "src/ciphers/aes/aes.c" includes "aes_tab.c"
+        "src/ciphers/aes/aes_tab.c",
+    ] + glob([
+        "src/headers/*.h",
+    ]),
+    copts = NO_WARN_COPTS,
+    defines = [
+        "LTC_NO_PROTOTYPES",
+    ],
+    includes = [
+        "src/headers",
+    ],
+    deps = [
+        ":tomcrypt_deps",
+    ],
+)

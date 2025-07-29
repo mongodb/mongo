@@ -50,7 +50,7 @@ function spawnShellToIterateCursor(cursorId) {
     let code = `const cursor = ${tojson(cursorId)};`;
     code += `const sessionId = ${tojson(session.getSessionId())};`;
     code += `const collName = "${coll.getName()}";`;
-    /* eslint-disable */
+
     function iterateCursorWithNoDocs() {
         const getMoreCmd = {
             getMore: cursor.id,
@@ -66,7 +66,7 @@ function spawnShellToIterateCursor(cursorId) {
             resp = assert.commandWorked(db.runCommand(getMoreCmd));
         }
     }
-    /* eslint-enable */
+
     code += `(${iterateCursorWithNoDocs.toString()})();`;
     return startParallelShell(code, st.rs0.getPrimary().port);
 }

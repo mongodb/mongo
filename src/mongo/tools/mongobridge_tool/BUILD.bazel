@@ -1,0 +1,56 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "mongobridge_tool_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_binary(
+    name = "mongobridge",
+    srcs = [
+        "//src/mongo/tools/mongobridge_tool:bridge.cpp",
+        "//src/mongo/tools/mongobridge_tool:bridge_commands.cpp",
+        "//src/mongo/tools/mongobridge_tool:mongobridge_options.cpp",
+        "//src/mongo/tools/mongobridge_tool:mongobridge_options_init.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:dbmessage",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/rpc",
+        "//src/mongo/tools/mongobridge_tool:mongobridge_options_idl",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:message_compressor_options_server_idl",
+        "//src/mongo/transport:service_executor",
+        "//src/mongo/transport:session_manager",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:signal_handlers",
+        "//src/mongo/util/net:network",
+        "//src/mongo/util/options_parser:options_parser_init",
+    ],
+)
+
+mongo_idl_library(
+    name = "mongobridge_options_idl",
+    src = "mongobridge_options.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)

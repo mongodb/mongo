@@ -1,6 +1,7 @@
 """Interactions with the undodb tool-suite."""
 
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
+
 from . import fetch
 
 _HELP = """

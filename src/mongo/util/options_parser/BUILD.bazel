@@ -1,0 +1,109 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "options_parser_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+# Found complex target None: src/mongo/util/options_parser/SConscript:Attribute(
+#     value=Name(
+#         id='env',
+#         ctx=Load(),
+#         lineno=48,
+#         col_offset=0,
+#         end_lineno=48,
+#         end_col_offset=3),
+#     attr='Library',
+#     ctx=Load(),
+#     lineno=48,
+#     col_offset=0,
+#     end_lineno=48,
+#     end_col_offset=11)
+
+# TODO BUILD-16566
+# This warning cause false positives with the v4 toolchain gcc on Ubuntu 2022
+# ARM64 platforms, in short term we will disable the warning until we can figure
+# out what the underlying issue is. Once the toolchain is updated, the
+# workaround below should be removed.
+selects.config_setting_group(
+    name = "options_parser_needs_no_missing_indentation_flag",
+    match_all = [
+        "@platforms//cpu:aarch64",
+        "//bazel/config:compiler_type_gcc",
+    ],
+)
+
+mongo_cc_library(
+    name = "options_parser",
+    srcs = [
+        "constraints.cpp",
+        "environment.cpp",
+        "option_description.cpp",
+        "option_section.cpp",
+        "options_parser.cpp",
+        "startup_option_init.cpp",
+        "startup_options.cpp",
+        "value.cpp",
+    ],
+    copts = select({
+        ":options_parser_needs_no_missing_indentation_flag": [
+            "-Wno-misleading-indentation",
+        ],
+        "//conditions:default": [],
+    }),
+    tags = [
+        "mongo_crypt",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/crypto:sha_block",
+        "//src/mongo/util/net:http_client",
+        "//src/mongo/util/net:network",
+        "//src/third_party/boost:boost_filesystem",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_iostreams",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_log",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_program_options",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/yaml-cpp:yaml",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "options_parser_test",
+    srcs = [
+        ":environment_test.cpp",
+        ":options_parser_test.cpp",
+    ],
+    data = [
+        "//src/mongo/util/options_parser/test_config_files:test_data",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_first_group",
+    ],
+    deps = [
+        "//src/mongo/unittest",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "options_parser_init",
+    srcs = ["options_parser_init.cpp"],
+    deps = ["options_parser"],
+)

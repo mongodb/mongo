@@ -1,0 +1,244 @@
+# This file exists to describe "mongo_toolchain", the http_archive defined in WORKSPACE.bazel
+
+load("@//bazel/toolchains/cc/mongo_linux:mongo_linux_cc_toolchain_config.bzl", "mongo_linux_cc_toolchain_config")
+load("@mongo_toolchain_{version}//:mongo_toolchain_flags.bzl",
+    "CLANG_INCLUDE_DIRS",
+    "COMMON_BINDIRS",
+    "COMMON_BUILTIN_INCLUDE_DIRECTORIES",
+    "COMMON_INCLUDE_DIRECTORIES",
+    "COMMON_LINK_FLAGS",
+    "GCC_INCLUDE_DIRS",
+)
+load(
+    "@//bazel/toolchains/cc:mongo_custom_features.bzl",
+    "FEATURES_ATTR_NAMES",
+    "get_common_features_attrs")
+
+package(default_visibility = ["//visibility:public"])
+
+# Helper target for the toolchain (see below):
+filegroup(
+    name = "all_files",
+    srcs = glob(["**/*"]),
+)
+
+# Export headers used for clang-tidy checks.
+cc_library(
+    name = "llvm_headers",
+    hdrs = glob([
+        "stow/llvm-{version}/include/**/*.h",
+        "stow/llvm-{version}/include/**/*.inc",
+        "stow/llvm-{version}/include/**/*.def",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+# A note on toolchains: this is complicated! Bazel requires multiple layers of indirection.
+#
+# In this case, we have:
+# cc_gcc_toolchain_config (of type cc_toolchain_config)
+# referenced by: cc_mongo_toolchain (of type cc_toolchain)
+# referenced by: mongo_toolchain (of type toolchain)
+# referenced by: toolchain_suite (of type cc_toolchain_suite)
+
+LINKER_ERROR_MESSAGE = """
+Error:
+  --//bazel/config:linker=lld is not supported on s390x
+"""
+
+LINKER_LINKFLAGS = select(
+    {
+        "@//bazel/config:linker_default": [],
+        "@//bazel/config:linker_gold": ["-fuse-ld=gold"],
+        "@//bazel/config:linker_lld_valid_settings": ["-fuse-ld=lld"],
+        "@//bazel/config:linker_mold_valid_settings": ["-fuse-ld=mold", "-B./external/mongo_toolchain_{version}/mold-2.37.1-{arch}-linux/bin/"],
+    },
+    no_match_error = LINKER_ERROR_MESSAGE,
+)
+
+CHOSEN_LINKER = select(
+    {
+        "@//bazel/config:linker_default": "",
+        "@//bazel/config:linker_gold": "gold",
+        "@//bazel/config:linker_lld_valid_settings": "lld",
+        "@//bazel/config:linker_mold_valid_settings": "mold",
+    }
+)
+
+LINKSTATIC_ENABLED = select({
+    "@//bazel/config:linkstatic_enabled": True,
+    "@//conditions:default": False,
+})
+
+SHARED_ARCHIVE_ENABLED = select({
+    "@//bazel/config:shared_archive_enabled": True,
+    "@//conditions:default": False,
+})
+
+DWARF_VERSION = select({
+    "@//bazel/config:dwarf_version_4_linux": 4,
+    "@//bazel/config:dwarf_version_5_linux": 5,
+    "@//conditions:default": None,
+})
+
+FISSION_ENABLED = select({
+    "@//bazel/config:fission_enabled": True,
+    "@//conditions:default": False,
+})
+
+DEBUG_LEVEL = select({
+    "@//bazel/config:gcc_or_clang_dbg_level_0": 0,
+    "@//bazel/config:gcc_or_clang_dbg_level_1": 1,
+    "@//bazel/config:gcc_or_clang_dbg_level_2": 2,
+    "@//bazel/config:gcc_or_clang_dbg_level_3": 3,
+})
+
+DISABLE_DEBUG_SYMBOLS = select({
+    "@//bazel/config:debug_symbols_disabled": True,
+    "@//conditions:default": False,
+})
+
+LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
+
+feature_attrs = get_common_features_attrs()
+
+mongo_linux_cc_toolchain_config(
+    name = "cc_gcc_toolchain_config",
+    bin_dirs = COMMON_BINDIRS,
+    compiler = "gcc",
+    linker = CHOSEN_LINKER,
+    distro = "{distro}",
+    cpu = "{bazel_toolchain_cpu}",
+    cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+    extra_ldflags = LINK_FLAGS,
+    includes = GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+    tool_paths = {
+        # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
+        # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,
+        # we have to conditionally set the value pointed to by `gcc`.
+        "gcc": "{version}/bin/gcc",
+        "g++": "{version}/bin/g++",
+        "cpp": "{version}/bin/cpp",
+        "ar": "{version}/bin/ar",
+        "nm": "{version}/bin/nm",
+        "ld": "{version}/bin/ld",
+        "as": "{version}/bin/as",
+        "dwp": "{version}/bin/dwp",
+        "objcopy": "{version}/bin/llvm-objcopy",
+        "objdump": "{version}/bin/objdump",
+        "strip": "{version}/bin/strip",
+        "gcov": "{version}/bin/gcov",
+        "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
+    },
+    toolchain_identifier = "gcc_toolchain",
+    verbose = True,
+    linkstatic = LINKSTATIC_ENABLED,
+    shared_archive = SHARED_ARCHIVE_ENABLED,
+    dwarf_version = DWARF_VERSION,
+    fission = FISSION_ENABLED,
+    debug_level = DEBUG_LEVEL,
+    disable_debug_symbols = DISABLE_DEBUG_SYMBOLS,
+    optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
+)
+
+mongo_linux_cc_toolchain_config(
+    name = "cc_clang_toolchain_config",
+    bin_dirs = COMMON_BINDIRS,
+    compiler = "clang",
+    linker = CHOSEN_LINKER,
+    distro = "{distro}",
+    cpu = "{bazel_toolchain_cpu}",
+    cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+    extra_ldflags = LINK_FLAGS,
+    # Note that CLANG_INCLUDE_DIRS needs to be searched after the common ones, otherwise some files
+    # will have include_next chains going backwards from the intended order.
+    includes = COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES + CLANG_INCLUDE_DIRS,
+    tool_paths = {
+        # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
+        # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,
+        # we have to conditionally set the value pointed to by `gcc`.
+        # TODO(SERVER-87211): The two lines below are using the absolute path to help clang find the sanitizer .a
+        # files. Switch these to the {version}/bin/* paths once EngFlow fixes the issue where symlinks are fully resolved
+        # when copied to the remote execution system.
+        "gcc": "{version}/bin/clang",
+        "g++": "{version}/bin/clang++",
+        "cpp": "{version}/bin/cpp",
+        "ar": "{version}/bin/ar",
+        "nm": "{version}/bin/nm",
+        "ld": "{version}/bin/ld",
+        "as": "{version}/bin/as",
+        "dwp": "{version}/bin/llvm-dwp",
+        "objcopy": "{version}/bin/llvm-objcopy",
+        "objdump": "{version}/bin/objdump",
+        "strip": "{version}/bin/strip",
+        "gcov": "{version}/bin/llvm-profdata",
+        "llvm-cov": "{version}/bin/llvm-cov",
+    },
+    toolchain_identifier = "clang_toolchain",
+    verbose = True,
+    linkstatic = LINKSTATIC_ENABLED,
+    shared_archive = SHARED_ARCHIVE_ENABLED,
+    dwarf_version = DWARF_VERSION,
+    fission = FISSION_ENABLED,
+    debug_level = DEBUG_LEVEL,
+    disable_debug_symbols = DISABLE_DEBUG_SYMBOLS,
+    optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
+)
+
+cc_toolchain(
+    name = "cc_mongo_toolchain",
+    all_files = ":all_files",
+    ar_files = ":all_files",
+    compiler_files = ":all_files",
+    dwp_files = ":all_files",
+    linker_files = ":all_files",
+    objcopy_files = ":all_files",
+    strip_files = ":all_files",
+    toolchain_config = select({
+        "@//bazel/config:compiler_type_clang": ":cc_clang_toolchain_config",
+        "@//bazel/config:compiler_type_gcc": ":cc_gcc_toolchain_config",
+    }),
+)
+
+toolchain(
+    name = "mongo_toolchain",
+    exec_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:{bazel_toolchain_cpu}",
+        "@//bazel/platforms:use_mongo_toolchain",
+    ],
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:{bazel_toolchain_cpu}",
+        "@//bazel/platforms:use_mongo_toolchain",
+    ],
+    target_settings = [
+        "@//bazel/config:mongo_toolchain_{version}",
+    ],
+    toolchain = ":cc_mongo_toolchain",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+
+
+# This file group makes it possible to set the clang-tidy configuration setting:
+#   --@bazel_clang_tidy//:clang_tidy_executable=@mongo_toolchain//:clang_tidy
+filegroup(
+    name = "clang_tidy",
+    srcs = [
+        "{version}/bin/clang-tidy",
+    ],
+)
+
+filegroup(
+    name = "llvm_symbolizer",
+    srcs = [
+        "{version}/bin/llvm-symbolizer",
+    ],
+)
+
+filegroup(
+    name = "clang_format",
+    srcs = [
+        "{version}/bin/clang-format",
+    ],
+)

@@ -1,0 +1,48 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "bson_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "dotted_path_support",
+    srcs = [
+        "//src/mongo/db/bson:dotted_path_support.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_bson_test",
+    srcs = [
+        "//src/mongo/db/bson:dotted_path_support_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_eighth_group",
+    ],
+    deps = [
+        "//src/mongo/db/bson:dotted_path_support",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/transport:transport_layer_common",
+    ],
+)

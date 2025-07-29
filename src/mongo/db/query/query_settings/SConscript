@@ -16,7 +16,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_spec',
         '$BUILD_DIR/mongo/db/query/index_hint',
         '$BUILD_DIR/mongo/db/query/query_knobs',
-        '$BUILD_DIR/mongo/db/query/query_shape/query_shape_hash',
+        '$BUILD_DIR/mongo/db/query/query_shape/query_shape_hash_idl',
         '$BUILD_DIR/mongo/db/server_base',
     ],
 )

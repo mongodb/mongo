@@ -10,11 +10,11 @@ _Health Observers_ are designed for every particular check to run. Each observer
 
 ## Health Observers Parameters
 
--   healthMonitoringIntensities: main configuration for each observer. Can be set at startup and changed at runtime. Valid values:
+- healthMonitoringIntensities: main configuration for each observer. Can be set at startup and changed at runtime. Valid values:
 
-    -   off: this observer if off
-    -   critical: if the observer detects a failure, the process will crash
-    -   non-critical: if the observer detects a failure, the error will be logged and the process will not crash
+    - off: this observer if off
+    - critical: if the observer detects a failure, the process will crash
+    - non-critical: if the observer detects a failure, the error will be logged and the process will not crash
 
     Example as startup parameter:
 
@@ -30,7 +30,7 @@ _Health Observers_ are designed for every particular check to run. Each observer
           [{type: "ldap", intensity: "critical"}] } });
     ```
 
--   healthMonitoringIntervals: how often this health observer will run, in milliseconds.
+- healthMonitoringIntervals: how often this health observer will run, in milliseconds.
 
     Example as startup parameter:
 
@@ -56,7 +56,7 @@ To enable this observer, use the _healthMonitoringIntensities_ and _healthMonito
 
 When a failure is detected, and the observer is configured as _critical_, the server will wait for the configured interval before crashing. The interval from the failure detection and crash is configured with _activeFaultDurationSecs_ parameter:
 
--   activeFaultDurationSecs: how long to wait from the failure detection to crash, in seconds. This can be configured at startup and changed at runtime.
+- activeFaultDurationSecs: how long to wait from the failure detection to crash, in seconds. This can be configured at startup and changed at runtime.
 
     Example:
 
@@ -68,10 +68,10 @@ When a failure is detected, and the observer is configured as _critical_, the se
 
 _Progress Monitor_ detects that every health check is not stuck, without returning either success or failure. If a health check starts and does not complete the server will crash. This behavior could be configured with:
 
--   progressMonitor: configure the progress monitor. Values:
+- progressMonitor: configure the progress monitor. Values:
 
-    -   _interval_: how often to run the liveness check, in milliseconds
-    -   _deadline_: timeout before crashing the server if a health check is not making progress, in seconds
+    - _interval_: how often to run the liveness check, in milliseconds
+    - _deadline_: timeout before crashing the server if a health check is not making progress, in seconds
 
     Example:
 

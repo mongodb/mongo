@@ -2,8 +2,7 @@
 
 import time
 
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import core, errors
 from buildscripts.resmokelib.testing.hooks import interface
 
 

@@ -42,11 +42,15 @@ import os
 import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Set, Optional, Tuple, Union
+from typing import Dict, List, Optional, Set, Tuple, Union
 
-from idl import parser, syntax, errors, common
+from idl_compatibility_errors import (
+    IDLCompatibilityContext,
+    IDLCompatibilityErrorCollection,
+)
+
+from idl import common, errors, parser, syntax
 from idl.compiler import CompilerImportResolver
-from idl_compatibility_errors import IDLCompatibilityContext, IDLCompatibilityErrorCollection
 
 ALLOW_ANY_TYPE_LIST: List[str] = [
     # This list if only used in unit-tests.

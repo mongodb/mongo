@@ -1,0 +1,246 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "optimizer_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "optimizer_base",
+    srcs = [
+        "//src/mongo/db/query/optimizer:defs.cpp",
+        "//src/mongo/db/query/optimizer:explain.cpp",
+        "//src/mongo/db/query/optimizer:index_bounds.cpp",
+        "//src/mongo/db/query/optimizer:metadata.cpp",
+        "//src/mongo/db/query/optimizer:node.cpp",
+        "//src/mongo/db/query/optimizer:partial_schema_requirements.cpp",
+        "//src/mongo/db/query/optimizer:props.cpp",
+        "//src/mongo/db/query/optimizer:reference_tracker.cpp",
+        "//src/mongo/db/query/optimizer/syntax:expr.cpp",
+        "//src/mongo/db/query/optimizer/utils:abt_compare.cpp",
+        "//src/mongo/db/query/optimizer/utils:abt_hash.cpp",
+        "//src/mongo/db/query/optimizer/utils:ce_math.cpp",
+        "//src/mongo/db/query/optimizer/utils:interval_utils.cpp",
+        "//src/mongo/db/query/optimizer/utils:path_utils.cpp",
+        "//src/mongo/db/query/optimizer/utils:reftracker_utils.cpp",
+        "//src/mongo/db/query/optimizer/utils:utils.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/db/exec/sbe:query_sbe_makeobj_spec",
+    ],
+)
+
+mongo_cc_library(
+    name = "optimizer_memo",
+    srcs = [
+        "//src/mongo/db/query/optimizer/cascades:memo.cpp",
+        "//src/mongo/db/query/optimizer/cascades:memo_defs.cpp",
+        "//src/mongo/db/query/optimizer/cascades:rewrite_queues.cpp",
+        "//src/mongo/db/query/optimizer/utils:memo_utils.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/optimizer:optimizer_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "optimizer_cascades",
+    srcs = [
+        "//src/mongo/db/query/optimizer/cascades:enforcers.cpp",
+        "//src/mongo/db/query/optimizer/cascades:implementers.cpp",
+        "//src/mongo/db/query/optimizer/cascades:logical_props_derivation.cpp",
+        "//src/mongo/db/query/optimizer/cascades:logical_rewriter.cpp",
+        "//src/mongo/db/query/optimizer/cascades:physical_rewriter.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/optimizer:optimizer_memo",
+    ],
+)
+
+mongo_cc_library(
+    name = "optimizer_rewrites",
+    srcs = [
+        "//src/mongo/db/query/optimizer/rewrites:const_eval.cpp",
+        "//src/mongo/db/query/optimizer/rewrites:normalize_projections.cpp",
+        "//src/mongo/db/query/optimizer/rewrites:path.cpp",
+        "//src/mongo/db/query/optimizer/rewrites:path_lower.cpp",
+        "//src/mongo/db/query/optimizer/rewrites:proj_spec_builder.cpp",
+        "//src/mongo/db/query/optimizer/rewrites:proj_spec_lower.cpp",
+        "//src/mongo/db/query/optimizer/rewrites:sampling_const_eval.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/optimizer:optimizer_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "optimizer_proj_spec_test",
+    srcs = [
+        "//src/mongo/db/query/optimizer/rewrites:proj_spec_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_third_group",
+    ],
+    deps = [
+        "//src/mongo/db/exec/sbe:query_sbe",
+        "//src/mongo/db/query/optimizer:optimizer_rewrites",
+        "//src/mongo/db/query/optimizer:unit_test_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "optimizer",
+    srcs = [
+        "//src/mongo/db/query/optimizer:metadata_factory.cpp",
+        "//src/mongo/db/query/optimizer:opt_phase_manager.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/optimizer:optimizer_cascades",
+        "//src/mongo/db/query/optimizer:optimizer_rewrites",
+    ],
+)
+
+mongo_cc_library(
+    name = "unit_test_utils",
+    srcs = [
+        "//src/mongo/db/query/optimizer/utils:unit_test_utils.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/bson:dotted_path_support",
+        "//src/mongo/db/pipeline:abt_utils",
+        "//src/mongo/db/query/ce:query_ce_heuristic",
+        "//src/mongo/db/query/ce:query_ce_hinted",
+        "//src/mongo/db/query/cost_model:query_cost_model",
+        "//src/mongo/db/query/optimizer",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "unit_test_pipeline_utils",
+    srcs = [
+        "//src/mongo/db/query/optimizer/utils:unit_test_pipeline_utils.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:abt_translation",
+        "//src/mongo/db/query:canonical_query",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/optimizer:unit_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "optimizer_test",
+    srcs = [
+        "//src/mongo/db/query/optimizer:bool_expression_test.cpp",
+        "//src/mongo/db/query/optimizer:explain_paths_exprs_test.cpp",
+        "//src/mongo/db/query/optimizer:explain_query_params_test.cpp",
+        "//src/mongo/db/query/optimizer:index_union_optimizer_test.cpp",
+        "//src/mongo/db/query/optimizer:logical_rewriter_optimizer_test.cpp",
+        "//src/mongo/db/query/optimizer:optimizer_test.cpp",
+        "//src/mongo/db/query/optimizer:physical_rewriter_optimizer_test.cpp",
+        "//src/mongo/db/query/optimizer:physical_rewriter_parallelism_test.cpp",
+        "//src/mongo/db/query/optimizer:reference_tracker_test.cpp",
+        "//src/mongo/db/query/optimizer:remove_orphans_requirement_test.cpp",
+        "//src/mongo/db/query/optimizer:unit_test_infra_test.cpp",
+        "//src/mongo/db/query/optimizer/rewrites:const_eval_test.cpp",
+        "//src/mongo/db/query/optimizer/rewrites:path_optimizer_test.cpp",
+    ],
+    data = [
+        "//src/mongo/db/test_output/query/optimizer:test_data",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fourth_group",
+    ],
+    deps = [
+        "//src/mongo/db/exec/sbe:query_sbe",
+        "//src/mongo/db/query/optimizer:unit_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "interval_simplify_test",
+    srcs = [
+        "//src/mongo/db/query/optimizer:interval_simplify_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_sixth_group",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/query/optimizer",
+        "//src/mongo/db/query/optimizer:unit_test_pipeline_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "optimizer_failure_test",
+    srcs = [
+        "//src/mongo/db/query/optimizer:optimizer_failure_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_second_group",
+    ],
+    deps = [
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query/optimizer:unit_test_utils",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "path_lower_bm",
+    srcs = [
+        "//src/mongo/db/query/optimizer/rewrites:path_lower_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
+    deps = [
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query/optimizer:optimizer_rewrites",
+        "//src/mongo/db/query/optimizer:unit_test_utils",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_binary(
+    name = "optimizer_gdb_test_program",
+    srcs = [
+        "optimizer_gdb_test_program.cpp",
+    ],
+    tags = [
+        "dist_test",
+    ],
+    deps = [
+        "optimizer",
+        "unit_test_utils",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+    ],
+)
+
+py_binary(
+    name = "optimizer_gdb_test",
+    srcs = ["optimizer_gdb_test.py"],
+)

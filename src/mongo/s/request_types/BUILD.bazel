@@ -1,0 +1,506 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "request_types_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_idl_library(
+    name = "set_allow_migrations_idl",
+    src = "set_allow_migrations.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/db/s:sharding_ddl_coordinator_idl_gen",
+        "//src/mongo/s/request_types:sharded_ddl_commands_idl_gen",
+        "//src/mongo/db/session:logical_session_id_idl_gen",
+        "//src/mongo/s:database_version_idl_gen",
+        "//src/mongo/s:error_status_idl_gen",
+        "//src/mongo/db/commands:create_idl_gen",
+        "//src/mongo/db/commands:rename_collection_idl_gen",
+        "//src/mongo/db/commands:set_user_write_block_mode_idl_gen",
+        "//src/mongo/db:drop_indexes_idl_gen",
+        "//src/mongo/db:drop_database_idl_gen",
+        "//src/mongo/db:keypattern_idl_gen",
+        "//src/mongo/db:coll_mod_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/db/timeseries:timeseries_idl_gen",
+        "//src/mongo/db/query:cursor_response_idl_only_gen",
+        "//src/mongo/db:metadata_consistency_types_idl_gen",
+        "//src/mongo/crypto:sha256_block_idl_gen",
+        "//src/mongo/s:database_version_base_idl_gen",
+        "//src/mongo/crypto:encryption_fields_idl_gen",
+        "//src/mongo/db/auth:access_checks_idl_gen",
+        "//src/mongo/db/auth:action_type_idl_gen",
+        "//src/mongo/db/catalog:collection_options_idl_gen",
+        "//src/mongo/db/catalog:clustered_collection_options_idl_gen",
+        "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/crypto:encryption_fields_idl",
+        "//src/mongo/crypto:sha256_block_idl",
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:coll_mod_idl",
+        "//src/mongo/db:drop_database_idl",
+        "//src/mongo/db:drop_indexes_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/db:metadata_consistency_types_idl",
+        "//src/mongo/db/auth:access_checks_idl",
+        "//src/mongo/db/auth:action_type_idl",
+        "//src/mongo/db/catalog:clustered_collection_options_idl",
+        "//src/mongo/db/catalog:collection_options_idl",
+        "//src/mongo/db/commands:create_idl",
+        "//src/mongo/db/commands:rename_collection_idl",
+        "//src/mongo/db/commands:set_user_write_block_mode_idl",
+        "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_idl",
+        "//src/mongo/db/query:cursor_response_idl",
+        "//src/mongo/db/query:cursor_response_idl_only",
+        "//src/mongo/db/session:logical_session_id_idl",
+        "//src/mongo/db/timeseries:timeseries_idl",
+        "//src/mongo/s:database_version_base_idl",
+        "//src/mongo/s:database_version_idl",
+        "//src/mongo/s:error_status_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/request_types:sharded_ddl_commands_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "resharding_operation_time_idl",
+    src = "resharding_operation_time.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "commit_reshard_collection_idl",
+    src = "commit_reshard_collection.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "drop_collection_if_uuid_not_matching_idl",
+    src = "drop_collection_if_uuid_not_matching.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "ensure_chunk_version_is_greater_than_idl",
+    src = "ensure_chunk_version_is_greater_than.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:chunk_version_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/s:chunk_version_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "flush_resharding_state_change_idl",
+    src = "flush_resharding_state_change.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "sharded_ddl_commands_idl",
+    src = "sharded_ddl_commands.idl",
+    idl_deps = [
+        "//src/mongo/db/commands:create_idl_gen",
+        "//src/mongo/db/commands:rename_collection_idl_gen",
+        "//src/mongo/db/commands:set_user_write_block_mode_idl_gen",
+        "//src/mongo/db:drop_indexes_idl_gen",
+        "//src/mongo/db:drop_database_idl_gen",
+        "//src/mongo/db:keypattern_idl_gen",
+        "//src/mongo/db:coll_mod_idl_gen",
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/db/timeseries:timeseries_idl_gen",
+        "//src/mongo/db/query:cursor_response_idl_only_gen",
+        "//src/mongo/db:metadata_consistency_types_idl_gen",
+        "//src/mongo/crypto:encryption_fields_idl_gen",
+        "//src/mongo/db/auth:access_checks_idl_gen",
+        "//src/mongo/db/auth:action_type_idl_gen",
+        "//src/mongo/db/catalog:collection_options_idl_gen",
+        "//src/mongo/db/catalog:clustered_collection_options_idl_gen",
+        "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/crypto:encryption_fields_idl",
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:coll_mod_idl",
+        "//src/mongo/db:drop_database_idl",
+        "//src/mongo/db:drop_indexes_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/db:metadata_consistency_types_idl",
+        "//src/mongo/db/auth:access_checks_idl",
+        "//src/mongo/db/auth:action_type_idl",
+        "//src/mongo/db/catalog:clustered_collection_options_idl",
+        "//src/mongo/db/catalog:collection_options_idl",
+        "//src/mongo/db/commands:create_idl",
+        "//src/mongo/db/commands:rename_collection_idl",
+        "//src/mongo/db/commands:set_user_write_block_mode_idl",
+        "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_idl",
+        "//src/mongo/db/query:cursor_response_idl_only",
+        "//src/mongo/db/timeseries:timeseries_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "configure_collection_balancing_idl",
+    src = "configure_collection_balancing.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "auto_split_vector_idl",
+    src = "auto_split_vector.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "cleanup_reshard_collection_idl",
+    src = "cleanup_reshard_collection.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "cluster_commands_without_shard_key_idl",
+    src = "cluster_commands_without_shard_key.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/s:sharding_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "coordinate_multi_update_idl",
+    src = "coordinate_multi_update.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "get_stats_for_balancing_idl",
+    src = "get_stats_for_balancing.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "clone_catalog_data_idl",
+    src = "clone_catalog_data.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "merge_chunk_request_idl",
+    src = "merge_chunk_request.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:chunk_range_idl_gen",
+        "//src/mongo/s:chunk_version_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/s:chunk_range_idl",
+        "//src/mongo/s:chunk_version_idl",
+        "//src/mongo/s:sharding_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "get_database_version_idl",
+    src = "get_database_version.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "move_range_request_idl",
+    src = "move_range_request.idl",
+    idl_deps = [
+        "//src/mongo/db:write_concern_options_idl_gen",
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+        "//src/mongo/db:read_write_concern_provenance_base_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:read_write_concern_provenance_base_idl",
+        "//src/mongo/db:write_concern_options_idl",
+        "//src/mongo/s:sharding_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "remove_shard_idl",
+    src = "remove_shard.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/s:sharding_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "reset_placement_history_idl",
+    src = "reset_placement_history.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "flush_database_cache_updates_idl",
+    src = "flush_database_cache_updates.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "shardsvr_join_migrations_request_idl",
+    src = "shardsvr_join_migrations_request.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "move_primary_idl",
+    src = "move_primary.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/s:sharding_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "reshard_collection_idl",
+    src = "reshard_collection.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/db:keypattern_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "wait_for_fail_point_idl",
+    src = "wait_for_fail_point.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "placement_history_commands_idl",
+    src = "placement_history_commands.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+        "//src/mongo/s/catalog:type_namespace_placement_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/catalog:type_namespace_placement_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "shardsvr_join_ddl_coordinators_request_idl",
+    src = "shardsvr_join_ddl_coordinators_request.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "transition_from_dedicated_config_server_idl",
+    src = "transition_from_dedicated_config_server.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "transition_to_dedicated_config_server_idl",
+    src = "transition_to_dedicated_config_server.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "untrack_unsplittable_collection_idl",
+    src = "untrack_unsplittable_collection.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "balancer_collection_status_idl",
+    src = "balancer_collection_status.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "flush_routing_table_cache_updates_idl",
+    src = "flush_routing_table_cache_updates.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "abort_reshard_collection_idl",
+    src = "abort_reshard_collection.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/s/resharding:resharding_common_types_idl_gen",
+        "//src/mongo/db:keypattern_idl_gen",
+        "//src/mongo/s:sharding_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db:keypattern_idl",
+        "//src/mongo/s:sharding_types_idl",
+        "//src/mongo/s/resharding:resharding_common_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "migration_blocking_operation_idl",
+    src = "migration_blocking_operation.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)

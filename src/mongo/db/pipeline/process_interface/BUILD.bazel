@@ -1,0 +1,160 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "process_interface_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "mongo_process_interface",
+    srcs = [
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongod_process_interfaces",
+    srcs = [
+        "//src/mongo/db/pipeline/process_interface:common_mongod_process_interface.cpp",
+        "//src/mongo/db/pipeline/process_interface:non_shardsvr_process_interface.cpp",
+        "//src/mongo/db/pipeline/process_interface:replica_set_node_process_interface.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:collection_index_usage_tracker",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:index_builds_coordinator_mongod",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:operation_time_tracker",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/db/ops:write_ops",
+        "//src/mongo/db/ops:write_ops_exec",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline/process_interface:common_process_interface",
+        "//src/mongo/db/repl:primary_only_service",
+        "//src/mongo/db/s:query_analysis_writer",
+        "//src/mongo/db/session:session_catalog",
+        "//src/mongo/db/stats:top",
+        "//src/mongo/db/storage:backup_cursor_hooks",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/transaction",
+        "//src/mongo/s:query_analysis_sampler",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/scripting:scripting_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "shardsvr_process_interface",
+    srcs = [
+        "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/pipeline/process_interface:mongod_process_interfaces",
+        "//src/mongo/s:sharding_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongos_process_interface_factory",
+    srcs = [
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface_factory.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongod_process_interface_factory",
+    srcs = [
+        "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/pipeline/process_interface:mongod_process_interfaces",
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
+        "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongos_process_interface",
+    srcs = [
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:sharded_agg_helpers",
+        "//src/mongo/db/pipeline/process_interface:common_process_interface",
+        "//src/mongo/db/session:session_catalog",
+        "//src/mongo/s/query:async_results_merger",
+        "//src/mongo/s/query:cluster_query",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "process_interface_test",
+    srcs = [
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface_test.cpp",
+        "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface_test.cpp",
+        "//src/mongo/db/pipeline/process_interface:standalone_process_interface_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_first_group",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db:vector_clock_mongod",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
+        "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/s:sharding_mongos_test_fixture",
+    ],
+)
+
+mongo_cc_library(
+    name = "common_process_interface",
+    srcs = [
+        "common_process_interface.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:generic_cursor",
+        "//src/mongo/db:operation_time_tracker",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/pipeline:field_path",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/util/concurrency:spin_lock",
+    ] + select({
+        "//bazel/config:use_diagnostic_latches_enabled": ["//src/mongo/util:diagnostic_info"],
+        "//conditions:default": [],
+    }),
+)

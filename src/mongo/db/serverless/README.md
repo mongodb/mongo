@@ -48,14 +48,14 @@ Access blockers are removed when the state document backing a shard split operat
 
 Access blockers may be removed in a few other scenarios:
 
--   [When the shard split namespace is dropped](https://github.com/mongodb/mongo/blob/87b60722e3c5ddaf7bc73d1ba08b31b437ef4f48/src/mongo/db/serverless/shard_split_donor_op_observer.cpp#L456)
--   [When it fails to insert the initial state document](https://github.com/mongodb/mongo/blob/87b60722e3c5ddaf7bc73d1ba08b31b437ef4f48/src/mongo/db/serverless/shard_split_donor_op_observer.cpp#L168-L169)
+- [When the shard split namespace is dropped](https://github.com/mongodb/mongo/blob/87b60722e3c5ddaf7bc73d1ba08b31b437ef4f48/src/mongo/db/serverless/shard_split_donor_op_observer.cpp#L456)
+- [When it fails to insert the initial state document](https://github.com/mongodb/mongo/blob/87b60722e3c5ddaf7bc73d1ba08b31b437ef4f48/src/mongo/db/serverless/shard_split_donor_op_observer.cpp#L168-L169)
 
 Access blockers are recovered
 
--   On startup after the [local config is loaded](https://github.com/mongodb/mongo/blob/65154f6a1356de6ca09e04975a0acdfb1a0351ef/src/mongo/db/repl/replication_coordinator_impl.cpp#L537)
--   After initial sync has completed in [InitialSyncer::\_teardown](https://github.com/mongodb/mongo/blob/65154f6a1356de6ca09e04975a0acdfb1a0351ef/src/mongo/db/repl/initial_syncer.cpp#L580)
--   On rollback during the [RollbackImpl::\_runPhaseFromAbortToReconstructPreparedTxns](https://github.com/mongodb/mongo/blob/65154f6a1356de6ca09e04975a0acdfb1a0351ef/src/mongo/db/repl/rollback_impl.cpp#L655)
+- On startup after the [local config is loaded](https://github.com/mongodb/mongo/blob/65154f6a1356de6ca09e04975a0acdfb1a0351ef/src/mongo/db/repl/replication_coordinator_impl.cpp#L537)
+- After initial sync has completed in [InitialSyncer::\_teardown](https://github.com/mongodb/mongo/blob/65154f6a1356de6ca09e04975a0acdfb1a0351ef/src/mongo/db/repl/initial_syncer.cpp#L580)
+- On rollback during the [RollbackImpl::\_runPhaseFromAbortToReconstructPreparedTxns](https://github.com/mongodb/mongo/blob/65154f6a1356de6ca09e04975a0acdfb1a0351ef/src/mongo/db/repl/rollback_impl.cpp#L655)
 
 ### Cleanup
 
@@ -114,10 +114,10 @@ The following diagram illustrates the lifetime of a shard split operation:
 
 During the critical section of a serverless operation the server will queue user requests for data involved in the operation, waiting to produce a response until after the critical section has completed. This process is called “blocking”, and the server provides this functionality by maintaining a [map of namespace to tenant access blocker](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/repl/tenant_migration_access_blocker_registry.h#L242-L243). This registry is consulted when deciding to block:
 
--   **commands** in the ServiceEntryPoint ([InvokeCommand::run](https://github.com/mongodb/mongo/blob/bc57b7313bce890cf1a7d6cdf20f1ec25949698f/src/mongo/db/service_entry_point_common.cpp#L886-L888), or [CheckoutSessionAndInvokeCommand::run](https://github.com/mongodb/mongo/blob/bc57b7313bce890cf1a7d6cdf20f1ec25949698f/src/mongo/db/service_entry_point_common.cpp#L886-L888))
--   **linearizable reads** in the [RunCommandImpl::\_epilogue](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/service_entry_point_common.cpp#L1249)
--   **writes** in [OpObserverImpl::onBatchedWriteCommit](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/op_observer/op_observer_impl.cpp#L1882-L1883), [OpObserverImpl::onUnpreparedTransactionCommit](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/op_observer/op_observer_impl.cpp#L1770-L1771), and the [\_logOpsInner oplog helper](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/repl/oplog.cpp#L429-L430)
--   **index builds** in [ReplIndexBuildState::tryAbort](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/repl_index_build_state.cpp#L495), IndexBuildsCoordinatorMongod::\_startIndexBuild ([here](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/index_builds_coordinator_mongod.cpp#L282), [here](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/index_builds_coordinator_mongod.cpp#L356-L357))
+- **commands** in the ServiceEntryPoint ([InvokeCommand::run](https://github.com/mongodb/mongo/blob/bc57b7313bce890cf1a7d6cdf20f1ec25949698f/src/mongo/db/service_entry_point_common.cpp#L886-L888), or [CheckoutSessionAndInvokeCommand::run](https://github.com/mongodb/mongo/blob/bc57b7313bce890cf1a7d6cdf20f1ec25949698f/src/mongo/db/service_entry_point_common.cpp#L886-L888))
+- **linearizable reads** in the [RunCommandImpl::\_epilogue](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/service_entry_point_common.cpp#L1249)
+- **writes** in [OpObserverImpl::onBatchedWriteCommit](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/op_observer/op_observer_impl.cpp#L1882-L1883), [OpObserverImpl::onUnpreparedTransactionCommit](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/op_observer/op_observer_impl.cpp#L1770-L1771), and the [\_logOpsInner oplog helper](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/repl/oplog.cpp#L429-L430)
+- **index builds** in [ReplIndexBuildState::tryAbort](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/repl_index_build_state.cpp#L495), IndexBuildsCoordinatorMongod::\_startIndexBuild ([here](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/index_builds_coordinator_mongod.cpp#L282), [here](https://github.com/mongodb/mongo/blob/a723af8863c5fae1eee7b0a891066e923468e974/src/mongo/db/index_builds_coordinator_mongod.cpp#L356-L357))
 
 ## Mutual Exclusion
 
@@ -129,9 +129,9 @@ This so-called “serverless operation lock” is acquired the first time a stat
 
 Change Stream data for a Serverless cluster is stored in a handful of tenantId-prefixed collections:
 
--   change collection: `<tenantId>_config.system.change_collection`
--   pre-images: `<tenantId>_config.system.preimages`
--   cluster parameters: `<tenantId>_config.system.cluster_parameters`
+- change collection: `<tenantId>_config.system.change_collection`
+- pre-images: `<tenantId>_config.system.preimages`
+- cluster parameters: `<tenantId>_config.system.cluster_parameters`
 
 A Shard Split operation will copy these collections from donor to recipient via Initial Sync. Upon completion, these collections will be cleaned up on the donor (by the cloud control plane) along with all other tenant-specific databases.
 

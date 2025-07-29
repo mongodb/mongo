@@ -1,0 +1,19 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "windows_sasl",
+    hdrs = select({
+        "@platforms//os:windows": ["@windows_sasl//:includes"],
+        "//conditions:default": [],
+    }),
+    additional_linker_inputs = select({
+        "@platforms//os:windows": ["@windows_sasl//:libraries"],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        "@platforms//os:windows": ["/LIBPATH:external/windows_sasl/lib"],
+        "//conditions:default": [],
+    }),
+)

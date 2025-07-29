@@ -1,12 +1,12 @@
+# begin:github_only
+load("@rules_pkg//:mappings.bzl", "pkg_files")
+# end:github_only
+
 load(
     "//bazel:upb_proto_library.bzl",
     "upb_proto_library",
     "upb_proto_reflection_library",
 )
-
-# begin:github_only
-load("@rules_pkg//:mappings.bzl", "pkg_files")
-# end:github_only
 
 # begin:google_only
 # package(default_applicable_licenses = ["//:license"])

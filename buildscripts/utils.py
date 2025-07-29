@@ -1,9 +1,9 @@
 """Various utilities that are handy."""
 
 import codecs
-import re
 import os
 import os.path
+import re
 import subprocess
 import sys
 

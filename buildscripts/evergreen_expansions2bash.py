@@ -1,8 +1,6 @@
 """Convert Evergreen's expansions.yml to an eval-able shell script."""
 import sys
-import platform
 from shlex import quote
-from typing import Any
 
 
 def _error(msg: str) -> None:
@@ -11,8 +9,8 @@ def _error(msg: str) -> None:
 
 
 try:
-    import yaml
     import click
+    import yaml
 except ModuleNotFoundError:
     _error("ERROR: Failed to import a dependency. This is almost certainly because "
            "the task did not initialize the venv immediately after cloning the repository.")

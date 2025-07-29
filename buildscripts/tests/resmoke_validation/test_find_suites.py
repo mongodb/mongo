@@ -1,6 +1,6 @@
+import glob
 import subprocess
 import unittest
-import glob
 
 
 class TestFindSuites(unittest.TestCase):

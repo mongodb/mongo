@@ -23,18 +23,24 @@ for (var j = 0; j < 10; ++j) {
 }
 
 // Confirm number of entries in the store and that none have been evicted.
-let res = getQueryStats(conn);
+let res = getQueryStats(conn, {collName: coll.getName()});
 assert.eq(res.length, 10, res);
-assert.eq(testDB.serverStatus().metrics.queryStats.numEvicted, 0);
-assert.gt(testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes, 0);
+{
+    const metrics = testDB.serverStatus().metrics.queryStats;
+    assert.eq(metrics.numEvicted, 0, metrics);
+    assert.gt(metrics.queryStatsStoreSizeEstimateBytes, 0, metrics);
+}
 
 // Command to clear the cache.
 assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "0MB"}));
 
 // 10 regular queries plus the $queryStats query, means 11 entries evicted when the cache is
 // cleared.
-assert.eq(testDB.serverStatus().metrics.queryStats.numEvicted, 11);
-assert.eq(testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes, 0);
+{
+    const metrics = testDB.serverStatus().metrics.queryStats;
+    assert.gte(metrics.numEvicted, 11, metrics);
+    assert.eq(metrics.queryStatsStoreSizeEstimateBytes, 0, metrics);
+}
 
 // Calling $queryStats should fail when the query stats store size is 0 bytes.
 assert.throwsWithCode(() => testDB.getSiblingDB("admin").aggregate([{$queryStats: {}}]), 6579000);

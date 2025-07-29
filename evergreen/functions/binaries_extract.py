@@ -23,12 +23,12 @@
 #
 
 import argparse
-import subprocess
+import glob
 import os
-import sys
 import pathlib
 import shutil
-import glob
+import subprocess
+import sys
 
 parser = argparse.ArgumentParser()
 

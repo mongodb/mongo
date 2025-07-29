@@ -1,7 +1,6 @@
 """The unittest.TestCase for C++ integration tests."""
 
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import core, utils
 from buildscripts.resmokelib.testing.testcases import interface
 
 

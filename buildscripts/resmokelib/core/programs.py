@@ -6,17 +6,16 @@ Handles all the nitty-gritty parameter conversion.
 import json
 import os
 import os.path
-from packaging import version
 import re
 import stat
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.core import process
-from buildscripts.resmokelib.core import network
-from buildscripts.resmokelib.testing.fixtures import standalone, shardedcluster
+from packaging import version
+
+from buildscripts.resmokelib import config, utils
+from buildscripts.resmokelib.core import network, process
+from buildscripts.resmokelib.testing.fixtures import shardedcluster, standalone
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
-from buildscripts.resmokelib.utils.history import make_historic, HistoryDict
+from buildscripts.resmokelib.utils.history import HistoryDict, make_historic
 
 
 def make_process(*args, **kwargs):

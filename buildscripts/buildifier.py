@@ -5,7 +5,7 @@ import pathlib
 import platform
 import subprocess
 
-from simple_report import put_report, try_combine_reports, make_report
+from simple_report import make_report, put_report, try_combine_reports
 
 mongo_dir = pathlib.Path(__file__).parents[1]
 

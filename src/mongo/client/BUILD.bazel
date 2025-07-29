@@ -1,0 +1,620 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "client_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "connection_string",
+    srcs = [
+        "//src/mongo/client:connection_string.cpp",
+        "//src/mongo/client:mongo_uri.cpp",
+    ],
+    deps = [
+        "//src/mongo/util:dns_query",
+        "//src/mongo/util/net:network",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "read_preference",
+    srcs = [
+        "//src/mongo/client:read_preference.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/client:read_preference_setting_idl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "authentication",
+    srcs = [
+        "//src/mongo/client:authenticate.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/client:internal_auth",
+        "//src/mongo/client:native_sasl_client",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth",
+        "//src/mongo/executor:remote_command",
+    ],
+)
+
+mongo_cc_library(
+    name = "internal_auth",
+    srcs = [
+        "//src/mongo/client:internal_auth.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db/auth",
+        "//src/mongo/util:md5",
+    ],
+)
+
+mongo_cc_library(
+    name = "clientdriver_minimal",
+    srcs = [
+        "//src/mongo/client:dbclient_base.cpp",
+        "//src/mongo/client:dbclient_cursor.cpp",
+        "//src/mongo/client:index_spec.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:authentication",
+        "//src/mongo/client:client_api_version_parameters_idl",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/client:read_preference",
+        "//src/mongo/db:dbmessage",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/pipeline:aggregation_request_helper",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/rpc",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/util/net:ssl_manager",
+    ],
+)
+
+mongo_cc_library(
+    name = "replica_set_monitor_server_parameters",
+    srcs = [
+        "//src/mongo/client:replica_set_monitor_server_parameters.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:replica_set_monitor_server_parameters_idl",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "async_client",
+    srcs = [
+        "//src/mongo/client:async_client.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:authentication",
+        "//src/mongo/db:connection_health_metrics_parameter_idl",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/executor:egress_connection_closer_manager",
+        "//src/mongo/rpc",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util/net:ssl_manager",
+    ],
+)
+
+mongo_cc_library(
+    name = "remote_command_targeter",
+    srcs = [
+        "//src/mongo/client:remote_command_targeter_factory_impl.cpp",
+        "//src/mongo/client:remote_command_targeter_rs.cpp",
+        "//src/mongo/client:remote_command_targeter_standalone.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "remote_command_targeter_mock",
+    srcs = [
+        "//src/mongo/client:remote_command_targeter_factory_mock.cpp",
+        "//src/mongo/client:remote_command_targeter_mock.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "replica_set_monitor_test_helper",
+    srcs = [
+        "//src/mongo/client:streamable_replica_set_monitor_for_testing.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/client/sdam:sdam_test_util",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "fetcher",
+    srcs = [
+        "//src/mongo/client:fetcher.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:remote_command_retry_scheduler",
+        "//src/mongo/db:server_base",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/rpc:command_status",
+    ],
+)
+
+mongo_cc_library(
+    name = "remote_command_retry_scheduler",
+    srcs = [
+        "//src/mongo/client:remote_command_retry_scheduler.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/executor:task_executor_interface",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "replica_set_monitor_integration_test",
+    srcs = [
+        "//src/mongo/client:replica_set_monitor_integration_test.cpp",
+    ],
+    tags = ["convert_target"],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_library(
+    name = "replica_set_monitor_protocol_test_util",
+    srcs = [
+        "//src/mongo/client:replica_set_monitor_protocol_test_util.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "client_rs_test",
+    srcs = [
+        "//src/mongo/client:dbclient_rs_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_sixth_group",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/client:replica_set_monitor_test_helper",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "scoped_db_connection_pool_test",
+    srcs = [
+        "//src/mongo/client:scoped_db_connection_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_seventh_group",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/dbtests:mocklib",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "dbclient_connection_test",
+    srcs = [
+        "//src/mongo/client:dbclient_connection_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_third_group",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "client_connpool_integration_test",
+    srcs = [
+        "//src/mongo/client:connpool_integration_test.cpp",
+    ],
+    tags = ["convert_target"],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "client_dbclient_connection_integration_test",
+    srcs = [
+        "//src/mongo/client:dbclient_connection_integration_test.cpp",
+    ],
+    tags = ["convert_target"],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "dbclient_mockcursor",
+    srcs = [
+        "//src/mongo/client:dbclient_mockcursor.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_minimal",
+    ],
+)
+
+mongo_cc_library(
+    name = "sasl_aws_client",
+    srcs = [
+        "//src/mongo/client:sasl_aws_client_protocol.cpp",
+    ],
+    deps = [
+        ":sasl_aws_protocol_common_idl",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/client:sasl_aws_client_protocol_idl",
+        "//src/mongo/db:server_base",
+        "//src/third_party/libmongocrypt:mongocrypt",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "client_test",
+    srcs = [
+        "//src/mongo/client:async_remote_command_targeter_adapter_test.cpp",
+        "//src/mongo/client:authenticate_test.cpp",
+        "//src/mongo/client:connection_string_test.cpp",
+        "//src/mongo/client:dbclient_cursor_test.cpp",
+        "//src/mongo/client:fetcher_test.cpp",
+        "//src/mongo/client:index_spec_test.cpp",
+        "//src/mongo/client:mongo_uri_test.cpp",
+        "//src/mongo/client:read_preference_test.cpp",
+        "//src/mongo/client:remote_command_retry_scheduler_test.cpp",
+        "//src/mongo/client:replica_set_monitor_server_parameters_test.cpp",
+        "//src/mongo/client:server_discovery_monitor_expedited_test.cpp",
+        "//src/mongo/client:server_discovery_monitor_test.cpp",
+        "//src/mongo/client:server_ping_monitor_test.cpp",
+        "//src/mongo/client:streamable_replica_set_monitor_discovery_time_processor_test.cpp",
+        "//src/mongo/client:streamable_replica_set_monitor_error_handler_test.cpp",
+    ],
+    data = [
+        "//src/mongo/client/mongo_uri_tests:test_data",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fourth_group",
+    ],
+    deps = [
+        "//src/mongo/client:authentication",
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/client:fetcher",
+        "//src/mongo/client:read_preference",
+        "//src/mongo/client:remote_command_retry_scheduler",
+        "//src/mongo/client:remote_command_targeter_mock",
+        "//src/mongo/client:replica_set_monitor_protocol_test_util",
+        "//src/mongo/client/sdam",
+        "//src/mongo/client/sdam:sdam_test_util",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:task_executor_test_fixture",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/unittest:task_executor_proxy",
+        "//src/mongo/util:md5",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "dbclient_grpc_stream_test",
+    srcs = [
+        "//src/mongo/client:dbclient_grpc_stream_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/transport/grpc:grpc_transport_mock",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "native_sasl_client",
+    srcs = [
+        "native_sasl_client_session.cpp",
+        "sasl_client_authenticate.cpp",
+        "sasl_client_authenticate_impl.cpp",
+        "sasl_client_conversation.cpp",
+        "sasl_client_session.cpp",
+        "sasl_oidc_client_conversation.cpp",
+        "sasl_plain_client_conversation.cpp",
+        "sasl_scram_client_conversation.cpp",
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            "sasl_aws_client_conversation.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "connection_string",
+        ":sasl_oidc_client_types_idl",
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:oidc_protocol",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/executor:remote_command",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/shell:program_runner",
+        "//src/mongo/util:icu",
+        "//src/mongo/util:md5",
+        "//src/mongo/util/net:http_client",
+        "//src/mongo/util/net:network",
+        "//src/mongo/util/options_parser",
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            "sasl_aws_client",
+            "sasl_aws_client_options_idl",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "cyrus_sasl_client",
+    srcs = [
+        "cyrus_sasl_client_session.cpp",
+        "sasl_sspi.cpp",
+        "sasl_sspi_options.cpp",
+    ],
+    linkopts = select({
+        "@platforms//os:windows": [
+            "secur32.lib",
+            "sasl2.lib",
+        ],
+        "//conditions:default": ["-lsasl2"],
+    }),
+    target_compatible_with = select({
+        "//bazel/config:use_sasl_client_required_settings": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "native_sasl_client",
+        "sasl_sspi_options_idl",
+    ],
+)
+
+mongo_cc_library(
+    name = "clientdriver_network",
+    srcs = [
+        "connection_string_connect.cpp",
+        "connpool.cpp",
+        "dbclient_connection.cpp",
+        "dbclient_rs.cpp",
+        "dbclient_session.cpp",
+        "global_conn_pool.cpp",
+        "mongo_uri_connect.cpp",
+        "replica_set_change_notifier.cpp",
+        "replica_set_monitor.cpp",
+        "replica_set_monitor_manager.cpp",
+        "replica_set_monitor_stats.cpp",
+        "server_discovery_monitor.cpp",
+        "server_ping_monitor.cpp",
+        "streamable_replica_set_monitor.cpp",
+        "streamable_replica_set_monitor_discovery_time_processor.cpp",
+        "streamable_replica_set_monitor_error_handler.cpp",
+        "streamable_replica_set_monitor_query_processor.cpp",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": ["dbclient_grpc_stream.cpp"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "clientdriver_minimal",
+        "global_conn_pool_idl",
+        "read_preference",
+        "replica_set_monitor_server_parameters",
+        "//src/mongo/client/sdam",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags_idl",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/executor:connection_pool_stats",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:background_job",
+        "//src/mongo/util:md5",
+        "//src/mongo/util/net:network",
+        "//src/mongo/util/net:ssl_manager",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": ["//src/mongo/transport/grpc:grpc_transport_layer"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_idl_library(
+    name = "global_conn_pool_idl",
+    src = "global_conn_pool.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "read_preference_idl",
+    src = "read_preference.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/client:hedging_mode_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/client:hedging_mode_idl",
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "hedging_mode_idl",
+    src = "hedging_mode.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "sasl_aws_client_options_idl",
+    src = "sasl_aws_client_options.idl",
+)
+
+mongo_idl_library(
+    name = "sasl_aws_client_protocol_idl",
+    src = "sasl_aws_client_protocol.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "sasl_aws_protocol_common_idl",
+    src = "sasl_aws_protocol_common.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "replica_set_monitor_server_parameters_idl",
+    src = "replica_set_monitor_server_parameters.idl",
+)
+
+mongo_idl_library(
+    name = "sasl_sspi_options_idl",
+    src = "sasl_sspi_options.idl",
+)
+
+mongo_idl_library(
+    name = "client_api_version_parameters_idl",
+    src = "client_api_version_parameters.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "sasl_oidc_client_types_idl",
+    src = "sasl_oidc_client_types.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "read_preference_setting_idl",
+    src = "read_preference_setting.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/client:read_preference_idl_gen",
+        "//src/mongo/client:hedging_mode_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/client:hedging_mode_idl",
+        "//src/mongo/client:read_preference_idl",
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "async_client_idl",
+    src = "async_client.idl",
+)

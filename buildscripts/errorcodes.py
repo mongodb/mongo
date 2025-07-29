@@ -9,8 +9,8 @@ import bisect
 import os.path
 import sys
 from collections import defaultdict, namedtuple
-from optparse import OptionParser
 from functools import reduce
+from optparse import OptionParser
 from pathlib import Path
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
@@ -185,10 +185,10 @@ def read_error_codes(src_root='src/mongo'):
         codes.append(assert_loc)
         code = assert_loc.code
 
-        if not code in seen:
+        if code not in seen:
             seen[code] = assert_loc
         else:
-            if not code in dups:
+            if code not in dups:
                 # on first duplicate, add original to dups, errors
                 dups[code].append(seen[code])
                 errors.append(seen[code])

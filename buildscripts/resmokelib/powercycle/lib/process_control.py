@@ -1,5 +1,6 @@
 """Wrapper for the ProcessControl class."""
 import logging
+
 import psutil
 
 LOGGER = logging.getLogger(__name__)

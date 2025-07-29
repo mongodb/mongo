@@ -1,0 +1,280 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "ce_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "ce_utils",
+    srcs = [
+        "//src/mongo/db/query/ce:bound_utils.cpp",
+        "//src/mongo/db/query/ce:sel_tree_utils.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline:abt_utils",
+        "//src/mongo/db/query/optimizer:optimizer_rewrites",
+    ],
+)
+
+mongo_cc_library(
+    name = "ce_heuristic_estimation",
+    srcs = [
+        "//src/mongo/db/query/ce:heuristic_predicate_estimation.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:ce_utils",
+        "//src/mongo/db/query/optimizer:optimizer_memo",
+    ],
+)
+
+mongo_cc_library(
+    name = "ce_histogram_estimation",
+    srcs = [
+        "//src/mongo/db/query/ce:histogram_predicate_estimation.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:ce_utils",
+        "//src/mongo/db/query/stats:stats_histograms",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_ce_heuristic",
+    srcs = [
+        "//src/mongo/db/query/ce:heuristic_estimator.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:ce_heuristic_estimation",
+        "//src/mongo/db/query/ce:ce_utils",
+        "//src/mongo/db/query/optimizer:optimizer_memo",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_ce_hinted",
+    srcs = [
+        "//src/mongo/db/query/ce:hinted_estimator.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:ce_utils",
+        "//src/mongo/db/query/ce:query_ce_heuristic",
+        "//src/mongo/db/query/optimizer:optimizer_memo",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_ce_histogram",
+    srcs = [
+        "//src/mongo/db/query/ce:histogram_estimator.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:ce_heuristic_estimation",
+        "//src/mongo/db/query/ce:ce_histogram_estimation",
+        "//src/mongo/db/query/ce:ce_utils",
+        "//src/mongo/db/query/optimizer:optimizer_memo",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_ce_sampling",
+    srcs = [
+        "//src/mongo/db/query/ce:sampling_estimator.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:ce_utils",
+        "//src/mongo/db/query/optimizer",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_ce_sampling_executor",
+    srcs = [
+        "//src/mongo/db/query/ce:sampling_executor.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/exec/sbe:query_sbe_abt",
+        "//src/mongo/db/query/ce:query_ce_sampling",
+    ],
+)
+
+mongo_cc_library(
+    name = "test_utils",
+    srcs = [
+        "//src/mongo/db/query/ce:test_utils.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/sbe:sbe_abt_test_util",
+        "//src/mongo/db/query/ce:query_ce_heuristic",
+        "//src/mongo/db/query/ce:query_ce_histogram",
+        "//src/mongo/db/query/ce:query_ce_sampling",
+        "//src/mongo/db/query/ce:query_ce_sampling_executor",
+        "//src/mongo/db/query/optimizer:unit_test_pipeline_utils",
+        "//src/mongo/db/s:sharding_catalog_manager",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "histogram_estimator_test",
+    srcs = [
+        "//src/mongo/db/query/ce:histogram_estimator_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_eighth_group",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:test_utils",
+        "//src/mongo/db/query/stats:stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "histogram_interpolation_test",
+    srcs = [
+        "//src/mongo/db/query/ce:histogram_interpolation_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_third_group",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "heuristic_estimator_test",
+    srcs = [
+        "//src/mongo/db/query/ce:heuristic_estimator_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_eighth_group",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "histogram_array_data_test",
+    srcs = [
+        "//src/mongo/db/query/ce:histogram_array_data_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_first_group",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:test_utils",
+        "//src/mongo/db/query/stats:stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "histogram_edge_cases_test",
+    srcs = [
+        "//src/mongo/db/query/ce:histogram_edge_cases_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_eighth_group",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:test_utils",
+        "//src/mongo/db/query/stats:stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "heuristic_dataflow_nodes_test",
+    srcs = [
+        "//src/mongo/db/query/ce:heuristic_dataflow_nodes_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_first_group",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "generated_histograms_test",
+    srcs = [
+        "//src/mongo/db/query/ce:generated_histograms_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "maxdiff_histogram_test",
+    srcs = [
+        "//src/mongo/db/query/ce:maxdiff_histogram_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fourth_group",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:test_utils",
+        "//src/mongo/db/query/stats:stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sampling_estimator_test",
+    srcs = [
+        "//src/mongo/db/query/ce:sampling_estimator_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_eighth_group",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:test_utils",
+        "//src/mongo/db/query/stats:stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ce_benchmark_test",
+    srcs = [
+        "//src/mongo/db/query/ce:benchmark_test.cpp",
+        "//src/mongo/db/query/ce:benchmark_utils.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:test_utils",
+        "//src/mongo/db/query/optimizer",
+        "//src/mongo/db/query/stats:stats_test_utils",
+    ],
+)

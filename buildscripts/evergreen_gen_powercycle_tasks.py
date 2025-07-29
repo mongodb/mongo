@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """Generate multiple powercycle tasks to run in evergreen."""
 from collections import namedtuple
-from typing import Any, List, Tuple, Set
+from typing import Any, List, Set, Tuple
 
 import click
-from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, Task, TaskDependency, ExistingTask
+from shrub.v2 import (
+    BuildVariant,
+    ExistingTask,
+    FunctionCall,
+    ShrubProject,
+    Task,
+    TaskDependency,
+)
 from shrub.v2.command import BuiltInCommand
 
 from buildscripts.util.fileops import write_file
@@ -59,7 +66,7 @@ def get_setup_commands() -> Tuple[List[FunctionCall], Set[TaskDependency]]:
     """Return setup commands."""
     return [
         FunctionCall("do setup"),
-    ], {TaskDependency("archive_dist_test_debug")}
+    ], {TaskDependency("archive_dist_test")}
 
 
 def get_skip_compile_setup_commands() -> Tuple[List[FunctionCall], set]:

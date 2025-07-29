@@ -4,12 +4,12 @@
 
 ### Server Parameters
 
--   `throughputProbingInitialConcurrency -> gInitialConcurrency`: initial number of concurrent read and write transactions
--   `throughputProbingMinConcurrency -> gMinConcurrency`: minimum concurrent read and write transactions
--   `throughputProbingMaxConcurrency -> gMaxConcurrency`: maximum concurrenct read and write transactions
--   `throughputProbingReadWriteRatio -> gReadWriteRatio`: ratio of read and write tickets where 0.5 indicates 1:1 ratio
--   `throughputProbingConcurrencyMovingAverageWeight -> gConcurrencyMovingAverageWeight`: weight of new concurrency measurement in the exponentially-decaying moving average
--   `throughputProbingStepMultiple -> gStepMultiple`: step size for throughput probing
+- `throughputProbingInitialConcurrency -> gInitialConcurrency`: initial number of concurrent read and write transactions
+- `throughputProbingMinConcurrency -> gMinConcurrency`: minimum concurrent read and write transactions
+- `throughputProbingMaxConcurrency -> gMaxConcurrency`: maximum concurrenct read and write transactions
+- `throughputProbingReadWriteRatio -> gReadWriteRatio`: ratio of read and write tickets where 0.5 indicates 1:1 ratio
+- `throughputProbingConcurrencyMovingAverageWeight -> gConcurrencyMovingAverageWeight`: weight of new concurrency measurement in the exponentially-decaying moving average
+- `throughputProbingStepMultiple -> gStepMultiple`: step size for throughput probing
 
 ### Pseudocode
 

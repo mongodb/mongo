@@ -17,7 +17,6 @@ assert(2 == t.find({
              }).length());
 assert(1 == t.find({
                  $where: function() {
-                     // eslint-disable-next-line
                      return obj.z == 2;
                  }
              }).length());

@@ -5,8 +5,8 @@
 # license that can be found in the LICENSE file or at
 # https://developers.google.com/open-source/licenses/bsd
 
-load("@rules_python//python:defs.bzl", "py_binary")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@rules_python//python:defs.bzl", "py_binary")
 
 # begin:google_only
 # package(default_applicable_licenses = ["//upb:license"])
@@ -38,8 +38,8 @@ bzl_library(
     ],
     deps = [
         "@bazel_skylib//lib:paths",
-        "@rules_proto//proto:defs",
         "@bazel_tools//tools/cpp:toolchain_utils.bzl",
+        "@rules_proto//proto:defs",
     ],
 )
 

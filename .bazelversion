@@ -1,3 +1,1 @@
-6.4.0
-# TODO(SERVER-86050): s390x and ppc64le are using custom built Bazel v6.4.0 binaries
-# Do not update this without updating the custom built binaries until Bazelisk is supported on s390x & ppc64le.
+7.5.0-mongo_9ea3a8ad9f

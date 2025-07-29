@@ -12,7 +12,10 @@ import os
 import subprocess
 import sys
 
-from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import LOCAL_BIN_DIR, MULTIVERSION_BIN_DIR
+from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import (
+    LOCAL_BIN_DIR,
+    MULTIVERSION_BIN_DIR,
+)
 
 
 def main():

@@ -1,0 +1,7 @@
+{
+  "name": "eslint-plugin-mongodb",
+  "version": "1.0.0",
+  "private": true,
+  "main": "plugin.js",
+  "type": "module"
+}

@@ -31,6 +31,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 import argparse
 import os
 import sys
+
 import yaml
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
@@ -39,6 +40,7 @@ if __name__ == "__main__" and __package__ is None:
 
 # pylint: disable=wrong-import-position
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
+
 # pylint: enable=wrong-import-position
 
 # Name of map to search for in the variables map in evergreen.yml

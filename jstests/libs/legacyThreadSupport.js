@@ -2,7 +2,6 @@
  * The ParallelTester class is used to test more than one test concurrently
  */
 
-/* eslint-disable */
 if (typeof _threadInject != "undefined") {
     // With --enableJavaScriptProtection functions are presented as Code objects.
     // This function evals all the Code objects then calls the provided start function.

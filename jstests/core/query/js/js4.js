@@ -14,7 +14,6 @@ assert.eq("/abc/i", real.c.toString(), "regex 1");
 
 var cursor = t.find({
     $where: function() {
-        /* eslint-disable */
         assert.eq(7, Object.keySet(obj).length, "A");
         assert.eq(1, obj.a, "B");
         assert.eq("abc", obj.b, "C");
@@ -22,7 +21,6 @@ var cursor = t.find({
         assert.eq(111911100111, obj.d.getTime(), "E");
         assert(obj.f, "F");
         assert(!obj.e, "G");
-        /* eslint-enable */
 
         return true;
     }
@@ -36,12 +34,10 @@ t.drop();
 t.save({a: 2, b: {c: 7, d: "d is good"}});
 var cursor = t.find({
     $where: function() {
-        /* eslint-disable */
         assert.eq(3, Object.keySet(obj).length);
         assert.eq(2, obj.a);
         assert.eq(7, obj.b.c);
         assert.eq("d is good", obj.b.d);
-        /* eslint-enable */
 
         return true;
     }

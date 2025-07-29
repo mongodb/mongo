@@ -215,7 +215,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 repl_config["writeConcernMajorityJournalDefault"] = False
 
         if (self.replset_config_options.get("configsvr", False)
-                or (self.use_auto_bootstrap_procedure and not "shardsvr" in self.mongod_options)):
+                or (self.use_auto_bootstrap_procedure and "shardsvr" not in self.mongod_options)):
             repl_config["configsvr"] = True
         if self.replset_config_options.get("settings"):
             replset_settings = self.replset_config_options["settings"]

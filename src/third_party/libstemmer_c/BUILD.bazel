@@ -1,0 +1,60 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "stemmer",
+    srcs = [
+        "dist/libstemmer/libstemmer_utf8.c",
+        "dist/libstemmer/modules.h",
+        "dist/libstemmer/modules_utf8.h",
+        "dist/runtime/api.c",
+        "dist/runtime/api.h",
+        "dist/runtime/header.h",
+        "dist/src_c/stem_UTF_8_danish.c",
+        "dist/src_c/stem_UTF_8_danish.h",
+        "dist/src_c/stem_UTF_8_dutch.c",
+        "dist/src_c/stem_UTF_8_dutch.h",
+        "dist/src_c/stem_UTF_8_english.c",
+        "dist/src_c/stem_UTF_8_english.h",
+        "dist/src_c/stem_UTF_8_finnish.c",
+        "dist/src_c/stem_UTF_8_finnish.h",
+        "dist/src_c/stem_UTF_8_french.c",
+        "dist/src_c/stem_UTF_8_french.h",
+        "dist/src_c/stem_UTF_8_german.c",
+        "dist/src_c/stem_UTF_8_german.h",
+        "dist/src_c/stem_UTF_8_hungarian.c",
+        "dist/src_c/stem_UTF_8_hungarian.h",
+        "dist/src_c/stem_UTF_8_italian.c",
+        "dist/src_c/stem_UTF_8_italian.h",
+        "dist/src_c/stem_UTF_8_norwegian.c",
+        "dist/src_c/stem_UTF_8_norwegian.h",
+        "dist/src_c/stem_UTF_8_porter.c",
+        "dist/src_c/stem_UTF_8_porter.h",
+        "dist/src_c/stem_UTF_8_portuguese.c",
+        "dist/src_c/stem_UTF_8_portuguese.h",
+        "dist/src_c/stem_UTF_8_romanian.c",
+        "dist/src_c/stem_UTF_8_romanian.h",
+        "dist/src_c/stem_UTF_8_russian.c",
+        "dist/src_c/stem_UTF_8_russian.h",
+        "dist/src_c/stem_UTF_8_spanish.c",
+        "dist/src_c/stem_UTF_8_spanish.h",
+        "dist/src_c/stem_UTF_8_swedish.c",
+        "dist/src_c/stem_UTF_8_swedish.h",
+        "dist/src_c/stem_UTF_8_turkish.c",
+        "dist/src_c/stem_UTF_8_turkish.h",
+    ],
+    hdrs = [
+        "dist/include/libstemmer.h",
+        "dist/runtime/utilities.c",
+    ],
+    copts = select({
+        "//bazel/config:gcc_or_clang": [
+            "-fno-strict-overflow",
+        ],
+        "//conditions:default": [],
+    }),
+    includes = [
+        "dist/include",
+    ],
+)

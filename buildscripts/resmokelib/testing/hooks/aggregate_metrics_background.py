@@ -4,8 +4,9 @@ This hook runs continuously, but the run_aggregate_metrics_background.js file it
 internally sleep for 1 second between runs.
 """
 
-import pymongo
 import random
+
+import pymongo
 
 from buildscripts.resmokelib.testing.hooks.bghook import BGHook
 

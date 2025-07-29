@@ -1,0 +1,44 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "write_ops_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "batch_write_types",
+    srcs = [
+        "//src/mongo/s/write_ops:batched_command_request.cpp",
+        "//src/mongo/s/write_ops:batched_command_response.cpp",
+        "//src/mongo/s/write_ops:batched_upsert_detail.cpp",
+        "//src/mongo/s/write_ops:bulk_write_command_modifier.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:common",
+        "//src/mongo/db:error_labels",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db/commands:bulk_write_parser",
+        "//src/mongo/db/ops:write_ops_parsers",
+        "//src/mongo/db/repl:optime",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/s:common_s",
+    ],
+)

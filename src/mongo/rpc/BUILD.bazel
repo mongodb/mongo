@@ -1,0 +1,253 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_fuzzer_test", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "rpc_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "command_status",
+    srcs = [
+        "//src/mongo/rpc:get_status_from_command_result.cpp",
+        "//src/mongo/rpc:write_concern_error_detail.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
+        "//src/mongo/rpc:write_concern_error_idl",
+    ],
+)
+
+mongo_cc_library(
+    name = "rpc",
+    srcs = [
+        "//src/mongo/rpc:check_allowed_op_query_cmd.cpp",
+        "//src/mongo/rpc:factory.cpp",
+        "//src/mongo/rpc:legacy_reply.cpp",
+        "//src/mongo/rpc:legacy_reply_builder.cpp",
+        "//src/mongo/rpc:legacy_request.cpp",
+        "//src/mongo/rpc:object_check.cpp",
+        "//src/mongo/rpc:reply_builder_interface.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:dbmessage",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/rpc:message",
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/rpc:object_check_idl",
+        "//src/mongo/rpc:rewrite_state_change_errors",
+        "//src/mongo/s:common_s",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "rewrite_state_change_errors",
+    srcs = [
+        "//src/mongo/rpc:rewrite_state_change_errors.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/rpc:message",
+        "//src/mongo/rpc:rewrite_state_change_errors_server_parameter_idl",
+        "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_library(
+    name = "metadata",
+    srcs = [
+        "//src/mongo/rpc:metadata.cpp",
+        "//src/mongo/rpc/metadata:egress_metadata_hook_list.cpp",
+        "//src/mongo/rpc/metadata:oplog_query_metadata.cpp",
+        "//src/mongo/rpc/metadata:repl_set_metadata.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/client:read_preference",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:signed_logical_time",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db:write_block_bypass",
+        "//src/mongo/db/auth:security_token",
+        "//src/mongo/db/repl:optime",
+        "//src/mongo/rpc:client_metadata",
+        "//src/mongo/rpc:message",
+        "//src/mongo/rpc:metadata_impersonated_user",
+        "//src/mongo/rpc:topology_version_idl",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "metadata_impersonated_user",
+    srcs = [
+        "//src/mongo/rpc/metadata:audit_client_attrs.cpp",
+        "//src/mongo/rpc/metadata:impersonated_user_metadata.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth",
+        "//src/mongo/rpc/metadata:audit_client_attrs_idl",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "client_metadata",
+    srcs = [
+        "//src/mongo/rpc/metadata:client_metadata.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/rpc/metadata:client_metadata_idl",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "rpc_integration_test",
+    srcs = [
+        "//src/mongo/rpc:op_legacy_integration_test.cpp",
+        "//src/mongo/rpc:op_msg_integration_test.cpp",
+    ],
+    tags = ["convert_target"],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/rpc:message",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "message",
+    srcs = [
+        "message.cpp",
+        "op_msg.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/auth:security_token_auth",
+        "//src/mongo/db/bson:dotted_path_support",
+        "//src/third_party/wiredtiger:wiredtiger_checksum",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "rpc_test",
+    srcs = [
+        "//src/mongo/rpc:get_status_from_command_result_test.cpp",
+        "//src/mongo/rpc:metadata_test.cpp",
+        "//src/mongo/rpc:object_check_test.cpp",
+        "//src/mongo/rpc:op_msg_test.cpp",
+        "//src/mongo/rpc:reply_builder_test.cpp",
+        "//src/mongo/rpc:rewrite_state_change_errors_test.cpp",
+        "//src/mongo/rpc/metadata:client_metadata_test.cpp",
+        "//src/mongo/rpc/metadata:egress_metadata_hook_list_test.cpp",
+        "//src/mongo/rpc/metadata:oplog_query_metadata_test.cpp",
+        "//src/mongo/rpc/metadata:repl_set_metadata_test.cpp",
+        "//src/mongo/rpc/metadata:security_token_metadata_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/s:sharding_catalog_manager",
+        "//src/mongo/rpc",
+        "//src/mongo/rpc:client_metadata",
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/rpc:rewrite_state_change_errors",
+        "//src/third_party/wiredtiger:wiredtiger_checksum",
+    ],
+)
+
+mongo_idl_library(
+    name = "topology_version_idl",
+    src = "topology_version.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "rewrite_state_change_errors_server_parameter_idl",
+    src = "rewrite_state_change_errors_server_parameter.idl",
+)
+
+mongo_idl_library(
+    name = "write_concern_error_idl",
+    src = "write_concern_error.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "object_check_idl",
+    src = "object_check.idl",
+)
+
+mongo_cc_fuzzer_test(
+    name = "protocol_fuzzer",
+    srcs = [
+        "protocol_fuzzer.cpp",
+    ],
+    deps = [
+        ":message",
+        ":rpc",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/ops:write_ops_parsers",
+        "//src/mongo/transport:message_compressor",
+    ],
+)

@@ -1,19 +1,47 @@
-load("@aspect_rules_lint//format:defs.bzl", "multi_formatter_binary")
-load("@npm//:prettier/package_json.bzl", prettier = "bin")
+load("@aspect_rules_lint//format:defs.bzl", "format_multirun", "format_test")
 
-# TODO: SERVER-82329 eslint binary should almost exactly mirror prettier binary
-# To update prettier change the version in package.json
-# Run `pnpm install`
-# Commit changes
-prettier.prettier_binary(
-    name = "prettier",
-    # Allow the binary to be run outside bazel
-    # See more details about this by commenting this out and running `bazel run //:format`
-    env = {"BAZEL_BINDIR": "."},
+py_binary(
+    name = "rules_lint_format_wrapper",
+    srcs = ["rules_lint_format_wrapper.py"],
+    args = [
+        "--prettier",
+        "$(location //:prettier)",
+        "--shellscripts-linters",
+        "$(location //buildscripts:shellscripts_linters)",
+        "--rules-lint-format",
+        "$(location :rules_lint_format)",
+        "--rules-lint-format-check",
+        "$(location :rules_lint_format.check)",
+    ],
+    data = [
+        ":rules_lint_format",
+        ":rules_lint_format.check",
+        "//:prettier",
+        "//buildscripts:shellscripts_linters",
+        "@shfmt",
+    ],
+    env = {
+        "SHFMT_PATH": "$(execpath @shfmt//:shfmt)",
+    },
+    main = "rules_lint_format_wrapper.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:unittest_grouper",
+    ],
 )
 
-multi_formatter_binary(
-    name = "format",
-    markdown = ":prettier",
+format_multirun(
+    name = "rules_lint_format",
+    # disabled until it stops formatting third party code
+    c = "//:clang_format",
+    cc = "//:clang_format",
+    css = "//:prettier",
+    graphql = "//:prettier",
+    html = "//:prettier",
+    markdown = "//:prettier",
+    sql = "//:prettier",
+    starlark = "@buildifier_prebuilt//:buildifier",
     visibility = ["//visibility:public"],
+    # TODO(SERVER-101034): Enable rules_lint shfmt after sh files are reformatted with .editorconfig
+    #   shell = "@shfmt//:shfmt",
 )

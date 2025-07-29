@@ -56,12 +56,12 @@ Sample index entry:
 {_id: {shk1: 1 .. shkN: 1, _id: 1}, ik: BinData(KeyString({ik1: 1, .. ikN: 1})), tb: BinData(TypeBits({ik1: 1, .. ikN: 1}))}
 ```
 
--   Top-level `_id` is the [document key](#glossary).
--   `ik` is the index key. The key is stored in its [KeyString](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#keystring)
-    form without [TypeBits](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#typebits), as BSON binary data with subtype 0 (Generic binary subtype).
--   `tb` are the [TypeBits](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#typebits).
-    This field is only present when not empty, and is stored as BSON binary data with subtype 0
-    (Generic binary subtype).
+- Top-level `_id` is the [document key](#glossary).
+- `ik` is the index key. The key is stored in its [KeyString](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#keystring)
+  form without [TypeBits](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#typebits), as BSON binary data with subtype 0 (Generic binary subtype).
+- `tb` are the [TypeBits](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#typebits).
+  This field is only present when not empty, and is stored as BSON binary data with subtype 0
+  (Generic binary subtype).
 
 The global index collection is [clustered](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#clustered-collections)
 by `_id`, it has a local unique secondary index on `ik` and is planned to be sharded by `ik`.

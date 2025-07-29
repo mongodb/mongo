@@ -606,6 +606,7 @@ if test "$PHP_GRPC" != "no"; then
     src/core/lib/gprpp/load_file.cc \
     src/core/lib/gprpp/mpscq.cc \
     src/core/lib/gprpp/per_cpu.cc \
+    src/core/lib/gprpp/posix/directory_reader.cc \
     src/core/lib/gprpp/posix/env.cc \
     src/core/lib/gprpp/posix/stat.cc \
     src/core/lib/gprpp/posix/thd.cc \
@@ -617,6 +618,7 @@ if test "$PHP_GRPC" != "no"; then
     src/core/lib/gprpp/time_averaged_stats.cc \
     src/core/lib/gprpp/time_util.cc \
     src/core/lib/gprpp/validation_errors.cc \
+    src/core/lib/gprpp/windows/directory_reader.cc \
     src/core/lib/gprpp/windows/env.cc \
     src/core/lib/gprpp/windows/stat.cc \
     src/core/lib/gprpp/windows/thd.cc \
@@ -769,6 +771,7 @@ if test "$PHP_GRPC" != "no"; then
     src/core/lib/security/credentials/tls/grpc_tls_certificate_provider.cc \
     src/core/lib/security/credentials/tls/grpc_tls_certificate_verifier.cc \
     src/core/lib/security/credentials/tls/grpc_tls_credentials_options.cc \
+    src/core/lib/security/credentials/tls/grpc_tls_crl_provider.cc \
     src/core/lib/security/credentials/tls/tls_credentials.cc \
     src/core/lib/security/credentials/tls/tls_utils.cc \
     src/core/lib/security/credentials/xds/xds_credentials.cc \
@@ -1341,7 +1344,7 @@ if test "$PHP_GRPC" != "no"; then
     -D_HAS_EXCEPTIONS=0 -DNOMINMAX -DGRPC_ARES=0 \
     -DGRPC_POSIX_FORK_ALLOW_PTHREAD_ATFORK=1 \
     -DGRPC_XDS_USER_AGENT_NAME_SUFFIX='"\"PHP\""' \
-    -DGRPC_XDS_USER_AGENT_VERSION_SUFFIX='"\"1.59.2\""')
+    -DGRPC_XDS_USER_AGENT_VERSION_SUFFIX='"\"1.59.5\""')
 
   PHP_ADD_BUILD_DIR($ext_builddir/src/core/ext/filters/backend_metrics)
   PHP_ADD_BUILD_DIR($ext_builddir/src/core/ext/filters/census)

@@ -1,75 +1,75 @@
 cxx_library(
-    name='buffer',
-    visibility=['PUBLIC'],
-    header_namespace='utils',
-    exported_headers=['Buffer.h'],
-    deps=[':range'],
+    name = "buffer",
+    exported_headers = ["Buffer.h"],
+    header_namespace = "utils",
+    visibility = ["PUBLIC"],
+    deps = [":range"],
 )
 
 cxx_library(
-    name='file_system',
-    visibility=['PUBLIC'],
-    header_namespace='utils',
-    exported_headers=['FileSystem.h'],
-    deps=[':range'],
+    name = "file_system",
+    exported_headers = ["FileSystem.h"],
+    header_namespace = "utils",
+    visibility = ["PUBLIC"],
+    deps = [":range"],
 )
 
 cxx_library(
-    name='likely',
-    visibility=['PUBLIC'],
-    header_namespace='utils',
-    exported_headers=['Likely.h'],
+    name = "likely",
+    exported_headers = ["Likely.h"],
+    header_namespace = "utils",
+    visibility = ["PUBLIC"],
 )
 
 cxx_library(
-    name='range',
-    visibility=['PUBLIC'],
-    header_namespace='utils',
-    exported_headers=['Range.h'],
-    deps=[':likely'],
+    name = "range",
+    exported_headers = ["Range.h"],
+    header_namespace = "utils",
+    visibility = ["PUBLIC"],
+    deps = [":likely"],
 )
 
 cxx_library(
-    name='resource_pool',
-    visibility=['PUBLIC'],
-    header_namespace='utils',
-    exported_headers=['ResourcePool.h'],
+    name = "resource_pool",
+    exported_headers = ["ResourcePool.h"],
+    header_namespace = "utils",
+    visibility = ["PUBLIC"],
 )
 
 cxx_library(
-    name='scope_guard',
-    visibility=['PUBLIC'],
-    header_namespace='utils',
-    exported_headers=['ScopeGuard.h'],
+    name = "scope_guard",
+    exported_headers = ["ScopeGuard.h"],
+    header_namespace = "utils",
+    visibility = ["PUBLIC"],
 )
 
 cxx_library(
-    name='thread_pool',
-    visibility=['PUBLIC'],
-    header_namespace='utils',
-    exported_headers=['ThreadPool.h'],
-    deps=[':work_queue'],
+    name = "thread_pool",
+    exported_headers = ["ThreadPool.h"],
+    header_namespace = "utils",
+    visibility = ["PUBLIC"],
+    deps = [":work_queue"],
 )
 
 cxx_library(
-    name='work_queue',
-    visibility=['PUBLIC'],
-    header_namespace='utils',
-    exported_headers=['WorkQueue.h'],
-    deps=[':buffer'],
+    name = "work_queue",
+    exported_headers = ["WorkQueue.h"],
+    header_namespace = "utils",
+    visibility = ["PUBLIC"],
+    deps = [":buffer"],
 )
 
 cxx_library(
-    name='utils',
-    visibility=['PUBLIC'],
-    deps=[
-        ':buffer',
-        ':file_system',
-        ':likely',
-        ':range',
-        ':resource_pool',
-        ':scope_guard',
-        ':thread_pool',
-        ':work_queue',
+    name = "utils",
+    visibility = ["PUBLIC"],
+    deps = [
+        ":buffer",
+        ":file_system",
+        ":likely",
+        ":range",
+        ":resource_pool",
+        ":scope_guard",
+        ":thread_pool",
+        ":work_queue",
     ],
 )

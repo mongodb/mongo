@@ -1,0 +1,218 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "scripting_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "scripting_common",
+    srcs = [
+        "//src/mongo/scripting:dbdirectclient_factory.cpp",
+        "//src/mongo/scripting:deadline_monitor.cpp",
+        "//src/mongo/scripting:engine.cpp",
+        "//src/mongo/scripting:jsexception.cpp",
+        "//src/mongo/scripting:utils.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/db:server_base",
+        "//src/mongo/scripting:bson_template_evaluator",
+        "//src/mongo/scripting:deadline_monitor_idl",
+        "//src/mongo/shell:mongojs",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util:md5",
+    ],
+)
+
+mongo_cc_library(
+    name = "bson_template_evaluator",
+    srcs = [
+        "//src/mongo/scripting:bson_template_evaluator.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "scripting_none",
+    srcs = [
+        "//src/mongo/scripting:engine_none.cpp",
+    ],
+    deps = [
+        "//src/mongo/scripting:scripting_common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "scripting_test",
+    srcs = [
+        "//src/mongo/scripting:bson_template_evaluator_test.cpp",
+        "//src/mongo/scripting:deadline_monitor_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_second_group",
+    ],
+    deps = [
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/scripting:scripting_common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "scripting_mozjs_test",
+    srcs = [
+        "//src/mongo/scripting/mozjs:asan_handles_test.cpp",
+        "//src/mongo/scripting/mozjs:module_loader_test.cpp",
+    ],
+    copts = select({
+        "@platforms//os:windows": [
+            # See the /Zc:preprocessor comment in third_party/mozjs/BUILD.bazel
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = select({
+        "//bazel/config:spider_monkey_dbg_enabled": ["MONGO_SPIDERMONKEY_DBG"],
+        "//conditions:default": [],
+    }),
+    tags = ["mongo_unittest_eighth_group"],
+    target_compatible_with = select({
+        "//bazel/config:js_engine_mozjs": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/mongo/scripting",
+        "//src/mongo/scripting:bson_template_evaluator",
+    ],
+)
+
+mongo_cc_library(
+    name = "scripting",
+    srcs = select({
+        "//bazel/config:js_engine_none": [
+            "scripting_none.cpp",
+        ],
+        "//bazel/config:js_engine_mozjs": [
+            "//src/mongo/scripting/mozjs:PosixNSPR.cpp",
+            "//src/mongo/scripting/mozjs:base.cpp",
+            "//src/mongo/scripting/mozjs:bindata.cpp",
+            "//src/mongo/scripting/mozjs:bson.cpp",
+            "//src/mongo/scripting/mozjs:code.cpp",
+            "//src/mongo/scripting/mozjs:countdownlatch.cpp",
+            "//src/mongo/scripting/mozjs:cursor.cpp",
+            "//src/mongo/scripting/mozjs:cursor_handle.cpp",
+            "//src/mongo/scripting/mozjs:db.cpp",
+            "//src/mongo/scripting/mozjs:dbcollection.cpp",
+            "//src/mongo/scripting/mozjs:dbpointer.cpp",
+            "//src/mongo/scripting/mozjs:dbquery.cpp",
+            "//src/mongo/scripting/mozjs:dbref.cpp",
+            "//src/mongo/scripting/mozjs:engine.cpp",
+            "//src/mongo/scripting/mozjs:error.cpp",
+            "//src/mongo/scripting/mozjs:exception.cpp",
+            "//src/mongo/scripting/mozjs:global.cpp",
+            "//src/mongo/scripting/mozjs:idwrapper.cpp",
+            "//src/mongo/scripting/mozjs:implscope.cpp",
+            "//src/mongo/scripting/mozjs:internedstring.cpp",
+            "//src/mongo/scripting/mozjs:jscustomallocator.cpp",
+            "//src/mongo/scripting/mozjs:jsstringwrapper.cpp",
+            "//src/mongo/scripting/mozjs:jsthread.cpp",
+            "//src/mongo/scripting/mozjs:maxkey.cpp",
+            "//src/mongo/scripting/mozjs:minkey.cpp",
+            "//src/mongo/scripting/mozjs:module_loader.cpp",
+            "//src/mongo/scripting/mozjs:mongo.cpp",
+            "//src/mongo/scripting/mozjs:mongohelpers.cpp",
+            "//src/mongo/scripting/mozjs:mongohelpers_js.cpp",
+            "//src/mongo/scripting/mozjs:nativefunction.cpp",
+            "//src/mongo/scripting/mozjs:numberdecimal.cpp",
+            "//src/mongo/scripting/mozjs:numberint.cpp",
+            "//src/mongo/scripting/mozjs:numberlong.cpp",
+            "//src/mongo/scripting/mozjs:object.cpp",
+            "//src/mongo/scripting/mozjs:objectwrapper.cpp",
+            "//src/mongo/scripting/mozjs:oid.cpp",
+            "//src/mongo/scripting/mozjs:proxyscope.cpp",
+            "//src/mongo/scripting/mozjs:regexp.cpp",
+            "//src/mongo/scripting/mozjs:session.cpp",
+            "//src/mongo/scripting/mozjs:status.cpp",
+            "//src/mongo/scripting/mozjs:timestamp.cpp",
+            "//src/mongo/scripting/mozjs:uri.cpp",
+            "//src/mongo/scripting/mozjs:valuereader.cpp",
+            "//src/mongo/scripting/mozjs:valuewriter.cpp",
+        ],
+    }),
+    copts = select({
+        "@platforms//os:windows": [
+            # The default MSVC preprocessor elides commas in some cases as a
+            # convenience, but this behavior breaks compilation of jspubtd.h.
+            # Enabling the newer preprocessor fixes the problem.
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:compiler_type_clang": [
+            "-Wno-dangling",
+        ],
+        "//bazel/config:compiler_type_gcc": [
+            "-Wno-dangling-pointer",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = select({
+        "//bazel/config:spider_monkey_dbg_enabled": ["MONGO_SPIDERMONKEY_DBG"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":scripting_common",
+    ] + select({
+        "//bazel/config:js_engine_none": [
+            ":scripting_none",
+        ],
+        "//bazel/config:js_engine_mozjs": [
+            "//src/mongo/client:clientdriver_network",
+            "//src/mongo/db:service_context",
+            "//src/mongo/db/auth:security_token_auth",
+            "//src/mongo/scripting/mozjs:engine_idl",
+            "//src/mongo/scripting/mozjs:scripting_util_idl",
+            "//src/mongo/util/concurrency:spin_lock",
+            "//src/third_party/mozjs",
+        ],
+    }),
+)
+
+mongo_cc_library(
+    name = "scripting_server",
+    srcs = [
+        "scripting_server.cpp",
+    ],
+    deps = select({
+        "//bazel/config:js_engine_mozjs": ["scripting"],
+        "//bazel/config:js_engine_none": ["scripting_none"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_idl_library(
+    name = "deadline_monitor_idl",
+    src = "deadline_monitor.idl",
+)

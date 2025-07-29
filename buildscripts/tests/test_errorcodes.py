@@ -1,6 +1,4 @@
 """Unit tests for the selected_tests script."""
-import json
-import os
 import unittest
 
 from buildscripts import errorcodes

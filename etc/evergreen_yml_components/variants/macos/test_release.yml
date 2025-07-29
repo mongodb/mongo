@@ -19,18 +19,13 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: macos
     push_arch: arm64
-    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx_arm.vars
-      --modules=
+    bazel_compile_flags: >-
+      --build_enterprise=False
     resmoke_jobs_max: 6
     compile_variant: macos-arm64
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
   - name: .development_critical !.incompatible_community !.incompatible_mac
   - name: .release_critical !.incompatible_community !.incompatible_mac !publish_packages
 
@@ -49,17 +44,12 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: macos
     push_arch: arm64-enterprise
-    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx_arm.vars
     resmoke_jobs_max: 6
     compile_variant: enterprise-macos-arm64
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
+  - name: convert_scons_to_bazel_TG
   - name: .development_critical !.incompatible_mac
   - name: .release_critical !.incompatible_mac !publish_packages
 
@@ -77,18 +67,12 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: macos
     push_arch: x86_64
-    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx.vars
-      --modules=
+      --build_enterprise=False
     resmoke_jobs_max: 6
     compile_variant: macos
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
   - name: .development_critical !.incompatible_community !.incompatible_mac
   - name: .release_critical !.incompatible_community !.incompatible_mac !publish_packages
 
@@ -107,16 +91,11 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: macos
     push_arch: x86_64-enterprise
-    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
     compile_variant: enterprise-macos
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
+  - name: convert_scons_to_bazel_TG
   - name: .development_critical !.incompatible_mac
   - name: .release_critical !.incompatible_mac !publish_packages

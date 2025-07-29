@@ -2,8 +2,8 @@
  * Sample file to demonstrate various clang-format messages
  */
 #include <stdio.h>
-#include <vector>
 #include <string>
+#include <vector>
 
 // NamespaceIndentation: None
 namespace foo {
@@ -15,7 +15,7 @@ int bar;
 
 namespace {
 int anony;
-}  // namespace anony
+}  // namespace
 
 }  // namespace bar
 

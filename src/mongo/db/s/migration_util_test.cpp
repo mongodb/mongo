@@ -42,7 +42,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/s/collection_sharding_runtime_test.cpp"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
@@ -54,6 +53,9 @@ namespace mongo {
 namespace {
 
 using MigrationUtilsTest = ShardServerTestFixture;
+
+const NamespaceString kTestNss =
+    NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
 UUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollection autoColl(opCtx, nss, MODE_IS);

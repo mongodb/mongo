@@ -1,12 +1,12 @@
 """Additional handlers that are used as the base classes of the buildlogger handler."""
 
-from collections import deque
-from enum import Enum
 import json
 import logging
 import re
 import threading
 import warnings
+from collections import deque
+from enum import Enum
 
 import requests
 import requests.adapters
@@ -20,8 +20,8 @@ except ImportError:
 
 import urllib3.util.retry as urllib3_retry
 
-from buildscripts.resmokelib.logging import flush
 from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.logging import flush
 
 _TIMEOUT_SECS = 55
 MAX_EXCEPTION_LENGTH = 10

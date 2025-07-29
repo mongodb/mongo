@@ -33,7 +33,6 @@ Common error handling code for IDL compatibility checker.
 """
 
 import inspect
-import os
 import sys
 from typing import List, Optional
 

@@ -1,12 +1,12 @@
+# begin:github_only
+load("@rules_pkg//:mappings.bzl", "pkg_files")
+# end:github_only
+
 load(
     "//bazel:build_defs.bzl",
     "UPB_DEFAULT_COPTS",
     "UPB_DEFAULT_CPPOPTS",
 )
-
-# begin:github_only
-load("@rules_pkg//:mappings.bzl", "pkg_files")
-# end:github_only
 
 cc_library(
     name = "internal",
@@ -77,10 +77,10 @@ cc_test(
         ":encode_internal",
         ":internal",
         ":mini_descriptor",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "//:upb",
         "//:message_accessors_internal",
         "//:mini_table",
+        "//:upb",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_googletest//:gtest_main",
         "@com_google_protobuf//:protobuf",
     ],

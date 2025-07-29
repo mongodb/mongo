@@ -1,0 +1,87 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "views_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "views",
+    srcs = [
+        "//src/mongo/db/views:util.cpp",
+        "//src/mongo/db/views:view.cpp",
+        "//src/mongo/db/views:view_graph.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/collation:collator_factory_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "view_catalog_helpers",
+    srcs = [
+        "//src/mongo/db/views:view_catalog_helpers.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/pipeline:aggregation",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/views",
+        "//src/mongo/db/views:resolved_view",
+    ],
+)
+
+mongo_cc_library(
+    name = "resolved_view",
+    srcs = [
+        "//src/mongo/db/views:resolved_view.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/pipeline:aggregation_request_helper",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/timeseries:timeseries_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_views_test",
+    srcs = [
+        "//src/mongo/db/views:resolved_view_test.cpp",
+        "//src/mongo/db/views:view_catalog_test.cpp",
+        "//src/mongo/db/views:view_definition_test.cpp",
+        "//src/mongo/db/views:view_graph_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_sixth_group",
+    ],
+    deps = [
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/views",
+        "//src/mongo/db/views:view_catalog_helpers",
+        "//src/mongo/unittest",
+    ],
+)

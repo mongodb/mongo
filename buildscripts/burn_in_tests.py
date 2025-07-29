@@ -24,12 +24,21 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # pylint: disable=wrong-import-position
-from buildscripts.patch_builds.change_data import generate_revision_map, \
-    RevisionMap, find_changed_files_in_repos
 import buildscripts.resmokelib.parser
+from buildscripts.ciconfig.evergreen import (
+    EvergreenProjectConfig,
+    Variant,
+    VariantTask,
+    parse_evergreen_file,
+)
+from buildscripts.patch_builds.change_data import (
+    RevisionMap,
+    find_changed_files_in_repos,
+    generate_revision_map,
+)
 from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get_suites
 from buildscripts.resmokelib.utils import default_if_none, globstar
-from buildscripts.ciconfig.evergreen import parse_evergreen_file, EvergreenProjectConfig, Variant, VariantTask
+
 # pylint: enable=wrong-import-position
 
 structlog.configure(logger_factory=LoggerFactory())
@@ -40,11 +49,11 @@ EXTERNAL_LOGGERS = {
     "urllib3",
 }
 
-DEFAULT_VARIANT = "enterprise-amazon-linux2-arm64-all-feature-flags"
+DEFAULT_VARIANT = "enterprise-amazon2-arm64"
 ENTERPRISE_MODULE_PATH = "src/mongo/db/modules/enterprise"
 DEFAULT_REPO_LOCATIONS = ["."]
 REPEAT_SUITES = 2
-DEFAULT_EVG_PROJECT_FILE = "etc/evergreen.yml"
+DEFAULT_EVG_PROJECT_FILE = "etc/evergreen_nightly.yml"
 # The executor_file and suite_files defaults are required to make the suite resolver work
 # correctly.
 SELECTOR_FILE = "etc/burn_in_tests.yml"

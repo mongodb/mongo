@@ -64,7 +64,7 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
     shellStr += `const sourceColl = testDB['${kSourceCollName}'];`;
     shellStr += `const destColl = testDB['${kDestCollName}'];`;
     shellStr += `const maxTimeMS = ${maxTimeMS};`;
-    /* eslint-disable */
+
     const runAggregate = function() {
         const pipeline = [{$out: destColl.getName()}];
         const err = assert.throws(
@@ -72,7 +72,7 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
                 pipeline, {maxTimeMS: maxTimeMS, $readPreference: {mode: "secondary"}}));
         assert.eq(err.code, ErrorCodes.MaxTimeMSExpired, "expected aggregation to fail");
     };
-    /* eslint-enable */
+
     shellStr += `(${runAggregate.toString()})();`;
     const awaitShell = startParallelShell(shellStr, conn.port);
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Collect system resource information on processes running in Evergreen on a given interval."""
 
-from datetime import datetime
 import optparse
 import os
 import sys
 import time
+from datetime import datetime
 
-from bson.json_util import dumps
 import requests
+from bson.json_util import dumps
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:

@@ -24,20 +24,20 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 load(
-    "//bazel:build_defs.bzl",
-    "UPB_DEFAULT_CPPOPTS",
+    "@rules_cc//cc:defs.bzl",
+    "cc_proto_library",
 )
 load(
-    "//protos/bazel:upb_cc_proto_library.bzl",
-    "upb_cc_proto_library",
+    "//bazel:build_defs.bzl",
+    "UPB_DEFAULT_CPPOPTS",
 )
 load(
     "//bazel:upb_proto_library.bzl",
     "upb_proto_library",
 )
 load(
-    "@rules_cc//cc:defs.bzl",
-    "cc_proto_library",
+    "//protos/bazel:upb_cc_proto_library.bzl",
+    "upb_cc_proto_library",
 )
 
 # begin:google_only
@@ -140,7 +140,7 @@ cc_test(
     copts = UPB_DEFAULT_CPPOPTS,
     deps = [
         # begin:google_only
-#         ":legacy_name_test_proto",
+        #         ":legacy_name_test_proto",
         # end:google_only
         ":no_package_upb_cc_proto",
         ":test_model_upb_cc_proto",

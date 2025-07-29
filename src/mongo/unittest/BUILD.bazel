@@ -1,0 +1,164 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "unittest_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "golden_test_base",
+    srcs = [
+        "//src/mongo/unittest:golden_test_base.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/third_party/yaml-cpp:yaml",
+    ],
+)
+
+mongo_cc_library(
+    name = "unittest",
+    srcs = [
+        "//src/mongo/unittest:barrier.cpp",
+        "//src/mongo/unittest:bson_test_util.cpp",
+        "//src/mongo/unittest:death_test.cpp",
+        "//src/mongo/unittest:golden_test.cpp",
+        "//src/mongo/unittest:inline_auto_update.cpp",
+        "//src/mongo/unittest:matcher.cpp",
+        "//src/mongo/unittest:stringify.cpp",
+        "//src/mongo/unittest:temp_dir.cpp",
+        "//src/mongo/unittest:unittest.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/unittest:golden_test_base",
+        "//src/mongo/util:pcre_util",
+        "//src/mongo/util:pcre_wrapper",
+        "//src/mongo/util/options_parser",
+        "//src/third_party/yaml-cpp:yaml",
+    ],
+)
+
+mongo_cc_library(
+    name = "unittest_main",
+    srcs = [
+        "//src/mongo/unittest:unittest_main.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/unittest",
+        "//src/mongo/unittest:unittest_options_idl",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "integration_test_main",
+    srcs = [
+        "//src/mongo/unittest:integration_test_main.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:server_options_base",
+        "//src/mongo/db:serverinit",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/unittest",
+        "//src/mongo/unittest:integration_test_main_idl",
+        "//src/mongo/util:testing_options",
+        "//src/mongo/util/options_parser",
+        "//src/mongo/util/options_parser:options_parser_init",
+    ],
+)
+
+mongo_cc_library(
+    name = "benchmark_main",
+    srcs = [
+        "//src/mongo/unittest:benchmark_main.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/unittest:benchmark_options_idl",
+        "//src/mongo/util/options_parser",
+        "//src/third_party/benchmark",
+    ],
+)
+
+mongo_cc_library(
+    name = "task_executor_proxy",
+    srcs = [
+        "//src/mongo/unittest:task_executor_proxy.cpp",
+    ],
+    deps = [
+        "//src/mongo/executor:task_executor_interface",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "system_resource_canary_bm",
+    srcs = [
+        "//src/mongo/unittest:system_resource_canary_bm.cpp",
+    ],
+    tags = ["streams_bm"],
+    deps = [
+        "//src/mongo/util:processinfo",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "unittest_test",
+    srcs = [
+        ":assert_that_test.cpp",
+        ":bson_test_util_test.cpp",
+        ":fixture_test.cpp",
+        ":golden_test_test.cpp",
+        ":inline_auto_update_test.cpp",
+        ":temp_dir_test.cpp",
+        ":thread_assertion_monitor_test.cpp",
+        ":unittest_test.cpp",
+    ],
+    data = [
+        "//src/mongo/unittest/expected_output/golden_self_test:sanity_test",
+        "//src/mongo/unittest/expected_output/golden_self_test2:sanity_test2",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fourth_group",
+        "server-programmability",
+    ],
+)
+
+mongo_idl_library(
+    name = "unittest_options_idl",
+    src = "unittest_options.idl",
+)
+
+mongo_idl_library(
+    name = "benchmark_options_idl",
+    src = "benchmark_options.idl",
+)
+
+mongo_idl_library(
+    name = "integration_test_main_idl",
+    src = "integration_test_main.idl",
+)

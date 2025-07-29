@@ -20,16 +20,11 @@ variables:
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-x86-dynamic-enterprise-compile-expansions
-  scons_cache_scope: shared
-  scons_cache_mode: all
   has_packages: false
-  compile_flags: >-
-    --ssl
-    MONGO_DISTMOD=rhel88
-    -j$(grep -c ^processor /proc/cpuinfo)
-    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    --link-model=dynamic
-    --use-diagnostic-latches=on
+  bazel_compile_flags: >-
+    --define=MONGO_DISTMOD=rhel88
+    --linkstatic=False
+    --use_diagnostic_latches=True
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
@@ -42,7 +37,7 @@ variables:
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
   tasks:
   - name: compile_test_parallel_core_stream_TG
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
   - name: compile_test_parallel_dbtest_stream_TG
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -52,8 +47,6 @@ variables:
 # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &generic_linux_compile_expansions  # The most commonly used compile expansions.
-  scons_cache_scope: shared
-  scons_cache_mode: all
   has_packages: false
 
 # THIS HAS COPIES IN:
@@ -64,7 +57,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
   - name: version_gen
     variant: generate-tasks-for-version
@@ -87,7 +80,6 @@ variables:
   repo_edition: enterprise
   large_distro_name: rhel8.8-medium
   core_analyzer_distro_name: rhel8.8-xlarge
-  num_scons_link_jobs_available: 0.99
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
 # THIS HAS COPIES IN:
@@ -97,8 +89,6 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &enterprise-rhel-8-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions
-  scons_cache_scope: shared
-  scons_cache_mode: all
   has_packages: false
   jstestfuzz_num_generated_files: 40
   jstestfuzz_concurrent_num_files: 10
@@ -122,15 +112,9 @@ variables:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel8
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=on
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=rhel88
+      --use_diagnostic_latches=True
     multiversion_platform: rhel80
     multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
@@ -211,10 +195,6 @@ buildvariants:
   tags: ["suggested"]
   expansions:
     <<: *linux-x86-dynamic-enterprise-compile-expansions
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-      -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
     compile_variant: *linux-crypt-compile
   tasks:
     - name: .crypt
@@ -227,14 +207,11 @@ buildvariants:
   stepback: false
   expansions:
     <<: *generic_linux_compile_expansions
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-      ENABLE_GRPC_BUILD=1
-      --use-diagnostic-latches=on
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=rhel88
+      --linkstatic=False
+      --build_grpc=True
+      --use_diagnostic_latches=True
     compile_variant: *linux-x86-dynamic-grpc-suggested
     clang_tidy_toolchain: v4
     large_distro_name: rhel8.8-xlarge
@@ -249,8 +226,7 @@ buildvariants:
       --mongodTlsCertificateKeyFile jstests/libs/server.pem
       --shellGRPC
   tasks:
-    - name: compile_ninja_quick_TG
-    - name: compile_test_parallel_unittest_stream_TG
+    - name: run_unit_tests_TG
     - name: compile_test_parallel_core_stream_TG
     - name: compile_test_parallel_dbtest_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
@@ -285,7 +261,7 @@ buildvariants:
     # run too long and hit execution timeouts.
     # burn_in_task_name: jsCore
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: *linux_x86_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
@@ -298,7 +274,7 @@ buildvariants:
   #   - name: version_burn_in_gen
   #     variant: generate-tasks-for-version
   #     omit_generated_tasks: true
-  #   - name: archive_dist_test_debug
+  #   - name: archive_dist_test
   #     variant: *linux_x86_dynamic_compile_variant_name
   # TODO: DEVPROD-5173
   # Add !.incompatible_all_feature_flags back when the tag is added to any task or DEVPROD-5173 is completed.
@@ -340,14 +316,11 @@ buildvariants:
   run_on:
   - rhel8.8-medium
   expansions:
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=on
-    scons_cache_scope: shared
-    num_scons_link_jobs_available: 0.5
+    bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel88
+        --dbg_level=1
+        --separate_debug=False
+        --use_diagnostic_latches=True
     compile_variant: *enterprise-rhel-8-benchmarks
   tasks:
   - name: compile_upload_benchmarks_TG
@@ -393,8 +366,6 @@ buildvariants:
   tags: []
   expansions:
     <<: *linux_x86_generic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
     resmoke_jobs_factor: 0.5
     bv_future_git_tag: r100.0.0-9999
     compile_variant: linux-x86-dynamic-compile-future-tag-multiversion
@@ -429,24 +400,23 @@ buildvariants:
   expansions:
     <<: *enterprise-rhel-8-64-bit-expansions-template
     additional_package_targets: ""
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --enterprise-features=hot_backups,magic_restore,ldap,sasl
-      --link-model=dynamic
-      --use-diagnostic-latches=on
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=rhel88
+      --//bazel/config:enterprise_feature_all=False
+      --//bazel/config:enterprise_feature_hot_backups=True
+      --//bazel/config:enterprise_feature_magic_restore=True
+      --//bazel/config:enterprise_feature_ldap=True
+      --//bazel/config:enterprise_feature_sasl=True
+      --//bazel/config:enterprise_feature_encryptdb=True
+      --linkstatic=False
+      --use_diagnostic_latches=True
     compile_variant: *hot_backups-rhel-8-64-bit
     has_packages: false
-    scons_cache_mode: all
-    scons_cache_scope: shared
-    num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel8.8-large
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
     distros:
     - rhel8.8-large
   - name: compile_test_parallel_dbtest_stream_TG
@@ -461,20 +431,15 @@ buildvariants:
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
-    compile_flags: >-
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-    scons_cache_mode: all
-    scons_cache_scope: shared
-    num_scons_link_jobs_available: 0.99
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=rhel88
+      --linkstatic=False
     compile_variant: *enterprise-rhel8-no-latch-64-bit
   tasks:
   - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel8.8-large
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
     distros:
     - rhel8.8-large
   - name: compile_test_parallel_dbtest_stream_TG
@@ -492,12 +457,10 @@ buildvariants:
   - rhel8.8-small
   expansions:
     <<: *linux_x86_generic_expansions
-    compile_flags: >-
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-      --use-diagnostic-latches=on
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=rhel88
+      --linkstatic=False
+      --use_diagnostic_latches=True
     test_flags: >-
       --mongosSetParameters="{replicaSetMonitorProtocol: sdam}"
       --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
@@ -508,7 +471,7 @@ buildvariants:
   - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel8.8-large
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
     distros:
     - rhel8.8-large
   - name: compile_test_parallel_dbtest_stream_TG
@@ -535,12 +498,10 @@ buildvariants:
   - rhel8.8-small
   expansions:
     <<: *linux_x86_generic_expansions
-    compile_flags: >-
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-      --use-diagnostic-latches=on
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=rhel88
+      --linkstatic=False
+      --use_diagnostic_latches=True
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
@@ -550,7 +511,7 @@ buildvariants:
   - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel8.8-large
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
     distros:
     - rhel8.8-large
   - name: compile_test_parallel_dbtest_stream_TG
@@ -577,15 +538,10 @@ buildvariants:
   - rhel8.8-small
   expansions:
     <<: *linux_x86_generic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    num_scons_link_jobs_available: 0.99
-    compile_flags: >-
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-      --use-diagnostic-latches=on
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=rhel88
+      --linkstatic=False
+      --use_diagnostic_latches=True
     multiversion_platform: rhel80
     multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
@@ -598,7 +554,7 @@ buildvariants:
   - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel8.8-large
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
     distros:
     - rhel8.8-large
   - name: compile_test_parallel_dbtest_stream_TG
@@ -625,15 +581,10 @@ buildvariants:
   - rhel8.8-small
   expansions:
     <<: *linux_x86_generic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    num_scons_link_jobs_available: 0.99
-    compile_flags: >-
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-      --use-diagnostic-latches=on
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=rhel88
+      --linkstatic=False
+      --use_diagnostic_latches=True
     multiversion_platform: rhel80
     multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
@@ -646,7 +597,7 @@ buildvariants:
   - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel8.8-large
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
     distros:
     - rhel8.8-large
   - name: compile_test_parallel_dbtest_stream_TG
@@ -715,13 +666,10 @@ buildvariants:
     - rhel8.8-small
   expansions:
     <<: *linux_x86_generic_expansions
-    scons_cache_scope: shared
-    compile_flags: >-
-      MONGO_DISTMOD=rhel88
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-      --use-diagnostic-latches=on
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=rhel88
+      --linkstatic=False
+      --use_diagnostic_latches=True
     multiversion_platform: rhel80
     multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
@@ -734,7 +682,7 @@ buildvariants:
   - name: compile_test_serial_TG
     distros:
     - rhel8.8-large
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
     distros:
     - rhel8.8-large
     patch_only: true
@@ -778,7 +726,7 @@ buildvariants:
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
       --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: *linux_x86_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
@@ -828,7 +776,7 @@ buildvariants:
     - name: version_burn_in_gen
       variant: generate-tasks-for-version
       omit_generated_tasks: true
-    - name: archive_dist_test_debug
+    - name: archive_dist_test
       variant: *linux_x86_dynamic_compile_variant_name
   - name: check_feature_flag_tags
   - name: check_for_todos
@@ -1053,7 +1001,7 @@ buildvariants:
     - name: version_burn_in_gen
       variant: generate-tasks-for-version
       omit_generated_tasks: true
-    - name: archive_dist_test_debug
+    - name: archive_dist_test
       variant: *linux_x86_dynamic_compile_variant_name
   - name: .audit .patch_build
   - name: .encrypt .patch_build

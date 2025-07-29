@@ -3,6 +3,7 @@
 
 import re
 import sys
+
 import jscomment
 
 try:

@@ -6,8 +6,8 @@ import sys
 
 import git
 import yaml
+
 from buildscripts.resmokelib import config
-from buildscripts.util.read_config import read_config_file
 from buildscripts.resmokelib.errors import RequiresForceRemove
 from buildscripts.util.expansions import get_expansion
 

@@ -15,7 +15,6 @@ assert.commandWorked(collection.save({a: 1}));
 const res = collection.runCommand("find", {
     filter: {
         $where: function myFunction() {
-            // eslint-disable-next-line
             return a();
         }
     }

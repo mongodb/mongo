@@ -4,7 +4,9 @@ import unittest
 from collections import defaultdict
 from typing import Optional
 
-from buildscripts.idl.gen_all_feature_flag_list import get_all_feature_flags_turned_on_by_default
+from buildscripts.idl.gen_all_feature_flag_list import (
+    get_all_feature_flags_turned_on_by_default,
+)
 from buildscripts.resmokelib.multiversionconstants import (
     REQUIRES_FCV_TAG_LATEST,
     REQUIRES_FCV_TAGS_LESS_THAN_LATEST,

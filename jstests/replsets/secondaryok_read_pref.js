@@ -59,10 +59,9 @@ assertNotPrimaryNoSecondaryOk(
         secondaryColl
             .aggregate([{$merge: {into: "target", whenMatched: "fail", whenNotMatched: "insert"}}])
             .itcount());
-/* eslint-disable */
+
 assertNotPrimaryNoSecondaryOk(() => secondaryColl.mapReduce(() => emit(this.a),
                                                             (k, v) => Array.sum(b),
                                                             {out: {replace: "target"}}));
-/* eslint-enable */
 
 rst.stopSet();

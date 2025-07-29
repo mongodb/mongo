@@ -85,14 +85,13 @@ assert(resultsEq(results,
 //
 // Test that the jsScope is allowed to have any number of fields.
 //
-/* eslint-disable */
+
 constants.jsScope.multiplier = 5;
 pipeline[0].$project.emits.$_internalJsEmit.eval = function() {
     for (let word of this.text.split(' ')) {
         emit(word, weights[word] * multiplier);
     }
 };
-/* eslint-enable */
 
 results =
     coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromMongos: true}).toArray();

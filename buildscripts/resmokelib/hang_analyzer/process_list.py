@@ -4,7 +4,6 @@ import csv
 import io
 import os
 import sys
-
 from typing import List, NamedTuple, Union
 
 from buildscripts.resmokelib.hang_analyzer.process import call, callo, find_program

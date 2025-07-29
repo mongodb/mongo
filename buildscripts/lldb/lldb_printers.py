@@ -18,10 +18,8 @@ import lldb
 
 try:
     import bson
-    from bson import json_util
-    from bson.codec_options import CodecOptions
-    from bson.codec_options import DEFAULT_CODEC_OPTIONS
-    from bson import Decimal128
+    from bson import Decimal128, json_util
+    from bson.codec_options import DEFAULT_CODEC_OPTIONS, CodecOptions
 except ImportError:
     print("Warning: Could not load bson library for Python {}.".format(sys.version))
     print("Check with the pip command if pymongo 3.x is installed.")

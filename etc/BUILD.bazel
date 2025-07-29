@@ -1,0 +1,40 @@
+load("//bazel:mongo_src_rules.bzl", "symlink")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "lsan.suppressions",
+    "tsan.suppressions",
+])
+
+# This is a hack to work around the fact that the cc_library flag additional_compiler_inputs doesn't
+# exist in cc_binary. Instead, we add the denylists to srcs as header files to make them visible to
+# the compiler executable.
+symlink(
+    name = "asan_denylist_h",
+    input = "asan.denylist",
+    output = "asan.denylist.h",
+)
+
+symlink(
+    name = "msan_denylist_h",
+    input = "msan.denylist",
+    output = "msan.denylist.h",
+)
+
+symlink(
+    name = "tsan_denylist_h",
+    input = "tsan.denylist",
+    output = "tsan.denylist.h",
+)
+
+symlink(
+    name = "ubsan_denylist_h",
+    input = "ubsan.denylist",
+    output = "ubsan.denylist.h",
+)
+
+filegroup(
+    name = "mac_plist",
+    srcs = ["macos_mongodb.plist"],
+)

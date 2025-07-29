@@ -1,0 +1,11 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+]))
+
+filegroup(
+    name = "transitional_tools_do_not_use_global_hdrs",
+    srcs = glob(["*.h"]),
+)

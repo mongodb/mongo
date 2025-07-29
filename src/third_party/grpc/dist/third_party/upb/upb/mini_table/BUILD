@@ -23,14 +23,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# begin:github_only
+load("@rules_pkg//:mappings.bzl", "pkg_files")
+# end:github_only
+
 load(
     "//bazel:build_defs.bzl",
     "UPB_DEFAULT_COPTS",
 )
-
-# begin:github_only
-load("@rules_pkg//:mappings.bzl", "pkg_files")
-# end:github_only
 
 cc_library(
     name = "mini_table",
@@ -98,7 +98,10 @@ pkg_files(
             "**/*.c",
             "**/*.h",
         ],
-        exclude = ["internal/**", "encode_test.cc"],
+        exclude = [
+            "internal/**",
+            "encode_test.cc",
+        ],
     ),
     prefix = "upb/mini_table",
     visibility = ["//python/dist:__pkg__"],

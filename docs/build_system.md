@@ -348,16 +348,16 @@ Libdeps is a subsystem within the build, which is centered around the LIBrary DE
 
 The `LIBDEPS` variables are how the library relationships are defined within the build scripts. The primary variables are as follows:
 
--   `LIBDEPS`:
-    The 'public' type which propagates lower level dependencies onward automatically.
--   `LIBDEPS_PRIVATE`:
-    Creates a dependency only between the target and the dependency.
--   `LIBDEPS_INTERFACE`:
-    Same as `LIBDEPS` but excludes itself from the propagation onward.
--   `LIBDEPS_DEPENDENTS`:
-    Creates a reverse `LIBDEPS_PRIVATE` dependency where the dependency is the one declaring the relationship.
--   `PROGDEPS_DEPENDENTS`:
-    Same as `LIBDEPS_DEPENDENTS` but for use with Program builders.
+- `LIBDEPS`:
+  The 'public' type which propagates lower level dependencies onward automatically.
+- `LIBDEPS_PRIVATE`:
+  Creates a dependency only between the target and the dependency.
+- `LIBDEPS_INTERFACE`:
+  Same as `LIBDEPS` but excludes itself from the propagation onward.
+- `LIBDEPS_DEPENDENTS`:
+  Creates a reverse `LIBDEPS_PRIVATE` dependency where the dependency is the one declaring the relationship.
+- `PROGDEPS_DEPENDENTS`:
+  Same as `LIBDEPS_DEPENDENTS` but for use with Program builders.
 
 Libraries are added to these variables as lists per each SCons builder instance in the SConscripts depending on what type of relationship is needed. For more detailed information on theses types, refer to [`The LIBDEPS variables`](build_system_reference.md#the-libdeps-variables)
 

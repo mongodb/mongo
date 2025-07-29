@@ -42,6 +42,7 @@ mongo_cc_library(
     ],
     hdrs = BOOST_LIB_HEADERS,
     copts = BOOST_COPTS,
+    includes = ["."],
     local_defines = BOOST_DEFINES,
     deps = [
         "//src/mongo/util:boost_assert_shim",
@@ -64,6 +65,7 @@ mongo_cc_library(
     ],
     hdrs = BOOST_LIB_HEADERS,
     copts = BOOST_COPTS,
+    includes = ["."],
     local_defines = BOOST_DEFINES,
     deps = [
         ":boost_system",
@@ -88,6 +90,7 @@ mongo_cc_library(
     ],
     hdrs = BOOST_LIB_HEADERS,
     copts = BOOST_COPTS,
+    includes = ["."],
     local_defines = BOOST_DEFINES,
     deps = [
         "//src/mongo/util:boost_assert_shim",
@@ -102,6 +105,7 @@ mongo_cc_library(
     ],
     hdrs = BOOST_LIB_HEADERS,
     copts = BOOST_COPTS,
+    includes = ["."],
     local_defines = BOOST_DEFINES,
     deps = [
         ":boost_system",
@@ -139,6 +143,7 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
     copts = BOOST_COPTS,
+    includes = ["."],
     local_defines = BOOST_DEFINES + ["BOOST_THREAD_BUILD_LIB"] + select({
         "@platforms//os:linux": [
             "BOOST_THREAD_PTHREAD",
@@ -200,6 +205,11 @@ mongo_cc_library(
         "@platforms//os:windows": [
             "/wd4828",
         ],
+        "//conditions:default": [],
+    }),
+    includes = ["."],
+    linkopts = select({
+        "@platforms//os:windows": ["synchronization.lib"],
         "//conditions:default": [],
     }),
     local_defines = BOOST_DEFINES + [

@@ -22,6 +22,6 @@ All commands run by a user with `bypassDefaultMaxTimeMS` privilege will ignore t
 When multiple time-out values are available, the value is chosen using the following hierarchy
 (higher to lower priority):
 
--   The query-specific `maxTimeMS` option
--   The tenant-specific `defaultMaxTimeMS` value
--   The global `defaultMaxTimeMS` value
+- The query-specific `maxTimeMS` option
+- The tenant-specific `defaultMaxTimeMS` value
+- The global `defaultMaxTimeMS` value

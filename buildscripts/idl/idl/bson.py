@@ -31,8 +31,6 @@ BSON Type Information.
 Utilities for validating bson types, etc.
 """
 
-from typing import Dict, List
-
 # Dictionary of BSON type Information
 # scalar: True if the type is not an array or object
 # bson_type_enum: The BSONType enum value for the given type

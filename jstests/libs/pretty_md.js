@@ -3,8 +3,6 @@
  * `printGolden` to write to the expected output files.
  */
 
-/* eslint-disable no-undef */
-
 let sectionCount = 1;
 export function section(msg) {
     printGolden(`## ${sectionCount}.`, msg);

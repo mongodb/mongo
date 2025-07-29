@@ -5,8 +5,8 @@
 # license that can be found in the LICENSE file or at
 # https://developers.google.com/open-source/licenses/bsd
 
-load("@rules_python//python:defs.bzl", "py_binary")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:build_defs.bzl", "UPB_DEFAULT_COPTS")
 load("//bazel:upb_minitable_proto_library.bzl", "upb_minitable_proto_library")
 load("//bazel:upb_proto_library.bzl", "upb_proto_reflection_library")
@@ -491,8 +491,8 @@ cc_test(
         ":port",
         ":reflection",
         ":reflection_internal",
-        "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -684,16 +684,16 @@ filegroup(
             "**/*.c",
             "**/*.h",
             "**/*.hpp",
-       ],
+        ],
         exclude = [
             "**/conformance_upb.c",
             "reflection/stage0/**/*",
         ],
     ),
     visibility = [
-        "//upb/cmake:__pkg__",
         "//python/dist:__pkg__",
-    ]
+        "//upb/cmake:__pkg__",
+    ],
 )
 # end:github_only
 

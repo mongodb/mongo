@@ -34,28 +34,28 @@ The tool uses mtime and MD5 hashing to know if any header dep has changed.
 """
 
 import argparse
+import atexit
+import concurrent.futures
+import enum
+import hashlib
 import json
-import subprocess
-import tempfile
-import shlex
 import os
 import re
-import concurrent.futures
-import hashlib
-import atexit
-import traceback
-import threading
+import shlex
 import shutil
 import signal
+import subprocess
 import sys
-import yaml
-import enum
-from dataclasses import dataclass, asdict
-from typing import Dict, List, Any, Optional, Callable, Union, Tuple
+import tempfile
+import threading
+import traceback
+from dataclasses import asdict, dataclass
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from tqdm import tqdm
-from colorama import init as colorama_init
+import yaml
 from colorama import Fore
+from colorama import init as colorama_init
+from tqdm import tqdm
 
 colorama_init()
 

@@ -7,8 +7,7 @@ import sys
 import time
 from datetime import timedelta
 from threading import Lock
-
-from typing import List, Optional, NamedTuple, Set
+from typing import List, NamedTuple, Optional, Set
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
@@ -16,7 +15,10 @@ from buildscripts.resmokelib.testing.testcases.interface import TestCase
 
 # This lock prevents different resmoke jobs from symbolizing stacktraces concurrently,
 # which includes downloading the debug symbols, that can be reused by other resmoke jobs
-_lock = Lock()
+_symbolizer_lock = Lock()
+
+# A lock for avoiding concurrent access to PROCESSED_FILES_LIST_FILE_PATH
+_processed_files_lock = Lock()
 
 STACKTRACE_FILE_EXTENSION = ".stacktrace"
 SYMBOLIZE_RETRY_TIMEOUT_SECS = timedelta(minutes=4).total_seconds()
@@ -98,15 +100,17 @@ class ResmokeSymbolizer:
         if dbpath is None:
             return
 
-        with _lock:
-            test.logger.info("Looking for stacktrace files in '%s'", dbpath)
-            files = self.collect_stacktrace_files(dbpath)
-            if not files:
-                test.logger.info("No failure logs/stacktrace files found, skipping symbolization")
-                return
+        test.logger.info("Looking for stacktrace files in '%s'", dbpath)
+        files = self.collect_stacktrace_files(dbpath)
+        if not files:
+            test.logger.info("No failure logs/stacktrace files found, skipping symbolization")
+            return
 
-            test.logger.info("Found stacktrace files. \nBEGIN Symbolization")
-            test.logger.info("Stacktrace files: %s", files)
+        test.logger.info("Found stacktrace files: %s", files)
+
+        test.logger.info("Starting symbolization once no other tests are being symbolized.")
+        with _symbolizer_lock:
+            test.logger.info("\nBEGIN Symbolization")
 
             start_time = time.perf_counter()
             for file_path in files:
@@ -206,9 +210,10 @@ class FileService:
 
         :param: path to a file where we store processed files info.
         """
-        if os.path.exists(file_path):
-            with open(file_path, "r") as file:
-                return {line for line in set(file.readlines()) if line}
+        with _processed_files_lock:
+            if os.path.exists(file_path):
+                with open(file_path, "r") as file:
+                    return {line for line in set(file.readlines()) if line}
         return set()
 
     def add_to_processed_files(self, files: List[str]) -> None:
@@ -228,8 +233,9 @@ class FileService:
         :param file_path: path to a file where we store processed files info
         :return: None
         """
-        with open(file_path, "w") as file:
-            file.write("\n".join(self._processed_files))
+        with _processed_files_lock:
+            with open(file_path, "w") as file:
+                file.write("\n".join(self._processed_files))
 
     def is_processed(self, file: str) -> bool:
         """
@@ -331,8 +337,6 @@ class SymbolizerService:
             _config.SYMBOLIZER_CLIENT_SECRET,
             "--client-id",
             _config.SYMBOLIZER_CLIENT_ID,
-            "--total-seconds-for-retries",
-            str(retry_timeout_secs),
         ]
 
         with open(full_file_path) as file_obj:

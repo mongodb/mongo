@@ -1,0 +1,496 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "executor_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "connection_pool_stats",
+    srcs = [
+        "//src/mongo/executor:connection_pool_stats.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "async_timer_mock",
+    srcs = [
+        "//src/mongo/executor:async_timer_mock.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/base:system_error",
+    ],
+)
+
+mongo_cc_library(
+    name = "remote_command",
+    srcs = [
+        "//src/mongo/executor:remote_command_request.cpp",
+        "//src/mongo/executor:remote_command_response.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:api_parameters",
+        "//src/mongo/db/auth:security_token_auth",
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/s:mongos_server_parameters",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "async_multicaster",
+    srcs = [
+        "//src/mongo/executor:async_multicaster.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/executor:remote_command",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "task_executor_interface",
+    srcs = [
+        "//src/mongo/executor:task_executor.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/executor:remote_command",
+    ],
+)
+
+mongo_cc_library(
+    name = "scoped_task_executor",
+    srcs = [
+        "//src/mongo/executor:scoped_task_executor.cpp",
+    ],
+    deps = [
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "network_interface",
+    srcs = [
+        "//src/mongo/executor:network_interface.cpp",
+    ],
+    deps = [
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "network_interface_mock",
+    srcs = [
+        "//src/mongo/executor:mock_network_fixture.cpp",
+        "//src/mongo/executor:network_interface_mock.cpp",
+        "//src/mongo/executor:thread_pool_mock.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "connection_pool_executor",
+    srcs = [
+        "//src/mongo/executor:connection_pool.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/executor:connection_pool_stats",
+        "//src/mongo/executor:egress_connection_closer_manager",
+        "//src/mongo/executor:remote_command",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "connection_pool_controllers",
+    srcs = [
+        "//src/mongo/executor:connection_pool_controllers.cpp",
+    ],
+    deps = [
+        "//src/mongo/executor:connection_pool_executor",
+    ],
+)
+
+mongo_cc_library(
+    name = "network_test_env",
+    srcs = [
+        "//src/mongo/executor:network_test_env.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:task_executor_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "egress_connection_closer_manager",
+    srcs = [
+        "//src/mongo/executor:egress_connection_closer_manager.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "hedging_metrics",
+    srcs = [
+        "//src/mongo/executor:hedging_metrics.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "network_interface_tl",
+    srcs = [
+        "//src/mongo/executor:connection_pool_tl.cpp",
+        "//src/mongo/executor:network_interface_tl.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:async_client",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/executor:connection_pool_executor",
+        "//src/mongo/executor:hedge_options_util",
+        "//src/mongo/executor:hedging_metrics",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:network_interface_tl_idl",
+        "//src/mongo/transport:transport_layer",
+        "//src/mongo/transport:transport_layer_manager",
+    ],
+)
+
+mongo_cc_library(
+    name = "network_interface_fixture",
+    srcs = [
+        "//src/mongo/executor:network_interface_integration_fixture.cpp",
+    ],
+    deps = [
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/unittest:integration_test_main",
+        "//src/mongo/util:version_impl",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_library(
+    name = "network_interface_factory",
+    srcs = [
+        "//src/mongo/executor:network_interface_factory.cpp",
+    ],
+    deps = [
+        "//src/mongo/executor:connection_pool_executor",
+        "//src/mongo/executor:egress_connection_closer_manager",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:network_interface_tl",
+    ],
+)
+
+mongo_cc_library(
+    name = "task_executor_test_fixture",
+    srcs = [
+        "//src/mongo/executor:task_executor_test_common.cpp",
+        "//src/mongo/executor:task_executor_test_fixture.cpp",
+    ],
+    deps = [
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/unittest",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_library(
+    name = "thread_pool_task_executor",
+    srcs = [
+        "//src/mongo/executor:thread_pool_task_executor.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "pinned_connection_task_executor",
+    srcs = [
+        "//src/mongo/executor:pinned_connection_task_executor.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:async_client",
+        "//src/mongo/executor:scoped_task_executor",
+        "//src/mongo/executor:task_executor_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "network_interface_thread_pool",
+    srcs = [
+        "//src/mongo/executor:network_interface_thread_pool.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "async_rpc_error_info",
+    srcs = [
+        "//src/mongo/executor:async_rpc_error_info.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "hedge_options_util",
+    srcs = [
+        "//src/mongo/executor:hedge_options_util.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:read_preference",
+        "//src/mongo/s:mongos_server_parameters",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "async_rpc",
+    srcs = [
+        "//src/mongo/executor:async_rpc.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:kill_common",
+        "//src/mongo/executor:async_rpc_error_info",
+        "//src/mongo/executor:hedge_options_util",
+        "//src/mongo/executor:remote_command",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/rpc:command_status",
+    ],
+)
+
+mongo_cc_library(
+    name = "thread_pool_task_executor_test_fixture",
+    srcs = [
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture.cpp",
+    ],
+    deps = [
+        "//src/mongo/executor:task_executor_test_fixture",
+        "//src/mongo/executor:thread_pool_task_executor",
+    ],
+)
+
+mongo_cc_library(
+    name = "task_executor_pool",
+    srcs = [
+        "//src/mongo/executor:task_executor_pool.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/executor:task_executor_pool_parameters_idl",
+        "//src/mongo/util:processinfo",
+    ],
+)
+
+mongo_cc_library(
+    name = "task_executor_cursor",
+    srcs = [
+        "//src/mongo/executor:task_executor_cursor.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:plan_yield_policy",
+        "//src/mongo/executor:pinned_connection_task_executor_factory",
+        "//src/mongo/executor:task_executor_cursor_parameters_idl",
+        "//src/mongo/executor:task_executor_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "async_request_executor",
+    srcs = [
+        "//src/mongo/executor:async_request_executor.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_library(
+    name = "pinned_connection_task_executor_factory",
+    srcs = [
+        "//src/mongo/executor:pinned_connection_task_executor_factory.cpp",
+    ],
+    deps = [
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:pinned_connection_task_executor",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/executor:thread_pool_task_executor",
+    ],
+)
+
+mongo_cc_library(
+    name = "inline_executor",
+    srcs = [
+        "//src/mongo/executor:inline_executor.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/executor:task_executor_interface",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "executor_test",
+    srcs = [
+        "//src/mongo/executor:async_rpc_test.cpp",
+        "//src/mongo/executor:async_rpc_util_test.cpp",
+        "//src/mongo/executor:cancelable_executor_test.cpp",
+        "//src/mongo/executor:connection_pool_test.cpp",
+        "//src/mongo/executor:connection_pool_test_fixture.cpp",
+        "//src/mongo/executor:hedge_options_util_test.cpp",
+        "//src/mongo/executor:hedged_async_rpc_test.cpp",
+        "//src/mongo/executor:inline_executor_test.cpp",
+        "//src/mongo/executor:mock_async_rpc_test.cpp",
+        "//src/mongo/executor:mock_network_fixture_test.cpp",
+        "//src/mongo/executor:network_interface_mock_test.cpp",
+        "//src/mongo/executor:network_interface_mock_test_fixture.cpp",
+        "//src/mongo/executor:pinned_connection_task_executor_test.cpp",
+        "//src/mongo/executor:scoped_task_executor_test.cpp",
+        "//src/mongo/executor:split_timer_test.cpp",
+        "//src/mongo/executor:task_executor_cursor_test.cpp",
+        "//src/mongo/executor:thread_pool_task_executor_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        "//src/mongo/client:remote_command_targeter",
+        "//src/mongo/client:remote_command_targeter_mock",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/db/commands:standalone",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/repl:hello_idl",
+        "//src/mongo/db/repl:task_executor_mock",
+        "//src/mongo/executor:async_rpc",
+        "//src/mongo/executor:connection_pool_executor",
+        "//src/mongo/executor:egress_connection_closer_manager",
+        "//src/mongo/executor:hedge_options_util",
+        "//src/mongo/executor:hedging_metrics",
+        "//src/mongo/executor:inline_executor",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:network_interface_tl",
+        "//src/mongo/executor:network_test_env",
+        "//src/mongo/executor:pinned_connection_task_executor",
+        "//src/mongo/executor:scoped_task_executor",
+        "//src/mongo/executor:task_executor_cursor",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/s:mongos_server_parameters",
+        "//src/mongo/s:sharding_mongos_test_fixture",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "executor_integration_test",
+    srcs = [
+        "//src/mongo/executor:network_interface_integration_test.cpp",
+        "//src/mongo/executor:task_executor_cursor_integration_test.cpp",
+        "//src/mongo/executor:thread_pool_task_executor_integration_test.cpp",
+    ],
+    tags = ["convert_target"],
+    deps = [
+        "//src/mongo/client:async_client",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_fixture",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:pinned_connection_task_executor",
+        "//src/mongo/executor:task_executor_cursor",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_idl_library(
+    name = "task_executor_cursor_parameters_idl",
+    src = "task_executor_cursor_parameters.idl",
+)
+
+mongo_idl_library(
+    name = "task_executor_pool_parameters_idl",
+    src = "task_executor_pool_parameters.idl",
+)
+
+mongo_idl_library(
+    name = "network_interface_tl_idl",
+    src = "network_interface_tl.idl",
+)

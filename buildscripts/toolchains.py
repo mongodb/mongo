@@ -8,9 +8,20 @@ import pathlib
 import string
 import sys
 import warnings
-
-from typing import Any, Callable, Dict, Generator, Iterator, List, Mapping
-from typing import Optional, Set, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 import yaml
 

@@ -10,7 +10,7 @@ import argparse
 import json
 import os
 import re
-import sys
+
 import yaml
 
 VERSION_JSON = "version.json"

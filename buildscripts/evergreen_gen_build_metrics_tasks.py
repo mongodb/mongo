@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import os
-import sys
 import platform
+import sys
 
-from shrub.v2 import ShrubProject, Task, BuildVariant, FunctionCall, TaskGroup
+from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, Task, TaskGroup
 from shrub.v2.command import BuiltInCommand
 
 

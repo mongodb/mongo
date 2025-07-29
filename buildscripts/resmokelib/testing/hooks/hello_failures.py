@@ -4,14 +4,9 @@ from __future__ import absolute_import
 
 import os
 
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing.hooks import interface
-from buildscripts.resmokelib.testing.fixtures import replicaset
-from buildscripts.resmokelib.testing.fixtures import shardedcluster
 
-from . import interface
-from . import jsfile
+from . import interface, jsfile
 
 
 class HelloDelays(interface.Hook):

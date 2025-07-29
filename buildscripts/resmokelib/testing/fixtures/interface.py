@@ -1,11 +1,11 @@
 """Interface of the different fixtures for executing JSTests against."""
 
-from logging import Logger
 import os.path
 import time
-from enum import Enum
 from collections import namedtuple
-from typing import List, TYPE_CHECKING
+from enum import Enum
+from logging import Logger
+from typing import TYPE_CHECKING, List
 
 import pymongo
 import pymongo.errors

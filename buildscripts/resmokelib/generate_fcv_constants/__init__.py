@@ -1,8 +1,7 @@
 """Generate FCV constants for consumption by non-C++ integration tests."""
 import argparse
 
-from buildscripts.resmokelib import configure_resmoke
-from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import configure_resmoke, logging
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 _COMMAND = "generate-fcv-constants"

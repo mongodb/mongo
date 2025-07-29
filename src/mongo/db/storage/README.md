@@ -120,13 +120,13 @@ different timestamp set prior to each write it did.
 A storage engine should generally implement the following classes. See their definitions for more
 details.
 
--   [KVEngine](kv/kv_engine.h)
--   [RecordStore](record_store.h)
--   [RecoveryUnit](recovery_unit.h)
--   [SeekableRecordCursor](record_store.h)
--   [SortedDataInterface](sorted_data_interface.h)
--   [ServerStatusSection](../commands/server_status.h)
--   [ServerParameter](../server_parameters.h)
+- [KVEngine](kv/kv_engine.h)
+- [RecordStore](record_store.h)
+- [RecoveryUnit](recovery_unit.h)
+- [SeekableRecordCursor](record_store.h)
+- [SortedDataInterface](sorted_data_interface.h)
+- [ServerStatusSection](../commands/server_status.h)
+- [ServerParameter](../server_parameters.h)
 
 [Concurrency FAQ]: http://docs.mongodb.org/manual/faq/concurrency/
 [initial sync]: http://docs.mongodb.org/manual/core/replica-set-sync/#replica-set-initial-sync

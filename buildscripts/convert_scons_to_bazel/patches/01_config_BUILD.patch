@@ -1,0 +1,32 @@
+diff --git a/bazel/config/BUILD.bazel b/bazel/config/BUILD.bazel
+index 5d303bf1749..0586e84762d 100644
+--- a/bazel/config/BUILD.bazel
++++ b/bazel/config/BUILD.bazel
+@@ -5,6 +5,7 @@ load(
+     "allocator",
+     "asan",
+     "build_enterprise",
++    "build_grpc",
+     "build_otel",
+     "compiler_type",
+     "compress_debug_compile",
+@@ -1277,13 +1278,18 @@ selects.config_setting_group(
+ # grpc options
+ # --------------------------------------
+ 
++build_grpc(
++    name = "build_grpc",
++    build_setting_default = False,
++)
++
+ config_setting(
+     name = "build_grpc_enabled",
+     constraint_values = [
+         "@platforms//os:linux",
+     ],
+     flag_values = {
+-        "//bazel/config:ssl": "True",
++        "//bazel/config:build_grpc": "True",
+     },
+ )
+ 

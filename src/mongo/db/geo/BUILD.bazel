@@ -1,0 +1,80 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "geo_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "geometry",
+    srcs = [
+        "//src/mongo/db/geo:big_polygon.cpp",
+        "//src/mongo/db/geo:hash.cpp",
+        "//src/mongo/db/geo:r2_region_coverer.cpp",
+        "//src/mongo/db/geo:shapes.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+        "//src/mongo/db/storage:key_string",
+        "//src/third_party/s2",
+    ],
+)
+
+mongo_cc_library(
+    name = "geoparser",
+    srcs = [
+        "//src/mongo/db/geo:geometry_container.cpp",
+        "//src/mongo/db/geo:geoparser.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/bson:dotted_path_support",
+        "//src/mongo/db/geo:geometry",
+        "//src/third_party/s2",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_geo_test",
+    srcs = [
+        "//src/mongo/db/geo:big_polygon_test.cpp",
+        "//src/mongo/db/geo:geoparser_test.cpp",
+        "//src/mongo/db/geo:hash_test.cpp",
+        "//src/mongo/db/geo:r2_region_coverer_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_first_group",
+    ],
+    deps = [
+        "//src/mongo/db:common",
+        "//src/mongo/db/geo:geometry",
+        "//src/mongo/db/geo:geoparser",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "hash_bm",
+    srcs = [
+        "//src/mongo/db/geo:hash_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/geo:geometry",
+    ],
+)

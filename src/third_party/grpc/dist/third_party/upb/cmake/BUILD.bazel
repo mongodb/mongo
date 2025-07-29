@@ -24,12 +24,12 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 load(
-    ":build_defs.bzl",
-    "staleness_test",
-)
-load(
     "//bazel:build_defs.bzl",
     "make_shell_script",
+)
+load(
+    ":build_defs.bzl",
+    "staleness_test",
 )
 
 licenses(["notice"])

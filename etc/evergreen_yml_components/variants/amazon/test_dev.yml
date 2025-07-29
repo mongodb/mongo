@@ -20,16 +20,13 @@ variables:
 # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-arm64-dynamic-enterprise-compile-expansions
-  scons_cache_scope: shared
-  scons_cache_mode: all
   has_packages: false
-  compile_flags: >-
-    --ssl
-    MONGO_DISTMOD=amazon2
-    -j$(grep -c ^processor /proc/cpuinfo)
-    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    --link-model=dynamic
-    --use-diagnostic-latches=on
+  bazel_compile_flags: >-
+    --use_diagnostic_latches=True
+  unittest_library_compile_flags: >-
+    --linkstatic=False
+  unittest_compile_flags: >-
+    --linkstatic=False
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/perf/perf.yml
@@ -46,7 +43,6 @@ variables:
   repo_edition: enterprise
   large_distro_name: amazon2-arm64-latest-large
   core_analyzer_distro_name: amazon2-arm64-latest-xlarge
-  num_scons_link_jobs_available: 0.99
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -54,7 +50,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &amazon_linux2_arm64_dynamic_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
     variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
   - name: version_gen
     variant: generate-tasks-for-version
@@ -75,8 +71,6 @@ variables:
 - &sys_perf_compile_expansions
   platform: linux
   project_dir: dsi
-  scons_cache_scope: shared
-  scons_cache_mode: all
   has_packages: false
 
 buildvariants:
@@ -87,6 +81,7 @@ buildvariants:
   expansions:
     <<: *linux-arm64-dynamic-enterprise-compile-expansions
     compile_variant: *amazon-linux2-arm64-crypt-compile
+    evergreen_remote_exec: on
   tasks:
     - name: .crypt
     - name: crypt_build_debug_and_test
@@ -101,9 +96,10 @@ buildvariants:
     build_mongot: true
     download_mongot_release: true
     compile_variant: *amazon-linux2-arm64-dynamic-compile
+    evergreen_remote_exec: on
+    skip_debug_link: true
   tasks:
-    - name: compile_ninja_quick_TG
-    - name: compile_test_parallel_unittest_stream_TG
+    - name: run_unit_tests_TG
     - name: compile_test_parallel_core_stream_TG
     - name: compile_test_parallel_dbtest_stream_TG
     - name: compile_integration_and_test_parallel_stream_TG
@@ -125,8 +121,6 @@ buildvariants:
   stepback: true
   expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
     <<: *amazon_linux2_arm64_dynamic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
     has_packages: false
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
@@ -150,31 +144,21 @@ buildvariants:
   stepback: false
   expansions:
     <<: *linux_arm64_generic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
     commit_queue_alternate_cache: amazon-linux2-arm64-dynamic-compile
     has_packages: false
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-      --use-diagnostic-latches=on
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-      -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
+    bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2
+        --linkstatic=False
+        --use_diagnostic_latches=True
     clang_tidy_toolchain: v4
-    num_scons_unit_cc_jobs_available: 0.75
+    evergreen_remote_exec: on
     compile_variant: *commit-queue
   depends_on: []
   tasks:
-  - name: compile_ninja_quick_TG
   - name: compile_test_parallel_core_stream_TG
     distros:
     - amazon2-arm64-xlarge-commitqueue
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
     distros:
     - amazon2-arm64-xlarge-commitqueue
   - name: compile_test_parallel_dbtest_stream_TG
@@ -197,10 +181,8 @@ buildvariants:
     <<: *amazon_linux2_arm64_dynamic_expansions
     # Diagnostic latches are disabled by default, and we match that behavior here. We also need to
     # exclude tests with 'requires_latch_analyzer'.
-    compile_flags: >-
-      --use-diagnostic-latches=off
-    scons_cache_scope: shared
-    scons_cache_mode: all
+    bazel_compile_flags: >-
+      --use_diagnostic_latches=False
     has_packages: false
     jstestfuzz_num_generated_files: 20
     jstestfuzz_concurrent_num_files: 5
@@ -237,7 +219,7 @@ buildvariants:
     - name: version_burn_in_gen
       variant: generate-tasks-for-version
       omit_generated_tasks: true
-    - name: archive_dist_test_debug
+    - name: archive_dist_test
       variant: *amazon_linux2_arm64_dynamic_compile_variant_name
   - name: multiversion_gen
   - name: .multiversion_sanity_check
@@ -251,12 +233,9 @@ buildvariants:
   expansions:
     <<: *sys_perf_compile_expansions
     compile_variant: amazon2-x86-compile
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --release
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2
+      --release=True
     evergreen_remote_exec: on
   run_on:
     - amazon2-latest-xlarge
@@ -270,12 +249,9 @@ buildvariants:
   expansions:
     <<: *sys_perf_compile_expansions
     compile_variant: amazon2023-x86-compile
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --release
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
+      --release=True
     evergreen_remote_exec: on
   run_on:
     - amazon2023.3-xlarge
@@ -289,12 +265,9 @@ buildvariants:
   expansions:
     <<: *sys_perf_compile_expansions
     compile_variant: amazon2-arm64-compile
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --release
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2
+      --release=True
     evergreen_remote_exec: on
   run_on:
     - amazon2-arm64-latest-xlarge
@@ -308,12 +281,9 @@ buildvariants:
   expansions:
     <<: *sys_perf_compile_expansions
     compile_variant: amazon2023-arm64-compile
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --release
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
+      --release=True
     evergreen_remote_exec: on
   run_on:
     - amazon2023.3-arm64-xlarge
@@ -327,21 +297,10 @@ buildvariants:
   expansions:
     <<: *sys_perf_compile_expansions
     compile_variant: amazon2-arm64-compile
-    use_scons_cache: true
-    compile_flags: >-
-      --separate-debug
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --release
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --allocator=system
-      --enterprise-features=fle
-      --js-engine=none
-      --link-model=dynamic-sdk
-      --enable-http-client=off
-      --ssl=off
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2
+      --release=True
+    evergreen_remote_exec: on
   run_on:
     - amazon2-arm64-latest-xlarge
   tasks:
@@ -353,21 +312,10 @@ buildvariants:
   expansions:
     <<: *sys_perf_compile_expansions
     compile_variant: amazon2023-arm64-compile
-    use_scons_cache: true
-    compile_flags: >-
-      --separate-debug
-      MONGO_DISTMOD=amazon2023
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --release
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --allocator=system
-      --enterprise-features=fle
-      --js-engine=none
-      --link-model=dynamic-sdk
-      --enable-http-client=off
-      --ssl=off
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2
+      --release=True
+    evergreen_remote_exec: on
   run_on:
     - amazon2023.3-arm64-xlarge
   tasks:
@@ -379,13 +327,11 @@ buildvariants:
   expansions:
     <<: *sys_perf_compile_expansions
     compile_variant: amazon2-x86-streams-compile
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --release
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --streams-release-build
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=amazon2023
+      --release=True
+      --streams_release_build=True
+    evergreen_remote_exec: on
   run_on:
     - amazon2-latest-xlarge
   tasks:

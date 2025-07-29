@@ -2,18 +2,15 @@
 
 import os
 import os.path
-import time
 import shutil
+import time
 import uuid
-
-import yaml
 
 import pymongo
 import pymongo.errors
+import yaml
+
 from buildscripts.resmokelib.testing.fixtures import interface
-from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
-from buildscripts.resmokelib.testing.fixtures.interface import _FIXTURES
-from buildscripts.resmokelib.testing.fixtures.mongot import MongoTFixture
 
 
 class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):

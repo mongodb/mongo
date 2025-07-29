@@ -29,9 +29,13 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <set>
+#include <utility>
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_operation_source.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/global_user_write_block_state.h"

@@ -23,7 +23,7 @@ env.Library(
 )
 
 env.Library(
-    target='query_shape_hash',
+    target='query_shape_hash_idl',
     source=[
         'query_shape_hash.idl',
     ],

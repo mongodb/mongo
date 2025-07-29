@@ -1,0 +1,200 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "admission_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "ingress_admission_control",
+    srcs = [
+        "//src/mongo/db/admission:ingress_admission_controller.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission:ingress_admission_context",
+        "//src/mongo/db/admission:ingress_admission_control_idl",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_library(
+    name = "ingress_admission_context",
+    srcs = [
+        "//src/mongo/db/admission:ingress_admission_context.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/concurrency:admission_context",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ingress_admission_control_test",
+    srcs = [
+        "//src/mongo/db/admission:ingress_admission_control_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_third_group",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/admission:ingress_admission_control",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "execution_admission_context",
+    srcs = [
+        "//src/mongo/db/admission:execution_admission_context.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/concurrency:admission_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "ticketholder_manager",
+    srcs = [
+        "//src/mongo/db/admission:ticketholder_manager.cpp",
+    ],
+    deps = [
+        ":execution_control_feature_flags_idl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_library(
+    name = "execution_control",
+    srcs = [
+        "//src/mongo/db/admission:concurrency_adjustment_validator.cpp",
+        "//src/mongo/db/admission:execution_control_init.cpp",
+        "//src/mongo/db/admission:throughput_probing.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission:execution_control_parameters_idl",
+        "//src/mongo/db/admission:throughput_probing_idl",
+        "//src/mongo/db/admission:ticketholder_manager",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_library(
+    name = "queues_server_status_section",
+    srcs = [
+        "//src/mongo/db/admission:queues_server_status_section.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission:ingress_admission_control",
+        "//src/mongo/db/admission:ticketholder_manager",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/transport:transport_layer_common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "throughput_probing_test",
+    srcs = [
+        "//src/mongo/db/admission:throughput_probing_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/admission:execution_control",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/unittest",
+        "//src/mongo/util:mock_periodic_runner",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_idl_library(
+    name = "execution_control_feature_flags",
+    src = "execution_control_feature_flags.idl",
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_idl_library(
+    name = "execution_control_parameters_idl",
+    src = "execution_control_parameters.idl",
+)
+
+mongo_idl_library(
+    name = "ingress_admission_control_idl",
+    src = "ingress_admission_control.idl",
+)
+
+mongo_idl_library(
+    name = "throughput_probing_idl",
+    src = "throughput_probing.idl",
+)
+
+mongo_idl_library(
+    name = "execution_control_feature_flags_idl",
+    src = "execution_control_feature_flags.idl",
+)
+
+mongo_cc_library(
+    name = "rate_limiter",
+    srcs = [
+        "rate_limiter.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/third_party/folly:headers",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "rate_limiter_util_test",
+    srcs = [
+        "rate_limiter_util_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        "rate_limiter",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/unittest",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)

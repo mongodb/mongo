@@ -72,7 +72,7 @@ When a new primary node is elected, the DDL primary only service is rebuilt, and
 
 ### Sections about specific standard DDL operations
 
--   [User write blocking](README_user_write_blocking.md)
+- [User write blocking](README_user_write_blocking.md)
 
 ## Non-Standard DDLs
 
@@ -84,4 +84,4 @@ Refine shard key commits only on the config server, again relying on shards to p
 
 ### Sections explaining specific non-standard DDL operations
 
--   [Chunk Migration](README_migrations.md)
+- [Chunk Migration](README_migrations.md)

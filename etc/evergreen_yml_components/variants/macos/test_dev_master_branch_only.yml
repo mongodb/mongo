@@ -7,33 +7,6 @@
 buildvariants:
 # Note that this task is currently optional;
 # This will eventually become suggested, then required.
-- name: &macos-arm64-bazel-compile macos-arm64-bazel-compile
-  display_name: "MacOS ARM64 Bazel Compile"
-  tags: ["bazel_check"]
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - macos-14-arm64
-  expansions:
-    test_flags: >-
-      --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    push_path: osx
-    push_bucket: downloads.mongodb.org
-    push_name: macos
-    push_arch: arm64
-    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx_arm.vars
-      --modules=
-    resmoke_jobs_max: 6
-    compile_variant: *macos-arm64-bazel-compile
-  tasks:
-  - name: compile_bazel_macos_TG
-  - name: compile_bazel_ninja_TG
-
 - name: &enterprise-macos-arm64 enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64"
   tags: ["bazel_check"]
@@ -42,18 +15,14 @@ buildvariants:
   expansions:
     compile_variant: *enterprise-macos-arm64
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
-    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx_arm.vars
-      --use-diagnostic-latches=on
+    bazel_compile_flags: >-
+      --build_enterprise=False
+      --use_diagnostic_latches=True
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_serial_TG
-  - name: compile_test_parallel_unittest_stream_TG
+  - name: run_unit_tests_TG
   - name: audit
   - name: auth_audit_gen
   - name: fle

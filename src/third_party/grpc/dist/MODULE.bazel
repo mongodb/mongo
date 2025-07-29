@@ -1,0 +1,17 @@
+module(
+    name = "grpc",
+)
+
+bazel_dep(name = "rules_proto", version = "4.0.0")
+bazel_dep(name = "protobuf", version = "26.0.bcr.1", repo_name = "com_google_protobuf")
+
+grpc_repo_deps_ext = use_extension("//bazel:grpc_deps.bzl", "grpc_repo_deps_ext")
+use_repo(
+    grpc_repo_deps_ext,
+    "com_envoyproxy_protoc_gen_validate",
+    "com_github_cncf_udpa",
+    "com_github_cncf_xds",
+    "envoy_api",
+    "google_cloud_cpp",
+    "io_opencensus_cpp",
+)

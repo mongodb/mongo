@@ -49,6 +49,11 @@ patch_aliases:
   variant: '^(.*-required$|linux-64-debug|enterprise-amazon-linux2-arm64-all-feature-flags|amazon-linux2-arm64-dynamic-compile|amazon-linux2-arm64-compile|amazon-linux2-arm64-crypt-compile|run-all-affected-jstests)$'
   task: '.*'
 
+- alias: convert_bazel
+  variant: '.*'
+  task: "^(convert_and_run_bazel|convert_and_run_bazel_windows)$"
+
+
 commit_queue_aliases:
 - variant: "commit-queue"
   task: "^(bazel_.*|run_.*|compile_.*|lint_.*|validate_commit_message|jsCore|version_gen_validation|resmoke_validation_tests)$"
@@ -86,7 +91,6 @@ post:
 - func: "f_expansions_write"
 - func: "cleanup external auth OIDC resources"
 - func: "upload npm logs"
-- func: "attach scons logs"
 - func: "attach local resmoke invocation"
 - func: "attach bazel invocation"
 - func: "attach multiversion exclude tags"
@@ -106,7 +110,6 @@ post:
 - func: "save mongo coredumps"
 - func: "generate hang analyzer tasks"
 - func: "save failed unittests"
-- func: "save unstripped dbtest"
 - func: "save hang analyzer debugger files"
 - func: "save disk statistics"
 - func: "save system resource information"
@@ -130,7 +133,6 @@ post:
       system-resource-info.tgz
       ${report_file|src/report.json}
       ${archive_file|src/archive.json}
-- func: "umount shared scons directory"
 - func: "umount tmp directory"
 - func: "cleanup FUSE watchdog"
 - func: "cleanup environment"

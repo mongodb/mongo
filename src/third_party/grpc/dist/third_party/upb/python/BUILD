@@ -23,23 +23,24 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# begin:github_only
-load("//python:py_extension.bzl", "py_extension")
-# end:github_only
-
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
-load("//bazel:build_defs.bzl", "UPB_DEFAULT_COPTS")
 
 # begin:github_only
 load("@rules_pkg//:mappings.bzl", "pkg_files")
+# end:github_only
+
+load("//bazel:build_defs.bzl", "UPB_DEFAULT_COPTS")
+
+# begin:github_only
+load("//python:py_extension.bzl", "py_extension")
 # end:github_only
 
 licenses(["notice"])
 
 package(
     # begin:google_only
-#     default_applicable_licenses = ["//:license"],
+    #     default_applicable_licenses = ["//:license"],
     # end:google_only
     default_visibility = ["//python/dist:__pkg__"],
 )
@@ -181,16 +182,16 @@ selects.config_setting_group(
 
 # begin:github_only
 _message_target_compatible_with = {
-   "@platforms//os:windows": ["@platforms//:incompatible"],
-   "@system_python//:none": ["@platforms//:incompatible"],
-   "@system_python//:unsupported": ["@platforms//:incompatible"],
-   "//conditions:default": [],
+    "@platforms//os:windows": ["@platforms//:incompatible"],
+    "@system_python//:none": ["@platforms//:incompatible"],
+    "@system_python//:unsupported": ["@platforms//:incompatible"],
+    "//conditions:default": [],
 }
 
 pkg_files(
-   name = "message_extension",
-   srcs = [":message_srcs"],
-   prefix = "python/",
+    name = "message_extension",
+    srcs = [":message_srcs"],
+    prefix = "python/",
 )
 # end:github_only
 # begin:google_only
@@ -226,7 +227,7 @@ filegroup(
         "unknown_fields.h",
     ],
     # begin:google_only
-#     compatible_with = ["//buildenv/target:non_prod"],
+    #     compatible_with = ["//buildenv/target:non_prod"],
     # end:google_only
 )
 

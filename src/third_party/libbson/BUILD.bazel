@@ -1,0 +1,95 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "bson",
+    srcs = [
+        "dist/src/common/common-b64.c",
+        "dist/src/common/common-md5.c",
+        "dist/src/common/common-thread.c",
+        "dist/src/libbson/src/bson/bcon.c",
+        "dist/src/libbson/src/bson/bson.c",
+        "dist/src/libbson/src/bson/bson-atomic.c",
+        "dist/src/libbson/src/bson/bson-clock.c",
+        "dist/src/libbson/src/bson/bson-context.c",
+        "dist/src/libbson/src/bson/bson-decimal128.c",
+        "dist/src/libbson/src/bson/bson-error.c",
+        "dist/src/libbson/src/bson/bson-iso8601.c",
+        "dist/src/libbson/src/bson/bson-iter.c",
+        "dist/src/libbson/src/bson/bson-json.c",
+        "dist/src/libbson/src/bson/bson-keys.c",
+        "dist/src/libbson/src/bson/bson-md5.c",
+        "dist/src/libbson/src/bson/bson-memory.c",
+        "dist/src/libbson/src/bson/bson-oid.c",
+        "dist/src/libbson/src/bson/bson-reader.c",
+        "dist/src/libbson/src/bson/bson-string.c",
+        "dist/src/libbson/src/bson/bson-timegm.c",
+        "dist/src/libbson/src/bson/bson-utf8.c",
+        "dist/src/libbson/src/bson/bson-value.c",
+        "dist/src/libbson/src/bson/bson-version-functions.c",
+        "dist/src/libbson/src/bson/bson-writer.c",
+        "dist/src/libbson/src/jsonsl/jsonsl.c",
+    ],
+    hdrs = glob([
+        "dist/src/common/*.h",
+        "dist/src/libbson/src/bson/*.h",
+        "dist/src/libbson/src/bson/forwarding/*.h",
+        "dist/src/libbson/src/jsonsl/*.h",
+    ]) + select({
+        "@platforms//os:windows": glob(["build_windows/**/*.h"]),
+        "@platforms//os:macos": glob(["build_osx/**/*.h"]),
+        "@platforms//os:linux": glob(["build_linux/**/*.h"]),
+        "//bazel/config:linux_s390x": glob(["build_linux_s390x/**/*.h"]),
+        "//conditions:default": [],
+    }),
+    copts = [
+        "-Isrc/third_party/libbson/dist/src/common",
+    ] + select({
+        "@platforms//os:windows": [
+            # msvc sign-compare warnings
+            "/wd4388",
+            "/wd4389",
+            "/wd4146",
+            "/wd4018",
+        ],
+        "@platforms//os:macos": [
+            "-Wno-sign-compare",
+            "-Wno-unguarded-availability-new",
+            "-Wno-implicit-fallthrough",
+        ],
+        "@platforms//os:linux": [
+            "-Wno-sign-compare",
+            "-Wno-implicit-fallthrough",
+        ],
+        "//conditions:default": [],
+    }),
+    defines = [
+        "BSON_STATIC",
+    ],
+    includes = [
+        "dist/src/libbson/src",
+        "dist/src/libbson/src/bson",
+    ] + select({
+        "@platforms//os:windows": [
+            "build_windows",
+            "build_windows/bson",
+        ],
+        "@platforms//os:macos": [
+            "build_osx",
+            "build_osx/bson",
+        ],
+        "@platforms//os:linux": [
+            "build_linux",
+            "build_linux/bson",
+        ],
+        "//bazel/config:linux_s390x": [
+            "build_linux_s390x",
+            "build_linux_s390x/bson",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "BSON_COMPILATION",
+    ],
+)

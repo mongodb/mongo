@@ -1,8 +1,7 @@
 """The unittest.TestCase for tests using a MongoDB vendored version of Google Benchmark."""
 
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import core, utils
 from buildscripts.resmokelib.testing.testcases import interface
 
 

@@ -1,6 +1,6 @@
+import argparse
 import json
 import sys
-import argparse
 
 parser = argparse.ArgumentParser(description='Print top n metrics from build metrics json files.')
 parser.add_argument('--build-metrics', metavar='FILE', type=str, default='build_metrics.json',

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Script to gather information about how tags are used in evergreen tasks."""
 
-from __future__ import absolute_import
-from __future__ import print_function
+from __future__ import absolute_import, print_function
 
 import argparse
 import os

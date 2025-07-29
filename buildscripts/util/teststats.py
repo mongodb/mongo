@@ -1,13 +1,19 @@
 """Utility to support parsing a TestStat."""
+
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
 from json import JSONDecodeError
-from typing import NamedTuple, List, Callable, Optional
+from typing import Callable, List, NamedTuple, Optional
+
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
-from buildscripts.util.testname import split_test_hook_name, is_resmoke_hook, get_short_name_from_test_file
+from buildscripts.util.testname import (
+    get_short_name_from_test_file,
+    is_resmoke_hook,
+    split_test_hook_name,
+)
 
 TASK_LEVEL_HOOKS = {"CleanEveryN"}
 TESTS_STATS_S3_LOCATION = "https://mongo-test-stats.s3.amazonaws.com"
@@ -95,8 +101,11 @@ class HistoricHookInfo(NamedTuple):
     @classmethod
     def from_test_stats(cls, test_stats: HistoricalTestInformation) -> "HistoricHookInfo":
         """Create an instance from a test_stats object."""
-        return cls(hook_id=test_stats.test_name, num_pass=test_stats.num_pass,
-                   avg_duration=test_stats.avg_duration_pass)
+        return cls(
+            hook_id=test_stats.test_name,
+            num_pass=test_stats.num_pass,
+            avg_duration=test_stats.avg_duration_pass,
+        )
 
     def test_name(self) -> str:
         """Get the name of the test associated with this hook."""
@@ -123,8 +132,12 @@ class HistoricTestInfo(NamedTuple):
     def from_test_stats(cls, test_stats: HistoricalTestInformation,
                         hooks: List[HistoricHookInfo]) -> "HistoricTestInfo":
         """Create an instance from a test_stats object."""
-        return cls(test_name=test_stats.test_name, num_pass=test_stats.num_pass,
-                   avg_duration=test_stats.avg_duration_pass, hooks=hooks)
+        return cls(
+            test_name=test_stats.test_name,
+            num_pass=test_stats.num_pass,
+            avg_duration=test_stats.avg_duration_pass,
+            hooks=hooks,
+        )
 
     def normalized_test_name(self) -> str:
         """Get the normalized version of the test name."""
@@ -133,8 +146,12 @@ class HistoricTestInfo(NamedTuple):
     def total_hook_runtime(self,
                            predicate: Optional[Callable[[HistoricHookInfo], bool]] = None) -> float:
         """Get the average runtime of all the hooks associated with this test."""
+
+        def default_predicate(_) -> bool:
+            return True
+
         if not predicate:
-            predicate = lambda _: True
+            predicate = default_predicate
         return sum([
             hook.avg_duration * (hook.num_pass // self.num_pass if self.num_pass else 1)
             for hook in self.hooks if predicate(hook)
@@ -170,7 +187,7 @@ class HistoricTaskData(object):
         """
         session = requests.Session()
         retries = Retry(total=5, backoff_factor=1, status_forcelist=[502, 503, 504])
-        session.mount('https://', HTTPAdapter(max_retries=retries))
+        session.mount("https://", HTTPAdapter(max_retries=retries))
 
         response = session.get(f"{TESTS_STATS_S3_LOCATION}/{project}/{variant}/{task}")
 

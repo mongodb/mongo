@@ -218,7 +218,7 @@ var queryConfigChunks = function(st) {
 
     // Map reduce query.
     const coll = configDB.collections.findOne({_id: testColl.getFullName()});
-    /* eslint-disable */
+
     var mapFunction = function() {
         if (xx.timestamp) {
             if (this.uuid.toString() == xx.uuid.toString()) {
@@ -230,7 +230,7 @@ var queryConfigChunks = function(st) {
             }
         }
     };
-    /* eslint-enable */
+
     var reduceFunction = function(key, values) {
         // We may be re-reducing values that have already been partially reduced. In that case, we
         // expect to see an object like {chunks: <count>} in the array of input values.

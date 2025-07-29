@@ -1344,7 +1344,7 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
             failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotWritablePrimary});
 
             assert.commandWorked(coll1.insert({a: 2, b: {c: 7, d: "d is good"}}));
-            /* eslint-disable */
+
             const cursor = coll1.find({
                 $where: function() {
                     assert.eq(3, Object.keySet(obj).length);
@@ -1354,7 +1354,7 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
                     return true;
                 }
             });
-            /* eslint-enable */
+
             assert.eq(1, cursor.toArray().length);
         }
     },

@@ -1,15 +1,88 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "platform_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_unit_test(
+    name = "platform_test",
+    srcs = [
+        "//src/mongo/platform:atomic_proxy_test.cpp",
+        "//src/mongo/platform:atomic_test.cpp",
+        "//src/mongo/platform:bits_test.cpp",
+        "//src/mongo/platform:decimal128_bson_test.cpp",
+        "//src/mongo/platform:decimal128_test.cpp",
+        "//src/mongo/platform:endian_test.cpp",
+        "//src/mongo/platform:int128_test.cpp",
+        "//src/mongo/platform:mutex_test.cpp",
+        "//src/mongo/platform:overflow_arithmetic_test.cpp",
+        "//src/mongo/platform:process_id_test.cpp",
+        "//src/mongo/platform:random_test.cpp",
+        "//src/mongo/platform:source_location_test.cpp",
+        "//src/mongo/platform:stack_locator_test.cpp",
+        "//src/mongo/platform:waitable_atomic_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_fourth_group",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "endian_bm",
+    srcs = [
+        "//src/mongo/platform:endian_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
+)
+
+mongo_cc_unit_test(
+    name = "rwmutex_test",
+    srcs = [
+        "//src/mongo/platform:rwmutex_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_sixth_group",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "rwmutex_bm",
+    srcs = [
+        "//src/mongo/platform:rwmutex_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/util:processinfo",
+    ],
+)
 
 mongo_cc_library(
     name = "visibility_test_libcommon",
     srcs = [
-        "visibility_test_libcommon.cpp",
-    ],
-    hdrs = [
-        "visibility.h",
-        "visibility_test_libcommon.h",
+        "//src/mongo/platform:visibility_test_libcommon.cpp",
     ],
     mongo_api_name = "visibility_test_libcommon",
 )
@@ -17,38 +90,52 @@ mongo_cc_library(
 mongo_cc_library(
     name = "visibility_test_lib1",
     srcs = [
-        "visibility_test_lib1.cpp",
-    ],
-    hdrs = [
-        "visibility_test_lib1.h",
+        "//src/mongo/platform:visibility_test_lib1.cpp",
     ],
     mongo_api_name = "visibility_test_lib1",
     deps = [
-        ":visibility_test_libcommon",
+        "//src/mongo/platform:visibility_test_libcommon",
     ],
 )
 
 mongo_cc_library(
     name = "visibility_test_lib2",
     srcs = [
-        "visibility_test_lib2.cpp",
-    ],
-    hdrs = [
-        "visibility_test_lib2.h",
+        "//src/mongo/platform:visibility_test_lib2.cpp",
     ],
     mongo_api_name = "visibility_test_lib2",
+    deps = [
+        "//src/mongo/platform:visibility_test_lib1",
+        "//src/mongo/platform:visibility_test_libcommon",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "visibility1_test",
+    srcs = [
+        "visibility_test1.cpp",
+    ],
+    has_custom_mainline = True,
+    tags = [
+        "convert_target",
+        "mongo_unittest_third_group",
+    ],
     deps = [
         ":visibility_test_lib1",
     ],
 )
 
-mongo_cc_binary(
-    name = "visibility_test1",
+mongo_cc_unit_test(
+    name = "visibility_test2",
     srcs = [
-        "visibility_test1.cpp",
-        "//src/mongo/util:exit_code",
+        "visibility_test2.cpp",
+    ],
+    has_custom_mainline = True,
+    tags = [
+        "convert_target",
+        "mongo_unittest_second_group",
     ],
     deps = [
-        ":visibility_test_lib1",
+        ":visibility_test_lib2",
     ],
 )

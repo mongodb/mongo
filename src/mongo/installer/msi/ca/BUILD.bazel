@@ -1,0 +1,54 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+]))
+
+filegroup(
+    name = "ca_global_hdrs",
+    srcs = glob(["*.h"]),
+)
+
+mongo_cc_library(
+    name = "mongoca",
+    srcs = [
+        "CustomAction.cpp",
+        "targetver.h",
+        "//src/mongo/platform:compiler.h",
+        "//src/mongo/platform:compiler_msvc.h",
+        "//src/mongo/util:scopeguard.h",
+    ],
+    copts = select({
+        "//bazel/config:dbg_enabled": [
+            "/MTd",
+        ],
+        "//conditions:default": [
+            "/MT",
+        ],
+    }),
+    linkopts = [
+        "msi.lib",
+        "user32.lib",
+        "Advapi32.lib",
+    ],
+    linkshared = True,
+    # We don't want any special allocator here either.
+    skip_global_deps = [
+        "allocator",
+        "libunwind",
+    ],
+    # Do not link with DLL version of the CRT.
+    # As part of install, we may need to install the CRT DLL but if it is not installed, we cannot run
+    # the installer if we dynamically linked against it.
+    skip_windows_crt_flags = True,
+    tags = ["dist_test"],
+    target_compatible_with = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    win_def_file = ":CustomAction.def",
+    deps = [],
+)

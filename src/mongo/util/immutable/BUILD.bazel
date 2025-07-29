@@ -1,0 +1,48 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob([
+    "*.cpp",
+    "*.h",
+    "*.inl",
+    "*.hpp",
+    "*.py",
+    "*.in",
+]))
+
+filegroup(
+    name = "immutable_global_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "*.hpp",
+    ]),
+)
+
+mongo_cc_unit_test(
+    name = "immutable_test",
+    srcs = [
+        "//src/mongo/util/immutable:immutable_ordered_test.cpp",
+        "//src/mongo/util/immutable:immutable_unordered_test.cpp",
+        "//src/mongo/util/immutable:immutable_vector_test.cpp",
+    ],
+    tags = [
+        "convert_target",
+        "mongo_unittest_seventh_group",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "immutable_absl_comparison_bm",
+    srcs = [
+        "//src/mongo/util/immutable:immutable_absl_comparison_bm.cpp",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "immutable_std_comparison_bm",
+    srcs = [
+        "//src/mongo/util/immutable:immutable_std_comparison_bm.cpp",
+    ],
+)

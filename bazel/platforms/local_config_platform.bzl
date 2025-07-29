@@ -1,19 +1,7 @@
 load("//bazel/platforms:remote_execution_containers.bzl", "REMOTE_EXECUTION_CONTAINERS")
+load("//bazel/platforms:normalize.bzl", "ARCH_TO_PLATFORM_MAP", "OS_TO_PLATFORM_MAP")
+load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 load("//bazel:utils.bzl", "get_host_distro_major_version")
-
-_OS_MAP = {
-    "macos": "@platforms//os:osx",
-    "linux": "@platforms//os:linux",
-    "windows": "@platforms//os:windows",
-}
-
-_ARCH_MAP = {
-    "amd64": "@platforms//cpu:x86_64",
-    "aarch64": "@platforms//cpu:arm64",
-    "x86_64": "@platforms//cpu:x86_64",
-    "ppc64le": "@platforms//cpu:ppc64le",
-    "s390x": "@platforms//cpu:s390x",
-}
 
 def _setup_local_config_platform(ctx):
     """
@@ -32,8 +20,8 @@ def _setup_local_config_platform(ctx):
 
     arch = ctx.os.arch
 
-    os_constraint = _OS_MAP[os]
-    arch_constraint = _ARCH_MAP[arch]
+    os_constraint = OS_TO_PLATFORM_MAP[os]
+    arch_constraint = ARCH_TO_PLATFORM_MAP[arch]
 
     constraints = [os_constraint, arch_constraint]
 
@@ -46,10 +34,41 @@ def _setup_local_config_platform(ctx):
     elif arch == "aarch64":
         arch = "arm64"
 
+    kernel_constraints = ""
+    if os == "linux":
+        result = ctx.execute([
+            "uname",
+            "-r",
+        ])
+        version_numbers = result.stdout.split(".")
+        if int(version_numbers[0]) > 4 or (int(version_numbers[0]) == 4 and int(version_numbers[1]) > 3):
+            kernel_constraints = ',\n        "@//bazel/platforms:kernel_version_4_4_or_greater"'
+        else:
+            kernel_constraints = ',\n        "@//bazel/platforms:kernel_version_less_than_4_4"'
+
     # EngFlow's "default" pool is ARM64
     remote_execution_pool = "x86_64" if arch == "amd64" else "default"
+    result = None
+    toolchain_key = "{distro}_{arch}".format(distro = distro, arch = arch)
+    print("Trying to find toolchain for {}".format(toolchain_key))
+    toolchain_exists = False
+    for version in TOOLCHAIN_MAP:
+        if toolchain_key in TOOLCHAIN_MAP[version]:
+            toolchain_exists = True
+            break
 
-    if distro != None and distro in REMOTE_EXECUTION_CONTAINERS:
+    cache_silo = '"cache-silo-key": "' + toolchain_key + '",' if ctx.os.environ.get("evergreen_remote_exec") == "off" else ""
+    if ctx.os.environ.get("USE_NATIVE_TOOLCHAIN"):
+        exec_props = ""
+        result = {"USE_NATIVE_TOOLCHAIN": "1"}
+        constraints_str += kernel_constraints
+    elif distro != None and distro in REMOTE_EXECUTION_CONTAINERS:
+        constraints_str += ',\n        "@//bazel/platforms:use_mongo_toolchain"'
+        constraints_str += ',\n        "@//bazel/platforms:%s"' % (distro)
+
+        # remote execution supported platforms assume valid tcmalloc kernel version even if running locally.
+        # if running a local build, other flags will auto select the correct tcmalloc.
+        constraints_str += ',\n        "@//bazel/platforms:kernel_version_4_4_or_greater"'
         container_url = REMOTE_EXECUTION_CONTAINERS[distro]["container-url"]
         web_url = REMOTE_EXECUTION_CONTAINERS[distro]["web-url"]
         dockerfile = REMOTE_EXECUTION_CONTAINERS[distro]["dockerfile"]
@@ -59,20 +78,26 @@ def _setup_local_config_platform(ctx):
         "container-image": "%s",
         "dockerNetwork": "standard",
         "Pool": "%s",
+        %s
     },
-""" % (container_url, remote_execution_pool)
+""" % (container_url, remote_execution_pool, cache_silo)
+        result = {"DISTRO": distro}
+    elif distro != None and toolchain_exists:
+        constraints_str += ',\n        "@//bazel/platforms:use_mongo_toolchain"'
+        constraints_str += ',\n        "@//bazel/platforms:%s"' % (distro)
+        result = {"DISTRO": distro}
+        exec_props = ""
+        constraints_str += kernel_constraints
+    elif os == "windows":
+        constraints_str += ',\n        "@//bazel/platforms:use_mongo_windows_toolchain_config"'
+        result = {"USE_NATIVE_TOOLCHAIN": "1"}
+        exec_props = ""
     else:
+        constraints_str += kernel_constraints
+        result = {"USE_NATIVE_TOOLCHAIN": "1"}
         exec_props = ""
 
-    result = ctx.execute([
-        "uname",
-        "-r",
-    ])
-    version_numbers = result.stdout.split(".")
-    if int(version_numbers[0]) > 4 or (int(version_numbers[0]) == 4 and int(version_numbers[1]) > 3):
-        platform_constraints_str = constraints_str + ',\n        "@//bazel/platforms:kernel_version_4_4_or_greater"'
-    else:
-        platform_constraints_str = constraints_str + ',\n        "@//bazel/platforms:kernel_version_less_than_4_4"'
+    platform_constraints_str = constraints_str
 
     substitutions = {
         "{constraints}": constraints_str,
@@ -81,18 +106,24 @@ def _setup_local_config_platform(ctx):
     }
 
     ctx.template(
-        "BUILD.bazel",
+        "host/BUILD.bazel",
         ctx.attr.build_tpl,
         substitutions = substitutions,
     )
 
     ctx.template(
-        "constraints.bzl",
+        "host/constraints.bzl",
         ctx.attr.constraints_tpl,
         substitutions = substitutions,
     )
 
-    return None
+    ctx.template(
+        "host/extension.bzl",
+        ctx.attr.extension_tpl,
+        substitutions = substitutions,
+    )
+
+    return result
 
 setup_local_config_platform = repository_rule(
     implementation = _setup_local_config_platform,
@@ -105,5 +136,10 @@ setup_local_config_platform = repository_rule(
             default = "//bazel/platforms:local_config_platform_constraints.bzl",
             doc = "Template modeling the builtin local config platform constraints file.",
         ),
+        "extension_tpl": attr.label(
+            default = "//bazel/platforms:local_config_platform_extension.bzl",
+            doc = "Template modeling the builtin local config platform constraints file.",
+        ),
     },
+    environ = ["USE_NATIVE_TOOLCHAIN"],
 )

@@ -12,10 +12,8 @@ function testAggWithSystemVariable(varName, explain) {
         // This query might or might not throw depending on the engine used
         // and whether the variable is defined.
         if (explain) {
-            // eslint-disable-next-line
             coll.explain().aggregate({$group: {_id: varName}});
         } else {
-            // eslint-disable-next-line
             coll.aggregate({$group: {_id: varName}});
         }
     } catch (e) {

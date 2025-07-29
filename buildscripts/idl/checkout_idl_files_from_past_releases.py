@@ -29,11 +29,11 @@
 import argparse
 import logging
 import os
-import sys
-import re
 import shutil
+import sys
 from subprocess import check_output
 from typing import List
+
 from packaging.version import Version
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
@@ -41,7 +41,12 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # pylint: disable=wrong-import-position
-from buildscripts.resmokelib.multiversionconstants import LAST_LTS_FCV, LAST_CONTINUOUS_FCV, LATEST_FCV
+from buildscripts.resmokelib.multiversionconstants import (
+    LAST_CONTINUOUS_FCV,
+    LAST_LTS_FCV,
+    LATEST_FCV,
+)
+
 # pylint: enable=wrong-import-position
 
 LOGGER_NAME = 'checkout-idl'

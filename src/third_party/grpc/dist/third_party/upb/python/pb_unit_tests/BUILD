@@ -23,10 +23,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-load(":pyproto_test_wrapper.bzl", "pyproto_test_wrapper")
 # begin:github_only
 load("@pip_deps//:requirements.bzl", "requirement")
 # end:github_only
+
+load(":pyproto_test_wrapper.bzl", "pyproto_test_wrapper")
 
 # begin:google_only
 # package(default_applicable_licenses = ["//:license"])
@@ -57,15 +58,15 @@ py_test(
     name = "numpy_test",
     srcs = ["numpy_test_wrapper.py"],
     main = "numpy_test_wrapper.py",
-    deps = [
-      requirement("numpy"),
-      "@com_google_protobuf//python/google/protobuf/internal/numpy:numpy_test",
-      "//python:_message",
-    ],
     target_compatible_with = select({
-      "@system_python//:supported": [],
-      "//conditions:default": ["@platforms//:incompatible"],
+        "@system_python//:supported": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
+    deps = [
+        requirement("numpy"),
+        "//python:_message",
+        "@com_google_protobuf//python/google/protobuf/internal/numpy:numpy_test",
+    ],
 )
 # end:github_only
 

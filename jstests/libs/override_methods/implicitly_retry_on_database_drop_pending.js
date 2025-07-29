@@ -59,7 +59,6 @@ function runCommandWithRetries(conn, dbName, commandObj, func, makeFuncArgs) {
                         // operation that were sent to the server by finding the object's
                         // reference (i.e. using strict-equality) in 'originalOps'.
                         for (let upsertInfo of res.upserted) {
-                            /* eslint-disable-next-line */
                             upsertInfo.index = originalOps.indexOf(opsToRetry[upsertInfo.index]);
                         }
 

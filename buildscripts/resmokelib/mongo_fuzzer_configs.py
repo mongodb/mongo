@@ -1,6 +1,7 @@
 """Generator functions for all parameters that we fuzz when invoked with --fuzzMongodConfigs."""
 
 import random
+
 from buildscripts.resmokelib import utils
 
 

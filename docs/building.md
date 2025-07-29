@@ -6,22 +6,22 @@ way to get started, rather than building from source.
 
 To build MongoDB, you will need:
 
--   A modern C++ compiler capable of compiling C++20. One of the following is required:
-    -   GCC 11.3 or newer
-    -   Clang 12.0 (or Apple XCode 13.0 Clang) or newer
-    -   Visual Studio 2022 version 17.0 or newer (See Windows section below for details)
--   On Linux and macOS, the libcurl library and header is required. MacOS includes libcurl.
-    -   Fedora/RHEL - `dnf install libcurl-devel`
-    -   Ubuntu/Debian - `libcurl-dev` is provided by three packages. Install one of them:
-        -   `libcurl4-openssl-dev`
-        -   `libcurl4-nss-dev`
-        -   `libcurl4-gnutls-dev`
-    -   On Ubuntu, the lzma library is required. Install `liblzma-dev`
-    -   On Amazon Linux, the xz-devel library is required. `yum install xz-devel`
--   Python 3.10.x and Pip modules:
-    -   See the section "Python Prerequisites" below.
--   About 13 GB of free disk space for the core binaries (`mongod`,
-    `mongos`, and `mongo`) and about 600 GB for the install-all target.
+- A modern C++ compiler capable of compiling C++20. One of the following is required:
+    - GCC 11.3 or newer
+    - Clang 12.0 (or Apple XCode 13.0 Clang) or newer
+    - Visual Studio 2022 version 17.0 or newer (See Windows section below for details)
+- On Linux and macOS, the libcurl library and header is required. MacOS includes libcurl.
+    - Fedora/RHEL - `dnf install libcurl-devel`
+    - Ubuntu/Debian - `libcurl-dev` is provided by three packages. Install one of them:
+        - `libcurl4-openssl-dev`
+        - `libcurl4-nss-dev`
+        - `libcurl4-gnutls-dev`
+    - On Ubuntu, the lzma library is required. Install `liblzma-dev`
+    - On Amazon Linux, the xz-devel library is required. `yum install xz-devel`
+- Python 3.10.x and Pip modules:
+    - See the section "Python Prerequisites" below.
+- About 13 GB of free disk space for the core binaries (`mongod`,
+  `mongos`, and `mongo`) and about 600 GB for the install-all target.
 
 MongoDB supports the following architectures: arm64, ppc64le, s390x,
 and x86-64. More detailed platform instructions can be found below.
@@ -57,9 +57,9 @@ dedicated to building MongoDB is optional but recommended.
 Note: In order to compile C-based Python modules, you'll also need the
 Python and OpenSSL C headers. Run:
 
--   Fedora/RHEL - `dnf install python3-devel openssl-devel`
--   Ubuntu (20.04 and newer)/Debian (Bullseye and newer) - `apt install python-dev-is-python3 libssl-dev`
--   Ubuntu (18.04 and older)/Debian (Buster and older) - `apt install python3.7-dev libssl-dev`
+- Fedora/RHEL - `dnf install python3-devel openssl-devel`
+- Ubuntu (20.04 and newer)/Debian (Bullseye and newer) - `apt install python-dev-is-python3 libssl-dev`
+- Ubuntu (18.04 and older)/Debian (Buster and older) - `apt install python3.7-dev libssl-dev`
 
 Note: If you are seeing errors involving "Prompt dismissed.." you might need to run the following command before poetry install.
 
@@ -102,13 +102,13 @@ tests, etc):
 The following targets can be named on the scons command line to build and
 install a subset of components:
 
--   `install-mongod`
--   `install-mongos`
--   `install-core` (includes _only_ `mongod` and `mongos`)
--   `install-servers` (includes all server components)
--   `install-devcore` (includes `mongod`, `mongos`, and `jstestshell` (formerly `mongo` shell))
--   `install-all` (includes a complete end-user distribution and tests)
--   `install-all-meta` (absolutely everything that can be built and installed)
+- `install-mongod`
+- `install-mongos`
+- `install-core` (includes _only_ `mongod` and `mongos`)
+- `install-servers` (includes all server components)
+- `install-devcore` (includes `mongod`, `mongos`, and `jstestshell` (formerly `mongo` shell))
+- `install-all` (includes a complete end-user distribution and tests)
+- `install-all-meta` (absolutely everything that can be built and installed)
 
 **_NOTE_**: The `install-core` and `install-servers` targets are _not_
 guaranteed to be identical. The `install-core` target will only ever include a
@@ -121,14 +121,14 @@ for a functional end-user installation. If you are testing, you should use the
 The build system will produce an installation tree into
 `$DESTDIR/$PREFIX`. `DESTDIR` by default is `build/install` while
 `PREFIX` is by default empty. This means that with all of the listed
-targets all built binaries will be in `build/install/bin` by default.
+targets all built binaries will be in `bazel-bin/install/bin` by default.
 
 ## Windows
 
 Build requirements:
 
--   Visual Studio 2022 version 17.0 or newer
--   Python 3.10
+- Visual Studio 2022 version 17.0 or newer
+- Python 3.10
 
 Or download a prebuilt binary for Windows at www.mongodb.org.
 
@@ -146,9 +146,9 @@ Install Xcode 13.0 or newer.
 
 Install the following ports:
 
--   `devel/libexecinfo`
--   `lang/llvm70`
--   `lang/python`
+- `devel/libexecinfo`
+- `lang/llvm70`
+- `lang/python`
 
 Add `CC=clang12 CXX=clang++12` to the `scons` options, when building.
 
@@ -156,6 +156,6 @@ Add `CC=clang12 CXX=clang++12` to the `scons` options, when building.
 
 Install the following ports:
 
--   `devel/libexecinfo`
--   `lang/gcc`
--   `lang/python`
+- `devel/libexecinfo`
+- `lang/gcc`
+- `lang/python`

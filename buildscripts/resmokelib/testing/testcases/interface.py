@@ -7,11 +7,10 @@ import os
 import os.path
 import unittest
 import uuid
+from typing import Any, Callable, Dict
 
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.utils import registry
-
-from typing import Any, Dict, Callable
 
 _TEST_CASES: Dict[str, Callable] = {}  # type: ignore
 

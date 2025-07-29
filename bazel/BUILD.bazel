@@ -1,0 +1,18 @@
+package(default_visibility = ["//visibility:public"])
+
+# Expose script for external usage through bazel.
+exports_files([
+    "install_rules.py",
+    "run_under_working_dir.sh",
+])
+
+sh_binary(
+    name = "lint",
+    srcs = ["lint.sh"],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "bazelisk",
+    srcs = ["bazelisk.py"],
+)

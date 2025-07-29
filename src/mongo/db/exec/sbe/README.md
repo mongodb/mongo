@@ -48,37 +48,37 @@ that EExpressions aren't tied to expressions in the Mongo Query Language, rather
 be building blocks that can be combined to express arbitrary query language semantics. Below is an
 overview of the different EExpression types:
 
--   [EConstant](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L251-L279):
-    As the name suggests, this expression type stores a single, immutable SBE value. An `EConstant`
-    manages the value's lifetime (that is, it releases the value's memory on destruction if
-    necessary).
--   [EPrimUnary and
-    EPrimBinary](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L324-L414):
-    These expressions represent basic logical, arithmetic, and comparison operations that take one and
-    two arguments, respectively.
--   [EIf](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L440-L461):
-    Represents an 'if then else' expression.
--   [EFunction](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L416-L438):
-    Represents a named, built-in function supported natively by the engine. At the time of writing, there are over [150 such
-    functions](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.cpp#L564-L567).
-    Note that function parameters are evaluated first and then are passed as arguments to the
-    function.
--   [EFail](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L511-L534):
-    Represents an exception and produces a query fatal error if reached at query runtime. It supports numeric error codes and error strings.
--   [ENumericConvert](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L536-L566):
-    Represents the conversion of an arbitrary value to a target numeric type.
--   [EVariable](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L281-L319)
-    Provides the ability to reference a variable defined elsewhere.
--   [ELocalBind](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L463-L485)
-    Provides the ability to define multiple variables in a local scope. They are particularly useful
-    when we want to reference some intermediate value multiple times.
--   [ELocalLambda](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L487-L507)
-    Represents an anonymous function which takes a single input parameter. Many `EFunctions` accept
-    these as parameters. A good example of this is the [`traverseF`
-    function](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.cpp#L1329-L1357):
-    it accepts 2 parameters: an input and an `ELocalLambda`. If the input is an array, the
-    `ELocalLambda` is applied to each element in the array, otherwise, it is applied to the input on
-    its own.
+- [EConstant](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L251-L279):
+  As the name suggests, this expression type stores a single, immutable SBE value. An `EConstant`
+  manages the value's lifetime (that is, it releases the value's memory on destruction if
+  necessary).
+- [EPrimUnary and
+  EPrimBinary](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L324-L414):
+  These expressions represent basic logical, arithmetic, and comparison operations that take one and
+  two arguments, respectively.
+- [EIf](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L440-L461):
+  Represents an 'if then else' expression.
+- [EFunction](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L416-L438):
+  Represents a named, built-in function supported natively by the engine. At the time of writing, there are over [150 such
+  functions](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.cpp#L564-L567).
+  Note that function parameters are evaluated first and then are passed as arguments to the
+  function.
+- [EFail](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L511-L534):
+  Represents an exception and produces a query fatal error if reached at query runtime. It supports numeric error codes and error strings.
+- [ENumericConvert](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L536-L566):
+  Represents the conversion of an arbitrary value to a target numeric type.
+- [EVariable](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L281-L319)
+  Provides the ability to reference a variable defined elsewhere.
+- [ELocalBind](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L463-L485)
+  Provides the ability to define multiple variables in a local scope. They are particularly useful
+  when we want to reference some intermediate value multiple times.
+- [ELocalLambda](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L487-L507)
+  Represents an anonymous function which takes a single input parameter. Many `EFunctions` accept
+  these as parameters. A good example of this is the [`traverseF`
+  function](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.cpp#L1329-L1357):
+  it accepts 2 parameters: an input and an `ELocalLambda`. If the input is an array, the
+  `ELocalLambda` is applied to each element in the array, otherwise, it is applied to the input on
+  its own.
 
 EExpressions cannot be executed directly. Rather, [they are
 compiled](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L81-L84)
@@ -111,10 +111,10 @@ SlotId](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933b
 Put another way, slots conceptually represent values that we care about during query execution,
 including:
 
--   Records and RecordIds retrieved from a collection
--   The result of evaluating an expression
--   The individual components of a sort key (where each component is bound to its own slot)
--   The result of executing some computation expressed in the input query
+- Records and RecordIds retrieved from a collection
+- The result of evaluating an expression
+- The individual components of a sort key (where each component is bound to its own slot)
+- The result of executing some computation expressed in the input query
 
 SlotIds by themselves don't provide a means to access or set values, rather, [slots are associated
 with
@@ -122,14 +122,14 @@ SlotAccessors](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5
 which provide the API to read the values bound to slots as well as to write new values into slots.
 There are several types of SlotAccessors, but the most common are the following:
 
--   The
-    [`OwnedValueAccessor`](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/values/slot.h#L113-L212)
-    allows for ownership of values. That is, this accessor is responsible for constructing/destructing
-    values (in the case of deep values, this involves allocating/releasing memory). Note that an
-    `OwnedValueAccessor` _can_ own values, but is not required to do so.
--   The
-    [`ViewOfValueAccessor`](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/values/slot.h#L81-L111)
-    provides a way to read values that are owned elsewhere.
+- The
+  [`OwnedValueAccessor`](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/values/slot.h#L113-L212)
+  allows for ownership of values. That is, this accessor is responsible for constructing/destructing
+  values (in the case of deep values, this involves allocating/releasing memory). Note that an
+  `OwnedValueAccessor` _can_ own values, but is not required to do so.
+- The
+  [`ViewOfValueAccessor`](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/values/slot.h#L81-L111)
+  provides a way to read values that are owned elsewhere.
 
 While a value bound to a slot can only be managed by a single `OwnedValueAccessor`, any number of
 `ViewOfValueAccessors` can be initialized to read the value associated with that slot.
@@ -164,21 +164,21 @@ stages (as opposed to a push-based model where stages offer data to parent stage
 A single `PlanStage` may have any number of children and performs some action, implements some algorithm,
 or maintains some execution state, such as:
 
--   Computing values bound to slots
--   Managing the lifetime of values in slots
--   Executing compiled `ByteCode`
--   Buffering values into memory
+- Computing values bound to slots
+- Managing the lifetime of values in slots
+- Executing compiled `ByteCode`
+- Buffering values into memory
 
 SBE PlanStages also follow an iterator model and perform query execution through the following steps:
 
--   First, a caller prepares a PlanStage tree for execution by calling `prepare()`.
--   Once the tree is prepared, the caller then calls `open()` to initialize the tree with any state
-    needed for query execution. Note that this may include performing actual execution work, as is
-    done by stages such as `HashAggStage` and `SortStage`.
--   With the PlanStage tree initialized, query execution can now proceed through iterative calls to
-    `getNext()`. Note that the result set can be obtained in between calls to `getNext()` by reading
-    values from slots.
--   Finally, `close()` is called to indicate that query execution is complete and release resources.
+- First, a caller prepares a PlanStage tree for execution by calling `prepare()`.
+- Once the tree is prepared, the caller then calls `open()` to initialize the tree with any state
+  needed for query execution. Note that this may include performing actual execution work, as is
+  done by stages such as `HashAggStage` and `SortStage`.
+- With the PlanStage tree initialized, query execution can now proceed through iterative calls to
+  `getNext()`. Note that the result set can be obtained in between calls to `getNext()` by reading
+  values from slots.
+- Finally, `close()` is called to indicate that query execution is complete and release resources.
 
 The following subsections describe [the PlanStage API](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/stages.h#L557-L651) introduced above in greater detail:
 
@@ -186,11 +186,11 @@ The following subsections describe [the PlanStage API](https://github.com/mongod
 
 This method prepares a `PlanStage` (and, recursively, its children) for execution by:
 
--   Performing slot resolution, that is, obtaining `SlotAccessors` for all slots that this stage
-    references and verifying that all slot accesses are valid. Typically, this is done by asking
-    child stages for a `SlotAccessor*` via `getAccessor()`.
--   Compiling `EExpressions` into executable `ByteCode`. Note that `EExpressions` can reference slots
-    through the `ctx` parameter.
+- Performing slot resolution, that is, obtaining `SlotAccessors` for all slots that this stage
+  references and verifying that all slot accesses are valid. Typically, this is done by asking
+  child stages for a `SlotAccessor*` via `getAccessor()`.
+- Compiling `EExpressions` into executable `ByteCode`. Note that `EExpressions` can reference slots
+  through the `ctx` parameter.
 
 ### `virtual value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) = 0;`
 
@@ -215,13 +215,13 @@ These two methods mirror one another. While `open()` acquires necessary resource
 can be called (that is, before `PlanStage` execution can begin), `close()` releases any resources
 acquired during `open()`. Acquiring resources for query execution can include actions such as:
 
--   Opening storage engine cursors.
--   Allocating memory.
--   Populating a buffer with results by exhausting child stages. This is often done by blocking stages
-    which require processing their input to produce results. For example, the
-    [`SortStage`](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/sort.cpp#L340-L349)
-    needs to sort all of the values produced by its children (either in memory or on disk) before it
-    can produce results in sorted order.
+- Opening storage engine cursors.
+- Allocating memory.
+- Populating a buffer with results by exhausting child stages. This is often done by blocking stages
+  which require processing their input to produce results. For example, the
+  [`SortStage`](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/sort.cpp#L340-L349)
+  needs to sort all of the values produced by its children (either in memory or on disk) before it
+  can produce results in sorted order.
 
 It is only legal to call `close()` on PlanStages that have called `open()`, and to call `open()` on
 PlanStages that are closed. In some cases (such as in
@@ -472,26 +472,26 @@ Outline:
 
 Outline:
 
--   Compilation of EExpressions
-    -   Frames/Labels
--   ByteCode Execution
-    -   Dispatch of instructions
-    -   Parameter resolution
-    -   Management of values
+- Compilation of EExpressions
+    - Frames/Labels
+- ByteCode Execution
+    - Dispatch of instructions
+    - Parameter resolution
+    - Management of values
 
 ## Slot Resolution
 
 Outline:
 
--   Binding reflectors
--   Other SlotAccessor types (`SwitchAccessor`, `MaterializedRowAccessor`)
+- Binding reflectors
+- Other SlotAccessor types (`SwitchAccessor`, `MaterializedRowAccessor`)
 
 ## Yielding
 
 Outline:
 
--   What is yielding and why we yield
--   `doSaveState()/doRestoreState()`
--   Index Key Consistency/Corruption checks
+- What is yielding and why we yield
+- `doSaveState()/doRestoreState()`
+- Index Key Consistency/Corruption checks
 
 ## Block Processing

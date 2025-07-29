@@ -1,7 +1,7 @@
 """Functions to parse suite yaml files to get tags and comments around them."""
 
-import textwrap
 import re
+import textwrap
 
 
 def parse_tags_blocks(suite):
