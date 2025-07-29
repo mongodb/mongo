@@ -34,7 +34,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parameterization.h"
 #include "mongo/db/matcher/expression_simplifier.h"
-#include "mongo/db/matcher/schema/json_schema_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/schema/json_schema_parser.h"
 #include "mongo/db/query/tree_walker.h"
 
 #include <algorithm>

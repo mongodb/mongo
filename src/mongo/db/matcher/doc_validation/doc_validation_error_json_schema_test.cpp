@@ -35,7 +35,7 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/db/matcher/doc_validation_error_test.h"
+#include "mongo/db/matcher/doc_validation/doc_validation_error_test.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/unittest/unittest.h"
 

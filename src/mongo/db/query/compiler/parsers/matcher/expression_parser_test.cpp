@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

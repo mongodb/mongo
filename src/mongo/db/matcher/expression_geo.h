@@ -71,33 +71,32 @@ public:
 
     enum Predicate { WITHIN, INTERSECT, INVALID };
 
-    // parseFrom() must be called before getGeometry() to ensure initialization of geoContainer
-    Status parseFrom(const BSONObj& obj);
-
     std::string getField() const {
-        return field;
+        return _field;
     }
     Predicate getPred() const {
-        return predicate;
+        return _predicate;
     }
     const GeometryContainer& getGeometry() const {
-        return *geoContainer;
+        return *_geoContainer;
     }
     std::shared_ptr<GeometryContainer> getGeometryPtr() const {
-        return geoContainer;
+        return _geoContainer;
+    }
+
+    void setPredicate(Predicate predicate) {
+        _predicate = predicate;
+    }
+
+    void setGeometry(std::shared_ptr<GeometryContainer> geoContainer) {
+        _geoContainer = geoContainer;
     }
 
 private:
-    // Parse geospatial query
-    // e.g.
-    // { "$intersect" : { "$geometry" : { "type" : "Point", "coordinates": [ 40, 5 ] } } }
-    Status parseQuery(const BSONObj& obj);
-    BSONObj redactGeoExpression(const BSONObj& obj,
-                                boost::optional<StringData> literalArgsReplacement);
     // Name of the field in the query.
-    std::string field;
-    std::shared_ptr<GeometryContainer> geoContainer;
-    Predicate predicate;
+    std::string _field;
+    std::shared_ptr<GeometryContainer> _geoContainer;
+    Predicate _predicate;
 };
 
 class GeoMatchExpression : public LeafMatchExpression {
@@ -174,8 +173,6 @@ public:
     GeoNearExpression();
     GeoNearExpression(const std::string& f);
 
-    Status parseFrom(const BSONObj& obj);
-
     // The name of the field that contains the geometry.
     std::string field;
 
@@ -201,10 +198,6 @@ public:
         ss << " isNearSphere=" << isNearSphere;
         return ss.str();
     }
-
-private:
-    bool parseLegacyQuery(const BSONObj& obj);
-    Status parseNewQuery(const BSONObj& obj);
 };
 
 class GeoNearMatchExpression : public LeafMatchExpression {

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/doc_validation_error.h"
+#include "mongo/db/matcher/doc_validation/doc_validation_error.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
@@ -39,7 +39,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/geo/geometry_container.h"
-#include "mongo/db/matcher/doc_validation_util.h"
+#include "mongo/db/matcher/doc_validation/doc_validation_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -70,7 +70,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_str_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
-#include "mongo/db/matcher/schema/json_schema_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/schema/json_schema_parser.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"

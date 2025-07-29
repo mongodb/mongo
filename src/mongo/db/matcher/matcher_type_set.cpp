@@ -31,8 +31,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/db/query/bson_typemask.h"
+#include "mongo/db/query/compiler/parsers/matcher/schema/json_schema_parser.h"
 #include "mongo/util/str.h"
 
 #include <string>
@@ -43,14 +43,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace {
 
-/**
- * Adds the type represented by 'typeAlias' to 'typeSet', using 'aliasMap' as the mapping from
- * string to BSON type.
- *
- * Returns a non-OK status if 'typeAlias' does not represent a valid type.
- */
 Status addAliasToTypeSet(StringData typeAlias,
                          const findBSONTypeAliasFun& aliasMapFind,
                          MatcherTypeSet* typeSet) {
@@ -80,48 +73,6 @@ Status addAliasToTypeSet(StringData typeAlias,
     return Status::OK();
 }
 
-/**
- * Parses an element containing either a numerical type code or a string type alias and adds the
- * resulting type to 'typeSet'. The 'aliasMapFind' function is used to map strings to BSON types.
- *
- * Returns a non-OK status if 'elt' does not represent a valid type.
- */
-Status parseSingleType(BSONElement elt,
-                       const findBSONTypeAliasFun& aliasMapFind,
-                       MatcherTypeSet* typeSet) {
-    if (!elt.isNumber() && elt.type() != BSONType::string) {
-        return Status(ErrorCodes::TypeMismatch, "type must be represented as a number or a string");
-    }
-
-    if (elt.type() == BSONType::string) {
-        return addAliasToTypeSet(elt.valueStringData(), aliasMapFind, typeSet);
-    }
-
-    auto valueAsInt = elt.parseIntegerElementToInt();
-    if (!valueAsInt.isOK()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Invalid numerical type code: " << elt.number());
-    }
-
-    if (valueAsInt.getValue() == 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Invalid numerical type code: " << elt.number()
-                                    << ". Instead use {$exists:false}.");
-    }
-
-    if (!isValidBSONType(valueAsInt.getValue())) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Invalid numerical type code: " << elt.number());
-    }
-
-    typeSet->bsonTypes.insert(static_cast<BSONType>(valueAsInt.getValue()));
-    return Status::OK();
-}
-
-}  // namespace
-
-constexpr StringData MatcherTypeSet::kMatchesAllNumbersAlias;
-
 const StringMap<BSONType> MatcherTypeSet::kJsonSchemaTypeAliasMap = {
     {std::string(JSONSchemaParser::kSchemaTypeArray), BSONType::array},
     {std::string(JSONSchemaParser::kSchemaTypeBoolean), BSONType::boolean},
@@ -147,27 +98,6 @@ StatusWith<MatcherTypeSet> MatcherTypeSet::fromStringAliases(
             return status;
         }
     }
-    return typeSet;
-}
-
-StatusWith<MatcherTypeSet> MatcherTypeSet::parse(BSONElement elt) {
-    MatcherTypeSet typeSet;
-
-    if (elt.type() != BSONType::array) {
-        auto status = parseSingleType(elt, findBSONTypeAlias, &typeSet);
-        if (!status.isOK()) {
-            return status;
-        }
-        return typeSet;
-    }
-
-    for (auto&& typeArrayElt : elt.embeddedObject()) {
-        auto status = parseSingleType(typeArrayElt, findBSONTypeAlias, &typeSet);
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-
     return typeSet;
 }
 
@@ -197,13 +127,4 @@ uint32_t MatcherTypeSet::getBSONTypeMask() const {
     return mask;
 }
 
-BSONTypeSet BSONTypeSet::parseFromBSON(const BSONElement& element) {
-    // BSON type can be specified with a type alias, other values will be rejected.
-    auto typeSet = uassertStatusOK(JSONSchemaParser::parseTypeSet(element, findBSONTypeAlias));
-    return BSONTypeSet(typeSet);
-}
-
-void BSONTypeSet::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
-    builder->appendArray(fieldName, _typeSet.toBSONArray());
-}
 }  // namespace mongo

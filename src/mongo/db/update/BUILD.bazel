@@ -89,6 +89,7 @@ mongo_cc_library(
         "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/exec/mutable_bson",
+        "//src/mongo/db/query/compiler/parsers/matcher:matcher_parser",
     ],
 )
 

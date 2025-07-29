@@ -42,7 +42,6 @@
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -53,6 +52,8 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_geo_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/logv2/log.h"
 
 #include <algorithm>
@@ -209,7 +210,7 @@ DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
     // asNearQuery() is something like '{fieldName: {$near: ...}}'.
     // GeoNearExpression seems to want something like '{$near: ...}'.
     auto nearQuery = asNearQuery(keyFieldPath->fullPath()).firstElement().Obj().getOwned();
-    auto exprStatus = nearExpr.parseFrom(nearQuery);
+    auto exprStatus = parsers::matcher::parseGeoNearExpressionFromBSON(nearQuery, nearExpr);
     uassert(6330900,
             str::stream() << "Unable to parse geoNear query: " << exprStatus.reason(),
             exprStatus.isOK());

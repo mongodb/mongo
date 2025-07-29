@@ -32,7 +32,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/find_command.h"
 

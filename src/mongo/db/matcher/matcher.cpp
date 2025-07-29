@@ -30,7 +30,7 @@
 #include "mongo/db/matcher/matcher.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>

@@ -1960,7 +1960,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/matcher/OWNERS.yml
 /src/mongo/db/matcher/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/matcher/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
-/src/mongo/db/matcher/**/doc_validation* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_*geo* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_text* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_where* @10gen/query-integration-extensions @svc-auto-approve-bot
@@ -1975,10 +1974,13 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/matcher/**/path.h @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/matcher/**/path_test.cpp @10gen/query-execution @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/matcher/doc_validation/OWNERS.yml
+/src/mongo/db/matcher/doc_validation/**/* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/matcher/doc_validation/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/matcher/schema/OWNERS.yml
 /src/mongo/db/matcher/schema/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/matcher/schema/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
-/src/mongo/db/matcher/schema/**/encrypt_keyword* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/matcher/schema/**/encrypt_schema* @10gen/query-integration-extensions @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/memory_tracking/OWNERS.yml
@@ -2391,6 +2393,16 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/compiler/optimizer/index_bounds_builder/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/compiler/optimizer/index_bounds_builder/**/expression_geo* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/query/compiler/optimizer/index_bounds_builder/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/query/compiler/parsers/matcher/OWNERS.yml
+/src/mongo/db/query/compiler/parsers/matcher/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/compiler/parsers/matcher/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+/src/mongo/db/query/compiler/parsers/matcher/**/*geo* @10gen/query-integration-extensions @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/query/compiler/parsers/matcher/schema/OWNERS.yml
+/src/mongo/db/query/compiler/parsers/matcher/schema/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/compiler/parsers/matcher/schema/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+/src/mongo/db/query/compiler/parsers/matcher/schema/**/encrypt* @10gen/query-integration-extensions @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/compiler/physical_model/index_bounds/OWNERS.yml
 /src/mongo/db/query/compiler/physical_model/index_bounds/**/* @10gen/query-optimization @svc-auto-approve-bot

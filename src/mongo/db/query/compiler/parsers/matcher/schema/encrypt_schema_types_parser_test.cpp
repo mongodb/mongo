@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/schema/encrypt_schema_types.h"
+#include "mongo/db/query/compiler/parsers/matcher/schema/encrypt_schema_types_parser.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -38,6 +38,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
+#include "mongo/db/matcher/schema/encrypt_schema_types.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -52,29 +53,29 @@
 namespace mongo {
 namespace {
 
-TEST(EncryptSchemaTest, KeyIDTypePointerTest) {
+TEST(EncryptSchemaTypesParserTest, KeyIDTypePointerTest) {
     auto tempObj = BSON("pointer" << "/pointer/pointing");
     auto elem = tempObj["pointer"];
-    auto keyid = EncryptSchemaKeyId::parseFromBSON(elem);
+    auto keyid = parsers::matcher::schema::parseEncryptSchemaKeyId(elem);
     ASSERT(keyid.type() == EncryptSchemaKeyId::Type::kJSONPointer);
     ASSERT_FALSE(UUID::parse(keyid.jsonPointer().toString()).isOK());
 }
 
-TEST(EncryptSchemaTest, KeyIDTypeArrayTest) {
+TEST(EncryptSchemaTypesParserTest, KeyIDTypeArrayTest) {
     auto tempObj =
         BSON("array" << BSON_ARRAY(UUID::gen() << UUID::gen() << UUID::gen() << UUID::gen()));
     auto elem = tempObj["array"];
-    auto keyid = EncryptSchemaKeyId::parseFromBSON(elem);
+    auto keyid = parsers::matcher::schema::parseEncryptSchemaKeyId(elem);
     ASSERT(keyid.type() == EncryptSchemaKeyId::Type::kUUIDs);
 }
 
-TEST(EncryptSchemaTest, KeyIDTypeInvalidTest) {
+TEST(EncryptSchemaTypesParserTest, KeyIDTypeInvalidTest) {
     auto tempObj = BSON("invalid" << 5);
     auto elem = tempObj["invalid"];
-    ASSERT_THROWS(EncryptSchemaKeyId::parseFromBSON(elem), DBException);
+    ASSERT_THROWS(parsers::matcher::schema::parseEncryptSchemaKeyId(elem), DBException);
 }
 
-DEATH_TEST(EncryptSchemaTest, KeyIDPointerToBSON, "tassert") {
+DEATH_TEST(EncryptSchemaTypesParserTest, KeyIDPointerToBSON, "tassert") {
     BSONObjBuilder builder;
     EncryptSchemaKeyId pointerKeyID{"/pointer"};
 
@@ -85,7 +86,7 @@ DEATH_TEST(EncryptSchemaTest, KeyIDPointerToBSON, "tassert") {
     ASSERT(pointer);
     ASSERT_EQ(pointer.type(), BSONType::string);
 
-    EncryptSchemaKeyId parsedPointer = EncryptSchemaKeyId::parseFromBSON(pointer);
+    EncryptSchemaKeyId parsedPointer = parsers::matcher::schema::parseEncryptSchemaKeyId(pointer);
     ASSERT_EQ(parsedPointer.type(), EncryptSchemaKeyId::Type::kJSONPointer);
     ASSERT_EQ(parsedPointer.jsonPointer().toString(), "/pointer");
 
@@ -93,7 +94,7 @@ DEATH_TEST(EncryptSchemaTest, KeyIDPointerToBSON, "tassert") {
     parsedPointer.uuids();
 }
 
-DEATH_TEST(EncryptSchemaTest, KeyIDArrayToBSON, "tassert") {
+DEATH_TEST(EncryptSchemaTypesParserTest, KeyIDArrayToBSON, "tassert") {
     BSONObjBuilder builder;
     std::vector<UUID> uuidList{UUID::gen(), UUID::gen()};
     EncryptSchemaKeyId vectKeyId{uuidList};
@@ -106,7 +107,7 @@ DEATH_TEST(EncryptSchemaTest, KeyIDArrayToBSON, "tassert") {
     ASSERT_EQ(array.type(), BSONType::array);
     ASSERT_EQ(array.Array().size(), unsigned{2});
 
-    EncryptSchemaKeyId parsedArray = EncryptSchemaKeyId::parseFromBSON(array);
+    EncryptSchemaKeyId parsedArray = parsers::matcher::schema::parseEncryptSchemaKeyId(array);
     ASSERT_EQ(parsedArray.type(), EncryptSchemaKeyId::Type::kUUIDs);
     std::vector<UUID> parsedUUIDs = parsedArray.uuids();
     ASSERT_EQ(parsedUUIDs[0], uuidList[0]);
@@ -116,7 +117,7 @@ DEATH_TEST(EncryptSchemaTest, KeyIDArrayToBSON, "tassert") {
     parsedArray.jsonPointer();
 }
 
-TEST(EncryptSchemaTest, ParseFullEncryptObjectFromBSON) {
+TEST(EncryptSchemaTypesParserTest, ParseFullEncryptObjectFromBSON) {
     BSONObj encryptInfoBSON = BSON("bsonType" << "int"
                                               << "algorithm"
                                               << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
@@ -133,7 +134,7 @@ TEST(EncryptSchemaTest, ParseFullEncryptObjectFromBSON) {
     ASSERT_EQ(keyid.jsonPointer().toString(), "/pointer");
 }
 
-TEST(EncryptSchemaTest, WrongTypeFailsParse) {
+TEST(EncryptSchemaTypesParserTest, WrongTypeFailsParse) {
     BSONObj encryptInfoBSON = BSON("keyId" << 2);
     IDLParserContext ctxt("encrypt");
     ASSERT_THROWS_CODE(EncryptionInfo::parse(ctxt, encryptInfoBSON), DBException, 51085);

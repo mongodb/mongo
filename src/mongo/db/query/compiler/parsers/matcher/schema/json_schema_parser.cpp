@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/matcher/schema/json_schema_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/schema/json_schema_parser.h"
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/error_codes.h"
@@ -39,10 +39,9 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/unordered_fields_bsonelement_comparator.h"
-#include "mongo/db/matcher/doc_validation_util.h"
+#include "mongo/db/matcher/doc_validation/doc_validation_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
@@ -64,6 +63,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"

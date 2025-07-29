@@ -701,6 +701,7 @@ mongo_cc_library(
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:query_expressions",
+        "//src/mongo/db:query_matcher",
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_filterer",
         "//src/mongo/db:shard_role_api",

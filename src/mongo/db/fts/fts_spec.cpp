@@ -38,7 +38,7 @@
 #include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/fts_util.h"
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

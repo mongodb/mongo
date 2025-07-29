@@ -12,6 +12,9 @@ exports_files(
 idl_generator(
     name = "encrypt_schema_gen",
     src = "encrypt_schema.idl",
+    hdrs = [
+        "//src/mongo/db/query/compiler/parsers/matcher/schema:encrypt_schema_types_parser.h",
+    ],
     deps = [
         "//src/mongo/crypto:encryption_fields_gen",
         "//src/mongo/db:basic_types_gen",

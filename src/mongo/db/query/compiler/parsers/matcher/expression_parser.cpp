@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -43,7 +43,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/geo/geometry_container.h"
-#include "mongo/db/matcher/doc_validation_util.h"
+#include "mongo/db/matcher/doc_validation/doc_validation_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -72,8 +72,10 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
-#include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_geo_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/matcher_type_set_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/schema/json_schema_parser.h"
 #include "mongo/db/query/dbref.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/stats/counters.h"
@@ -787,7 +789,7 @@ template <class T>
 StatusWithMatchExpression parseType(boost::optional<StringData> name,
                                     BSONElement elt,
                                     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto typeSet = MatcherTypeSet::parse(elt);
+    auto typeSet = parsers::matcher::parseMatcherTypeSet(elt);
     if (!typeSet.isOK()) {
         return typeSet.getStatus();
     }
@@ -1327,7 +1329,7 @@ StatusWithMatchExpression parseGeo(boost::optional<StringData> name,
                                    MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
     if (PathAcceptingKeyword::WITHIN == type || PathAcceptingKeyword::GEO_INTERSECTS == type) {
         auto gq = std::make_unique<GeoExpression>(name ? std::string{*name} : "");
-        auto parseStatus = gq->parseFrom(section);
+        auto parseStatus = parsers::matcher::parseGeoExpressionFromBSON(section, *gq);
         if (!parseStatus.isOK()) {
             return parseStatus;
         }
@@ -1349,7 +1351,7 @@ StatusWithMatchExpression parseGeo(boost::optional<StringData> name,
         }
 
         auto nq = std::make_unique<GeoNearExpression>(name ? std::string{*name} : "");
-        auto status = nq->parseFrom(section);
+        auto status = parsers::matcher::parseGeoNearExpressionFromBSON(section, *nq);
         if (!status.isOK()) {
             return status;
         }

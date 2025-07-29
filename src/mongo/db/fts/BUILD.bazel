@@ -105,6 +105,8 @@ mongo_cc_library(
         "//src/mongo/db:common",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/fts/unicode",
+        "//src/mongo/db/query/bson:multikey_dotted_path_support",
+        "//src/mongo/db/query/compiler/parsers/matcher:matcher_parser",
         "//src/mongo/util:md5",
     ],
 )

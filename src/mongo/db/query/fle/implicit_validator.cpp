@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/matcher/doc_validation_util.h"
+#include "mongo/db/matcher/doc_validation/doc_validation_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"

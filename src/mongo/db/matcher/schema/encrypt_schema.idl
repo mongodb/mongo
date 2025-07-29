@@ -29,9 +29,8 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/db/matcher/matcher_type_set.h"
         - "mongo/db/matcher/schema/encrypt_schema_types.h"
-
+        - "mongo/db/query/compiler/parsers/matcher/schema/encrypt_schema_types_parser.h"
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/crypto/encryption_fields.idl"
@@ -42,7 +41,7 @@ types:
         description: "A string pointing to the key id or an array UUIDs identifying a set of keys."
         cpp_type: "mongo::EncryptSchemaKeyId"
         serializer: mongo::EncryptSchemaKeyId::serializeToBSON
-        deserializer: mongo::EncryptSchemaKeyId::parseFromBSON
+        deserializer: mongo::parsers::matcher::schema::parseEncryptSchemaKeyId
         # EncryptSchemaKeyId has only non view members.
         is_view: false
 
@@ -51,7 +50,7 @@ types:
         description: "A string or array of strings representing BSONType names."
         cpp_type: "mongo::BSONTypeSet"
         serializer: mongo::BSONTypeSet::serializeToBSON
-        deserializer: mongo::BSONTypeSet::parseFromBSON
+        deserializer: mongo::parsers::matcher::schema::parseBSONTypeSet
         # BSONTypeSet initialized with non view objects.
         is_view: false
 

@@ -32,7 +32,6 @@
 #include "mongo/base/data_range.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/symmetric_crypto.h"
-#include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

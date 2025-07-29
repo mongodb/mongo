@@ -31,11 +31,11 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_expr.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/unittest/assert.h"
 
 namespace mongo::evaluate_expr_matcher_test {

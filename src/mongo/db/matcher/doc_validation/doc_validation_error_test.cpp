@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/doc_validation_error.h"
+#include "mongo/db/matcher/doc_validation/doc_validation_error_test.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
@@ -38,12 +38,12 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/matcher/doc_validation_error_test.h"
-#include "mongo/db/matcher/doc_validation_util.h"
+#include "mongo/db/matcher/doc_validation/doc_validation_error.h"
+#include "mongo/db/matcher/doc_validation/doc_validation_util.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"

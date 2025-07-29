@@ -448,6 +448,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:query_expressions",
+        "//src/mongo/db/query/compiler/parsers/matcher:matcher_parser",
         "//src/third_party/s2",
     ],
 )

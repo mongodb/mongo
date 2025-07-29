@@ -30,8 +30,8 @@
 #include "query_rewriter.h"
 
 #include "mongo/db/matcher/expression_expr.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_walker.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/fle/range_validator.h"
 #include "mongo/db/query/fle/text_search_predicate.h"
 #include "mongo/db/server_feature_flags_gen.h"

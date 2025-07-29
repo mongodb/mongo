@@ -29,7 +29,6 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
@@ -45,6 +44,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/unittest/assert.h"
 
 namespace mongo::evaluate_internal_schema_matcher_test {

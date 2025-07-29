@@ -2432,8 +2432,6 @@ mongo_cc_library(
         "//src/mongo/db/exec/matcher:matcher_single_element_match.cpp",
         "//src/mongo/db/exec/matcher:matcher_text.cpp",
         "//src/mongo/db/exec/matcher:matcher_where.cpp",
-        "//src/mongo/db/matcher:doc_validation_error.cpp",
-        "//src/mongo/db/matcher:doc_validation_util.cpp",
         "//src/mongo/db/matcher:expression.cpp",
         "//src/mongo/db/matcher:expression_algo.cpp",
         "//src/mongo/db/matcher:expression_array.cpp",
@@ -2445,7 +2443,6 @@ mongo_cc_library(
         "//src/mongo/db/matcher:expression_internal_bucket_geo_within.cpp",
         "//src/mongo/db/matcher:expression_leaf.cpp",
         "//src/mongo/db/matcher:expression_parameterization.cpp",
-        "//src/mongo/db/matcher:expression_parser.cpp",
         "//src/mongo/db/matcher:expression_restorer.cpp",
         "//src/mongo/db/matcher:expression_simplifier.cpp",
         "//src/mongo/db/matcher:expression_text_base.cpp",
@@ -2460,10 +2457,8 @@ mongo_cc_library(
         "//src/mongo/db/matcher:match_expression_dependencies.cpp",
         "//src/mongo/db/matcher:match_expression_util.cpp",
         "//src/mongo/db/matcher:matchable.cpp",
-        "//src/mongo/db/matcher:matcher.cpp",
         "//src/mongo/db/matcher:matcher_type_set.cpp",
         "//src/mongo/db/matcher:rewrite_expr.cpp",
-        "//src/mongo/db/matcher/schema:encrypt_schema_gen",
         "//src/mongo/db/matcher/schema:encrypt_schema_types.cpp",
         "//src/mongo/db/matcher/schema:expression_internal_schema_all_elem_match_from_index.cpp",
         "//src/mongo/db/matcher/schema:expression_internal_schema_allowed_properties.cpp",
@@ -2478,7 +2473,6 @@ mongo_cc_library(
         "//src/mongo/db/matcher/schema:expression_internal_schema_unique_items.cpp",
         "//src/mongo/db/matcher/schema:expression_internal_schema_xor.cpp",
         "//src/mongo/db/matcher/schema:json_pointer.cpp",
-        "//src/mongo/db/matcher/schema:json_schema_parser.cpp",
         "//src/mongo/db/pipeline:expression.cpp",
         "//src/mongo/db/pipeline:expression_context.cpp",
         "//src/mongo/db/pipeline:expression_dependencies.cpp",
@@ -2496,7 +2490,6 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:name_expression.cpp",
         "//src/mongo/db/pipeline:variables.cpp",
         "//src/mongo/db/query:query_utils.cpp",
-        "//src/mongo/db/query/fle:implicit_validator.cpp",
         "//src/mongo/db/query/query_shape:let_shape_component.cpp",
     ],
     hdrs = [
@@ -2508,8 +2501,6 @@ mongo_cc_library(
         "//src/mongo/db/exec/matcher:matcher.h",
         "//src/mongo/db/exec/matcher:matcher_geo.h",
         "//src/mongo/db/exec/sbe:match_path.h",
-        "//src/mongo/db/matcher:doc_validation_error.h",
-        "//src/mongo/db/matcher:doc_validation_util.h",
         "//src/mongo/db/matcher:expression.h",
         "//src/mongo/db/matcher:expression_algo.h",
         "//src/mongo/db/matcher:expression_always_boolean.h",
@@ -2525,7 +2516,6 @@ mongo_cc_library(
         "//src/mongo/db/matcher:expression_internal_expr_comparison.h",
         "//src/mongo/db/matcher:expression_leaf.h",
         "//src/mongo/db/matcher:expression_parameterization.h",
-        "//src/mongo/db/matcher:expression_parser.h",
         "//src/mongo/db/matcher:expression_restorer.h",
         "//src/mongo/db/matcher:expression_simplifier.h",
         "//src/mongo/db/matcher:expression_text.h",
@@ -2543,7 +2533,6 @@ mongo_cc_library(
         "//src/mongo/db/matcher:match_expression_util.h",
         "//src/mongo/db/matcher:match_expression_walker.h",
         "//src/mongo/db/matcher:matchable.h",
-        "//src/mongo/db/matcher:matcher.h",
         "//src/mongo/db/matcher:matcher_type_set.h",
         "//src/mongo/db/matcher:rewrite_expr.h",
         "//src/mongo/db/matcher/schema:encrypt_schema_types.h",
@@ -2567,7 +2556,6 @@ mongo_cc_library(
         "//src/mongo/db/matcher/schema:expression_internal_schema_unique_items.h",
         "//src/mongo/db/matcher/schema:expression_internal_schema_xor.h",
         "//src/mongo/db/matcher/schema:json_pointer.h",
-        "//src/mongo/db/matcher/schema:json_schema_parser.h",
         "//src/mongo/db/pipeline:expression.h",
         "//src/mongo/db/pipeline:expression_context.h",
         "//src/mongo/db/pipeline:expression_context_diagnostic_printer.h",
@@ -2589,7 +2577,8 @@ mongo_cc_library(
         "//src/mongo/db/query:expression_walker.h",
         "//src/mongo/db/query:indexability.h",
         "//src/mongo/db/query:query_utils.h",
-        "//src/mongo/db/query/fle:implicit_validator.h",
+        "//src/mongo/db/query/compiler/parsers/matcher:expression_parser.h",
+        "//src/mongo/db/query/compiler/parsers/matcher/schema:json_schema_parser.h",
         "//src/mongo/db/query/query_shape:let_shape_component.h",
     ],
     deps = [
@@ -2633,6 +2622,20 @@ mongo_cc_library(
         "//src/mongo/util:pcre_util",
         "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:summation",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "query_matcher",
+    srcs = [
+        "//src/mongo/db/matcher:matcher.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/matcher:matcher.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/query/compiler/parsers/matcher:matcher_parser",
     ],
 )
 
@@ -2858,6 +2861,20 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "fle_implicit_validator",
+    srcs = [
+        "//src/mongo/db/query/fle:implicit_validator.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/query/fle:implicit_validator.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/matcher/doc_validation",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "fle_test",
     srcs = [
@@ -2879,6 +2896,7 @@ mongo_cc_unit_test(
     }),
     deps = [
         ":fle_crud",
+        ":fle_implicit_validator",
         ":fle_mocks",
         ":query_expressions",
         ":service_context_d_test_fixture",

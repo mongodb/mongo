@@ -101,8 +101,8 @@ mongo_cc_unit_test(
         ":query_shape",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/matcher:parsed_match_expression_for_test",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/compiler/parsers/matcher:parsed_match_expression_for_test",
     ],
 )
 

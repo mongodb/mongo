@@ -40,7 +40,6 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -53,6 +52,8 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_geo_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/golden_test_base.h"
@@ -138,7 +139,7 @@ TEST(DebugStringTest, ExpressionGeo) {
     BSONObj query = fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
 
     std::unique_ptr<GeoExpression> gq(new GeoExpression);
-    ASSERT_OK(gq->parseFrom(query["loc"].Obj()));
+    ASSERT_OK(parsers::matcher::parseGeoExpressionFromBSON(query["loc"].Obj(), *gq));
 
     GeoMatchExpression ge("a"_sd, gq.release(), query);
     verifyDebugString(gctx, &ge, "GeoMatchExpression");
@@ -149,7 +150,7 @@ TEST(DebugStringTest, ExpressionGeo) {
         "$geometry:{type:\"Point\", coordinates:[0,0]}}}}");
 
     std::unique_ptr<GeoNearExpression> nq(new GeoNearExpression);
-    ASSERT_OK(nq->parseFrom(query["loc"].Obj()));
+    ASSERT_OK(parsers::matcher::parseGeoNearExpressionFromBSON(query["loc"].Obj(), *nq));
 
     GeoNearMatchExpression gne("a"_sd, nq.release(), query);
     verifyDebugString(gctx, &gne, "GeoNearMatchExpression");

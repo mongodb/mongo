@@ -1,0 +1,41 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "json_schema_parser",
+    srcs = [
+        "encrypt_schema_types_parser.cpp",
+        "json_schema_parser.cpp",
+        "//src/mongo/db/matcher/schema:encrypt_schema_gen",
+    ],
+    hdrs = [
+        "encrypt_schema_types_parser.h",
+        "json_schema_parser.h",
+        "//src/mongo/db/matcher/schema:encrypt_schema_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/matcher/doc_validation",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "json_schema_parser_test",
+    srcs = [
+        "array_keywords_test.cpp",
+        "assert_serializes_to.h",
+        "encrypt_keyword_test.cpp",
+        "encrypt_schema_types_parser_test.cpp",
+        "logical_keywords_test.cpp",
+        "object_keywords_test.cpp",
+        "scalar_keywords_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":json_schema_parser",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)

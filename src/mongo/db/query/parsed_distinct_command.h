@@ -31,12 +31,12 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/distinct_command_gen.h"
 
 #include <memory>

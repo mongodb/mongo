@@ -31,8 +31,9 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_geo_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -262,7 +263,7 @@ TEST(ExpressionGeoTest, Geo1) {
     BSONObj query = fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
 
     std::unique_ptr<GeoExpression> gq(new GeoExpression);
-    ASSERT_OK(gq->parseFrom(query["loc"].Obj()));
+    ASSERT_OK(parsers::matcher::parseGeoExpressionFromBSON(query["loc"].Obj(), *gq));
 
     GeoMatchExpression ge("a"_sd, gq.release(), query);
 

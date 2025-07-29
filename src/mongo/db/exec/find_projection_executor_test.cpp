@@ -35,7 +35,6 @@
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -47,6 +46,7 @@
 #include "mongo/db/pipeline/expression_find_internal.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 

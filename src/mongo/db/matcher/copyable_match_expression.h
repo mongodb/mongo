@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 
 namespace mongo {
 

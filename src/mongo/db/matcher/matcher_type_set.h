@@ -68,15 +68,6 @@ struct MatcherTypeSet {
     static boost::optional<BSONType> findJsonSchemaTypeAlias(StringData key);
 
     /**
-     * Given a mapping from string alias to BSON type, creates a MatcherTypeSet from a
-     * BSONElement. This BSON alias may either represent a single type (via numerical type code or
-     * string alias), or may be an array of types.
-     *
-     * Returns an error if the element cannot be parsed to a set of types.
-     */
-    static StatusWith<MatcherTypeSet> parse(BSONElement);
-
-    /**
      * Given a set of string type alias and a mapping from string alias to BSON type, returns the
      * corresponding MatcherTypeSet.
      *
@@ -140,38 +131,12 @@ struct MatcherTypeSet {
 };
 
 /**
- * An IDL-compatible wrapper class for MatcherTypeSet for BSON type aliases.
- * It represents a set of types or of type aliases in the match language.
+ * Adds the type represented by 'typeAlias' to 'typeSet', using 'aliasMap' as the mapping from
+ * string to BSON type.
+ *
+ * Returns a non-OK status if 'typeAlias' does not represent a valid type.
  */
-class BSONTypeSet {
-public:
-    static BSONTypeSet parseFromBSON(const BSONElement& element);
-
-    BSONTypeSet(MatcherTypeSet typeSet) : _typeSet(std::move(typeSet)) {}
-
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
-
-    const MatcherTypeSet& typeSet() const {
-        return _typeSet;
-    }
-
-    bool operator==(const BSONTypeSet& other) const {
-        return _typeSet == other._typeSet;
-    }
-
-    /**
-     * IDL requires overload of all comparison operators, however for this class the only viable
-     * comparison is equality. These should be removed once SERVER-39677 is implemented.
-     */
-    bool operator>(const BSONTypeSet& other) const {
-        MONGO_UNREACHABLE;
-    }
-
-    bool operator<(const BSONTypeSet& other) const {
-        MONGO_UNREACHABLE;
-    }
-
-private:
-    MatcherTypeSet _typeSet;
-};
+Status addAliasToTypeSet(StringData typeAlias,
+                         const findBSONTypeAliasFun& aliasMapFind,
+                         MatcherTypeSet* typeSet);
 }  // namespace mongo

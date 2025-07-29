@@ -36,7 +36,6 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
@@ -45,6 +44,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"

@@ -38,10 +38,10 @@
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/optional/optional.hpp>
