@@ -91,18 +91,15 @@ GenericArguments makeGenericArgs(const WriteConcernIdl& wc) {
 
 constexpr auto kCommandName = "doSomeWrite"_sd;
 
-TEST_F(WriteConcernTest, ExtractFailsOnNullBytes) {
-    WriteConcernIdl wc;
+TEST_F(WriteConcernTest, ParseFailsOnNullBytes) {
     std::string s = "wcWithNullBytes ";
     s[s.length() - 1] = '\0';
-    wc.setWriteConcernW(WriteConcernW(s));
-    auto expectedErrMsg = "illegal embedded NUL byte in write concern " + s;
-    expectedErrMsg.pop_back();
+    auto testDoc = BSON("w" << s);
     ASSERT_THROWS_CODE_AND_WHAT(
-        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/),
+        WriteConcernIdl::parse(IDLParserContext("writeConcernTest"), testDoc),
         DBException,
-        103742,
-        expectedErrMsg);
+        ErrorCodes::FailedToParse,
+        "w has illegal embedded NUL byte, w: wcWithNullBytes");
 }
 
 TEST_F(WriteConcernTest, ExtractOverridesWMajorityJFalse) {

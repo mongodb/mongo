@@ -54,7 +54,11 @@ WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
 
         return WriteConcernW{wNum};
     } else if (wEl.type() == BSONType::string) {
-        return WriteConcernW{wEl.str()};
+        auto wStr = wEl.str();
+        uassert(ErrorCodes::FailedToParse,
+                fmt::format("w has illegal embedded NUL byte, w: {}", wStr),
+                wStr.find('\0') == std::string::npos);
+        return WriteConcernW{std::move(wStr)};
     } else if (wEl.type() == BSONType::object) {
         auto wTags = wEl.Obj();
         uassert(ErrorCodes::FailedToParse, "tagged write concern requires tags", !wTags.isEmpty());
