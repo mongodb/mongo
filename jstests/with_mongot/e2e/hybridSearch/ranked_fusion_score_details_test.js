@@ -66,7 +66,6 @@ let testQuery = [
     },
     {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
 ];
-
 let results = coll.aggregate(testQuery).toArray();
 
 function fieldPresent(field, containingObj) {
@@ -100,16 +99,20 @@ for (const foundDoc of results) {
     assertFieldPresent("inputPipelineName", searchDetails);
     assert.eq(searchDetails["inputPipelineName"], "search");
     assertFieldPresent("rank", searchDetails);
-    assertFieldPresent("weight", searchDetails);
-    assert.eq(searchDetails["weight"], 2);
     // If there isn't a value, we didn't get this back from search at all.
     if (searchDetails.hasOwnProperty("value")) {
+        assertFieldPresent("weight", searchDetails);
+        assert.eq(searchDetails["weight"], 2);
         assertFieldPresent("value", searchDetails);  // Output of rank calculation.
         assertFieldPresent("details",
                            searchDetails);  // Not checking description contents, just that its
                                             // present and not our placeholder value.
         assert.neq(searchDetails["details"], []);
         // Note we won't check the shape of the search scoreDetails beyond here.
+    } else {
+        assert.eq(searchDetails["rank"], "NA");
+        assert.eq(searchDetails.hasOwnProperty("weight"), false);
+        assert.eq(searchDetails.hasOwnProperty("details"), false);
     }
 
     const vectorDetails = subDetails[1];
@@ -233,14 +236,18 @@ for (const foundDoc of results) {
     assertFieldPresent("inputPipelineName", searchDetails);
     assert.eq(searchDetails["inputPipelineName"], "search");
     assertFieldPresent("rank", searchDetails);
-    assertFieldPresent("weight", searchDetails);
-    assert.eq(searchDetails["weight"], 1);
     // If there isn't a value, we didn't get this back from search at all.
     if (searchDetails.hasOwnProperty("value")) {
+        assertFieldPresent("weight", searchDetails);
+        assert.eq(searchDetails["weight"], 1);
         assertFieldPresent("value", searchDetails);  // Output of rank calculation.
         assertFieldPresent("details", searchDetails);
         assert.eq(searchDetails["details"], []);
         // Note we won't check the shape of the search scoreDetails beyond here.
+    } else {
+        assert.eq(searchDetails["rank"], "NA");
+        assert.eq(searchDetails.hasOwnProperty("weight"), false);
+        assert.eq(searchDetails.hasOwnProperty("details"), false);
     }
 
     const vectorDetails = subDetails[1];
