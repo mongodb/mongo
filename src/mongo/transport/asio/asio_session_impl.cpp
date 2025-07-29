@@ -250,7 +250,7 @@ void CommonAsioSession::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {
     }
     _isLoadBalancerPeer = helloHasLoadBalancedOption;
 
-    auto sessionManager = getSessionManager();
+    auto sessionManager = _tl->getSharedSessionManager();
     if (auto asioSessionManager = checked_pointer_cast<AsioSessionManager>(sessionManager)) {
         if (helloHasLoadBalancedOption) {
             asioSessionManager->incrementLBConnections();

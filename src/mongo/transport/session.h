@@ -64,6 +64,11 @@ class Session;
 class SessionManager;
 class TransportLayer;
 
+struct SessionManagerOpCounters {
+    Atomic<std::size_t> total{0};
+    Atomic<std::size_t> completed{0};
+};
+
 /**
  * This type contains data needed to associate Messages with connections
  * (on the transport side) and Messages with Client objects (on the database side).
@@ -255,14 +260,10 @@ public:
 protected:
     Session();
 
-    std::shared_ptr<SessionManager> getSessionManager() const {
-        return _sessionManager.lock();
-    }
-
 private:
     const Id _id;
     bool _inOperation{false};
-    std::weak_ptr<SessionManager> _sessionManager;
+    std::shared_ptr<SessionManagerOpCounters> _opCounters;
 };
 
 }  // namespace transport

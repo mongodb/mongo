@@ -29,8 +29,7 @@
 
 #include "mongo/transport/session.h"
 
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
 
@@ -45,44 +44,34 @@ AtomicWord<unsigned long long> sessionIdCounter(0);
 
 Session::Session() : _id(sessionIdCounter.addAndFetch(1)) {}
 Session::~Session() {
-    if (_inOperation) {
-        // Session died while OperationContext was still active.
-        // Mark operation completed in SessionManager to resolve counts.
-        if (auto sm = _sessionManager.lock()) {
-            sm->_completedOperations.fetchAndAddRelaxed(1);
-        }
+    if (_opCounters && _inOperation) {
+        _opCounters->completed.fetchAndAddRelaxed(1);
     }
 }
 
 void Session::setInOperation(bool state) {
-    // On first call, resolve the SessionManager associated with
-    // this session and store a weak reference to it on the base Session.
-    // This is necessary because if we need access to it in the destructor,
-    // we won't be able to refer to the vtable's getTransportLayer().
-    // As a bonus, subsequent invocations of setInOpertion() also end up with the
-    // stashed copy of SessionManager rather than having to walk the pointer tree.
-    auto sm = [this] {
-        if (auto smgr = _sessionManager.lock())
-            return smgr;
-
-        auto* tl = getTransportLayer();
+    if (MONGO_unlikely(!_opCounters)) {
+        // We should only take this path once for each connection in production, so we are opting
+        // for readability over performance here.
+        auto tl = getTransportLayer();
         if (MONGO_unlikely(!tl))
-            return std::shared_ptr<SessionManager>();
-        auto smgr = tl->getSharedSessionManager();
-        _sessionManager = smgr;
-        return smgr;
-    }();
-    if (MONGO_unlikely(!sm))
-        return;
+            return;
+
+        auto sm = tl->getSessionManager();
+        if (MONGO_unlikely(!sm))
+            return;
+
+        _opCounters = sm->getOpCounters();
+    }
 
     auto oldState = std::exchange(_inOperation, state);
     if (state) {
         uassert(ErrorCodes::InvalidOptions,
                 "Operation started on session already in an active operation",
                 !oldState);
-        sm->_totalOperations.fetchAndAddRelaxed(1);
+        _opCounters->total.fetchAndAddRelaxed(1);
     } else if (oldState) {
-        sm->_completedOperations.fetchAndAddRelaxed(1);
+        _opCounters->completed.fetchAndAddRelaxed(1);
     }
 }
 

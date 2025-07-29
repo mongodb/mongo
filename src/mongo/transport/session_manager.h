@@ -109,7 +109,7 @@ public:
      * Total number of operations created on sessions belonging to this SessionManager.
      */
     std::size_t getTotalOperations() const {
-        return _totalOperations.load();
+        return _opCounters->total.load();
     }
 
     /**
@@ -117,14 +117,18 @@ public:
      * which have begun but not yet completed.
      */
     std::size_t getActiveOperations() const {
-        return _totalOperations.load() - _completedOperations.load();
+        return getTotalOperations() - getCompletedOperations();
     }
 
     /**
      * Total number of completed operations on sessions belonging to this SessionManager.
      */
     std::size_t getCompletedOperations() const {
-        return _completedOperations.load();
+        return _opCounters->completed.load();
+    }
+
+    const auto& getOpCounters() const {
+        return _opCounters;
     }
 
     HelloMetrics helloMetrics;
@@ -132,9 +136,8 @@ public:
 
 protected:
     friend class Session;
-    AtomicWord<std::size_t> _totalOperations{0};
-    AtomicWord<std::size_t> _completedOperations{0};
-
+    std::shared_ptr<SessionManagerOpCounters> _opCounters =
+        std::make_shared<SessionManagerOpCounters>();
     SessionEstablishmentRateLimiter _sessionEstablishmentRateLimiter;
 };
 
