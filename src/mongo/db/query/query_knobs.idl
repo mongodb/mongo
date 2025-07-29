@@ -1704,6 +1704,8 @@ server_parameters:
         cpp_vartype: InternalVectorSearchStoredSource
         redact: false
         omit_in_ftdc: false
+        condition:
+            min_fcv: 8.2
 
     internalQuerySettingsBackfillDelaySeconds:
         description: >-
