@@ -239,8 +239,6 @@ typedef struct MongoExtensionHostPortal {
  * At extension loading time, the MongoDB server will check compatibility of the extension's API
  * version with the server's API version then invoke the initializer.
  *
- * TODO SERVER-106242 Flesh out initialization function.
- *
  * NOTE: If any new fields need to be added to this struct in the future, they must be added
  * at the end to maintain backward compatibility. Any older extensions will zero out the additional
  * field automatically.

@@ -28,11 +28,43 @@
  */
 
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 
+namespace sdk = mongo::extension::sdk;
+
+class TestFooLogicalStage : public mongo::extension::sdk::LogicalAggregationStage {};
+
+class TestFooStageDescriptor : public mongo::extension::sdk::AggregationStageDescriptor {
+public:
+    static inline const std::string kStageName = "$testFoo";
+
+    TestFooStageDescriptor()
+        : mongo::extension::sdk::AggregationStageDescriptor(
+              kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+
+    std::unique_ptr<mongo::extension::sdk::LogicalAggregationStage> parse(
+        mongo::BSONObj stageBson) const override {
+        uassert(10624200,
+                "Failed to parse " + kStageName + ", expected object",
+                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
+
+        return std::make_unique<TestFooLogicalStage>();
+    }
+};
+
+
 MongoExtensionStatus* initialize_extension(MongoExtensionHostPortal* portal) {
-    // TODO SERVER-106242 Test initialization logic.
-    return mongo::extension::sdk::enterCXX([&]() {});
+    return sdk::enterCXX([&]() {
+        static sdk::ExtensionAggregationStageDescriptor testFooDescriptor{
+            std::make_unique<TestFooStageDescriptor>()};
+        return sdk::enterC([&]() {
+            return portal->registerStageDescriptor(
+                reinterpret_cast<const ::MongoExtensionAggregationStageDescriptor*>(
+                    &testFooDescriptor));
+        });
+    });
 }
 
 static const MongoExtension my_extension = {

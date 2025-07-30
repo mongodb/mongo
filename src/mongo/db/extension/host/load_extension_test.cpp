@@ -29,6 +29,10 @@
 
 #include "mongo/db/extension/host/load_extension.h"
 
+#include "mongo/db/extension/host/document_source_extension.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -90,9 +94,49 @@ TEST(LoadExtensionsTest, LoadExtensionErrorCases) {
                        10615506);
 }
 
+// Tests successful extension loading and verifies stage registration works in pipelines.
+// The libfoo_extension.so adds a "$testFoo" stage for testing.
 TEST(LoadExtensionTest, LoadExtensionSucceeds) {
-    // TODO SERVER-106242: Expand the testing to make sure the initialization function works.
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(getExtensionPath("libfoo_extension.so")));
+
+    // Verify the initialization function registered a stage.
+    BSONObj stageSpec = BSON("$testFoo" << BSONObj());
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+    auto sourceList = DocumentSource::parse(expCtx, stageSpec);
+    ASSERT_EQUALS(sourceList.size(), 1U);
+
+    auto extensionStage = dynamic_cast<DocumentSourceExtension*>(sourceList.front().get());
+    ASSERT_TRUE(extensionStage != nullptr);
+    ASSERT_EQUALS(std::string(extensionStage->getSourceName()), std::string("$testFoo"));
+
+    // Verify the stage can be used in a pipeline with other existing stages.
+    std::vector<BSONObj> pipeline = {BSON("$testFoo" << BSONObj()), BSON("$limit" << 1)};
+
+    auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    ASSERT_TRUE(parsedPipeline != nullptr);
+    ASSERT_EQUALS(parsedPipeline->getSources().size(), 2U);
+
+    auto firstStage =
+        dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+    ASSERT_TRUE(firstStage != nullptr);
+    ASSERT_EQUALS(std::string(firstStage->getSourceName()), std::string("$testFoo"));
+}
+
+// Tests that extension initialization properly populates the parser map before and after loading.
+TEST(LoadExtensionTest, InitializationFunctionPopulatesParserMap) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    BSONObj stageSpec = BSON("$testFoo" << BSONObj());
+
+    // Since the extension might already be loaded by previous tests, just verify it works.
+    ASSERT_DOES_NOT_THROW({
+        auto sourceList = DocumentSource::parse(expCtx, stageSpec);
+        ASSERT_EQUALS(sourceList.size(), 1U);
+
+        auto extensionStage = dynamic_cast<DocumentSourceExtension*>(sourceList.front().get());
+        ASSERT_TRUE(extensionStage != nullptr);
+        ASSERT_EQUALS(std::string(extensionStage->getSourceName()), std::string("$testFoo"));
+    });
 }
 
 TEST(LoadExtensionTest, LoadExtensionHostVersionParameterSucceeds) {
