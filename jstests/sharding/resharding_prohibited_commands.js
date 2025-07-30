@@ -28,11 +28,10 @@ const indexDroppedByTest = {
     x: 1
 };
 
-// TODO SERVER-108421 Re-enable dropIndexes once investigation is done.
 const prohibitedCommands = [
     {collMod: collectionName},
     {createIndexes: collectionName, indexes: [{name: "idx1", key: indexCreatedByTest}]},
-    // {dropIndexes: collectionName, index: indexDroppedByTest},
+    {dropIndexes: collectionName, index: indexDroppedByTest},
 ];
 
 /**

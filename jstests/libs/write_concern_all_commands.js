@@ -5920,7 +5920,6 @@ const shardedDDLCommandsRequiringMajorityCommit = [
     "convertToCapped",
     "drop",
     "dropDatabase",
-    "dropIndexes",
     "movePrimary",
     "refineCollectionShardKey",
     "renameCollection",

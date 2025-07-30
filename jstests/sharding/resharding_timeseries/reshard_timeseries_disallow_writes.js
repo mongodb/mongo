@@ -156,6 +156,6 @@ assert.commandWorked(coll.runCommand(
 assert.commandWorked(coll.runCommand({collMod: coll.getName()}));
 
 assert.commandWorked(
-    coll.runCommand({dropIndexes: coll.getName(), index: {indexToDropAfterResharding: 1}}));
+    coll.runCommand({dropIndexes: coll.getName(), index: {indexToDropDuringResharding: 1}}));
 
 reshardingTest.teardown();
