@@ -72,17 +72,11 @@ std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCach
         MONGO_UNREACHABLE;
     }();
 
-    auto reapSessionsOlderThanFn = [isRouterServer](OperationContext* opCtx,
-                                                    SessionsCollection& sessionsCollection,
-                                                    Date_t possiblyExpired) {
-        int shardReapedSessions = MongoDSessionCatalog::get(opCtx)->reapSessionsOlderThan(
+    auto reapSessionsOlderThanFn = [](OperationContext* opCtx,
+                                      SessionsCollection& sessionsCollection,
+                                      Date_t possiblyExpired) {
+        return MongoDSessionCatalog::get(opCtx)->reapSessionsOlderThan(
             opCtx, sessionsCollection, possiblyExpired);
-
-        int routerReapedSessions = isRouterServer ? RouterSessionCatalog::reapSessionsOlderThan(
-                                                        opCtx, sessionsCollection, possiblyExpired)
-                                                  : 0;
-
-        return shardReapedSessions + routerReapedSessions;
     };
 
     return std::make_unique<LogicalSessionCacheImpl>(
