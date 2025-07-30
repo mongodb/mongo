@@ -199,7 +199,11 @@ TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesDeletesNoCollection) {
     request.setDeletes(
         {write_ops::DeleteOpEntry(BSON("_id" << 0), false /* multi */, boost::none)});
     auto source = OperationSource::kTimeseriesDelete;
-    auto writeResult = write_ops_exec::performDeletes(_opCtx, request, source);
+    const auto preConditions =
+        timeseries::CollectionPreConditions::getCollectionPreConditions(_opCtx,
+                                                                        nss,
+                                                                        /*isRawDataRequest=*/true);
+    auto writeResult = write_ops_exec::performDeletes(_opCtx, request, preConditions, source);
     ASSERT_FALSE(writeResult.canContinue);
     ASSERT_EQ(1, writeResult.results.size());
     ASSERT_EQ(8555700, writeResult.results[0].getStatus().code());

@@ -106,9 +106,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
                  `Expected exactly one document to be updated. ${coll.find().toArray()}`);
 }
 
-// TODO(SERVER-106444) - Re-enable this once delete path is fixed for viewless Timeseries
-if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesDeletesSupport") &&
-    FeatureFlagUtil.isPresentAndDisabled(testDB, "CreateViewlessTimeseriesCollections")) {
+if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesDeletesSupport")) {
     // The first two buckets containing documents 0 and 1 are closed, so we can only delete the
     // third document from the last bucket. Use a filter on 'f' so this is treated as a non-batched
     // multi delete.

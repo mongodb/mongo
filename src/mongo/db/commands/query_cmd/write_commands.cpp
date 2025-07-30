@@ -730,20 +730,20 @@ public:
 
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::DeleteCommandReply deleteReply;
-            OperationSource source = OperationSource::kStandard;
 
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
                 return processFLEDelete(opCtx, request());
             }
 
-            if (auto [isTimeseriesViewRequest, _] =
-                    timeseries::isTimeseriesViewRequest(opCtx, request());
-                isTimeseriesViewRequest && !isRawDataOperation(opCtx)) {
-                source = OperationSource::kTimeseriesDelete;
-            }
+            const auto [preConditions, isTimeseriesLogicalRequest] =
+                timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+                    opCtx, ns(), request(), request().getCollectionUUID());
+
+            OperationSource source = isTimeseriesLogicalRequest ? OperationSource::kTimeseriesDelete
+                                                                : OperationSource::kStandard;
 
 
-            auto reply = write_ops_exec::performDeletes(opCtx, request(), source);
+            auto reply = write_ops_exec::performDeletes(opCtx, request(), preConditions, source);
             populateReply(opCtx,
                           !request().getWriteCommandRequestBase().getOrdered(),
                           request().getDeletes().size(),
@@ -777,15 +777,12 @@ public:
                     "explained write batches must be of size 1",
                     request().getDeletes().size() == 1);
 
-            auto [isTimeseriesViewRequest, nss] =
-                timeseries::isTimeseriesViewRequest(opCtx, request());
-
-            if (isRawDataOperation(opCtx)) {
-                isTimeseriesViewRequest = false;
-            }
+            auto [preConditions, isTimeseriesLogicalRequest] =
+                timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+                    opCtx, ns(), request(), request().getCollectionUUID());
 
             auto deleteRequest = DeleteRequest{};
-            deleteRequest.setNsString(nss);
+            deleteRequest.setNsString(preConditions.getTargetNs(ns()));
             deleteRequest.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants().value_or(
                 Variables::generateRuntimeConstants(opCtx)));
             deleteRequest.setLet(request().getLet());
@@ -807,7 +804,7 @@ public:
 
             write_ops_exec::explainDelete(opCtx,
                                           deleteRequest,
-                                          isTimeseriesViewRequest,
+                                          isTimeseriesLogicalRequest,
                                           request().getSerializationContext(),
                                           _commandObj,
                                           verbosity,

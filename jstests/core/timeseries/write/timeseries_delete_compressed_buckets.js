@@ -13,7 +13,6 @@
  *   does_not_support_stepdowns,
  *   # The config fuzzer can fuzz the bucketMaxCount.
  *   does_not_support_config_fuzzer,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

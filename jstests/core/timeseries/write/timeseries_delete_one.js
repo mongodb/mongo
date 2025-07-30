@@ -5,7 +5,6 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   requires_fcv_71,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

@@ -8,8 +8,6 @@
  *   requires_timeseries,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   # TODO SERVER-102039
- *   does_not_support_viewless_timeseries_yet,
  *   uses_curop_agg_stage,
  *   # TODO Undenylist (SERVER-38852).
  *   assumes_against_mongod_not_mongos,

@@ -47,6 +47,7 @@
 #include "mongo/db/s/type_shard_database.h"
 #include "mongo/db/s/type_shard_database_gen.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -424,7 +425,10 @@ Status updateShardChunks(OperationContext* opCtx,
                 write_ops::DeleteCommandRequest deleteReq{chunksNss, std::move(deletes)};
                 deleteReq.getWriteCommandRequestBase().setOrdered(true);
                 deleteReq.getWriteCommandRequestBase().setBypassDocumentValidation(true);
-                auto deleteResp = write_ops_exec::performDeletes(opCtx, deleteReq);
+                const auto preConditions =
+                    timeseries::CollectionPreConditions::getCollectionPreConditions(
+                        opCtx, chunksNss, /*isRawDataRequest=*/true);
+                auto deleteResp = write_ops_exec::performDeletes(opCtx, deleteReq, preConditions);
                 // Since the writes are ordered, it's ok to check just the last writeOp result.
                 uassertStatusOK(deleteResp.results.back());
             }

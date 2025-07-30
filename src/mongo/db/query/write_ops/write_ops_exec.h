@@ -197,6 +197,7 @@ WriteResult performUpdates(OperationContext* opCtx,
                            OperationSource source = OperationSource::kStandard);
 WriteResult performDeletes(OperationContext* opCtx,
                            const write_ops::DeleteCommandRequest& op,
+                           const timeseries::CollectionPreConditions& preConditions,
                            OperationSource source = OperationSource::kStandard);
 
 void runTimeseriesRetryableUpdates(OperationContext* opCtx,

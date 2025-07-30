@@ -342,7 +342,11 @@ TEST_F(WriteOpsRetryability, OpCountersDeleteSuccess) {
         entry.setMulti(false);
         return entry;
     }()});
-    result = write_ops_exec::performDeletes(opCtxRaii.get(), deleteOp);
+    const auto preConditions =
+        timeseries::CollectionPreConditions::getCollectionPreConditions(opCtxRaii.get(),
+                                                                        nss,
+                                                                        /*isRawDataRequest=*/true);
+    result = write_ops_exec::performDeletes(opCtxRaii.get(), deleteOp, preConditions);
     auto globalCommandsCountAfterDelete = opCounters().getCommand()->load();
     auto globalDeletesCountAfterDelete = opCounters().getDelete()->load();
     auto globalInsertsCountAfterDelete = opCounters().getInsert()->load();

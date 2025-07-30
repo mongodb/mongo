@@ -1676,7 +1676,6 @@ WriteResult performUpdates(OperationContext* opCtx,
                            const timeseries::CollectionPreConditions& preConditions,
                            OperationSource source) {
     auto ns = preConditions.getTargetNs(wholeOp.getNamespace());
-    NamespaceString originalNs;
 
     // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run in a
     // transaction.
@@ -1735,7 +1734,8 @@ WriteResult performUpdates(OperationContext* opCtx,
                 // the caller since each statement will run as a command through the internal
                 // transaction API.
                 containsRetry = source != OperationSource::kTimeseriesUpdate ||
-                    !preConditions.wasNssTranslated();
+                    (!preConditions.wasNssTranslated() &&
+                     preConditions.isLegacyTimeseriesCollection());
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 // Returns the '_id' of the user measurement for time-series upserts.
                 boost::optional<BSONElement> upsertedId;
@@ -1867,14 +1867,16 @@ WriteResult performUpdates(OperationContext* opCtx,
     return out;
 }
 
-static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
-                                               const NamespaceString& ns,
-                                               const boost::optional<mongo::UUID>& opCollectionUUID,
-                                               StmtId stmtId,
-                                               const write_ops::DeleteOpEntry& op,
-                                               const LegacyRuntimeConstants& runtimeConstants,
-                                               const boost::optional<BSONObj>& letParams,
-                                               OperationSource source) {
+static SingleWriteResult performSingleDeleteOp(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const boost::optional<mongo::UUID>& opCollectionUUID,
+    StmtId stmtId,
+    const write_ops::DeleteOpEntry& op,
+    const LegacyRuntimeConstants& runtimeConstants,
+    const boost::optional<BSONObj>& letParams,
+    const timeseries::CollectionPreConditions& preConditions,
+    OperationSource source) {
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use (or request) retryable writes with limit=0",
             !opCtx->isRetryableWrite() || !op.getMulti() || stmtId == kUninitializedStmtId);
@@ -1885,8 +1887,10 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS(lk,
-                    source == OperationSource::kTimeseriesDelete ? ns.getTimeseriesViewNamespace()
-                                                                 : ns);
+                    (preConditions.isLegacyTimeseriesCollection() &&
+                             source == OperationSource::kTimeseriesDelete
+                         ? ns.getTimeseriesViewNamespace()
+                         : ns));
         curOp.setNetworkOp(lk, dbDelete);
         curOp.setLogicalOp(lk, LogicalOp::opDelete);
         curOp.setOpDescription(lk, op.toBSON());
@@ -1916,6 +1920,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         opCtx, ns, AcquisitionPrerequisites::kWrite, opCollectionUUID);
     const auto collection = acquireCollection(
         opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
+    timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+        opCtx, preConditions, collection);
 
     // Create an RAII object that prints the collection's shard key in the case of a tassert
     // or crash.
@@ -2001,20 +2007,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
 WriteResult performDeletes(OperationContext* opCtx,
                            const write_ops::DeleteCommandRequest& wholeOp,
+                           const timeseries::CollectionPreConditions& preConditions,
                            OperationSource source) {
-    auto ns = wholeOp.getNamespace();
-    if (isRawDataOperation(opCtx)) {
-        ns = timeseries::isTimeseriesViewRequest(opCtx, wholeOp).second;
-    }
-    if (source == OperationSource::kTimeseriesDelete) {
-        if (!ns.isTimeseriesBucketsCollection()) {
-            ns = ns.makeTimeseriesBucketsNamespace();
-        }
-
-        checkCollectionUUIDMismatch(
-            opCtx, ns.getTimeseriesViewNamespace(), nullptr, wholeOp.getCollectionUUID());
-    }
-
+    auto ns = preConditions.getTargetNs(wholeOp.getNamespace());
     // Delete performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -2107,6 +2102,7 @@ WriteResult performDeletes(OperationContext* opCtx,
                                                                     singleOp,
                                                                     runtimeConstants,
                                                                     wholeOp.getLet(),
+                                                                    preConditions,
                                                                     source);
             out.results.push_back(reply);
             lastOpFixer.finishedOpSuccessfully();

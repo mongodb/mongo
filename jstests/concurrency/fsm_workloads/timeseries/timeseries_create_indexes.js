@@ -5,8 +5,6 @@
  *   requires_timeseries,
  *   # TODO SERVER-105327 remove the following exclusion tag
  *   excluded_from_simulate_crash_suites,
- *   # TODO SERVER-105270 enable test in viewless timeseries suites
- *   does_not_support_viewless_timeseries_yet,
  *   # TODO SERVER-105492 enable test in multiversion suites
  *   multiversion_incompatible,
  *   # TODO SERVER-105509 enable test in config shard suites

@@ -63,10 +63,15 @@
         - jstests/sharding/resharding_timeseries/unshard_timeseries.js
         - jstests/sharding/timeseries/timeseries_balancer.js
         - jstests/sharding/timeseries/timeseries_buckets_modification_with_id.js
+        - jstests/sharding/timeseries/timeseries_change_stream_no_orphans.js
         - jstests/sharding/timeseries/timeseries_cluster_collstats.js
         - jstests/sharding/timeseries/timeseries_cluster_indexstats.js
         - jstests/sharding/timeseries/timeseries_coll_mod.js
         - jstests/sharding/timeseries/timeseries_coll_mod_bucketing_parameters.js
+        - jstests/sharding/timeseries/timeseries_delete_multi.js
+        - jstests/sharding/timeseries/timeseries_delete_one_with_shard_key.js
+        - jstests/sharding/timeseries/timeseries_delete_one_without_shard_key.js
+        - jstests/sharding/timeseries/timeseries_delete_with_meta.js
         - jstests/sharding/timeseries/timeseries_drop.js
         - jstests/sharding/timeseries/timeseries_indexes.js
         - jstests/sharding/timeseries/timeseries_insert.js
@@ -150,6 +155,7 @@
         - jstests/noPassthrough/timeseries/query/timeseries_sparse_fields.js
         - jstests/noPassthrough/timeseries/stats/timeseries_collStats.js
         - jstests/noPassthrough/timeseries/stats/timeseries_latency_stats.js
+        - jstests/noPassthrough/timeseries/stats/timeseries_metrics.js
         - jstests/noPassthrough/timeseries/stats/timeseries_serverStatus.js
         - jstests/noPassthrough/timeseries/stats/timeseries_server_status_state_management.js
         - jstests/noPassthrough/timeseries/timeseries_buckets_oplog_update.js
@@ -158,8 +164,10 @@
         - jstests/noPassthrough/timeseries/ttl/timeseries_expire.js
         - jstests/noPassthrough/timeseries/ttl/timeseries_expires_with_partial_index.js
         - jstests/noPassthrough/timeseries/ttl/timeseries_ttl.js
+        - jstests/noPassthrough/timeseries/updates_deletes/timeseries_delete_one_transaction.js
         - jstests/noPassthrough/timeseries/updates_deletes/timeseries_direct_update.js
         - jstests/noPassthrough/timeseries/updates_deletes/timeseries_multi_update_spill_to_disk.js
+        - jstests/noPassthrough/timeseries/updates_deletes/timeseries_update_delete_transaction.js
         - jstests/noPassthrough/timeseries/updates_deletes/timeseries_update_one_transaction.js
         - jstests/noPassthrough/timeseries/updates_deletes/timeseries_update_oplog.js
         - jstests/noPassthrough/timeseries/updates_deletes/timeseries_updates_create_compressed_buckets.js
@@ -196,6 +204,7 @@
         - jstests/noPassthrough/timeseries/write/timeseries_side_bucket_catalog_memory_usage_threshold.js
         - jstests/noPassthrough/timeseries/write/timeseries_time_backward.js
         - jstests/noPassthrough/timeseries/write/timeseries_use_after_meta_update.js
+        - jstests/noPassthrough/timeseries/write/timeseries_write_compresses_uncompressed_bucket.js
         - jstests/noPassthrough/timeseries/write/timeseries_write_concern.js
         - jstests/noPassthrough/versioning_protocol/stale_shard_version_with_timeseries.js
 - name: all_replica_sets_timeseries_tests_selector
