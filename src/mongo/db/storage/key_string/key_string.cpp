@@ -944,7 +944,7 @@ void BuilderBase<BufferT>::_appendDoubleWithoutTypeBits(const double num,
             dassert(fractionalBytes > 0);
             uint64_t mantissa;
             memcpy(&mantissa, &num, sizeof(mantissa));
-            mantissa &= ~(uint64_t(-1) << fractionalBits);  // set non-fractional bits to 0;
+            mantissa &= (1ULL << fractionalBits) - 1;  // set non-fractional bits to 0;
 
             mantissa = endian::nativeToBig(mantissa);
 
