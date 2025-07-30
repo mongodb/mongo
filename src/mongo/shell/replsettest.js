@@ -2455,6 +2455,15 @@ var ReplSetTest = function ReplSetTest(opts) {
             if (skipTempCollections) {
                 commandObj.skipTempCollections = 1;
             }
+            // If we are running in a multiversion suite, preserve old behavior of checking capped
+            // collections in _id order instead of natural order. The
+            // 'useIndexScanForCappedCollections' option for dbHash should be ignored in older
+            // binaries.
+            if (typeof TestData !== "undefined" &&
+                (TestData.useRandomBinVersionsWithinReplicaSet || TestData.mongosBinVersion ||
+                 TestData.multiversionBinVersion || TestData.mixedBinVersions)) {
+                commandObj.useIndexScanForCappedCollections = 1;
+            }
 
             return assert.commandWorked(db.runCommand(commandObj));
         });
