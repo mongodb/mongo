@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/exec/delete_stage.h"
+#include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/repl/oplog.h"

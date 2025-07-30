@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/idhack.h"
+#include "mongo/db/exec/classic/idhack.h"
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/return_key.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"

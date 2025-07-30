@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"

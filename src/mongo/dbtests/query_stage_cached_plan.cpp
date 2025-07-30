@@ -43,7 +43,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/cached_plan.h"
+#include "mongo/db/exec/classic/cached_plan.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/mock_stage.h"

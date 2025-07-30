@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/namespace_string.h"

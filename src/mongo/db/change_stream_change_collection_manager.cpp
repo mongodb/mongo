@@ -50,7 +50,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/drop_gen.h"
-#include "mongo/db/exec/batched_delete_stage.h"
+#include "mongo/db/exec/classic/batched_delete_stage.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"

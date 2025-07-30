@@ -164,7 +164,7 @@ Unlike a multi-document transaction, the applyOps entry lacks the `lsId` and the
 fields. Callers must ensure that the WriteUnitOfWork does not generate more than 16MB of oplog,
 otherwise the operation will fail with `TransactionTooLarge` code.
 
-As of MongoDB 6.0, the `groupOplogEntries` mode is only used by the [BatchedDeleteStage](https://github.com/mongodb/mongo/blob/9676cf4ad8d537518eb1b570fc79bad4f31d8a79/src/mongo/db/exec/batched_delete_stage.h)
+As of MongoDB 6.0, the `groupOplogEntries` mode is only used by the [BatchedDeleteStage](../exec/classic/batched_delete_stage.h)
 for efficient mass-deletes.
 
 See

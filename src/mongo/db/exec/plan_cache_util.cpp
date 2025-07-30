@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/basic_types_gen.h"
-#include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/plan_cache_callbacks_impl.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_interface.h"

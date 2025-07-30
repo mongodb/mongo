@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/multi_plan_rate_limiter.h"
+#include "mongo/db/exec/classic/multi_plan_rate_limiter.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/plan_cache/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache/plan_cache_log_utils.h"
