@@ -53,7 +53,8 @@ async def calibrate(config: QuerySolutionCalibrationConfig, database: DatabaseIn
     qsn_df = exp.extract_qsn_nodes(noout_df)
     result = {}
     for node_config in config.nodes:
-        result[node_config.type] = calibrate_node(qsn_df, config, node_config)
+        key = node_config.name if node_config.name else node_config.type
+        result[key] = calibrate_node(qsn_df, config, node_config)
     return result
 
 
@@ -62,13 +63,16 @@ def calibrate_node(
     config: QuerySolutionCalibrationConfig,
     node_config: QsNodeCalibrationConfig,
 ):
+    node_name = node_config.name if node_config.name else node_config.type
     qsn_node_df = qsn_df[
         (qsn_df.node_type == node_config.type)
-        & (qsn_df.note.isna() | (qsn_df.note == node_config.type))
+        & (
+            qsn_df.note.isna()
+            | (qsn_df.note == node_name)
+        )
     ]
     if node_config.filter_function is not None:
         qsn_node_df = node_config.filter_function(qsn_node_df)
-
     y = qsn_node_df["execution_time"]
     X_vars = (
         qsn_node_df["n_processed"]
@@ -131,5 +135,5 @@ def calibrate_node(
             )
 
             ax.legend()
-        fig.savefig(f"{node_config.type}.png")
+        fig.savefig(f"{node_name}.png")
     return model

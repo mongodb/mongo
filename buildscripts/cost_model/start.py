@@ -135,17 +135,17 @@ async def execute_index_intersections(
 
 
 async def execute_collection_scans(
-    database: DatabaseInstance, collections: Sequence[CollectionInfo], forwards=True
+    database: DatabaseInstance, collections: Sequence[CollectionInfo]
 ):
     collections = [c for c in collections if c.name.startswith("coll_scan")]
     # Even though these numbers are not representative of the way COLLSCANs are usually used,
     # we can use them for calibration based on the assumption that the cost scales linearly.
     limits = [5, 10, 50, 75, 100, 150, 300, 500, 1000]
-    direction = 1 if forwards else -1
-    requests = [
-        Query({"limit": limit, "sort": {"$natural": direction}}, note="COLLSCAN")
-        for limit in limits
-    ]
+    requests = []
+    for direction in [1, -1]:
+        note = f"COLLSCAN_{'FORWARD' if direction == 1 else 'BACKWARD'}"
+        for limit in limits:
+            requests.append(Query({"limit": limit, "sort": {"$natural": direction}}, note=note))
     await workload_execution.execute(
         database, main_config.workload_execution, collections, requests
     )
@@ -153,7 +153,7 @@ async def execute_collection_scans(
 
 async def execute_limits(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collection = [c for c in collections if c.name.startswith("index_scan")][0]
-    limits = [1, 2, 5, 10, 15, 20, 25, 50]  # , 100, 250, 500, 1000, 2500, 5000, 10000]
+    limits = [1, 2, 5, 10, 15, 20, 25, 50, 100, 250, 500, 1000] #, 2500, 5000, 10000]
 
     requests = [Query({"limit": limit}, note="LIMIT") for limit in limits]
     await workload_execution.execute(
@@ -197,7 +197,7 @@ async def execute_projections(database: DatabaseInstance, collections: Sequence[
                 note="PROJECTION_COVERED",
             )
         )
-        
+    
     # Default projections, these are the only ones that can handle computed projections,
     # so that is how we calibrate them. We assume that the computation will be constant across
     # the enumerated plans and thus keep it very simple.
@@ -227,10 +227,6 @@ async def main():
         await generator.populate_collections()
         # 3. Collecting data for calibration (optional).
         # It runs the pipelines and stores explains to the database.
-        # NOTE: you must run the collection scan workload twice, once to get the coefficients for a forward scan,
-        # and another for backwards ones. To toggle this, change the argument 'forwards' in the signature of
-        # 'execute_collection_scans'. We need to do this as otherwise data from both directions will be used
-        # for the same calibration, which we explicitly want to avoid.
         execution_query_functions = [
             execute_projections,
             execute_collection_scans,

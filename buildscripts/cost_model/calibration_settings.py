@@ -336,7 +336,8 @@ def make_filter_by_note(note_value: Any):
 
 qsn_nodes = [
     config.QsNodeCalibrationConfig(type="SUBPLAN"),
-    config.QsNodeCalibrationConfig(type="COLLSCAN"),
+    config.QsNodeCalibrationConfig(name="COLLSCAN_FORWARD", type="COLLSCAN"),
+    config.QsNodeCalibrationConfig(name="COLLSCAN_BACKWARD", type="COLLSCAN"),
     config.QsNodeCalibrationConfig(type="IXSCAN"),
     config.QsNodeCalibrationConfig(type="FETCH"),
     config.QsNodeCalibrationConfig(type="AND_HASH"),

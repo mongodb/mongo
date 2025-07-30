@@ -108,6 +108,10 @@ class QsNodeCalibrationConfig:
     type: str
     filter_function: Callable[[Any], Any] = None
     variables_override: Callable[[pd.DataFrame], pd.DataFrame] = None
+    # The difference between `name` and `type` is that `name` is a unique identifier for whatever is being calibrated,
+    # while `type` is the QSN we will be measuring. These two may not always align, as in the case of
+    # forward/backward scans or the different sort varieties (which are the same node but different calibrations).
+    name: str = None
 
 
 @dataclass
