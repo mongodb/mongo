@@ -6,6 +6,8 @@
  *   command_not_supported_in_serverless,
  *   requires_timeseries,
  *   does_not_support_viewless_timeseries_yet,
+ *   # TODO(SERVER-108445) Reenable this test
+ *   multiversion_incompatible,
  * ]
  */
 

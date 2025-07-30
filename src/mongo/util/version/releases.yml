@@ -26,6 +26,7 @@ featureCompatibilityVersions:
   - "8.0"
   - "8.1"
   - "8.2"
+  - "8.3"
   - "100.0" # This version is not an actual version and used for testing only
 # All LTS releases starting with 4.0.
 longTermSupportReleases:

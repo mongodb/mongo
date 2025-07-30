@@ -5,7 +5,11 @@
 // Note: Enabling new feature flags which aren't yet default-enabled will break this test,
 // because such feature flags do not have a minimum FCV set and therefore will not be
 // disabled when lowering the FCV, causing an incompatibility.
-// @tags: [all_feature_flags_incompatible]
+// @tags: [
+//   all_feature_flags_incompatible,
+//   # TODO(SERVER-108443) Reenable this test
+//   multiversion_incompatible,
+// ]
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 

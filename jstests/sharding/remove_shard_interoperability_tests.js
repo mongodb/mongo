@@ -1,7 +1,9 @@
 /**
  * Check the startShardDraining and removeShard interoperability
  * @tags: [
- * requires_fcv_82
+ * requires_fcv_82,
+ * # TODO(SERVER-108416): Remove exclusion when 8.2 -> 8.3 FCV change finishes
+ * multiversion_incompatible,
  * ]
  */
 
