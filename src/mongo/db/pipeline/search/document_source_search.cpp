@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
+#include "mongo/db/query/search/search_index_view_validation.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/compiler.h"
 
@@ -126,6 +127,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
 
     if (auto view = spec.getView()) {
         search_helpers::validateMongotIndexedViewsFF(expCtx, view->getEffectivePipeline());
+        search_index_view_validation::validate(*view);
     }
 
     return make_intrusive<DocumentSourceSearch>(expCtx, std::move(spec));

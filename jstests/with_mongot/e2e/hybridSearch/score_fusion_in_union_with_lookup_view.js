@@ -33,7 +33,7 @@ function buildScoreFusionPipeline(inputPipelines) {
 
     (function testMatchView() {
         runScoreFusionInUnionWithLookupSubViewTest(
-            "match_view_match_pipelines", [{$match: {y: {$gt: 10}}}], {
+            "match_view_match_pipelines", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
                 a: [
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
@@ -49,19 +49,19 @@ function buildScoreFusionPipeline(inputPipelines) {
             });
 
         runScoreFusionInUnionWithLookupSubViewTest(
-            "match_view_search_pipeline_second", [{$match: {y: {$gt: 10}}}], {
+            "match_view_search_pipeline_second", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
                 a: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
                 b: [{$sort: {x: 1}}, {$score: {score: "$y", normalization: "sigmoid"}}]
             });
 
         runScoreFusionInUnionWithLookupSubViewTest(
-            "match_pipeline_search_pipeline_second", [{$match: {y: {$gt: 10}}}], {
+            "match_pipeline_search_pipeline_second", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
                 a: [{$sort: {x: 1}}, {$score: {score: "$x", normalization: "minMaxScaler"}}],
                 b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
             });
 
         runScoreFusionInUnionWithLookupSubViewTest(
-            "match_pipeline_both_search_pipelines", [{$match: {y: {$gt: 10}}}], {
+            "match_pipeline_both_search_pipelines", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
                 a: [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
                 b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
             });
@@ -85,24 +85,6 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$score: {score: "$y", normalization: "sigmoid"}}
                 ]
             });
-
-        runScoreFusionInUnionWithLookupSubViewTest(
-            "search_view_search_pipeline_second",
-            [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
-            {
-                a: [
-                    {$match: {x: {$gte: 3}}},
-                    {$sort: {x: 1}},
-                    {$limit: 10},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
-                ],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
-            });
-
-        // TODO SERVER-107803: Add search view with search first input pipeline test.
-        // Note this is a search-on-views w/ $lookup general bug, not hybrid search specific.
-        // Currently a $lookup on a search view with a mongot sub-pipeline asserts instead of
-        // returning no results, like in a top-level query.
     })();
 })();
 
@@ -118,7 +100,7 @@ function buildScoreFusionPipeline(inputPipelines) {
 
     (function testMatchView() {
         runScoreFusionInUnionWithLookupTopLevelViewTest(
-            "match_view_match_pipelines", [{$match: {y: {$gt: 10}}}], {
+            "match_view_match_pipelines", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
                 a: [
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
@@ -134,19 +116,19 @@ function buildScoreFusionPipeline(inputPipelines) {
             });
 
         runScoreFusionInUnionWithLookupTopLevelViewTest(
-            "match_view_search_pipeline_second", [{$match: {y: {$gt: 10}}}], {
+            "match_view_search_pipeline_second", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
                 a: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
                 b: [{$sort: {x: 1}}, {$score: {score: "$y", normalization: "sigmoid"}}]
             });
 
         runScoreFusionInUnionWithLookupTopLevelViewTest(
-            "match_pipeline_search_pipeline_second", [{$match: {y: {$gt: 10}}}], {
+            "match_pipeline_search_pipeline_second", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
                 a: [{$sort: {x: 1}}, {$score: {score: "$x", normalization: "minMaxScaler"}}],
                 b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
             });
 
         runScoreFusionInUnionWithLookupTopLevelViewTest(
-            "match_pipeline_both_search_pipelines", [{$match: {y: {$gt: 10}}}], {
+            "match_pipeline_both_search_pipelines", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
                 a: [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
                 b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
             });
@@ -222,7 +204,10 @@ function buildScoreFusionPipeline(inputPipelines) {
 
     (function testBothMatchViews() {
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
-            "match_views_match_pipelines", [{$match: {y: {$gt: 10}}}], [{$match: {y: {$lt: 25}}}], {
+            "match_views_match_pipelines",
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            [{$match: {$expr: {$lt: ["$y", 25]}}}],
+            {
                 a: [
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
@@ -239,8 +224,8 @@ function buildScoreFusionPipeline(inputPipelines) {
 
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "match_views_search_pipeline_first",
-            [{$match: {y: {$gt: 10}}}],
-            [{$match: {y: {$lt: 25}}}],
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            [{$match: {$expr: {$lt: ["$y", 25]}}}],
             {
                 a: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
                 b: [
@@ -253,8 +238,8 @@ function buildScoreFusionPipeline(inputPipelines) {
 
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "match_views_search_pipeline_second",
-            [{$match: {y: {$gt: 10}}}],
-            [{$match: {y: {$lt: 25}}}],
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            [{$match: {$expr: {$lt: ["$y", 25]}}}],
             {
                 a: [
                     {$match: {x: {$lte: 13}}},
@@ -267,8 +252,8 @@ function buildScoreFusionPipeline(inputPipelines) {
 
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "match_views_both_search_pipelines",
-            [{$match: {y: {$gt: 10}}}],
-            [{$match: {y: {$lt: 25}}}],
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            [{$match: {$expr: {$lt: ["$y", 25]}}}],
             {
                 a: [{$search: {index: searchIndexName, text: {query: "bar", path: "a"}}}],
                 b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
@@ -278,7 +263,7 @@ function buildScoreFusionPipeline(inputPipelines) {
     (function testMatchTopViewSearchSubView() {
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "match_top_search_sub_view_match_pipelines",
-            [{$match: {y: {$gt: 10}}}],
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
             [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
             {
                 a: [
@@ -294,32 +279,13 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$score: {score: "$y", normalization: "sigmoid"}}
                 ]
             });
-
-        runScoreFusionInUnionWithLookupViewTopAndSubTest(
-            "match_top_search_sub_view_search_pipeline_second",
-            [{$match: {y: {$gt: 10}}}],
-            [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
-            {
-                a: [
-                    {$match: {x: {$lte: 13}}},
-                    {$sort: {x: -1}},
-                    {$limit: 8},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
-                ],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
-            });
-
-        // TODO SERVER-107803: Add search view with search first input pipeline test.
-        // Note this is a search-on-views w/ $lookup general bug, not hybrid search specific.
-        // Currently a $lookup on a search view with a mongot sub-pipeline asserts instead of
-        // returning no results, like in a top-level query.
     })();
 
     (function testSearchTopViewMatchSubView() {
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "search_top_match_sub_view_match_pipelines",
             [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
-            [{$match: {y: {$lt: 25}}}],
+            [{$match: {$expr: {$lt: ["$y", 25]}}}],
             {
                 a: [
                     {$match: {x: {$gte: 3}}},
@@ -338,7 +304,7 @@ function buildScoreFusionPipeline(inputPipelines) {
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "search_top_match_sub_view_search_pipeline_first",
             [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
-            [{$match: {y: {$lt: 25}}}],
+            [{$match: {$expr: {$lt: ["$y", 25]}}}],
             {
                 a: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
                 b: [
@@ -352,7 +318,7 @@ function buildScoreFusionPipeline(inputPipelines) {
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "search_top_match_sub_view_search_pipeline_second",
             [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
-            [{$match: {y: {$lt: 25}}}],
+            [{$match: {$expr: {$lt: ["$y", 25]}}}],
             {
                 a: [
                     {$match: {x: {$lte: 13}}},
@@ -366,7 +332,7 @@ function buildScoreFusionPipeline(inputPipelines) {
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "search_top_match_sub_view_both_search_pipelines",
             [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
-            [{$match: {y: {$lt: 25}}}],
+            [{$match: {$expr: {$lt: ["$y", 25]}}}],
             {
                 a: [{$search: {index: searchIndexName, text: {query: "bar", path: "a"}}}],
                 b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
@@ -392,24 +358,5 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$score: {score: "$y", normalization: "sigmoid"}}
                 ]
             });
-
-        runScoreFusionInUnionWithLookupViewTopAndSubTest(
-            "search_views_search_pipeline_second",
-            [{$search: {index: searchIndexName, text: {query: "orange", path: "b"}}}],
-            [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
-            {
-                a: [
-                    {$match: {x: {$lte: 13}}},
-                    {$sort: {x: -1}},
-                    {$limit: 8},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
-                ],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
-            });
-
-        // TODO SERVER-107803: Add search view with search first input pipeline test.
-        // Note this is a search-on-views w/ $lookup general bug, not hybrid search specific.
-        // Currently a $lookup on a search view with a mongot sub-pipeline asserts instead of
-        // returning no results, like in a top-level query.
     })();
 })();
