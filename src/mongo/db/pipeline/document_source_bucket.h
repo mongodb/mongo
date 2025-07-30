@@ -63,6 +63,10 @@ public:
             return {};
         }
 
+        bool requiresAuthzChecks() const override {
+            return false;
+        }
+
         /**
          * The correct collation for the aggregate is needed at parse time to determine whether the
          * parsed bucket boundaries are valid.

@@ -112,6 +112,10 @@ public:
                                            bool bypassDocumentValidation) const final {
             return requiredPrivilegesBasic(isMongos, bypassDocumentValidation);
         };
+
+        bool requiresAuthzChecks() const override {
+            return false;
+        }
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

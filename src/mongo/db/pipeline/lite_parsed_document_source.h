@@ -347,7 +347,8 @@ public:
     /**
      * Creates the default LiteParsedDocumentSource. This should be used with caution. Make sure
      * your stage doesn't need to communicate any special behavior before registering a
-     * DocumentSource using this parser.
+     * DocumentSource using this parser. Additionally, explicitly ensure your stage does not require
+     * authorization checks.
      */
     static std::unique_ptr<LiteParsedDocumentSourceDefault> parse(
         const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
@@ -363,6 +364,14 @@ public:
 
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
         return {};
+    }
+
+    /**
+     * requiresAuthzChecks() is overriden to false because requiredPrivileges() returns an empty
+     * vector and has no authz checks by default.
+     */
+    bool requiresAuthzChecks() const override {
+        return false;
     }
 };
 

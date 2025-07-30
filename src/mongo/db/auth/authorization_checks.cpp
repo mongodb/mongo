@@ -44,6 +44,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -381,6 +382,12 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* auth
         PrivilegeVector currentPrivs = liteParsedDocSource->requiredPrivileges(
             isMongos, request.getBypassDocumentValidation().value_or(false));
         Privilege::addPrivilegesToPrivilegeVector(&privileges, currentPrivs);
+        if (MONGO_unlikely(gFeatureFlagMandatoryAuthzChecks.isEnabled())) {
+            invariant((!(liteParsedDocSource->requiresAuthzChecks() && currentPrivs.empty())),
+                      "Must specify authorization checks for this stage: " +
+                          pipelineStage.firstElementFieldNameStringData() +
+                          " or manually opt out by overriding requiresAuthzChecks to false");
+        }
     }
     return privileges;
 }

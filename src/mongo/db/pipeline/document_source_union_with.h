@@ -91,6 +91,10 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final;
+
+        bool requiresAuthzChecks() const override {
+            return false;
+        }
     };
 
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,

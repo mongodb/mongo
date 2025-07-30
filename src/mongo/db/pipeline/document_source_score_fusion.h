@@ -88,6 +88,10 @@ public:
             return requiredPrivilegesBasic(isMongos, bypassDocumentValidation);
         };
 
+        bool requiresAuthzChecks() const override {
+            return false;
+        }
+
         bool isSearchStage() const final {
             return _pipelines[0].hasSearchStage();
         }

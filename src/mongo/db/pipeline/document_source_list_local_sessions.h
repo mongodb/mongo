@@ -107,6 +107,10 @@ public:
             return _privileges;
         }
 
+        bool requiresAuthzChecks() const override {
+            return false;
+        }
+
         bool isInitialSource() const final {
             return true;
         }

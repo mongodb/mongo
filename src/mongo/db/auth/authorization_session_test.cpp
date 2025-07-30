@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
@@ -63,6 +64,7 @@
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -2358,5 +2360,229 @@ TEST_F(AuthorizationSessionTest, ClusterActionsTestUser) {
     authzSession->logoutAllDatabases("Test finished");
 }
 
+// Test agg stage that doesn't use authz checks and doesn't use opt-out
+class TestDocumentSourceNoPrivsWithAuthzChecks : public DocumentSource {
+public:
+    static constexpr StringData kStageName = "$testNoPrivsWithAuthzChecks"_sd;
+
+    class LiteParsed : public LiteParsedDocumentSource {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options) {
+            return std::make_unique<LiteParsed>(spec.fieldName());
+        }
+
+        LiteParsed(std::string parseTimeName)
+            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+            return {};
+        }
+
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const override {
+            return {};
+        }
+    };
+
+    TestDocumentSourceNoPrivsWithAuthzChecks(auto stageName,
+                                             const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSource(stageName, expCtx) {}
+
+    GetNextResult doGetNext() {
+        return GetNextResult::makeEOF();
+    }
+
+    const char* getSourceName() const override {
+        return kStageName.data();
+    }
+
+    StageConstraints constraints(PipelineSplitState pipStage) const final {
+        return StageConstraints(StreamType::kStreaming,
+                                PositionRequirement::kNone,
+                                HostTypeRequirement::kNone,
+                                DiskUseRequirement::kNoDiskUse,
+                                FacetRequirement::kAllowed,
+                                TransactionRequirement::kAllowed,
+                                LookupRequirement::kAllowed,
+                                UnionRequirement::kAllowed,
+                                ChangeStreamRequirement::kAllowlist);
+    }
+    Id getId() const override {
+        return 0;
+    }
+    void addVariableRefs(std::set<Variables::Id>* refs) const override {}
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+        return DistributedPlanLogic{};
+    }
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override {
+        return Value{};
+    }
+
+    static auto createFromBson(BSONElement elem,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return boost::intrusive_ptr<TestDocumentSourceNoPrivsWithAuthzChecks>{
+            new TestDocumentSourceNoPrivsWithAuthzChecks("$testNoPrivsWithAuthzChecks", expCtx)};
+    }
+};
+
+REGISTER_DOCUMENT_SOURCE(testNoPrivsWithAuthzChecks,
+                         TestDocumentSourceNoPrivsWithAuthzChecks::LiteParsed::parse,
+                         TestDocumentSourceNoPrivsWithAuthzChecks::createFromBson,
+                         AllowedWithApiStrict::kAlways);
+
+// Test agg stage that doesn't use authz checks and uses opt-out
+class TestDocumentSourceNoPrivsWithAuthzChecksOptOut
+    : public TestDocumentSourceNoPrivsWithAuthzChecks {
+public:
+    static constexpr StringData kStageName = "$testNoPrivsWithAuthzChecksOptOut"_sd;
+
+    const char* getSourceName() const override {
+        return kStageName.data();
+    }
+
+    class LiteParsedOptOut : public TestDocumentSourceNoPrivsWithAuthzChecks::LiteParsed {
+    public:
+        static std::unique_ptr<LiteParsedOptOut> parse(const NamespaceString& nss,
+                                                       const BSONElement& spec,
+                                                       const LiteParserOptions& options) {
+            return std::make_unique<LiteParsedOptOut>(spec.fieldName());
+        }
+
+        LiteParsedOptOut(std::string parseTimeName)
+            : TestDocumentSourceNoPrivsWithAuthzChecks::LiteParsed(std::move(parseTimeName)) {}
+
+        // Opt-out
+        bool requiresAuthzChecks() const override {
+            return false;
+        }
+    };
+
+    TestDocumentSourceNoPrivsWithAuthzChecksOptOut(
+        auto stageName, const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : TestDocumentSourceNoPrivsWithAuthzChecks(stageName, expCtx) {}
+
+    static auto createFromBson(BSONElement elem,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return boost::intrusive_ptr<TestDocumentSourceNoPrivsWithAuthzChecksOptOut>{
+            new TestDocumentSourceNoPrivsWithAuthzChecksOptOut("$testNoPrivsWithAuthzChecksOptOut",
+                                                               expCtx)};
+    }
+};
+
+REGISTER_DOCUMENT_SOURCE(testNoPrivsWithAuthzChecksOptOut,
+                         TestDocumentSourceNoPrivsWithAuthzChecksOptOut::LiteParsedOptOut::parse,
+                         TestDocumentSourceNoPrivsWithAuthzChecksOptOut::createFromBson,
+                         AllowedWithApiStrict::kAlways);
+
+// Test agg stage that uses authz checks (no need for opt out)
+class TestDocumentSourceWithPrivs : public TestDocumentSourceNoPrivsWithAuthzChecks {
+public:
+    static constexpr StringData kStageName = "$testWithPrivs"_sd;
+
+    const char* getSourceName() const override {
+        return kStageName.data();
+    }
+
+    class LiteParsedWithPrivs : public TestDocumentSourceWithPrivs::LiteParsed {
+    public:
+        static std::unique_ptr<LiteParsedWithPrivs> parse(const NamespaceString& nss,
+                                                          const BSONElement& spec,
+                                                          const LiteParserOptions& options) {
+            return std::make_unique<LiteParsedWithPrivs>(spec.fieldName(), nss);
+        }
+
+        // Includes authz checks
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const override {
+            return {Privilege(ResourcePattern::forExactNamespace(_namespace), ActionType::find)};
+        }
+
+        LiteParsedWithPrivs(std::string parseTimeName, NamespaceString nss)
+            : TestDocumentSourceNoPrivsWithAuthzChecks::LiteParsed(std::move(parseTimeName)),
+              _namespace(std::move(nss)) {}
+
+    private:
+        NamespaceString _namespace;
+    };
+
+    TestDocumentSourceWithPrivs(auto stageName,
+                                const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : TestDocumentSourceNoPrivsWithAuthzChecks(stageName, expCtx) {}
+
+    static auto createFromBson(BSONElement elem,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return boost::intrusive_ptr<TestDocumentSourceWithPrivs>{
+            new TestDocumentSourceWithPrivs("$testWithPrivs", expCtx)};
+    }
+};
+
+REGISTER_DOCUMENT_SOURCE(testWithPrivs,
+                         TestDocumentSourceWithPrivs::LiteParsedWithPrivs::parse,
+                         TestDocumentSourceWithPrivs::createFromBson,
+                         AllowedWithApiStrict::kAlways);
+
+//  Multitenancy disabled
+DEATH_TEST_F(
+    AuthorizationSessionTest,
+    AggStageFailsRequiresAuthzChecksWithNoPrivilegesAndNoOptOutMultitenancyDisabled,
+    "Must specify authorization checks for this stage: $testNoPrivsWithAuthzChecks or manually "
+    "opt out by overriding requiresAuthzChecks to false") {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+    RAIIServerParameterControllerForTest featureFlagController{"featureFlagMandatoryAuthzChecks",
+                                                               true};
+
+    auto nss = testFooNss;
+    auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+    // 1. Stage does not use authz checks, and developer did not opt out of authz checks -> FAIL
+    BSONArray pipeline_test_one = BSON_ARRAY(BSON("$testNoPrivsWithAuthzChecks" << nss.coll()));
+    auto aggReq_test_one = buildAggReq(nss, pipeline_test_one);
+    auto priv = auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq_test_one, false);
+}
+
+//  Multitenancy enabled
+DEATH_TEST_F(
+    AuthorizationSessionTest,
+    AggStageFailsRequiresAuthzChecksWithNoPrivilegesAndNoOptOutMultitenancyEnabled,
+    "Must specify authorization checks for this stage: $testNoPrivsWithAuthzChecks or manually "
+    "opt out by overriding requiresAuthzChecks to false") {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController{"featureFlagMandatoryAuthzChecks",
+                                                               true};
+
+    auto nss = testTenant1FooNss;
+    auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+    // 1. Stage does not use authz checks, and developer did not opt out of authz checks -> FAIL
+    BSONArray pipeline_test_one = BSON_ARRAY(BSON("$testNoPrivsWithAuthzChecks" << nss.coll()));
+    auto aggReq_test_one = buildAggReq(nss, pipeline_test_one);
+    auto priv = auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq_test_one, false);
+}
+
+TEST_F(AuthorizationSessionTest, AggStagePassesRequiresAuthzChecksWithPrivilegesOrOptOut) {
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
+        RAIIServerParameterControllerForTest featureFlagController{
+            "featureFlagMandatoryAuthzChecks", true};
+
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        // 2. Stage does not use authz checks, and developer opted out of authz checks -> SUCCESS
+        BSONArray pipeline_test_two =
+            BSON_ARRAY(BSON("$testNoPrivsWithAuthzChecksOptOut" << nss.coll()));
+        auto aggReq_test_two = buildAggReq(nss, pipeline_test_two);
+        ASSERT_OK(auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq_test_two, false));
+
+        // 3. Stage uses authz checks, and authz checks were implemented -> SUCCESS
+        BSONArray pipeline_test_three = BSON_ARRAY(BSON("$testWithPrivs" << nss.coll()));
+        auto aggReq_test_three = buildAggReq(nss, pipeline_test_three);
+        ASSERT_OK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq_test_three, false));
+    }
+}
 }  // namespace
 }  // namespace mongo

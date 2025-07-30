@@ -139,6 +139,10 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final;
+
+        bool requiresAuthzChecks() const override {
+            return false;
+        }
     };
 
     /**
