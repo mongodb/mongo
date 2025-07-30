@@ -992,7 +992,9 @@ MongoProgramScope::~MongoProgramScope() {
 BSONObj ReplayWorkloadRecordingFile(const BSONObj& a, void*) {
 
     int nFields = a.nFields();
-    uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields <= 2);
+    uassert(ErrorCodes::FailedToParse,
+            "Exactly two arguments are required (data path, connection string)",
+            nFields == 2);
 
     std::vector<BSONElement> elems;
     a.elems(elems);

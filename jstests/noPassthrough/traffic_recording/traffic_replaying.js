@@ -82,6 +82,29 @@ const replayWorkloadLambda = (recordingFilePath, serverURI) => {
     replayWorkloadRecordingFile(recordingFilePath, serverURI);
 };
 
+// First, test the native method with _invalid_ input, and check appropriate errors are returned.
+
+// Too few arguments
+assert.throwsWithCode(() => replayWorkloadRecordingFile(), ErrorCodes.FailedToParse);
+assert.throwsWithCode(() => replayWorkloadRecordingFile("asdf"), ErrorCodes.FailedToParse);
+
+// Too many arguments
+assert.throwsWithCode(() => replayWorkloadRecordingFile("foo", "bar", "baz"),
+                      ErrorCodes.FailedToParse);
+
+// Invalid directory
+assert.throwsWithCode(() => replayWorkloadRecordingFile("asdf", "asdf"), ErrorCodes.FileNotOpen);
+
+// Empty directory
+// Burn-in runs multiple instances; ensure directory is unique.
+let realDirectory = "real_directory_" + UUID().hex();
+mkdir(realDirectory);
+// The cluster spec is _not_ valid here, but is currently not validated until
+// first required to connect.
+// TODO: SERVER-108026 validate the cluster string earlier.
+assert.doesNotThrow(() => replayWorkloadRecordingFile(realDirectory, "asdf"));
+removeFile(realDirectory);
+
 // ======================================================================================== //
 // Recording
 const initialResults = runInstances("traffic_recording", "recordings", defaultOperationsLambda);
