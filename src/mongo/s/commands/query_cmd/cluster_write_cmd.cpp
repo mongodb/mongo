@@ -440,7 +440,8 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
         // Note that this implementation will not handle targeting retries and does not
         // completely emulate write behavior.
         if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
-            return std::vector{targeter.targetInsert(opCtx, targetingBatchItem.getDocument())};
+            return std::vector{
+                targeter.targetInsert(opCtx, targetingBatchItem.getInsertOp().getDocument())};
         } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
             return targeter.targetUpdate(opCtx, targetingBatchItem).endpoints;
         } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {

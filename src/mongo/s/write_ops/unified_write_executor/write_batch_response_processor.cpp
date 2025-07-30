@@ -238,7 +238,7 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
         } else {
             if (!item.getStatus().isOK()) {
                 _nErrors++;
-                if (op.getWriteOpContext().getOrdered()) {
+                if (op.getCommand().getOrdered()) {
                     unrecoverableError = true;
                 }
             }
@@ -268,8 +268,17 @@ std::vector<WriteOp> WriteBatchResponseProcessor::processOpsNotInReplyItems(
     return toRetry;
 }
 
-template <>
-BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponse<BulkWriteCommandReply>() {
+WriteCommandResponse WriteBatchResponseProcessor::generateClientResponse() {
+    return _context.visitRequest(OverloadedVisitor{
+        [&](const BatchedCommandRequest&) {
+            return WriteCommandResponse{generateClientResponseForBatchedCommand()};
+        },
+        [&](const BulkWriteCommandRequest&) {
+            return WriteCommandResponse{generateClientResponseForBulkWriteCommand()};
+        }});
+}
+
+BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponseForBulkWriteCommand() {
     std::vector<BulkWriteReplyItem> results;
     for (const auto& [id, item] : _results) {
         results.push_back(item);
@@ -303,9 +312,7 @@ BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponse<BulkWr
     return reply;
 }
 
-template <>
-BatchedCommandResponse
-WriteBatchResponseProcessor::generateClientResponse<BatchedCommandResponse>() {
+BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBatchedCommand() {
     BatchedCommandResponse resp;
     resp.setStatus(Status::OK());
 

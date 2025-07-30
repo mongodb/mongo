@@ -32,6 +32,13 @@
 namespace mongo {
 namespace unified_write_executor {
 
+boost::optional<WriteOp> WriteOpProducer::peekNext() {
+    if (_activeIndices.empty()) {
+        return boost::none;
+    }
+    return WriteOp(_cmdRef.getOp(*_activeIndices.begin()));
+}
+
 void WriteOpProducer::advance() {
     if (!_activeIndices.empty()) {
         _activeIndices.erase(*_activeIndices.begin());

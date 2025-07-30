@@ -1469,7 +1469,7 @@ TEST_F(BulkWriteOpTest, BatchItemRefGetLet) {
     request.setLet(expected);
 
     BulkWriteOp bulkWriteOp(_opCtx, request);
-    const auto& letOption = bulkWriteOp.getWriteOp_forTest(0).getWriteItem().getLet();
+    const auto& letOption = bulkWriteOp.getWriteOp_forTest(0).getWriteItem().getCommand().getLet();
     ASSERT(letOption.has_value());
     ASSERT_BSONOBJ_EQ(letOption.value(), expected);
 }
@@ -1718,7 +1718,7 @@ int getSizeEstimate(BulkWriteOpVariant op) {
     dummyBulkRequest.setOps({op});
     dummyBulkRequest.setDbName(DatabaseName::kAdmin);
     dummyBulkRequest.setNsInfo({});
-    return BatchItemRef(&dummyBulkRequest, 0).getSizeForBulkWriteBytes();
+    return BatchItemRef{dummyBulkRequest, 0}.estimateOpSizeInBytes();
 }
 
 int getActualSize(BulkWriteOpVariant op) {

@@ -43,18 +43,18 @@ Analysis WriteOpAnalyzer::analyze(OperationContext* opCtx,
     // TODO SERVER-103781 Add support for kPartialKeyWithId.
     // TODO SERVER-103146 Add kChangesOwnership.
     // TODO SERVER-103781 Add support for "WriteWithoutShardKeyWithId" writes.
-
     NSTargeter::TargetingResult tr;
 
     switch (op.getType()) {
         case WriteType::kInsert: {
-            tr.endpoints.emplace_back(targeter.targetInsert(opCtx, op.getRef().getDocument()));
+            tr.endpoints.emplace_back(
+                targeter.targetInsert(opCtx, op.getItemRef().getInsertOp().getDocument()));
         } break;
         case WriteType::kUpdate: {
-            tr = targeter.targetUpdate(opCtx, op.getRef());
+            tr = targeter.targetUpdate(opCtx, op.getItemRef());
         } break;
         case WriteType::kDelete: {
-            tr = targeter.targetDelete(opCtx, op.getRef());
+            tr = targeter.targetDelete(opCtx, op.getItemRef());
         } break;
         case WriteType::kFindAndMod: {
             MONGO_UNIMPLEMENTED;

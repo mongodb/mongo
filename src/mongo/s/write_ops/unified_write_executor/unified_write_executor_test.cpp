@@ -144,8 +144,7 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteBasic) {
         {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
 
     auto future = launchAsync([&]() {
-        auto reply = execWriteRequest<BulkWriteCommandReply, BulkWriteCommandRequest>(
-            operationContext(), request);
+        auto reply = bulkWrite(operationContext(), request);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 2);
         ASSERT_BSONOBJ_EQ(replyItems[0].toBSON(), BSON("ok" << 1.0 << "idx" << 0 << "n" << 1));
@@ -210,8 +209,7 @@ TEST_F(UnifiedWriteExecutorTest, BatchWriteBasic) {
 
 
     auto future = launchAsync([&]() {
-        auto resp = execWriteRequest<BatchedCommandResponse, BatchedCommandRequest>(
-            operationContext(), insertRequest);
+        auto resp = write(operationContext(), insertRequest);
         ASSERT(resp.getOk());
         ASSERT_FALSE(resp.isErrDetailsSet());
         ASSERT_EQ(resp.getN(), 2);
@@ -257,8 +255,7 @@ TEST_F(UnifiedWriteExecutorTest, BatchWriteBasic) {
 
 
     auto updateFuture = launchAsync([&]() {
-        auto resp = execWriteRequest<BatchedCommandResponse, BatchedCommandRequest>(
-            operationContext(), updateRequest);
+        auto resp = write(operationContext(), updateRequest);
         ASSERT(resp.getOk());
         ASSERT_FALSE(resp.isErrDetailsSet());
         ASSERT_EQ(resp.getN(), 0);
@@ -296,8 +293,7 @@ TEST_F(UnifiedWriteExecutorTest, BatchWriteBasic) {
     }());
 
     auto deleteFuture = launchAsync([&]() {
-        auto resp = execWriteRequest<BatchedCommandResponse, BatchedCommandRequest>(
-            operationContext(), deleteRequest);
+        auto resp = write(operationContext(), deleteRequest);
         ASSERT(resp.getOk());
         ASSERT_FALSE(resp.isErrDetailsSet());
         ASSERT_EQ(resp.getN(), 1);
@@ -329,8 +325,7 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteImplicitCollectionCreation) {
                                     {NamespaceInfoEntry(nss1)});
 
     auto future = launchAsync([&]() {
-        auto reply = execWriteRequest<BulkWriteCommandReply, BulkWriteCommandRequest>(
-            operationContext(), request);
+        auto reply = bulkWrite(operationContext(), request);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 1);
         ASSERT_BSONOBJ_EQ(replyItems[0].toBSON(), BSON("ok" << 1.0 << "idx" << 0 << "n" << 1));
@@ -400,8 +395,7 @@ TEST_F(UnifiedWriteExecutorTest, OrderedBulkWriteErrorsAndStops) {
     request.setOrdered(true);
 
     auto future = launchAsync([&]() {
-        auto reply = execWriteRequest<BulkWriteCommandReply, BulkWriteCommandRequest>(
-            operationContext(), request);
+        auto reply = bulkWrite(operationContext(), request);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 1);
         ASSERT_BSONOBJ_EQ(replyItems[0].toBSON(),

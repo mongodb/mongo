@@ -61,14 +61,7 @@ auto getOpsFieldNameForOp(const BatchItemRef& op) {
 }
 
 auto getOpAsBson(const BatchItemRef& op) {
-    switch (op.getOpType()) {
-        case BatchedCommandRequest::BatchType_Update:
-            return op.getUpdateRef().toBSON();
-        case BatchedCommandRequest::BatchType_Delete:
-            return op.getDeleteRef().toBSON();
-        default:
-            MONGO_UNREACHABLE;
-    }
+    return op.toBSON();
 }
 
 // Prevents arguments from the user's original request from being incorrectly included in the

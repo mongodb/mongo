@@ -112,7 +112,7 @@ std::string getBatchTypeString(BatchedCommandRequest::BatchType batchType) {
 
 TEST(UnifiedWriteExecutorProducerTest, BulkWriteOpProducerPeekAndAdvance) {
     auto request = createBulkWriteInsertsRequest(kNss, 3);
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+    WriteOpProducer producer(request);
 
     // Repeated peek and advance three times.
     auto op0 = producer.peekNext();
@@ -136,7 +136,7 @@ TEST(UnifiedWriteExecutorProducerTest, BulkWriteOpProducerPeekAndAdvance) {
 
 TEST(UnifiedWriteExecutorProducerTest, BulkWriteOpProducerRepeatedPeek) {
     auto request = createBulkWriteInsertsRequest(kNss, 2);
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+    WriteOpProducer producer(request);
 
     // Peek the same write op three times then advance.
     auto op0First = producer.peekNext();
@@ -164,7 +164,7 @@ TEST(UnifiedWriteExecutorProducerTest, BulkWriteOpProducerRepeatedPeek) {
 
 TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerRepeatedAdvance) {
     auto request = createBulkWriteInsertsRequest(kNss, 3);
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+    WriteOpProducer producer(request);
 
     auto op0First = producer.peekNext();
     ASSERT_TRUE(op0First.has_value());
@@ -189,7 +189,7 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerRepeatedAdvance) {
 
 TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerAdvancePastEnd) {
     auto request = createBulkWriteInsertsRequest(kNss, 1);
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+    WriteOpProducer producer(request);
 
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
@@ -207,7 +207,7 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerAdvancePastEnd) {
 
 TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessSingle) {
     auto request = createBulkWriteInsertsRequest(kNss, 3);
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+    WriteOpProducer producer(request);
 
     auto op0First = producer.peekNext();
     ASSERT_TRUE(op0First.has_value());
@@ -239,7 +239,7 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessSingle) {
 
 TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessLowThenHighId) {
     auto request = createBulkWriteInsertsRequest(kNss, 3);
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+    WriteOpProducer producer(request);
 
     auto op0First = producer.peekNext();
     ASSERT_TRUE(op0First.has_value());
@@ -280,7 +280,7 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessLowThenHighId) {
 
 TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessHighThenLowId) {
     auto request = createBulkWriteInsertsRequest(kNss, 3);
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+    WriteOpProducer producer(request);
 
     auto op0First = producer.peekNext();
     ASSERT_TRUE(op0First.has_value());
@@ -321,7 +321,7 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessHighThenLowId) {
 
 TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessSameOpAgain) {
     auto request = createBulkWriteInsertsRequest(kNss, 3);
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+    WriteOpProducer producer(request);
 
     auto op0First = producer.peekNext();
     ASSERT_TRUE(op0First.has_value());
@@ -370,28 +370,28 @@ TEST(UnifiedWriteExecutorProducerTest, BulkWriteOpProducerDifferentNamespaces) {
                                BSON("$set" << BSON("b" << 1)).firstElement())),
          BulkWriteDeleteOp(2, BSON("a" << 2))},
         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+    WriteOpProducer producer(request);
 
     // Check ops with different namespaces and request contents.
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
     ASSERT_EQ(op0->getId(), 0);
     ASSERT_EQ(op0->getNss(), nss0);
-    ASSERT_BSONOBJ_EQ(op0->getRef().getDocument(), BSON("a" << 0));
+    ASSERT_BSONOBJ_EQ(op0->getItemRef().getInsertOp().getDocument(), BSON("a" << 0));
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
     ASSERT_EQ(op1->getId(), 1);
     ASSERT_EQ(op1->getNss(), nss1);
-    ASSERT_BSONOBJ_EQ(op1->getRef().getUpdateRef().getFilter(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(op1->getItemRef().getUpdateOp().getFilter(), BSON("a" << 1));
     producer.advance();
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
     ASSERT_EQ(op2->getId(), 2);
     ASSERT_EQ(op2->getNss(), nss2);
-    ASSERT_BSONOBJ_EQ(op2->getRef().getDeleteRef().getFilter(), BSON("a" << 2));
+    ASSERT_BSONOBJ_EQ(op2->getItemRef().getDeleteOp().getFilter(), BSON("a" << 2));
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -408,7 +408,7 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerPeekAndAdvance) {
               "Running BatchWriteOpProducer test for request type",
               "requestType"_attr = getBatchTypeString(requestPtr->getBatchType()));
 
-        MultiWriteOpProducer<BatchedCommandRequest> producer(*requestPtr);
+        WriteOpProducer producer(*requestPtr);
 
         // Repeated peek and advance three times.
         auto op0 = producer.peekNext();
@@ -438,7 +438,7 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerRepeatedPeek) {
               "Running BatchWriteOpProducer test for request type",
               "requestType"_attr = getBatchTypeString(requestPtr->getBatchType()));
 
-        MultiWriteOpProducer<BatchedCommandRequest> producer(*requestPtr);
+        WriteOpProducer producer(*requestPtr);
         // Peek the same write op three times then advance.
         auto op0First = producer.peekNext();
         ASSERT_TRUE(op0First.has_value());
@@ -475,27 +475,27 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerInsertContents) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll0");
     auto insertRequest = createInsertRequest(nss);
 
-    MultiWriteOpProducer<BatchedCommandRequest> producer(*insertRequest);
+    WriteOpProducer producer(*insertRequest);
 
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
     ASSERT_EQ(op0->getId(), 0);
     ASSERT_EQ(op0->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op0->getRef().getDocument(), BSON("x" << 0));
+    ASSERT_BSONOBJ_EQ(op0->getItemRef().getInsertOp().getDocument(), BSON("x" << 0));
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
     ASSERT_EQ(op1->getId(), 1);
     ASSERT_EQ(op1->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op1->getRef().getDocument(), BSON("x" << 1));
+    ASSERT_BSONOBJ_EQ(op1->getItemRef().getInsertOp().getDocument(), BSON("x" << 1));
     producer.advance();
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
     ASSERT_EQ(op2->getId(), 2);
     ASSERT_EQ(op2->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op2->getRef().getDocument(), BSON("x" << 2));
+    ASSERT_BSONOBJ_EQ(op2->getItemRef().getInsertOp().getDocument(), BSON("x" << 2));
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -506,27 +506,27 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerUpdateContents) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll1");
     auto updateRequest = createUpdateRequest(nss);
 
-    MultiWriteOpProducer<BatchedCommandRequest> producer(*updateRequest);
+    WriteOpProducer producer(*updateRequest);
 
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
     ASSERT_EQ(op0->getId(), 0);
     ASSERT_EQ(op0->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op0->getRef().getUpdateRef().getFilter(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(op0->getItemRef().getUpdateOp().getFilter(), BSON("_id" << 1));
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
     ASSERT_EQ(op1->getId(), 1);
     ASSERT_EQ(op1->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op1->getRef().getUpdateRef().getFilter(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(op1->getItemRef().getUpdateOp().getFilter(), BSON("_id" << 2));
     producer.advance();
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
     ASSERT_EQ(op2->getId(), 2);
     ASSERT_EQ(op2->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op2->getRef().getUpdateRef().getFilter(), BSON("_id" << 3));
+    ASSERT_BSONOBJ_EQ(op2->getItemRef().getUpdateOp().getFilter(), BSON("_id" << 3));
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -538,27 +538,30 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerDeleteContents) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll2");
     auto deleteRequest = createDeleteRequest(nss);
 
-    MultiWriteOpProducer<BatchedCommandRequest> producer(*deleteRequest);
+    WriteOpProducer producer(*deleteRequest);
 
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
     ASSERT_EQ(op0->getId(), 0);
     ASSERT_EQ(op0->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op0->getRef().getDeleteRef().getFilter(), BSON("x" << GTE << -1 << LT << 2));
+    ASSERT_BSONOBJ_EQ(op0->getItemRef().getDeleteOp().getFilter(),
+                      BSON("x" << GTE << -1 << LT << 2));
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
     ASSERT_EQ(op1->getId(), 1);
     ASSERT_EQ(op1->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op1->getRef().getDeleteRef().getFilter(), BSON("x" << GTE << -2 << LT << 1));
+    ASSERT_BSONOBJ_EQ(op1->getItemRef().getDeleteOp().getFilter(),
+                      BSON("x" << GTE << -2 << LT << 1));
     producer.advance();
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
     ASSERT_EQ(op2->getId(), 2);
     ASSERT_EQ(op2->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op2->getRef().getDeleteRef().getFilter(), BSON("x" << GTE << -3 << LT << 0));
+    ASSERT_BSONOBJ_EQ(op2->getItemRef().getDeleteOp().getFilter(),
+                      BSON("x" << GTE << -3 << LT << 0));
     producer.advance();
 
     auto noop = producer.peekNext();

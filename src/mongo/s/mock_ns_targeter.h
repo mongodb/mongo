@@ -89,7 +89,7 @@ public:
                                  const BatchItemRef& itemRef) const override {
         TargetingResult result;
 
-        result.endpoints = _targetQuery(itemRef.getUpdateRef().getFilter());
+        result.endpoints = _targetQuery(itemRef.getUpdateOp().getFilter());
         return result;
     }
 
@@ -102,7 +102,7 @@ public:
                                  const BatchItemRef& itemRef) const override {
         TargetingResult result;
 
-        result.endpoints = _targetQuery(itemRef.getDeleteRef().getFilter());
+        result.endpoints = _targetQuery(itemRef.getDeleteOp().getFilter());
         return result;
     }
 

@@ -81,8 +81,8 @@ std::vector<AsyncRequestsSender::Request> WriteBatchExecutor::buildBulkWriteRequ
         bulkRequest.setOrdered(_context.getOrdered());
         bulkRequest.setBypassDocumentValidation(_context.getBypassDocumentValidation());
         bulkRequest.setLet(_context.getLet());
-        if (_context.isBulkWrite()) {
-            bulkRequest.setErrorsOnly(_context.getErrorsOnly());
+        if (_context.isBulkWriteCommand()) {
+            bulkRequest.setErrorsOnly(_context.getErrorsOnly().value_or(false));
             bulkRequest.setComment(_context.getComment());
             bulkRequest.setMaxTimeMS(_context.getMaxTimeMS());
         }

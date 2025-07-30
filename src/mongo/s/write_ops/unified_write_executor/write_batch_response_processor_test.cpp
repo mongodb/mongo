@@ -87,14 +87,14 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
             {shard1Name, Response{rcr1, {}}},
             {shard2Name, Response{rcr2, {WriteOp(request, 0), WriteOp(request, 1)}}}});
 
-    auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
     ASSERT_EQ(clientReply.getNInserted(), 2);
     ASSERT_EQ(clientReply.getNMatched(), 6);
     ASSERT_EQ(clientReply.getNModified(), 6);
 
     // Generating a 'BatchedCommandResponse' should output the same statistics, save for 'n', which
     // is the combination of 'nInserted' and 'nMatched'.
-    auto batchedCommandReply = processor.generateClientResponse<BatchedCommandResponse>();
+    auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
     ASSERT_EQ(batchedCommandReply.getN(), 8);
     ASSERT_EQ(batchedCommandReply.getNModified(), 6);
 }
@@ -119,7 +119,7 @@ TEST_F(WriteBatchResponseProcessorTest, AllStatisticsCopied) {
 
     processor.onWriteBatchResponse(
         routingCtx, SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {WriteOp(request, 0)}}}});
-    auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
     ASSERT_EQ(clientReply.getNInserted(), 1);
     ASSERT_EQ(clientReply.getNMatched(), 1);
     ASSERT_EQ(clientReply.getNModified(), 1);
@@ -186,7 +186,7 @@ TEST_F(WriteBatchResponseProcessorTest, MixedErrorsAndOk) {
                                  {shard2Name, Response{rcr2, {op2, op3}}},
                                  {shard3Name, Response{rcr3, {op4}}}});
 
-    auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
     ASSERT_EQ(clientReply.getNErrors(), 2);
     // Should still be able to keep processing even if we encountered an inner error.
     ASSERT_EQ(clientReply.getNInserted(), 2);
@@ -244,7 +244,7 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
     // Confirm so far we've only processed one error. Copy the processor since generating a
     // response consumes the results array.
     auto tempProcessor = processor;
-    auto clientReply = tempProcessor.generateClientResponse<BulkWriteCommandReply>();
+    auto clientReply = tempProcessor.generateClientResponseForBulkWriteCommand();
     // Should have 0 errors since we can retry CannotImplicitlyCreateCollection
     ASSERT_EQ(clientReply.getNErrors(), 0);
     // Should still be able to keep processing even if we encountered an inner error.
@@ -270,7 +270,7 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
     ASSERT_FALSE(result.unrecoverableError);
     ASSERT(result.opsToRetry.empty());
     ASSERT(result.collsToCreate.empty());
-    clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
+    clientReply = processor.generateClientResponseForBulkWriteCommand();
 
     // Assert we have both ops completed now.
     ASSERT_EQ(clientReply.getNErrors(), 0);
@@ -319,7 +319,7 @@ TEST_F(WriteBatchResponseProcessorTest, SingleReplyItemForBatchOfThree) {
     ASSERT(result.collsToCreate.contains(nss1));
 
     // Assert the generated response is as expected.
-    auto response = processor.generateClientResponse<BulkWriteCommandReply>();
+    auto response = processor.generateClientResponseForBulkWriteCommand();
     // Should have 0 errors since we can retry CannotImplicitlyCreateCollection.
     ASSERT_EQ(response.getNErrors(), 0);
     ASSERT_EQ(response.getNInserted(), 0);
@@ -472,7 +472,7 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
     ASSERT_EQ(result.collsToCreate.size(), 1);
     ASSERT(result.collsToCreate.contains(nss1));
 
-    auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
     ASSERT_EQ(clientReply.getNErrors(), 3);
     ASSERT_EQ(clientReply.getNInserted(), 2);
     ASSERT_EQ(clientReply.getNModified(), 0);
@@ -542,7 +542,7 @@ TEST_F(WriteBatchResponseProcessorTest, RetryStalenessErrors) {
     ASSERT(result.collsToCreate.empty());
 
     // Assert errors was not incremented since we can retry Staleness errors.
-    auto response = processor.generateClientResponse<BulkWriteCommandReply>();
+    auto response = processor.generateClientResponseForBulkWriteCommand();
     ASSERT_EQ(response.getNErrors(), 0);
     ASSERT_EQ(response.getNInserted(), 0);
 }
@@ -648,7 +648,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesSingleWriteConcernError) {
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
-    auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
     ASSERT_EQ(clientReply.getNErrors(), 0);
     ASSERT_EQ(clientReply.getNInserted(), 2);
     auto batch = clientReply.getCursor().getFirstBatch();
@@ -715,7 +715,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
-    auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
     ASSERT_EQ(clientReply.getNErrors(), 0);
     ASSERT_EQ(clientReply.getNInserted(), 2);
     auto batch = clientReply.getCursor().getFirstBatch();

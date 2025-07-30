@@ -954,7 +954,7 @@ int BulkCommandSizeEstimator::getOpSizeEstimate(int opIdx, const ShardId& shardI
     // If retryable writes are used, MongoS needs to send an additional array of stmtId(s)
     // corresponding to the statements that got routed to each individual shard, so they need to
     // be accounted in the potential request size so it does not exceed the max BSON size.
-    int writeSizeBytes = BatchItemRef(&_clientRequest, opIdx).getSizeForBulkWriteBytes() +
+    int writeSizeBytes = BatchItemRef{&_clientRequest, opIdx}.estimateOpSizeInBytes() +
         write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
         (_isRetryableWriteOrInTransaction
              ? write_ops::kStmtIdSize + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes
@@ -1062,7 +1062,7 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
         stmtIds.reserve(targetedBatch.getNumOps());
 
     for (const auto& targetedWrite : targetedBatch.getWrites()) {
-        const WriteOpRef& writeOpRef = targetedWrite->writeOpRef;
+        const ItemIndexChildIndexPair& writeOpRef = targetedWrite->writeOpRef;
         ops.push_back(_clientRequest.getOps().at(writeOpRef.first));
 
         if (targetedWrite->sampleId.has_value()) {
@@ -1773,7 +1773,8 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
                         _writeOps.size() > 1) {
                         serviceOpCounters(ClusterRole::RouterServer).gotUpdate();
                     }
-                    UpdateRef updateRef = writeOp.getWriteItem().getUpdateRef();
+
+                    UpdateOpRef updateRef = writeOp.getWriteItem().getUpdateOp();
 
                     const auto opIdx = writeOp.getWriteItem().getItemIndex();
                     const auto& bulkWriteOp = BulkWriteCRUDOp(_clientRequest.getOps()[opIdx]);

@@ -342,7 +342,7 @@ private:
     WriteType _writeType{WriteType::Ordinary};
 };
 // First value is write item index in the batch, second value is child write op index
-typedef std::pair<int, int> WriteOpRef;
+typedef std::pair<int, int> ItemIndexChildIndexPair;
 
 /**
  * A write with A) a request targeted at a particular shard endpoint, and B) a response targeted
@@ -353,7 +353,7 @@ typedef std::pair<int, int> WriteOpRef;
  */
 struct TargetedWrite {
     TargetedWrite(const ShardEndpoint& endpoint,
-                  WriteOpRef writeOpRef,
+                  ItemIndexChildIndexPair writeOpRef,
                   boost::optional<UUID> sampleId)
         : endpoint(endpoint), writeOpRef(writeOpRef), sampleId(sampleId) {}
 
@@ -363,7 +363,7 @@ struct TargetedWrite {
     // Where to find the write item and put the response
     // TODO: Could be a more complex handle, shared between write state and networking code if
     // we need to be able to cancel ops.
-    WriteOpRef writeOpRef;
+    ItemIndexChildIndexPair writeOpRef;
 
     // The unique sample id for the write if it has been chosen for sampling.
     boost::optional<UUID> sampleId;

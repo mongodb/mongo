@@ -16,12 +16,14 @@ mongo_cc_library(
         "batched_command_response.cpp",
         "batched_upsert_detail.cpp",
         "bulk_write_command_modifier.cpp",
+        "write_command_ref.cpp",
     ],
     hdrs = [
         "batched_command_request.h",
         "batched_command_response.h",
         "batched_upsert_detail.h",
         "bulk_write_command_modifier.h",
+        "write_command_ref.h",
     ],
     deps = [
         "//src/mongo:base",

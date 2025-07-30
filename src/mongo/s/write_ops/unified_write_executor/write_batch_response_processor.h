@@ -35,6 +35,8 @@
 #include "mongo/s/write_ops/wc_error.h"
 
 namespace mongo::unified_write_executor {
+using WriteCommandResponse = std::variant<BatchedCommandResponse, BulkWriteCommandReply>;
+
 /**
  * Handles responses from shards and interactions with the catalog necessary to retry certain
  * errors.
@@ -51,7 +53,6 @@ namespace mongo::unified_write_executor {
  * start a new routing operation
  * // Process more rounds of batches...
  * // Generate a response based on the original command we received.
- * auto = generateClientResponse<CmdResponse>()
  */
 class WriteBatchResponseProcessor {
 public:
@@ -78,8 +79,11 @@ public:
      * Turns gathered statistics into a command reply for the client. Consumes any pending reply
      * items.
      */
-    template <typename CmdResponse>
-    CmdResponse generateClientResponse();
+    WriteCommandResponse generateClientResponse();
+
+    BatchedCommandResponse generateClientResponseForBatchedCommand();
+
+    BulkWriteCommandReply generateClientResponseForBulkWriteCommand();
 
 private:
     Result _onWriteBatchResponse(RoutingContext& routingCtx,

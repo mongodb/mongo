@@ -511,7 +511,7 @@ int BatchedCommandSizeEstimator::getOpSizeEstimate(int opIdx, const ShardId& sha
     // corresponding to the statements that got routed to each individual shard, so they
     // need to be accounted in the potential request size so it does not exceed the max BSON
     // size.
-    const int writeSizeBytes = BatchItemRef(&_clientRequest, opIdx).getSizeForBatchWriteBytes() +
+    const int writeSizeBytes = BatchItemRef{&_clientRequest, opIdx}.estimateOpSizeInBytes() +
         getEncryptionInformationSize(_clientRequest) +
         write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
         (_isRetryableWriteOrInTransaction
@@ -589,7 +589,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
     boost::optional<std::vector<write_ops::DeleteOpEntry>> deletes;
 
     for (auto&& targetedWrite : targetedBatch.getWrites()) {
-        const WriteOpRef& writeOpRef = targetedWrite->writeOpRef;
+        const ItemIndexChildIndexPair& writeOpRef = targetedWrite->writeOpRef;
 
         switch (batchType) {
             case BatchedCommandRequest::BatchType_Insert:

@@ -45,11 +45,22 @@ namespace unified_write_executor {
  */
 class WriteOpProducer {
 public:
+    WriteOpProducer(WriteCommandRef cmdRef) : _cmdRef(std::move(cmdRef)) {
+        size_t numOps = _cmdRef.getNumOps();
+        populateActiveIndices(numOps);
+    }
+
+    WriteOpProducer(const BatchedCommandRequest& request)
+        : WriteOpProducer(WriteCommandRef{request}) {}
+
+    WriteOpProducer(const BulkWriteCommandRequest& request)
+        : WriteOpProducer(WriteCommandRef{request}) {}
+
     /**
      * Peek the current active write op without advancing the internal pointer. Repeated calls
      * return the same write op. When no active write op is left, return empty.
      */
-    virtual boost::optional<WriteOp> peekNext() = 0;
+    virtual boost::optional<WriteOp> peekNext();
 
     /**
      * Mark the current write op as inactive and advance the internal pointer to the next active
@@ -64,46 +75,14 @@ public:
     virtual void markOpReprocess(const WriteOp& op);
 
 protected:
-    absl::btree_set<size_t> _activeIndices;
-};
-
-template <typename RequestType>
-class MultiWriteOpProducer : public WriteOpProducer {
-public:
-    MultiWriteOpProducer(const RequestType& request) : _request(request) {
-        size_t numOps = extractNumOperations(_request);
-        populateActiveIndices(numOps);
-    }
-
-    boost::optional<WriteOp> peekNext() override {
-        if (_activeIndices.empty()) {
-            return boost::none;
-        }
-        return WriteOp(_request, *_activeIndices.begin());
-    }
-
-private:
-    size_t extractNumOperations(const BulkWriteCommandRequest& request) const {
-        return request.getOps().size();
-    }
-    size_t extractNumOperations(const BatchedCommandRequest& request) const {
-        switch (request.getBatchType()) {
-            case BatchedCommandRequest::BatchType_Insert:
-                return request.getInsertRequest().getDocuments().size();
-            case BatchedCommandRequest::BatchType_Update:
-                return request.getUpdateRequest().getUpdates().size();
-            case BatchedCommandRequest::BatchType_Delete:
-                return request.getDeleteRequest().getDeletes().size();
-            default:
-                uasserted(ErrorCodes::BadValue, "Unknown operation type");
-        }
-    }
     void populateActiveIndices(size_t numOps) {
         for (size_t i = 0; i < numOps; ++i) {
             _activeIndices.insert(i);
         }
     }
-    const RequestType& _request;
+
+    WriteCommandRef _cmdRef;
+    absl::btree_set<size_t> _activeIndices;
 };
 
 }  // namespace unified_write_executor

@@ -422,105 +422,6 @@ int BatchedCommandRequest::getBaseCommandSizeEstimate(OperationContext* opCtx) c
     return builder.obj().objsize();
 }
 
-BatchItemRef::BatchItemRef(const BatchedCommandRequest* request, int index)
-    : _batchedRequest(*request), _index(index), _batchType(_batchedRequest->getBatchType()) {
-    invariant(index < int(request->sizeWriteOps()));
-}
-
-BatchItemRef::BatchItemRef(const BulkWriteCommandRequest* request, int index)
-    : _bulkWriteRequest(*request), _index(index) {
-    invariant(index < int(request->getOps().size()));
-    _batchType = convertOpType(BulkWriteCRUDOp(request->getOps()[index]).getType());
-}
-
-int BatchItemRef::getSizeForBatchWriteBytes() const {
-    tassert(7328113, "Invalid BatchedCommandRequest reference", _batchedRequest);
-
-    switch (_batchType) {
-        case BatchedCommandRequest::BatchType_Insert:
-            return getDocument().objsize();
-
-        case BatchedCommandRequest::BatchType_Update: {
-            auto& update = _batchedRequest->getUpdateRequest().getUpdates()[_index];
-            auto estSize = write_ops::getUpdateSizeEstimate(
-                update.getQ(),
-                update.getU(),
-                update.getC(),
-                update.getUpsertSupplied().has_value(),
-                update.getCollation(),
-                update.getArrayFilters(),
-                update.getSort(),
-                update.getHint(),
-                update.getSampleId(),
-                update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value());
-            // When running a debug build, verify that estSize is at least the BSON serialization
-            // size.
-            dassert(estSize >= update.toBSON().objsize());
-            return estSize;
-        }
-
-        case BatchedCommandRequest::BatchType_Delete: {
-            auto& deleteOp = _batchedRequest->getDeleteRequest().getDeletes()[_index];
-            auto estSize = write_ops::getDeleteSizeEstimate(deleteOp.getQ(),
-                                                            deleteOp.getCollation(),
-                                                            deleteOp.getHint(),
-                                                            deleteOp.getSampleId());
-            // When running a debug build, verify that estSize is at least the BSON serialization
-            // size.
-            dassert(estSize >= deleteOp.toBSON().objsize());
-            return estSize;
-        }
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-int BatchItemRef::getSizeForBulkWriteBytes() const {
-    tassert(7353600, "Invalid BulkWriteCommandRequest reference", _bulkWriteRequest);
-
-    switch (_batchType) {
-        case BatchedCommandRequest::BatchType_Insert: {
-            auto& insertOp = *BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]).getInsert();
-            auto estSize = write_ops::getBulkWriteInsertSizeEstimate(insertOp.getDocument());
-            // When running a debug build, verify that estSize is at least the BSON serialization
-            // size.
-            dassert(estSize >= insertOp.toBSON().objsize());
-            return estSize;
-        }
-
-        case BatchedCommandRequest::BatchType_Update: {
-            auto& updateOp = *BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]).getUpdate();
-            auto estSize =
-                write_ops::getBulkWriteUpdateSizeEstimate(updateOp.getFilter(),
-                                                          updateOp.getUpdateMods(),
-                                                          updateOp.getConstants(),
-                                                          updateOp.getUpsertSupplied().has_value(),
-                                                          updateOp.getCollation(),
-                                                          updateOp.getArrayFilters(),
-                                                          updateOp.getSort(),
-                                                          updateOp.getHint(),
-                                                          updateOp.getSampleId());
-            // When running a debug build, verify that estSize is at least the BSON serialization
-            // size.
-            dassert(estSize >= updateOp.toBSON().objsize());
-            return estSize;
-        }
-        case BatchedCommandRequest::BatchType_Delete: {
-            auto& deleteOp = *BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]).getDelete();
-            auto estSize = write_ops::getBulkWriteDeleteSizeEstimate(deleteOp.getFilter(),
-                                                                     deleteOp.getCollation(),
-                                                                     deleteOp.getHint(),
-                                                                     deleteOp.getSampleId());
-            // When running a debug build, verify that estSize is at least the BSON serialization
-            // size.
-            dassert(estSize >= deleteOp.toBSON().objsize());
-            return estSize;
-        }
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
 BatchedCommandRequest::BatchType convertOpType(BulkWriteCRUDOp::OpType opType) {
     switch (opType) {
         case BulkWriteCRUDOp::OpType::kInsert:
@@ -529,7 +430,6 @@ BatchedCommandRequest::BatchType convertOpType(BulkWriteCRUDOp::OpType opType) {
             return BatchedCommandRequest::BatchType_Update;
         case BulkWriteCRUDOp::OpType::kDelete:
             return BatchedCommandRequest::BatchType_Delete;
-            break;
         default:
             MONGO_UNREACHABLE;
     }

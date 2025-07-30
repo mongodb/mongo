@@ -33,29 +33,27 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/write_command_ref.h"
 
 namespace mongo {
 namespace unified_write_executor {
 
-/**
- * Function template to execute a request of type 'RequestType' and return a response of type
- * 'ResponseType'.
- */
-template <typename ResponseType, typename RequestType>
-ResponseType execWriteRequest(OperationContext* opCtx, const RequestType& request);
+using WriteCommandResponse = std::variant<BatchedCommandResponse, BulkWriteCommandReply>;
 
 /**
- * Function template instantiation declaration for executing insert/update/delete commands.
+ * This function will execute the specified write command and return a response.
  */
-extern template BatchedCommandResponse
-execWriteRequest<BatchedCommandResponse, BatchedCommandRequest>(OperationContext*,
-                                                                const BatchedCommandRequest&);
+WriteCommandResponse executeWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef);
 
 /**
- * Function template instantiation declaration for executing bulk commands.
+ * Helper function for executing insert/update/delete commands.
  */
-extern template BulkWriteCommandReply
-execWriteRequest<BulkWriteCommandReply, BulkWriteCommandRequest>(OperationContext*,
-                                                                 const BulkWriteCommandRequest&);
+BatchedCommandResponse write(OperationContext* opCtx, const BatchedCommandRequest& request);
+
+/**
+ * Helper function for executing bulk commands.
+ */
+BulkWriteCommandReply bulkWrite(OperationContext* opCtx, const BulkWriteCommandRequest& request);
+
 }  // namespace unified_write_executor
 }  // namespace mongo

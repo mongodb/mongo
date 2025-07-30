@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/commands/query_cmd/bulk_write_common.h"
-#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/write_command_ref.h"
 
 #include <variant>
 
@@ -47,141 +47,88 @@ enum WriteType {
 
 using WriteOpId = size_t;
 
-class WriteOpContext {
-public:
-    WriteOpContext(const BulkWriteCommandRequest& request)
-        : _bulkWriteRequest(&request), _batchedRequest(nullptr) {}
-    WriteOpContext(const BatchedCommandRequest& request)
-        : _bulkWriteRequest(nullptr), _batchedRequest(&request) {}
-
-    bool isBulkWrite() const {
-        if (_bulkWriteRequest) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    bool getOrdered() const {
-        if (_bulkWriteRequest) {
-            return _bulkWriteRequest->getOrdered();
-        } else {
-            return _batchedRequest->getOrdered();
-        }
-    }
-
-    bool getBypassDocumentValidation() const {
-        if (_bulkWriteRequest) {
-            return _bulkWriteRequest->getBypassDocumentValidation();
-        } else {
-            return _batchedRequest->getBypassDocumentValidation();
-        }
-    }
-
-    bool getErrorsOnly() const {
-        if (_bulkWriteRequest) {
-            return _bulkWriteRequest->getErrorsOnly();
-        } else {
-            MONGO_UNREACHABLE_TASSERT(10412900);
-        }
-    }
-
-    const boost::optional<mongo::BSONObj>& getLet() const {
-        if (_bulkWriteRequest) {
-            return _bulkWriteRequest->getLet();
-        } else {
-            return _batchedRequest->getLet();
-        }
-    }
-
-    const boost::optional<mongo::IDLAnyTypeOwned>& getComment() const {
-        if (_bulkWriteRequest) {
-            return _bulkWriteRequest->getComment();
-        } else {
-            MONGO_UNREACHABLE_TASSERT(10412901);
-        }
-    }
-
-    boost::optional<std::int64_t> getMaxTimeMS() const {
-        if (_bulkWriteRequest) {
-            return _bulkWriteRequest->getMaxTimeMS();
-        } else {
-            MONGO_UNREACHABLE_TASSERT(10412902);
-        }
-    }
-
-private:
-    // TODO SERVER-104262 refactor the WriteOp implementation to not use raw pointers
-    const BulkWriteCommandRequest* _bulkWriteRequest{nullptr};
-    const BatchedCommandRequest* _batchedRequest{nullptr};
-};
+using WriteOpContext = WriteCommandRef;
 
 class WriteOp {
 public:
-    WriteOp(const BulkWriteCommandRequest& request, int index)
-        : _bulkWriteRequest(&request), _batchedRequest(nullptr), _index(index) {}
-    WriteOp(const BatchedCommandRequest& request, int index)
-        : _bulkWriteRequest(nullptr), _batchedRequest(&request), _index(index) {}
+    WriteOp(WriteOpRef ref) : _ref(std::move(ref)) {}
 
-    ~WriteOp() = default;
+    WriteOp(const BatchedCommandRequest& request, int index)
+        : WriteOp(WriteOpRef{request, index}) {}
+
+    WriteOp(const BulkWriteCommandRequest& request, int index)
+        : WriteOp(WriteOpRef{request, index}) {}
 
     WriteOpId getId() const {
-        return _index;
-    }
-
-    BatchItemRef getRef() const {
-        if (_bulkWriteRequest) {
-            return BatchItemRef(_bulkWriteRequest, _index);
-        } else {
-            return BatchItemRef(_batchedRequest, _index);
-        }
+        return _ref.getIndex();
     }
 
     const NamespaceString& getNss() const {
-        return getRef().getNss();
+        return _ref.getNss();
     }
 
     WriteType getType() const {
-        return WriteType(getRef().getOpType());
+        return WriteType(_ref.getOpType());
     }
 
     BulkWriteOpVariant getBulkWriteOp() const {
-        if (_bulkWriteRequest) {
-            return _bulkWriteRequest->getOps()[_index];
-        } else {
-            tassert(10605500, "_batchedRequest is not initialized", _batchedRequest != nullptr);
-            switch (_batchedRequest->getBatchType()) {
-                case BatchedCommandRequest::BatchType_Insert:
-                    return BulkWriteInsertOp(0, getRef().getDocument());
-                case BatchedCommandRequest::BatchType_Update:
-                    return bulk_write_common::toBulkWriteUpdate(
-                        _batchedRequest->getUpdateRequest().getUpdates()[_index]);
-                case BatchedCommandRequest::BatchType_Delete:
-                    return bulk_write_common::toBulkWriteDelete(
-                        _batchedRequest->getDeleteRequest().getDeletes()[_index]);
-                default:
-                    MONGO_UNREACHABLE_TASSERT(10605502);
-            }
-        }
+        return _ref.visitOpData(
+            OverloadedVisitor{[&](const BSONObj& insertDoc) -> BulkWriteOpVariant {
+                                  return BulkWriteInsertOp(0, insertDoc);
+                              },
+                              [&](const write_ops::UpdateOpEntry& updateOp) -> BulkWriteOpVariant {
+                                  return bulk_write_common::toBulkWriteUpdate(updateOp);
+                              },
+                              [&](const write_ops::DeleteOpEntry& deleteOp) -> BulkWriteOpVariant {
+                                  return bulk_write_common::toBulkWriteDelete(deleteOp);
+                              },
+                              [&](const mongo::BulkWriteInsertOp& insertOp) -> BulkWriteOpVariant {
+                                  return insertOp;
+                              },
+                              [&](const mongo::BulkWriteUpdateOp& updateOp) -> BulkWriteOpVariant {
+                                  return updateOp;
+                              },
+                              [&](const mongo::BulkWriteDeleteOp& deleteOp) -> BulkWriteOpVariant {
+                                  return deleteOp;
+                              }});
     }
 
     bool isMulti() const {
-        return getRef().isMulti();
+        return _ref.getMulti();
     }
 
-    WriteOpContext getWriteOpContext() const {
-        if (_bulkWriteRequest) {
-            return WriteOpContext(*_bulkWriteRequest);
-        } else {
-            return WriteOpContext(*_batchedRequest);
+    WriteCommandRef getCommand() const {
+        return _ref.getCommand();
+    }
+
+    WriteOpRef getItemRef() const {
+        return _ref;
+    }
+
+    int getEffectiveStmtId() const {
+        auto cmdRef = _ref.getCommand();
+        int index = _ref.getIndex();
+
+        if (auto stmtIds = cmdRef.getStmtIds()) {
+            return stmtIds->at(index);
         }
+
+        auto stmtId = cmdRef.getStmtId();
+        int32_t firstStmtId = stmtId ? *stmtId : 0;
+        return firstStmtId + index;
+    }
+
+    friend bool operator==(const WriteOp& lhs, const WriteOp& rhs) = default;
+
+    friend std::strong_ordering operator<=>(const WriteOp& lhs, const WriteOp& rhs) = default;
+
+    template <typename H>
+    friend H AbslHashValue(H h, const WriteOp& op) {
+        return H::combine(std::move(h), op._ref);
     }
 
 private:
-    // TODO SERVER-104262 refactor the WriteOp implementation to not use raw pointers
-    const BulkWriteCommandRequest* _bulkWriteRequest{nullptr};
-    const BatchedCommandRequest* _batchedRequest{nullptr};
-    int _index;
+    WriteOpRef _ref;
 };
 
 }  // namespace unified_write_executor

@@ -202,7 +202,7 @@ WriteOp::TargetWritesResult WriteOp::targetWrites(OperationContext* opCtx,
     bool isNonTargetedRetryableWriteWithId = false;
 
     if (isInsert) {
-        endpoints = std::vector{targeter.targetInsert(opCtx, _itemRef.getDocument())};
+        endpoints = std::vector{targeter.targetInsert(opCtx, _itemRef.getInsertOp().getDocument())};
     } else if (isUpdate || isDelete) {
         auto targetingResult = isUpdate ? targeter.targetUpdate(opCtx, _itemRef)
                                         : targeter.targetDelete(opCtx, _itemRef);
@@ -216,14 +216,7 @@ WriteOp::TargetWritesResult WriteOp::targetWrites(OperationContext* opCtx,
 
     const bool multipleEndpoints = endpoints.size() > 1u;
 
-    const bool isMultiWrite = [&] {
-        if (isUpdate) {
-            return _itemRef.getUpdateRef().getMulti();
-        } else if (isDelete) {
-            return _itemRef.getDeleteRef().getMulti();
-        }
-        return false;
-    }();
+    const bool isMultiWrite = _itemRef.getMulti();
 
     // Check if an update or delete requires using a non ordinary writeType. An updateOne
     // or deleteOne necessitates using the two phase write in the case where the query does
@@ -339,7 +332,7 @@ WriteOp::TargetWritesResult WriteOp::targetWrites(OperationContext* opCtx,
         analyze_shard_key::tryGenerateTargetedSampleId(opCtx, targeter.getNS(), opType, endpoints);
 
     for (auto&& endpoint : endpoints) {
-        WriteOpRef ref(_itemRef.getItemIndex(), _childOps.size());
+        ItemIndexChildIndexPair ref(_itemRef.getItemIndex(), _childOps.size());
 
         const auto sampleId = targetedSampleId && targetedSampleId->isFor(endpoint)
             ? boost::make_optional(targetedSampleId->getId())
@@ -502,7 +495,7 @@ void WriteOp::_noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite(
     const TargetedWrite& targetedWrite,
     int n,
     boost::optional<const BulkWriteReplyItem&> bulkWriteReplyItem) {
-    const WriteOpRef& ref = targetedWrite.writeOpRef;
+    const ItemIndexChildIndexPair& ref = targetedWrite.writeOpRef;
     auto& currentChildOp = _childOps[ref.second];
     dassert(n == 0 || n == 1);
     if (n == 0) {
@@ -566,7 +559,7 @@ void WriteOp::resetWriteToReady(OperationContext* opCtx) {
 void WriteOp::noteWriteComplete(OperationContext* opCtx,
                                 const TargetedWrite& targetedWrite,
                                 boost::optional<const BulkWriteReplyItem&> bulkWriteReplyItem) {
-    const WriteOpRef& ref = targetedWrite.writeOpRef;
+    const ItemIndexChildIndexPair& ref = targetedWrite.writeOpRef;
     auto& childOp = _childOps[ref.second];
 
     _successfulShardSet.emplace(targetedWrite.endpoint.shardName);
@@ -580,7 +573,7 @@ void WriteOp::noteWriteComplete(OperationContext* opCtx,
 void WriteOp::noteWriteError(OperationContext* opCtx,
                              const TargetedWrite& targetedWrite,
                              const write_ops::WriteError& error) {
-    const WriteOpRef& ref = targetedWrite.writeOpRef;
+    const ItemIndexChildIndexPair& ref = targetedWrite.writeOpRef;
     auto& childOp = _childOps[ref.second];
 
     childOp.pendingWrite = nullptr;
@@ -607,7 +600,7 @@ void WriteOp::noteWriteWithoutShardKeyWithIdResponse(
             opCtx, targetedWrite, n, bulkWriteReplyItem);
         return;
     }
-    const WriteOpRef& ref = targetedWrite.writeOpRef;
+    const ItemIndexChildIndexPair& ref = targetedWrite.writeOpRef;
     auto& currentChildOp = _childOps[ref.second];
     if (_state == WriteOpState::WriteOpState_Deferred ||
         _state == WriteOpState::WriteOpState_Completed) {
