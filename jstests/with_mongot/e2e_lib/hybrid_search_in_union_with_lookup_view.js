@@ -88,8 +88,7 @@ export function runHybridSearchInUnionWithLookupSubViewTest(
     assertDocArrExpectedFuzzy(expectedResults.toArray(), unionWithResults.toArray());
 
     // Explains for both passthroughs should work too.
-    // TODO SERVER-108243: Uncomment this line once the $unionWith serialization bug is fixed.
-    // assert.commandWorked(coll.explain().aggregate(unionWithPipeline));
+    assert.commandWorked(coll.explain().aggregate(unionWithPipeline));
     assert.commandWorked(coll.explain().aggregate(lookupPipeline));
 
     dropSearchIndex(coll, {name: searchIndexName});
@@ -159,8 +158,7 @@ export function runHybridSearchInUnionWithLookupViewTopAndSubTest(
     assertDocArrExpectedFuzzy(expectedLookupResults.toArray(), lookupResults.toArray());
 
     // Explains for both passthroughs should work too.
-    // TODO SERVER-108243: Uncomment this line once the $unionWith serialization bug is fixed.
-    // assert.commandWorked(topLevelView.explain().aggregate(unionWithPipeline));
+    assert.commandWorked(topLevelView.explain().aggregate(unionWithPipeline));
     assert.commandWorked(topLevelView.explain().aggregate(lookupPipeline));
 
     dropSearchIndex(coll, {name: searchIndexName});

@@ -554,26 +554,29 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                                 _pipeline->getContext()->getNamespaceString().coll())
                          << "pipeline" << explainLocal.firstElement());
         return Value(DOC(getSourceName() << spec));
-    } else {
+    } else if (opts.isSerializingForQueryStats()) {
         // Query shapes must reflect the original, unresolved and unoptimized pipeline, so we need a
         // special case here if we are serializing the stage for that purpose. Otherwise, we should
         // return the current (optimized) pipeline for introspection with explain, etc.
-        auto serializedPipeline = [&]() -> std::vector<BSONObj> {
-            if (opts.isSerializingForQueryStats()) {
-                // TODO SERVER-94227 we don't need to do any validation as part of this parsing
-                // pass.
-                return Pipeline::parse(_userPipeline, _pipeline->getContext())
-                    ->serializeToBson(opts);
-            }
-            return _pipeline->serializeToBson(opts);
-        }();
-
-        bool isHybridSearch = hybrid_scoring_util::isHybridSearchPipeline(_userPipeline);
+        // TODO SERVER-94227: we don't need to do any validation as part of this parsing pass.
+        const auto serializedPipeline =
+            Pipeline::parse(_userPipeline, _pipeline->getContext())->serializeToBson(opts);
+        auto spec = collectionless ? DOC("pipeline" << serializedPipeline)
+                                   : DOC("coll" << opts.serializeIdentifier(_userNss.coll())
+                                                << "pipeline" << serializedPipeline);
+        return Value(DOC(getSourceName() << spec));
+    } else {
         MutableDocument spec;
         if (!collectionless) {
-            spec["coll"] = Value(opts.serializeIdentifier(_userNss.coll()));
+            // When serializing to BSON before sending the request from router to shard, use the
+            // underlying namespace rather than _userNss, since the pipeline is already resolved.
+            // Using _userNss here could incorrectly retain the view name, leading to duplicated
+            // view resolution and stages (e.g. $search applied twice).
+            const auto underlyingNss = _pipeline->getContext()->getNamespaceString();
+            spec["coll"] = Value(opts.serializeIdentifier(underlyingNss.coll()));
         }
-        spec["pipeline"] = Value(serializedPipeline);
+        spec["pipeline"] = Value(_pipeline->serializeToBson(opts));
+        bool isHybridSearch = hybrid_scoring_util::isHybridSearchPipeline(_userPipeline);
         if (isHybridSearch) {
             spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(isHybridSearch);
         }
