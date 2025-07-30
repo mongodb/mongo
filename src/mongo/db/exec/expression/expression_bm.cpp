@@ -35,7 +35,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/util/intrusive_counter.h"
 
 #include <memory>
@@ -73,108 +72,9 @@ class ClassicExpressionBenchmarkFixture : public ExpressionBenchmarkFixture {
             benchmark::ClobberMemory();
         }
     }
-
-    static const std::string _longHTMLStr;
-
-
-public:
-    void SetUp(benchmark::State& state) final {
-        ExpressionBenchmarkFixture::SetUp(state);
-        ScriptEngine::setup(ExecutionEnvironment::Server);
-    }
-
-    void TearDown(benchmark::State& state) final {
-        ScriptEngine::dropScopeCache();
-        ExpressionBenchmarkFixture::TearDown(state);
-    }
-
-    void benchmarkMQLReplaceOneRegex(benchmark::State& state) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap",
-                                                                   true);
-        benchmarkExpression(
-            BSON("$replaceOne" << BSON("input" << "$input" << "find" << BSONRegEx("<a.+>")
-                                               << "replacement" << "<a>")),
-            state,
-            std::vector<Document>(1, {{"input"_sd, _longHTMLStr}}));
-    }
-
-    void benchmarkJSReplaceOneRegex(benchmark::State& state) {
-        benchmarkExpression(
-            BSON("$function" << BSON("body"
-                                     << "function(input) {return input.replace(/<a.+>/, '<a>');}"
-                                     << "args" << BSON_ARRAY("$input") << "lang" << "js")),
-            state,
-            std::vector<Document>(1, {{"input"_sd, _longHTMLStr}}));
-    }
-
-    void benchmarkMQLReplaceAllRegex(benchmark::State& state) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap",
-                                                                   true);
-        benchmarkExpression(
-            BSON("$replaceAll" << BSON("input" << "$input" << "find" << BSONRegEx("<a.+>")
-                                               << "replacement" << "<a>")),
-            state,
-            std::vector<Document>(1, {{"input"_sd, _longHTMLStr}}));
-    }
-
-    void benchmarkJSReplaceAllRegex(benchmark::State& state) {
-        benchmarkExpression(
-            BSON("$function" << BSON("body"
-                                     << "function(input) {return input.replace(/<a.+>/g, '<a>');}"
-                                     << "args" << BSON_ARRAY("$input") << "lang" << "js")),
-            state,
-            std::vector<Document>(1, {{"input"_sd, _longHTMLStr}}));
-    }
-
-    void benchmarkMQLSplitRegex(benchmark::State& state) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap",
-                                                                   true);
-        benchmarkExpression(BSON("$split" << BSON_ARRAY("$input" << BSONRegEx("<a.+>"))),
-                            state,
-                            std::vector<Document>(1, {{"input"_sd, _longHTMLStr}}));
-    }
-
-    void benchmarkJSSplitRegex(benchmark::State& state) {
-        benchmarkExpression(
-            BSON("$function" << BSON("body" << "function(input) {return input.split(/<a.+>/);}"
-                                            << "args" << BSON_ARRAY("$input") << "lang" << "js")),
-            state,
-            std::vector<Document>(1, {{"input"_sd, _longHTMLStr}}));
-    }
 };
 
-const std::string ClassicExpressionBenchmarkFixture::_longHTMLStr =
-    "<div class='sidenav'> <a href='#about'>About</a> <a href='#services'>Services</a> <a "
-    "href='#clients'>Clients</a> <a href='#contact'>Contact</a> <button "
-    "class='dropdown-btn'>Dropdown <i class='fa fa-caret-down'></i> </button> <div "
-    "class='dropdown-container'> <a href='#'>Link 1</a> <a href='#'>Link 2</a> <a "
-    "href='#'>Link 3</a> </div> <a href='#contact'>Search</a> </div>";
-
 BENCHMARK_EXPRESSIONS(ClassicExpressionBenchmarkFixture)
-
-BENCHMARK_F(ClassicExpressionBenchmarkFixture, MQLReplaceOneRegex)(benchmark::State& state) {
-    benchmarkMQLReplaceOneRegex(state);
-}
-
-BENCHMARK_F(ClassicExpressionBenchmarkFixture, JSReplaceOneRegex)(benchmark::State& state) {
-    benchmarkJSReplaceOneRegex(state);
-}
-
-BENCHMARK_F(ClassicExpressionBenchmarkFixture, MQLReplaceAllRegex)(benchmark::State& state) {
-    benchmarkMQLReplaceAllRegex(state);
-}
-
-BENCHMARK_F(ClassicExpressionBenchmarkFixture, JSReplaceAllRegex)(benchmark::State& state) {
-    benchmarkJSReplaceAllRegex(state);
-}
-
-BENCHMARK_F(ClassicExpressionBenchmarkFixture, MQLSplitRegex)(benchmark::State& state) {
-    benchmarkMQLSplitRegex(state);
-}
-
-BENCHMARK_F(ClassicExpressionBenchmarkFixture, JSSplitRegex)(benchmark::State& state) {
-    benchmarkJSSplitRegex(state);
-}
 
 }  // namespace
 }  // namespace mongo

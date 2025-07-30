@@ -51,7 +51,7 @@ private:
 public:
     ExpressionBenchmarkFixture() : random(kSeed) {}
 
-    void SetUp(benchmark::State& state) override {
+    void SetUp(benchmark::State& state) final {
         QueryFCVEnvironmentForTest::setUp();
     }
 
