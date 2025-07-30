@@ -68,6 +68,17 @@ server_parameters:
     cpp_vartype: bool
     default: true
 
+  pessimisticConnectivityCheckForAcceptedConnections:
+    description: >-
+      Instructs the server to check connectivity of accepted connections before further 
+      processing and discard those that are terminated by the client. This parameter has no 
+      effect on non-Linux platforms.
+    set_at: [startup, runtime]
+    cpp_varname: gPessimisticConnectivityCheckForAcceptedConnections
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    redact: false
+
   ingressConnectionEstablishmentRateLimiterBypass:
     description: "A list of CIDRs to be exempted from the ingress connection establishment rate limit"
     set_at: [startup, runtime]

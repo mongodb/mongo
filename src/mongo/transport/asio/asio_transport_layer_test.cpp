@@ -193,6 +193,47 @@ public:
         _hangDuringAccept.setMode(FailPoint::off);
     }
 
+    auto getDiscardedDueToClientDisconnect() {
+        BSONObjBuilder bob;
+        tla().appendStatsForFTDC(bob);
+        return bob.obj()["connsDiscardedDueToClientDisconnect"].Long();
+    }
+
+    void runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        std::function<void(transport::test::ConnectionThread&)> closeClientFunc,
+        std::function<void(transport::test::ConnectionThread&)> onConnectFunc = nullptr) {
+        Notification<void> sessionCreated;
+        sep().setOnStartSession([&](auto&&) { sessionCreated.set(); });
+
+        // Temporarily enable `pessimisticConnectivityCheckForAcceptedConnections` for this test.
+        const auto oldValue =
+            transport::gPessimisticConnectivityCheckForAcceptedConnections.swap(true);
+        ON_BLOCK_EXIT([&] {
+            transport::gPessimisticConnectivityCheckForAcceptedConnections.store(oldValue);
+        });
+
+        const auto discardedBefore = getDiscardedDueToClientDisconnect();
+
+        LOGV2(6109515, "creating test client connection");
+        auto& fp = transport::asioTransportLayerHangDuringAcceptCallback;
+        auto timesEntered = fp.setMode(FailPoint::alwaysOn);
+        transport::test::ConnectionThread connectThread(tla().listenerPort(), onConnectFunc);
+        fp.waitForTimesEntered(timesEntered + 1);
+        connectThread.wait();
+
+        LOGV2(6109516, "closing test client connection");
+        closeClientFunc(connectThread);
+        fp.setMode(FailPoint::off);
+
+        // Using a second connection as a means to wait for the server to process the closed
+        // connection and move on to accept the next connection.
+        transport::test::ConnectionThread dummyConnection(tla().listenerPort(), nullptr);
+        dummyConnection.wait();
+        sessionCreated.get();
+
+        ASSERT_EQ(getDiscardedDueToClientDisconnect() - discardedBefore, 1);
+    }
+
 private:
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagConnHealthMetrics",
                                                                 true};
@@ -232,33 +273,64 @@ void setNoLinger(transport::test::ConnectionThread& conn) {
     }
 }
 
+#ifdef __linux__
+
 /**
  * Test that the server appropriately handles a client-side socket disconnection, and that the
  * client sends an RST packet when the socket is forcibly closed.
  */
 TEST(AsioTransportLayer, TCPResetAfterConnectionIsSilentlySwallowed) {
     TestFixture tf;
-
-    AtomicWord<int> sessionsCreated{0};
-    tf.sep().setOnStartSession([&](auto&&) { sessionsCreated.fetchAndAdd(1); });
-
-    LOGV2(6109515, "connecting");
-    auto& fp = transport::asioTransportLayerHangDuringAcceptCallback;
-    auto timesEntered = fp.setMode(FailPoint::alwaysOn);
-    transport::test::ConnectionThread connectThread(tf.tla().listenerPort(), &setNoLinger);
-    fp.waitForTimesEntered(timesEntered + 1);
-    // Test case thread does not close socket until client thread has set options to ensure that an
-    // RST packet will be set on close.
-    connectThread.wait();
-
-    LOGV2(6109516, "closing");
-    connectThread.close();
-    fp.setMode(FailPoint::off);
-
-    ASSERT_EQ(sessionsCreated.load(), 0);
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        [](transport::test::ConnectionThread& client) { client.close(); }, &setNoLinger);
 }
 
-#ifdef __linux__
+/**
+ * Test that the server doesn't create a session when the client is gracefully closed before
+ * accepting.
+ */
+TEST(AsioTransportLayer, CheckGracefulClientClose) {
+    TestFixture tf;
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        [](transport::test::ConnectionThread& client) { client.close(); });
+}
+
+TEST(AsioTransportLayer, CheckClientWriteThenGracefulClientClose) {
+    TestFixture tf;
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        [&](transport::test::ConnectionThread& client) {
+            OpMsgRequest request;
+            request.body = BSON("ping" << 1 << "$db"
+                                       << "admin");
+            auto msg = request.serialize();
+            msg.header().setResponseToMsgId(0);
+            client.socket().send(msg.buf(), msg.size(), "writing to the socket before closing it");
+            client.close();
+        });
+}
+
+TEST(AsioTransportLayer, CheckClientCloseWithoutShutdown) {
+    TestFixture tf;
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        [&](transport::test::ConnectionThread& client) { ::close(client.socket().rawFD()); });
+}
+
+TEST(AsioTransportLayer, CheckClientRDWRShutdownWithoutClose) {
+    TestFixture tf;
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        [&](transport::test::ConnectionThread& client) {
+            shutdown(client.socket().rawFD(), SHUT_RDWR);
+        });
+}
+
+TEST(AsioTransportLayer, CheckClientWRShutdownWithoutClose) {
+    TestFixture tf;
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        [&](transport::test::ConnectionThread& client) {
+            shutdown(client.socket().rawFD(), SHUT_WR);
+        });
+}
+
 /**
  * Test that the server successfully captures the TCP socket queue depth, and places the value both
  * into the AsioTransportLayer class and FTDC output.
@@ -273,6 +345,11 @@ TEST(AsioTransportLayer, TCPCheckQueueDepth) {
 
     LOGV2(6400501, "Starting and hanging three connection threads");
     tf.setUpHangDuringAcceptingFirstConnection();
+
+    ON_BLOCK_EXIT([&] {
+        LOGV2(6400503, "Stopping failpoints, shutting down test");
+        tf.stopHangDuringAcceptingConnection();
+    });
 
     transport::test::ConnectionThread connectThread1(tf.tla().listenerPort());
     transport::test::ConnectionThread connectThread2(tf.tla().listenerPort());
@@ -306,10 +383,6 @@ TEST(AsioTransportLayer, TCPCheckQueueDepth) {
     const auto& queueDepthObj = queueDepthsArray[0].Obj();
     ASSERT_EQ(HostAndPort(queueDepthObj.firstElementFieldName()).port(), tf.tla().listenerPort());
     ASSERT_EQ(queueDepthObj.firstElement().Int(), 2);
-
-    LOGV2(6400503, "Stopping failpoints, shutting down test");
-
-    tf.stopHangDuringAcceptingConnection();
 }
 #endif
 
