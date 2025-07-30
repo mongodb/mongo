@@ -469,12 +469,12 @@ void TimeseriesTestFixture::_assertBatchDoesNotRollover(const TimeseriesOptions&
         auto rolloverReason =
             bucket_catalog::internal::determineRolloverReason(measurement,
                                                               options,
-                                                              *bucket,
                                                               numActiveBuckets,
                                                               sizesToBeAdded,
                                                               measurementTimestamp,
                                                               _storageCacheSizeBytes,
                                                               nullptr,
+                                                              *bucket,
                                                               batch.stats);
         ASSERT(rolloverReason == bucket_catalog::RolloverReason::kNone);
     }

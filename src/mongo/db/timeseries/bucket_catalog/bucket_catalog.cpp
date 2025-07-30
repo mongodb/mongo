@@ -547,12 +547,12 @@ RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
     auto rolloverReason = internal::determineRolloverReason(
         measurement,
         options,
-        bucket,
         catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
         sizesToBeAdded,
         measurementTimestamp,
         storageCacheSizeBytes,
         comparator,
+        bucket,
         stats);
 
     if (rolloverReason != RolloverReason::kNone) {
@@ -672,7 +672,7 @@ Bucket* findOpenBucketForMeasurement(BucketCatalog& catalog,
                                      const Date_t& measurementTimestamp,
                                      const TimeseriesOptions& options,
                                      const StringDataComparator* comparator,
-                                     uint64_t storageCacheSizeBytes,
+                                     const uint64_t storageCacheSizeBytes,
                                      AllowQueryBasedReopening& allowQueryBasedReopening,
                                      ExecutionStatsController& stats,
                                      bool& bucketOpenedDueToMetadata) {
@@ -719,7 +719,7 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
     const BucketKey& bucketKey,
     const TimeseriesOptions& options,
     const std::variant<OID, std::vector<BSONObj>>& reopeningCandidate,
-    BucketStateRegistry::Era catalogEra,
+    const BucketStateRegistry::Era catalogEra,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     ExecutionStatsController& stats,
     bool& bucketOpenedDueToMetadata) {
@@ -784,7 +784,7 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                           const Date_t& measurementTimestamp,
                           const TimeseriesOptions& options,
                           const StringDataComparator* comparator,
-                          uint64_t storageCacheSizeBytes,
+                          const uint64_t storageCacheSizeBytes,
                           const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
                           ExecutionStatsController& stats,
                           bool& bucketOpenedDueToMetadata) {
@@ -895,9 +895,9 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     const BucketKey& bucketKey,
     const Date_t& time,
     const TimeseriesOptions& options,
-    BucketStateRegistry::Era catalogEra,
+    const BucketStateRegistry::Era catalogEra,
     const AllowQueryBasedReopening& allowQueryBasedReopening,
-    uint64_t storageCacheSizeBytes,
+    const uint64_t storageCacheSizeBytes,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     ExecutionStatsController& stats,
     bool& bucketOpenedDueToMetadata) {

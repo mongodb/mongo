@@ -295,7 +295,7 @@ std::vector<BSONObj> getQueryReopeningCandidate(BucketCatalog& catalog,
 std::shared_ptr<WriteBatch> findPreparedBatch(const Stripe& stripe,
                                               WithLock stripeLock,
                                               const BucketKey& key,
-                                              boost::optional<OID> oid);
+                                              const boost::optional<OID>& oid);
 
 /**
  * Aborts 'batch', and if the corresponding bucket still exists, proceeds to abort any other
@@ -369,12 +369,12 @@ Bucket& allocateBucket(BucketCatalog& catalog,
  */
 RolloverReason determineRolloverReason(const BSONObj& doc,
                                        const TimeseriesOptions& timeseriesOptions,
-                                       Bucket& bucket,
                                        int64_t numberOfActiveBuckets,
                                        const Sizes& sizesToBeAdded,
                                        const Date_t& time,
                                        uint64_t storageCacheSizeBytes,
                                        const StringDataComparator* comparator,
+                                       Bucket& bucket,
                                        ExecutionStatsController& stats);
 
 /**
@@ -457,10 +457,10 @@ bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
                                           OperationId opId,
                                           const TimeseriesOptions& timeseriesOptions,
                                           const StripeNumber& stripeNumber,
-                                          ExecutionStatsController& stats,
                                           uint64_t storageCacheSizeBytes,
                                           const StringDataComparator* comparator,
                                           Bucket& bucket,
+                                          ExecutionStatsController& stats,
                                           std::shared_ptr<WriteBatch>& writeBatch);
 
 /**
@@ -476,11 +476,10 @@ void addMeasurementToBatchAndBucket(BucketCatalog& catalog,
                                     OperationId opId,
                                     const TimeseriesOptions& timeseriesOptions,
                                     const StripeNumber& stripeNumber,
-                                    ExecutionStatsController& stats,
                                     const StringDataComparator* comparator,
-                                    Bucket::NewFieldNames& newFieldNamesToBeInserted,
                                     const Sizes& sizesToBeAdded,
                                     bool isNewlyOpenedBucket,
+                                    const Bucket::NewFieldNames& newFieldNamesToBeInserted,
                                     Bucket& bucket,
                                     std::shared_ptr<WriteBatch>& writeBatch);
 }  // namespace mongo::timeseries::bucket_catalog::internal

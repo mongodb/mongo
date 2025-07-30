@@ -139,7 +139,7 @@ void decrementBucketCountForEra(BucketStateRegistry& registry, BucketStateRegist
 }
 
 BucketStateRegistry::Era getBucketCountForEra(BucketStateRegistry& registry,
-                                              BucketStateRegistry::Era value) {
+                                              const BucketStateRegistry::Era value) {
     stdx::lock_guard lk{registry.mutex};
     auto it = registry.bucketsPerEra.find(value);
     if (it == registry.bucketsPerEra.end()) {
@@ -225,8 +225,8 @@ bool conflictsWithInsertions(std::variant<BucketState, DirectWriteCounter>& stat
 
 Status initializeBucketState(BucketStateRegistry& registry,
                              const BucketId& bucketId,
-                             Bucket* bucket,
-                             boost::optional<BucketStateRegistry::Era> targetEra) {
+                             const boost::optional<BucketStateRegistry::Era>& targetEra,
+                             Bucket* bucket) {
     stdx::lock_guard catalogLock{registry.mutex};
 
     // Returns a WriteConflict error if the target Era is older than the registry Era or if the
@@ -315,7 +315,7 @@ StateChangeSuccessful unprepareBucketState(BucketStateRegistry& registry,
 std::variant<BucketState, DirectWriteCounter> addDirectWrite(
     BucketStateRegistry& registry,
     const BucketId& bucketId,
-    ContinueTrackingBucket continueTrackingBucket) {
+    const ContinueTrackingBucket continueTrackingBucket) {
     stdx::lock_guard catalogLock{registry.mutex};
 
     auto it = registry.bucketStates.find(bucketId);

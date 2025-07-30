@@ -213,7 +213,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromUntrackedState) {
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
     // We expect transition to 'kNormal' to succeed.
-    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
     // Reset the state.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
@@ -248,7 +248,7 @@ DEATH_TEST_F(BucketStateRegistryTest, CannotInitializeAnUnclearedBucket, "invari
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
     // We expect initialize to invariant.
-    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
@@ -260,7 +260,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
     // Reset the state.
-    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
 
     // We expect transition to 'kPrepared' to succeed.
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
@@ -274,7 +274,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
     // Reset the state.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
     // We expect direct writes to succeed on 'kNormal' buckets.
@@ -283,7 +283,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
     // Reset the state.
     removeDirectWrite(bucketStateRegistry, bucket.bucketId);
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
     // We expect transition to 'kFrozen' to succeed.
@@ -305,7 +305,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromClearedState) {
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
     // Reset the state.
-    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     clearBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
@@ -359,7 +359,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromFrozenState) {
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 
     // We cannot initialize bucket state for a bucket that is already frozen.
-    auto status = initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr);
+    auto status = initializeBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.code(), ErrorCodes::TimeseriesBucketFrozen);
 }
@@ -386,7 +386,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedState) {
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
     // Reset the state.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
@@ -394,7 +394,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedState) {
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
     // Reset the state.
-    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 

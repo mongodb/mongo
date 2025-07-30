@@ -211,10 +211,11 @@ bool conflictsWithInsertions(std::variant<BucketState, DirectWriteCounter>& stat
  * | PreparedAndFrozen  | TimeseriesBucketFrozen
  * | DirectWriteCounter | WriteConflict
  */
-Status initializeBucketState(BucketStateRegistry& registry,
-                             const BucketId& bucketId,
-                             Bucket* bucket = nullptr,
-                             boost::optional<BucketStateRegistry::Era> targetEra = boost::none);
+Status initializeBucketState(
+    BucketStateRegistry& registry,
+    const BucketId& bucketId,
+    const boost::optional<BucketStateRegistry::Era>& targetEra = boost::none,
+    Bucket* bucket = nullptr);
 
 /**
  * Transitions bucket state to 'kPrepared'. If included, checks if the 'bucket' has been marked as
