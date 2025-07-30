@@ -319,6 +319,20 @@ public:
         assertResultMatchesMap(result, expectedResultsMap, expectedOutputBlockSizes);
     }
 
+    static inline const AssertStageStatsFn assertPeakMemGreaterThanZero =
+        [](const SpecificStats* statsGeneric) {
+            const auto* stats = static_cast<const BlockHashAggStats*>(statsGeneric);
+            ASSERT_NE(stats, nullptr);
+            ASSERT_GT(stats->maxUsedMemBytes, 0);
+        };
+
+    static inline const AssertStageStatsFn assertPeakMemIsZero =
+        [](const SpecificStats* statsGeneric) {
+            const auto* stats = static_cast<const BlockHashAggStats*>(statsGeneric);
+            ASSERT_NE(stats, nullptr);
+            ASSERT_EQ(stats->maxUsedMemBytes, 0);
+        };
+
     /**
      * Given the data input, the number of slots the stage requires, accumulators used, and
      * expected output, runs the BlockHashAgg stage and asserts that we get correct results.
@@ -374,13 +388,23 @@ public:
      *     group_ids, the stage will produce more than one output block. All but the last one will
      *     be of size 'kBlockOutSize', while the last one may be smaller (anywhere in the range 1 to
      *     'kBlockOutSize').
+     *
+     *  assertNoSpillStats - Function to check stage stats at the conclusion of the test for a test
+     *     where allowDiskUse is set to false.
+     *
+     * assertFirstBatchSpillingStats - Function to check stage stats at the conclusion of the test
+     *     for a test where allowDiskUse is set to false and forcedIncreaseSpilling is true.
+     *
+     * assertForceSpillingStats - Function to check stage stats at the conclusion of the test
+     *     for a test where allowDiskUse is set to false and forcedIncreaseSpilling is false.
      */
     void runBlockHashAggTest(
         const std::vector<Bucket>& buckets,
         AccNamesVector accNames,
         TestResultType expectedResultsMap,
         std::vector<size_t> expectedOutputBlockSizes,
-        const AssertStageStatsFn& assertFirstBatchSpillingStats = AssertStageStatsFn{},
+        const AssertStageStatsFn& assertNoSpillStats = assertPeakMemGreaterThanZero,
+        const AssertStageStatsFn& assertFirstBatchSpillingStats = assertPeakMemIsZero,
         const AssertStageStatsFn& assertForceSpillingStats = AssertStageStatsFn{}) {
 
         runBlockHashAggTestHelper(buckets,
@@ -388,7 +412,8 @@ public:
                                   expectedResultsMap,
                                   expectedOutputBlockSizes,
                                   false /* allowDiskUse */,
-                                  false /* forceIncreasedSpilling */);
+                                  false /* forceIncreasedSpilling */,
+                                  assertNoSpillStats);
         runBlockHashAggTestHelper(buckets,
                                   accNames,
                                   expectedResultsMap,
@@ -414,17 +439,18 @@ TEST_F(BlockHashAggStageTest, NoData) {
     std::vector<Bucket> buckets;
     // We should have an empty block with no data.
     TestResultType expected = {};
-    runBlockHashAggTest(buckets, {{"valueBlockAggMin", "min", "min"}}, expected, {});
+    runBlockHashAggTest(
+        buckets, {{"valueBlockAggMin", "min", "min"}}, expected, {}, assertPeakMemIsZero);
 }
 
 TEST_F(BlockHashAggStageTest, AllDataFiltered) {
     std::vector<Bucket> buckets = {Bucket{.ids = {makeInt32sBlock({0, 1, 2})},
                                           .bitset = {false, false, false},
                                           .dataBlocks = {makeInt32sBlock({50, 20, 30})}}};
-
     // We should have an empty block with no data.
     TestResultType expected = {};
-    runBlockHashAggTest(buckets, {{"valueBlockAggMin", "min", "min"}}, expected, {});
+    runBlockHashAggTest(
+        buckets, {{"valueBlockAggMin", "min", "min"}}, expected, {}, assertPeakMemIsZero);
 }
 
 TEST_F(BlockHashAggStageTest, ScalarKeySingleAccumulatorMin) {
@@ -464,6 +490,8 @@ TEST_F(BlockHashAggStageTest, ScalarKeySingleAccumulatorMinForceSpill) {
         ASSERT_EQ(stats->spillingStats.getSpilledRecords(), BlockHashAggStage::kBlockOutSize * 5);
         ASSERT_EQ(stats->spillingStats.getSpilledBytes(),
                   14 * BlockHashAggStage::kBlockOutSize * 5);
+        // Since forceIncreasedSpilling is true, we spill without using any memory.
+        ASSERT_EQ(stats->maxUsedMemBytes, 0);
     };
     auto assertForceSpillingStageStats = [](const SpecificStats* statsGeneric) {
         const auto* stats = dynamic_cast<const BlockHashAggStats*>(statsGeneric);
@@ -476,6 +504,7 @@ TEST_F(BlockHashAggStageTest, ScalarKeySingleAccumulatorMinForceSpill) {
                            // been consumed.
         ASSERT_EQ(stats->spillingStats.getSpilledBytes(),
                   14 * BlockHashAggStage::kBlockOutSize * 2);
+        ASSERT_GT(stats->maxUsedMemBytes, 0);
     };
 
     TestResultType expected;
@@ -515,6 +544,7 @@ TEST_F(BlockHashAggStageTest, ScalarKeySingleAccumulatorMinForceSpill) {
                         {{"valueBlockAggSum", "sum", "sum"}},
                         expected,
                         expectedOutputBlockSizes,
+                        assertPeakMemGreaterThanZero,
                         assertFirstBatchSpillingStageStats,
                         assertForceSpillingStageStats);
 }

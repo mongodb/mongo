@@ -290,6 +290,9 @@ struct HashAggStats : public SpecificStats {
 
     bool usedDisk{false};
     SpillingStats spillingStats;
+
+    // The maximum amount of memory that was used.
+    uint64_t maxUsedMemBytes = 0u;
 };
 
 struct BlockHashAggStats : public HashAggStats {

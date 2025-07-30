@@ -94,7 +94,6 @@ protected:
             memoryCheckFrequency = std::min(atMostCheckFrequency, atLeastMemoryCheckFrequency);
             nextMemoryCheckpoint = 0;
             memoryCheckpointCounter = 0;
-            lastEstimatedMemoryUsage = 0;
         }
 
         const double checkpointMargin = internalQuerySBEAggMemoryUseCheckMargin.load();
@@ -112,8 +111,6 @@ protected:
 
         // The counter of the incoming records between memory checkpoints.
         int64_t memoryCheckpointCounter = 0;
-
-        int64_t lastEstimatedMemoryUsage = 0;
     };
 
     /**
@@ -148,10 +145,6 @@ protected:
     void checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd);
 
     void doForceSpill() final;
-
-    // Memory tracking and spilling to disk.
-    const long long _approxMemoryUseInBytesBeforeSpill =
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
 
     // Hash table where we'll map groupby key to the accumulators.
     boost::optional<TableType> _ht;

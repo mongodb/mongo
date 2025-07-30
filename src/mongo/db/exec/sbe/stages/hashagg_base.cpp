@@ -182,6 +182,7 @@ void HashAggBaseStage<Derived>::spill() {
                     "Clearing memory.");
         _ht->clear();
         _htIt = _ht->end();
+        _memoryTracker.value().set(0);
         return;
     }
 
@@ -209,6 +210,7 @@ void HashAggBaseStage<Derived>::spill() {
 
     _ht->clear();
     _htIt = _ht->end();
+    _memoryTracker.value().set(0);
 
     auto spilledDataStorageIncrease =
         static_cast<Derived*>(this)->getHashAggStats()->spillingStats.updateSpillingStats(
@@ -278,11 +280,14 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
         return;
     }
 
+    const long lastEstimatedMemoryUsage = _memoryTracker.value().currentMemoryBytes();
     const long estimatedRowSize =
         _htIt->first.memUsageForSorter() + _htIt->second.memUsageForSorter();
-    const long long estimatedTotalSize = _ht->size() * estimatedRowSize;
+    _memoryTracker.value().set(_ht->size() * estimatedRowSize);
+    static_cast<Derived*>(this)->getHashAggStats()->maxUsedMemBytes =
+        _memoryTracker.value().maxMemoryBytes();
 
-    if (estimatedTotalSize >= _approxMemoryUseInBytesBeforeSpill) {
+    if (!_memoryTracker.value().withinMemoryLimit()) {
         // It is safe to set this to the begining because spilling outside the releaseMemory only
         // happens before any results have been consumed and every time data is spilled the _ht is
         // cleared.
@@ -297,11 +302,14 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
         // 'estimatedGainPerChildAdvance' close to zero indicates a stable hash stable size, in
         // which case we can delay the next check progressively.
         const double estimatedGainPerChildAdvance =
-            (static_cast<double>(estimatedTotalSize - mcd.lastEstimatedMemoryUsage) /
+            (static_cast<double>(_memoryTracker.value().currentMemoryBytes() -
+                                 lastEstimatedMemoryUsage) /
              mcd.memoryCheckpointCounter);
 
         const long nextCheckpointCandidate = (estimatedGainPerChildAdvance > 0.1)
-            ? mcd.checkpointMargin * (_approxMemoryUseInBytesBeforeSpill - estimatedTotalSize) /
+            ? mcd.checkpointMargin *
+                (_memoryTracker.value().maxAllowedMemoryUsageBytes() -
+                 _memoryTracker.value().currentMemoryBytes()) /
                 estimatedGainPerChildAdvance
             : mcd.nextMemoryCheckpoint * 2;
 
@@ -309,7 +317,6 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
             std::min<long>(mcd.memoryCheckFrequency,
                            std::max<long>(mcd.atMostCheckFrequency, nextCheckpointCandidate));
 
-        mcd.lastEstimatedMemoryUsage = estimatedTotalSize;
         mcd.memoryCheckpointCounter = 0;
         mcd.memoryCheckFrequency =
             std::min<long>(mcd.memoryCheckFrequency * 2, mcd.atLeastMemoryCheckFrequency);

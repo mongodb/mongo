@@ -108,8 +108,21 @@ public:
         ASSERT_EQ(expectedSpillingStats.getSpilledRecords(),
                   stats->spillingStats.getSpilledRecords());
 
+        ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+
         // Get ready to retrieve more records.
         stage->restoreState();
+    }
+
+    void checkMemoryStats(mongo::sbe::PlanStage* stage, bool spill) {
+        ASSERT_GT(stage->getMemoryTracker()->maxMemoryBytes(), 0);
+        if (spill) {
+            ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+        } else {
+            ASSERT_GT(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+        }
+        auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
+        ASSERT_GT(stats->maxUsedMemBytes, 0);
     }
 
 private:
@@ -205,6 +218,12 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     }
 
     assertValuesEqual(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal);
+    ASSERT_GT(stage->getMemoryTracker()->maxMemoryBytes(), 0);
+    if (shouldSpill) {
+        ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+    } else {
+        ASSERT_GT(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+    }
 };
 
 TEST_F(HashAggStageTest, HashAggMinMaxTest) {
@@ -360,6 +379,10 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
     // Assert that the results array does not contain more than one element.
     resultsEnumerator.advance();
     ASSERT_TRUE(resultsEnumerator.atEnd());
+
+    // The group-by key is empty, so we never compute an estimate for the amount of memory.
+    ASSERT_EQ(stage->getMemoryTracker()->maxMemoryBytes(), 0);
+    ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
 }
 
 TEST_F(HashAggStageTest, HashAggCollationTest) {
@@ -450,6 +473,7 @@ TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
     assertValuesEqual(res3Tag, res3Val, value::TypeTags::NumberInt32, value::bitcastFrom<int>(4));
     ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);
 
+    checkMemoryStats(stage.get(), false /*spill*/);
     stage->close();
 }
 
@@ -506,6 +530,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     ASSERT_EQ(0, stats->spillingStats.getSpills());
     ASSERT_EQ(0, stats->spillingStats.getSpilledRecords());
 
+    checkMemoryStats(stage.get(), false /*spill*/);
     stage->close();
 }
 
@@ -581,6 +606,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
     ASSERT_EQ(1, stats->spillingStats.getSpills());
     ASSERT_EQ(2, stats->spillingStats.getSpilledRecords());
 
+    checkMemoryStats(stage.get(), true /*spill*/);
     stage->close();
 }
 
@@ -650,6 +676,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
+    checkMemoryStats(stage.get(), true /*spill*/);
     stage->close();
 }
 
@@ -722,6 +749,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
     ASSERT_EQ(0, stats->spillingStats.getSpills());
     ASSERT_EQ(0, stats->spillingStats.getSpilledRecords());
 
+    checkMemoryStats(stage.get(), false /*spill*/);
     stage->close();
 }
 
@@ -791,6 +819,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
+    checkMemoryStats(stage.get(), true /*spill*/);
     stage->close();
 }
 
@@ -848,6 +877,10 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
     ASSERT_FALSE(stats->usedDisk);
     ASSERT_EQ(0, stats->spillingStats.getSpills());
     ASSERT_EQ(0, stats->spillingStats.getSpilledRecords());
+
+    // The group-by key is empty, so we never compute an estimate for the amount of memory.
+    ASSERT_EQ(stage->getMemoryTracker()->maxMemoryBytes(), 0);
+    ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
 
     stage->close();
 }
@@ -929,6 +962,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
+    checkMemoryStats(stage.get(), true /*spill*/);
     stage->close();
 }
 
@@ -1007,6 +1041,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     ASSERT_EQ(stats->spillingStats.getSpills(), 9);
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 9);
 
+    checkMemoryStats(stage.get(), true /*spill*/);
     stage->close();
 }
 
@@ -1099,6 +1134,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
     ASSERT_EQ(1, stats->spillingStats.getSpills());
     ASSERT_EQ(2, stats->spillingStats.getSpilledRecords());
 
+    checkMemoryStats(stage.get(), true /*spill*/);
     stage->close();
 }
 
@@ -1186,6 +1222,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
+    checkMemoryStats(stage.get(), true /*spill*/);
     stage->close();
 }
 
@@ -1247,6 +1284,7 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
                           value::TypeTags::NumberInt32,
                           value::bitcastFrom<int>(it->second));
     }
+    checkMemoryStats(stage.get(), true /*spill*/);
     stage->close();
 }
 
@@ -1307,6 +1345,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     ASSERT_EQ(3, results[10]);
     ASSERT_EQ(4, results[999]);
 
+    checkMemoryStats(stage.get(), false /*spill*/);
     stage->close();
 }
 }  // namespace mongo::sbe

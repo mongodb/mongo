@@ -234,6 +234,9 @@ void HashAggStage::prepare(CompileCtx& ctx) {
     }
 
     _compiled = true;
+
+    _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
+        _opCtx, internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load());
 }
 
 value::SlotAccessor* HashAggStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -532,6 +535,11 @@ std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) co
             "spilledDataStorageSize",
             static_cast<long long>(_specificStats.spillingStats.getSpilledDataStorageSize()));
 
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("maxUsedMemBytes",
+                             static_cast<long long>(_specificStats.maxUsedMemBytes));
+        }
+
         ret->debugInfo = bob.obj();
     }
 
@@ -566,6 +574,9 @@ void HashAggStage::close() {
         _children[0]->close();
         _childOpened = false;
     }
+
+    _memoryTracker.value().set(0);
+    _specificStats.maxUsedMemBytes = _memoryTracker.value().maxMemoryBytes();
 }
 
 std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {

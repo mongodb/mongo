@@ -285,6 +285,9 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
     }
 
     _compiled = true;
+
+    _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
+        _opCtx, internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load());
 }
 
 value::SlotAccessor* BlockHashAggStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -972,6 +975,11 @@ std::unique_ptr<PlanStageStats> BlockHashAggStage::getStats(bool includeDebugInf
         bob.appendNumber("blockAccumulatorTotalCalls", _specificStats.blockAccumulatorTotalCalls);
         bob.appendNumber("elementWiseAccumulations", _specificStats.elementWiseAccumulations);
 
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("maxUsedMemBytes",
+                             static_cast<long long>(_specificStats.maxUsedMemBytes));
+        }
+
         ret->debugInfo = bob.obj();
     }
 
@@ -1010,6 +1018,9 @@ void BlockHashAggStage::close() {
     _monoBlocks.clear();
 
     _children[0]->close();
+
+    _specificStats.maxUsedMemBytes = _memoryTracker.value().maxMemoryBytes();
+    _memoryTracker.value().set(0);
 }
 
 std::vector<DebugPrinter::Block> BlockHashAggStage::debugPrint() const {
