@@ -255,6 +255,10 @@ public:
 
     void setMinBytesPerMarker(int64_t size);
 
+    // Sets the _initialSamplingFinished variable to true. Allows other threads to know that initial
+    // sampling of oplog truncate markers during startup has finished.
+    void initialSamplingFinished();
+
     static constexpr uint64_t kRandomSamplesPerMarker = 10;
 
     Microseconds getCreationProcessingTime() const {
@@ -306,9 +310,13 @@ private:
     AtomicWord<int64_t> _currentRecords;  // Number of records in the marker being filled.
     AtomicWord<int64_t> _currentBytes;    // Number of bytes in the marker being filled.
 
-    // Protects against concurrent access to the deque of collection markers.
+    // Protects against concurrent access to the deque of collection markers and the
+    // _initialSamplingFinished variable.
     mutable stdx::mutex _markersMutex;
     std::deque<Marker> _markers;  // front = oldest, back = newest.
+
+    // Whether or not the initial set of markers has finished being sampled.
+    bool _initialSamplingFinished = false;
 
 protected:
     struct PartialMarkerMetrics {
