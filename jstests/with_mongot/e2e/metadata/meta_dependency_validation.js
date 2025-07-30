@@ -20,6 +20,7 @@
  *   featureFlagRankFusionBasic,
  *   featureFlagRankFusionFull,
  *   featureFlagSearchHybridScoringFull,
+ *   requires_fcv_82
  * ]
  */
 

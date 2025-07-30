@@ -4,7 +4,7 @@
  * analysis in various pipeline structures and does not verify correctness of the scoreDetails field
  * contents itself.
  *
- * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_81 ]
+ * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
 
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";

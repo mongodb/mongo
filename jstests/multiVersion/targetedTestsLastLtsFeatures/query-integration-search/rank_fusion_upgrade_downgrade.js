@@ -11,8 +11,14 @@ import {
 
 const collName = jsTestName();
 const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
+const docs = [{_id: 0, foo: "xyz"}, {_id: 1, foo: "bar"}, {_id: 2, foo: "mongodb"}];
 
 const viewName = "rank_fusion_view";
+
+// This is a simple view pipeline that we will attempt to run $rankFusion queries on.
+const viewPipeline = [{$match: {_id: {$gt: 0}}}];
+
+// TODO SERVER-108470 Add tests for $rankFusion with multiple input pipelines.
 const rankFusionPipeline = [{$rankFusion: {input: {pipelines: {field: [{$sort: {foo: 1}}]}}}}];
 const rankFusionPipelineWithScoreDetails = [
     {$rankFusion: {input: {pipelines: {field: [{$sort: {foo: 1}}]}}, scoreDetails: true}},
@@ -20,7 +26,6 @@ const rankFusionPipelineWithScoreDetails = [
 ];
 
 const kUnrecognizedPipelineStageErrorCode = 40324;
-
 function setupCollection(primaryConn, shardingTest = null) {
     const coll = assertDropAndRecreateCollection(getDB(primaryConn), collName);
 
@@ -28,8 +33,7 @@ function setupCollection(primaryConn, shardingTest = null) {
         shardingTest.shardColl(coll, {_id: 1});
     }
 
-    assert.commandWorked(
-        coll.insertMany([{_id: 0, foo: "xyz"}, {_id: 1, foo: "bar"}, {_id: 2, foo: "mongodb"}]));
+    assert.commandWorked(coll.insertMany(docs));
 }
 
 function assertRankFusionCompletelyRejected(primaryConn) {
@@ -47,7 +51,6 @@ function assertRankFusionCompletelyRejected(primaryConn) {
             {aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}),
         [kUnrecognizedPipelineStageErrorCode, ErrorCodes.QueryFeatureNotAllowed]);
 
-    // TODO SERVER-101721 Remove "OptionNotSupportedOnView" once $rankFusion in view is enabled.
     // View creation is rejected when view pipeline has $rankFusion.
     assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipeline), [
         kUnrecognizedPipelineStageErrorCode,
@@ -60,6 +63,12 @@ function assertRankFusionCompletelyRejected(primaryConn) {
             ErrorCodes.QueryFeatureNotAllowed,
             ErrorCodes.OptionNotSupportedOnView
         ]);
+
+    // Running $rankFusion against a view is rejected.
+    assert.commandWorked(db.createView(viewName, collName, viewPipeline));
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}),
+        [kUnrecognizedPipelineStageErrorCode, ErrorCodes.OptionNotSupportedOnView]);
 }
 
 function assertRankFusionCompletelyAccepted(primaryConn) {
@@ -74,31 +83,7 @@ function assertRankFusionCompletelyAccepted(primaryConn) {
     assert.commandWorked(db.runCommand(
         {aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}));
 
-    // TODO SERVER-101721 Enable $rankFusion to be run in a view definition.
-    assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipeline),
-                                 [ErrorCodes.OptionNotSupportedOnView]);
-    assert.commandFailedWithCode(
-        db.createView(viewName, collName, rankFusionPipelineWithScoreDetails),
-        [ErrorCodes.OptionNotSupportedOnView]);
-    /**
-    assert.commandWorked(db.createView(viewName, collName, rankFusionPipeline));
-    assert.commandWorked(
-    db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: {$gt: 0}}}], cursor: {}}));
-    */
-}
-
-function assertRankFusionAcceptedButNotInView(primaryConn) {
-    const db = getDB(primaryConn);
-    db[viewName].drop();
-
-    // $rankFusion succeeds in an aggregation command, but view creation is rejection with
-    // $rankFusion in the view pipeline.
-    assert.commandWorked(
-        db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}));
-    assert.commandWorked(db.runCommand(
-        {aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}));
-
-    // TODO SERVER-101721 Remove "OptionNotSupportedOnView" once $rankFusion in view is enabled.
+    // View creation is rejected when view pipeline has $rankFusion.
     assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipeline), [
         kUnrecognizedPipelineStageErrorCode,
         ErrorCodes.QueryFeatureNotAllowed,
@@ -110,6 +95,13 @@ function assertRankFusionAcceptedButNotInView(primaryConn) {
             ErrorCodes.QueryFeatureNotAllowed,
             ErrorCodes.OptionNotSupportedOnView
         ]);
+
+    // Running $rankFusion against a view succeeds.
+    assert.commandWorked(db.createView(viewName, collName, viewPipeline));
+    assert.commandWorked(
+        db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}));
+    assert.commandWorked(db.runCommand(
+        {aggregate: viewName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}));
 }
 
 testPerformUpgradeDowngradeReplSet({
@@ -126,6 +118,9 @@ testPerformUpgradeDowngradeSharded({
     whenOnlyConfigIsLatestBinary: assertRankFusionCompletelyRejected,
     whenSecondariesAndConfigAreLatestBinary: assertRankFusionCompletelyRejected,
     whenMongosBinaryIsLastLTS: assertRankFusionCompletelyRejected,
-    whenBinariesAreLatestAndFCVIsLastLTS: assertRankFusionAcceptedButNotInView,
+    // TODO SERVER-108470 This should completely reject $rankFusion, however because mongos is not
+    // FCV-aware, it is non-trivial to detect that $rankFusion should be rejected here on the
+    // shards.
+    whenBinariesAreLatestAndFCVIsLastLTS: assertRankFusionCompletelyAccepted,
     whenFullyUpgraded: assertRankFusionCompletelyAccepted,
 });

@@ -9,7 +9,7 @@
  * assumes_unsharded_collection tag.
  *
  * @tags: [ requires_timeseries, assumes_unsharded_collection, featureFlagSearchHybridScoringFull,
- * requires_fcv_81 ]
+ * requires_fcv_82 ]
  */
 
 const timeseriesCollName = jsTestName() + "_timeseries";

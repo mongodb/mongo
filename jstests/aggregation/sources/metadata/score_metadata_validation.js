@@ -9,7 +9,8 @@
  * @tags: [
  *   featureFlagRankFusionFull,
  *   featureFlagSearchHybridScoringFull,
- *   do_not_wrap_aggregations_in_facets
+ *   do_not_wrap_aggregations_in_facets,
+ *   requires_fcv_82
  *  ]
  */
 

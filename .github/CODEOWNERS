@@ -1005,6 +1005,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/query-integration-observability/OWNERS.yml
 /jstests/multiVersion/targetedTestsLastLtsFeatures/query-integration-observability/ @10gen/query-integration-observability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/query-integration-search/OWNERS.yml
+/jstests/multiVersion/targetedTestsLastLtsFeatures/query-integration-search/ @10gen/query-integration-search @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/query-optimization/OWNERS.yml
 /jstests/multiVersion/targetedTestsLastLtsFeatures/query-optimization/ @10gen/query-optimization @svc-auto-approve-bot
 
