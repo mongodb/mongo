@@ -2565,7 +2565,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/get*version*command* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*user_write* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*metadata* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/**/namespace_metadata_change_notifications* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*move_primary* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*participant_block* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*consistency* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -2672,9 +2671,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_clear_jumbo_flag_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/index_on_config* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/*initial_split_policy* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/db/s/config/**/configsvr_commit_refine_collection_shard_key.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/config/**/configsvr_commit_move_primary_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/config/**/configsvr_commit_chunk_migration_command.cpp @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_move_range_command.cpp @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/config/**/*reshard* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_start_shard_draining_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
