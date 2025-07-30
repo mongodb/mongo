@@ -81,20 +81,6 @@ server_parameters:
         default: 1
         validator: {gte: 0}
         redact: false
-    CachePressureAbortMemoryClearLimitPerBatch:
-        description: >-
-            The target amount of memory which will be freed at a time when aborting oldest transactions.
-             - Positive values are absolute targets, in MB. So "1024" means a gigabyte.
-             - Negative values are percentages, relative to the cache size allocated for storage. so "-3"
-               means 3% of the cache's configured maximum size.
-             - Zero (the default) means that no limit will be applied, i.e. transactions will continue to
-               be rolled-back until the system is not under memory pressure or a different limit is reached.
-        set_at: [startup, runtime]
-        cpp_vartype: double
-        cpp_varname: gCachePressureAbortMemoryClearLimitPerBatch
-        default: 0
-        validator: {gte: -100}
-        redact: false
 
 structs:
     KillSessionsCmdFromClient:

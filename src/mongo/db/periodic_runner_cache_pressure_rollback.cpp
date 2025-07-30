@@ -75,23 +75,6 @@ bool underCachePressure(OperationContext* opCtx) {
 const auto periodicThreadToRollbackUnderCachePressureDecoration =
     ServiceContext::declareDecoration<PeriodicThreadToRollbackUnderCachePressure>();
 
-int64_t getPerBatchMemoryLimitBytes(OperationContext* opCtx) {
-    double limitParameter = gCachePressureAbortMemoryClearLimitPerBatch;
-
-    // Positive values are MB.
-    if (limitParameter > 0) {
-        return limitParameter * 1024 * 1024;
-    }
-    // 0 means no limit, so just set the limit to be larger than the total memory.
-    if (limitParameter == 0) {
-        limitParameter = -101;
-    }
-    // Negative values are percentages of cache allocated to the engine.
-    double onePercentMB = opCtx->getServiceContext()->getStorageEngine()->getCacheSizeMB() / 100.0;
-    double cacheLimitMB = onePercentMB * (-limitParameter);
-    return cacheLimitMB * 1024 * 1024;
-}
-
 }  // namespace
 
 // Tracks the number of passes the "rollbackUnderCachePressure" thread makes to abort oldest
@@ -108,9 +91,6 @@ auto& rollbackUnderCachePressureSkippedSessions =
 // thread due to timing out trying to checkout a sessions.
 auto& rollbackUnderCachePressureTimedOutKills =
     *MetricBuilder<Counter64>("rollbackUnderCachePressure.timedOutKills");
-// Tracks the (estimated) number of bytes freed up by killing oldest transactions.
-auto& rollbackUnderCachePressureBytesClearedEstimate =
-    *MetricBuilder<Counter64>("rollbackUnderCachePressure.bytesClearedEstimate");
 
 auto PeriodicThreadToRollbackUnderCachePressure::get(ServiceContext* serviceContext)
     -> PeriodicThreadToRollbackUnderCachePressure& {
@@ -161,9 +141,8 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
                 shard_role_details::getRecoveryUnit(opCtx)->setNoEvictionAfterCommitOrRollback();
 
 
-                int64_t bytesTarget = getPerBatchMemoryLimitBytes(opCtx);
                 int64_t killsTarget = gCachePressureAbortSessionKillLimitPerBatch;
-                while (bytesTarget > 0 && killsTarget > 0) {
+                while (killsTarget > 0) {
                     if (!underCachePressure(opCtx)) {
                         break;
                     }
@@ -171,7 +150,6 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
                     int64_t numKills = 0;
                     int64_t numSkips = 0;
                     int64_t numTimeOuts = 0;
-                    int64_t bytesClearedEstimate = 0;
                     // TODO(SERVER-102762): This is a linear scan of the session catalog for every
                     // session we try to kill. If we find that "larger than a small constant" is a
                     // reasonable default then we should re-visit this strategy, and find more than
@@ -181,15 +159,12 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
                         Milliseconds(gCachePressureAbortCheckoutTimeoutMilliseconds),
                         &numKills,
                         &numSkips,
-                        &numTimeOuts,
-                        &bytesClearedEstimate);
+                        &numTimeOuts);
                     rollbackUnderCachePressurePasses.increment(1);
                     rollbackUnderCachePressureSuccessfulKills.increment(numKills);
                     rollbackUnderCachePressureSkippedSessions.increment(numSkips);
                     rollbackUnderCachePressureTimedOutKills.increment(numTimeOuts);
-                    rollbackUnderCachePressureBytesClearedEstimate.increment(bytesClearedEstimate);
 
-                    bytesTarget -= bytesClearedEstimate;
                     killsTarget -= numKills;
                 }
             } catch (ExceptionFor<ErrorCategory::CancellationError>& ex) {

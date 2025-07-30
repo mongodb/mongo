@@ -181,8 +181,7 @@ void killOldestTransaction(OperationContext* opCtx,
                            Milliseconds timeout,
                            int64_t* numKills,
                            int64_t* numSkips,
-                           int64_t* numTimeOuts,
-                           int64_t* bytesClearedEstimate) {
+                           int64_t* numTimeOuts) {
     SessionKiller::Matcher matcher(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
     boost::optional<LogicalSessionId> oldest;
@@ -228,7 +227,6 @@ void killOldestTransaction(OperationContext* opCtx,
 
         auto session =
             sessionCatalog->checkOutSessionForKill(opCtx, std::move(killToken), &timeout);
-        size_t sessionBytes = shard_role_details::getRecoveryUnit(opCtx)->getCacheDirtyBytes();
 
         // TODO (SERVER-33850): Rename KillAllSessionsByPattern and
         // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill
@@ -250,7 +248,6 @@ void killOldestTransaction(OperationContext* opCtx,
                            "Transaction aborted due to cache pressure."));
             }
             (*numKills)++;
-            (*bytesClearedEstimate) += sessionBytes;
         }
     } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
         // Failed to check out the session for kill.
