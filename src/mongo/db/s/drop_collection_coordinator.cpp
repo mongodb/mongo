@@ -344,7 +344,9 @@ void DropCollectionCoordinator::_commitDropCollection(
     }
 
     if (collIsSharded) {
-        invariant(_doc.getCollInfo());
+        tassert(10644514,
+                "Expected collInfo to be set on the coordinator document",
+                _doc.getCollInfo());
         const auto coll = _doc.getCollInfo().value();
 
         sharding_ddl_util::removeCollAndChunksMetadataFromConfig(

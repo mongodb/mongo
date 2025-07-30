@@ -43,6 +43,7 @@ tests = [
     "test_MongoStringDataConstRefCheck3",
     "test_MongoStringDataStringViewApiCheck",
     "test_MongoInvariantStatusIsOKCheck",
+    "test_MongoInvariantDDLCoordinatorCheck",
 ]
 
 [

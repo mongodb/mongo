@@ -67,7 +67,9 @@ void CloneAuthoritativeMetadataCoordinator::_prepareDbsToClone(OperationContext*
 }
 
 void CloneAuthoritativeMetadataCoordinator::_clone(OperationContext* opCtx) {
-    invariant(_doc.getDbsToClone());
+    tassert(10644513,
+            "Expected dbsToClone to be set on the coordinator document",
+            _doc.getDbsToClone());
     const auto databasesToClone = *_doc.getDbsToClone();
 
     for (const auto& dbName : databasesToClone) {

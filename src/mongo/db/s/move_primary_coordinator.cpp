@@ -305,7 +305,9 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
         .then(_buildPhaseHandler(
             Phase::kCommit,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
-                invariant(_doc.getDatabaseVersion());
+                tassert(10644515,
+                        "Expected databaseVersion to be set on the coordinator document",
+                        _doc.getDatabaseVersion());
                 const auto& preCommitDbVersion = *_doc.getDatabaseVersion();
 
                 commitMetadataToConfig(opCtx, preCommitDbVersion);
@@ -625,7 +627,9 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
 
 void MovePrimaryCoordinator::assertClonedData(
     const std::vector<NamespaceString>& clonedCollections) const {
-    invariant(_doc.getCollectionsToClone());
+    tassert(10644516,
+            "Expected collectionsToClone to be set on the coordinator document",
+            _doc.getCollectionsToClone());
     const auto& collectionToClone = *_doc.getCollectionsToClone();
 
     uassert(7118501,
@@ -716,7 +720,9 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
     // Enable write blocking bypass to allow cleaning of stale data even if writes are disallowed.
     WriteBlockBypass::get(opCtx).set(true);
 
-    invariant(_doc.getCollectionsToClone());
+    tassert(10644517,
+            "Expected collectionsToClone to be set on the coordinator document",
+            _doc.getCollectionsToClone());
 
     const auto dropColl = [&](const NamespaceString& nssToDrop) {
         DropReply unusedDropReply;

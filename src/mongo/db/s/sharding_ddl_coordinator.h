@@ -125,14 +125,16 @@ public:
     }
 
     const ForwardableOperationMetadata& getForwardableOpMetadata() const {
-        invariant(_forwardableOpMetadata);
+        tassert(10644500, "Expected _forwardableOpMetadata to be set", _forwardableOpMetadata);
         return _forwardableOpMetadata.get();
     }
 
     // TODO SERVER-99655: update once the operationFCV is always present for sharded DDLs
     boost::optional<multiversion::FeatureCompatibilityVersion> getOperationFCV() const {
         const auto versionContext = getForwardableOpMetadata().getVersionContext();
-        invariant(!versionContext || versionContext->getOperationFCV(VersionContext::Passkey()));
+        tassert(10644501,
+                "Expected either no versionContext, or a versionContext with an operation FCV",
+                !versionContext || versionContext->getOperationFCV(VersionContext::Passkey()));
         return versionContext
             ? boost::make_optional(
                   versionContext->getOperationFCV(VersionContext::Passkey())->getVersion())
@@ -468,7 +470,9 @@ protected:
 
     void _updateStateDocument(OperationContext* opCtx, StateDoc&& newDoc) {
         PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
-        invariant(newDoc.getShardingDDLCoordinatorMetadata().getRecoveredFromDisk());
+        tassert(10644540,
+                "Expected recoveredFromDisk to be set on the coordinator document metadata",
+                newDoc.getShardingDDLCoordinatorMetadata().getRecoveredFromDisk());
         store.update(opCtx,
                      BSON(StateDoc::kIdFieldName << newDoc.getId().toBSON()),
                      newDoc.toBSON(),
@@ -493,7 +497,7 @@ protected:
 
     boost::optional<Status> getAbortReason() const override {
         const auto& status = _doc.getAbortReason();
-        invariant(!status || !status->isOK(), "when persisted, status must be an error");
+        tassert(10644541, "when persisted, status must be an error", !status || !status->isOK());
         return status;
     }
 
@@ -547,7 +551,9 @@ private:
             return _doc.getShardingDDLCoordinatorMetadata().getSession();
         }();
 
-        invariant(optSession);
+        tassert(10644542,
+                "Expected session to be set on the coordinator document metadata",
+                optSession);
 
         OperationSessionInfo osi;
         osi.setSessionId(optSession->getLsid());

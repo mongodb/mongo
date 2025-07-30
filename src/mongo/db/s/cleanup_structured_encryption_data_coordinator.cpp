@@ -265,7 +265,7 @@ bool doRenameOperation(OperationContext* opCtx,
     *newEcocRenameUuid = state.getEcocRenameUuid();
 
     if (needRename) {
-        invariant(needEcocCreate);
+        tassert(10644536, "Expected ECOC to need creation", needEcocCreate);
 
         if (escDeleteSet) {
             auto memoryLimit =

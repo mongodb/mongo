@@ -78,7 +78,7 @@ public:
      */
     BSONObj getResult(OperationContext* opCtx) {
         getCompletionFuture().get(opCtx);
-        invariant(_result.is_initialized());
+        tassert(10644503, "Expected _result to be initialized", _result.is_initialized());
         return *_result;
     }
 

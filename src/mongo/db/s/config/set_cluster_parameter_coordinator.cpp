@@ -92,7 +92,9 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
 Timestamp parseClusterParameterTime(const BSONObj& parameterDoc) {
     BSONElement clusterParameterTimeElem = parameterDoc.getField(
         SetClusterParameterCoordinatorDocument::kClusterParameterTimeFieldName);
-    dassert(!clusterParameterTimeElem.eoo() && !clusterParameterTimeElem.isNull());
+    tassert(10644546,
+            "Expected clusterParameterTime to be present",
+            !clusterParameterTimeElem.eoo() && !clusterParameterTimeElem.isNull());
     return clusterParameterTimeElem.timestamp();
 }
 
@@ -187,7 +189,9 @@ boost::optional<BSONObj> SetClusterParameterCoordinator::_getPersistedClusterPar
         BSONObj(),
         boost::none));
 
-    dassert(configsvrParameters.docs.size() <= 1);
+    tassert(10644547,
+            "Found more than one cluster parameter document",
+            configsvrParameters.docs.size() <= 1);
 
     if (configsvrParameters.docs.empty()) {
         return boost::none;

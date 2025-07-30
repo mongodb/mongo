@@ -227,7 +227,9 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                 // Populates the result if the coordinator was rebuilt after the commit phase.
                 if (!_result.is_initialized()) {
                     const auto& dbVersion = getDatabaseVersion();
-                    invariant(dbVersion.is_initialized());
+                    tassert(10644531,
+                            "Expected databaseVersion to be initialized",
+                            dbVersion.is_initialized());
                     _result = ConfigsvrCreateDatabaseResponse(dbVersion.get());
                 }
                 _exitCriticalSection(opCtx, executor, token, false /* throwIfReasonDiffers */);
@@ -267,7 +269,7 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
 
 ConfigsvrCreateDatabaseResponse CreateDatabaseCoordinator::getResult(OperationContext* opCtx) {
     getCompletionFuture().get(opCtx);
-    invariant(_result.is_initialized());
+    tassert(10644532, "Expected _result to be initialized", _result.is_initialized());
     return *_result;
 }
 

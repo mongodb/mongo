@@ -736,8 +736,9 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
 
     if (request.getDataShard()) {
 
-        // Data shard can only be specified in createCollection not in shardCollection
-        invariant(isUnsplittable(request));
+        tassert(10644537,
+                "Data shard can only be specified in createCollection not in shardCollection",
+                isUnsplittable(request));
 
         tassert(
             8119031,
@@ -894,9 +895,11 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
         }
     }
 
-    invariant(optTargetNss);
+    tassert(10644538, "Expected optTargetNss to be set", optTargetNss);
     const auto& targetNss = *optTargetNss;
-    invariant(optTargetCollUUID || missingSessionsCollectionLocally);
+    tassert(10644539,
+            "Expected optTargetCollUUID to be set unless creating system.sessions",
+            optTargetCollUUID || missingSessionsCollectionLocally);
 
     // 2. Make sure we're not trying to track a temporary collection upon moveCollection
     if (request.getRegisterExistingCollectionInGlobalCatalog()) {
@@ -1424,7 +1427,7 @@ void CreateCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuild
 
 CreateCollectionResponse CreateCollectionCoordinator::getResult(OperationContext* opCtx) {
     getCompletionFuture().get(opCtx);
-    invariant(_result.is_initialized());
+    tassert(10644506, "Expected _result to be initialized", _result.is_initialized());
     return *_result;
 }
 
@@ -1432,7 +1435,9 @@ const NamespaceString& CreateCollectionCoordinator::nss() const {
     // Rely on the resolved request parameters to retrieve the nss to be targeted by the
     // coordinator.
     stdx::lock_guard lk{_docMutex};
-    invariant(_doc.getTranslatedRequestParams());
+    tassert(10644507,
+            "Expected translatedRequestParams to be set in the coordinator document",
+            _doc.getTranslatedRequestParams());
     return _doc.getTranslatedRequestParams()->getNss();
 }
 
@@ -1869,8 +1874,13 @@ void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
     auto optUuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
     // TODO (SERVER-100309): Remove sessions collection handling once 9.0 becomes last LTS.
     if (!optUuid) {
-        invariant(nss() == NamespaceString::kLogicalSessionsNamespace &&
-                  _doc.getCreateSessionsCollectionRemotelyOnFirstShard());
+        tassert(10644508,
+                "Expected the namespace to be system.sessions",
+                nss() == NamespaceString::kLogicalSessionsNamespace);
+        tassert(10644509,
+                "Expected createSessionsCollectionRemotelyOnFirstShard to be set on the "
+                "coordinator document",
+                _doc.getCreateSessionsCollectionRemotelyOnFirstShard());
         // If we are in the state described above, we cannot get the uuid locally and so we need to
         // take the existing one from config.collections.
         const auto& cri = uassertStatusOK(
@@ -2030,7 +2040,9 @@ OptionsAndIndexes CreateCollectionCoordinator::_getCollectionOptionsAndIndexes(
                             Milliseconds(-1)))
             .docs;
 
-    invariant(!collectionResponse.empty());
+    tassert(10644510,
+            "Expected listCollections to return a non-empty response",
+            !collectionResponse.empty());
     auto& entry = collectionResponse.front();
 
     if (entry["options"].isABSONObj()) {
@@ -2304,7 +2316,9 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
     if (*_doc.getOriginalDataShard() != ShardingState::get(opCtx)->shardId() &&
         std::find(allShardIds.begin(), allShardIds.end(), *_doc.getOriginalDataShard()) ==
             allShardIds.end()) {
-        invariant(*_doc.getCollectionIsEmpty());
+        tassert(10644511,
+                "Expected collectionIsEmpty to be set on the coordinator document",
+                *_doc.getCollectionIsEmpty());
         sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
             opCtx, nss(), {*_doc.getOriginalDataShard()}, **executor, session, true, false, _uuid);
     }
@@ -2355,9 +2369,9 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
 
             if (_doc.getPhase() >= Phase::kCreateCollectionOnParticipants) {
                 _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
-                // TODO SERVER-83774: Remove the following invariant and skip the broadcast if the
+                // TODO SERVER-83774: Remove the following tassert and skip the broadcast if the
                 // _uuid does not exist.
-                invariant(_uuid);
+                tassert(10644512, "Expected _uuid to be set", _uuid);
                 const auto session = getNewSession(opCtx);
                 broadcastDropCollection(opCtx,
                                         nss(),

@@ -285,7 +285,7 @@ void RemoveShardCommitCoordinator::checkIfOptionsConflict(const BSONObj& stateDo
 
 RemoveShardProgress RemoveShardCommitCoordinator::getResult(OperationContext* opCtx) {
     getCompletionFuture().get(opCtx);
-    invariant(_result.is_initialized());
+    tassert(10644502, "Expected _result to be initialized", _result.is_initialized());
     return *_result;
 }
 

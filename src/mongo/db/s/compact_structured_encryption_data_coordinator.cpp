@@ -193,7 +193,7 @@ bool doRenameOperation(OperationContext* opCtx,
     *newEcocRenameUuid = state.getEcocRenameUuid();
 
     if (needRename) {
-        invariant(needCreate);
+        tassert(10644535, "Expected ECOC to need creation", needCreate);
 
         if (escDeleteSet) {
             // (v2 only) load the random set of ESC non-anchor entries to be deleted post-compact

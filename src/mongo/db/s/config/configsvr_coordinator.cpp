@@ -70,7 +70,9 @@ ConfigsvrCoordinator::ConfigsvrCoordinator(const BSONObj& stateDoc)
     : _coordId(extractConfigsvrCoordinatorMetadata(stateDoc).getId()) {}
 
 ConfigsvrCoordinator::~ConfigsvrCoordinator() {
-    invariant(_completionPromise.getFuture().isReady());
+    tassert(10644543,
+            "Expected _completionPromise to be ready",
+            _completionPromise.getFuture().isReady());
 }
 
 void ConfigsvrCoordinator::_removeStateDocument(OperationContext* opCtx) {
@@ -88,7 +90,9 @@ void ConfigsvrCoordinator::_removeStateDocument(OperationContext* opCtx) {
 
 OperationSessionInfo ConfigsvrCoordinator::_getCurrentSession() const {
     const auto& coordinatorMetadata = metadata();
-    invariant(coordinatorMetadata.getSession());
+    tassert(10644544,
+            "Expected session to be set on the coordinator document metadata",
+            coordinatorMetadata.getSession());
     ConfigsvrCoordinatorSession coordinatorSession = *coordinatorMetadata.getSession();
 
     OperationSessionInfo osi;
@@ -135,8 +139,10 @@ SemiFuture<void> ConfigsvrCoordinator::run(std::shared_ptr<executor::ScopedTaskE
                 // Nothing else to do, the _completionPromise will be cancelled once the coordinator
                 // is interrupted, because the only reasons to stop forward progress in this node is
                 // because of a stepdown happened or the coordinator was canceled.
-                dassert((token.isCanceled() && status.isA<ErrorCategory::CancellationError>()) ||
-                        status.isA<ErrorCategory::NotPrimaryError>());
+                tassert(10644545,
+                        "Execution of the ConfigsvrCoordinator failed unexpectedly",
+                        (token.isCanceled() && status.isA<ErrorCategory::CancellationError>()) ||
+                            status.isA<ErrorCategory::NotPrimaryError>());
                 return status;
             }
 

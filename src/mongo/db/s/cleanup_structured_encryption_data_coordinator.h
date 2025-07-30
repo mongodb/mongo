@@ -75,7 +75,7 @@ public:
 
     CleanupStructuredEncryptionDataCommandReply getResponse(OperationContext* opCtx) {
         getCompletionFuture().get(opCtx);
-        invariant(_response);
+        tassert(10644518, "Expected _response to be set", _response);
         return *_response;
     }
 

@@ -35,6 +35,7 @@
 #include "MongoCxx20StdChronoCheck.h"
 #include "MongoFCVConstantCheck.h"
 #include "MongoHeaderBracketCheck.h"
+#include "MongoInvariantDDLCoordinatorCheck.h"
 #include "MongoInvariantStatusIsOKCheck.h"
 #include "MongoMacroDefinitionLeaksCheck.h"
 #include "MongoNoUniqueAddressCheck.h"
@@ -90,6 +91,8 @@ public:
         CheckFactories.registerCheck<MongoRWMutexCheck>("mongo-rwmutex-check");
         CheckFactories.registerCheck<MongoInvariantStatusIsOKCheck>(
             "mongo-invariant-status-is-ok-check");
+        CheckFactories.registerCheck<InvariantDDLCoordinatorCheck>(
+            "mongo-invariant-ddl-coordinator-check");
     }
 };
 

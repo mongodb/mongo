@@ -174,7 +174,9 @@ void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
             !chunkManager.isSharded());
 
     if (chunkManager.hasRoutingTable()) {
-        invariant(chunkManager.isUnsplittable());
+        tassert(10644528,
+                "Expected tracked collection to be capped to be unsplittable",
+                chunkManager.isUnsplittable());
 
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 "Can't convert a timeseries collection to a capped collection",
@@ -182,7 +184,9 @@ void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
 
         std::set<ShardId> shards;
         chunkManager.getAllShardIds(&shards);
-        invariant(!shards.empty());
+        tassert(10644529,
+                "Expected the collection to be capped to have a chunk on some shard",
+                !shards.empty());
         _doc.setDataShard(*(shards.begin()));
 
         _doc.setOriginalCollection(sharding_ddl_util::getCollectionFromConfigServer(opCtx, nss()));

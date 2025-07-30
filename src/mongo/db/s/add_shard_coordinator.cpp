@@ -157,9 +157,11 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 // versions.
                 const auto currentFCV =
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-                invariant(currentFCV == multiversion::GenericFCV::kLatest ||
-                          currentFCV == multiversion::GenericFCV::kLastContinuous ||
-                          currentFCV == multiversion::GenericFCV::kLastLTS);
+                tassert(10644526,
+                        "Expected the FCV to be latest, lastContinuous or lastLTS during addShard",
+                        currentFCV == multiversion::GenericFCV::kLatest ||
+                            currentFCV == multiversion::GenericFCV::kLastContinuous ||
+                            currentFCV == multiversion::GenericFCV::kLastLTS);
 
                 _setFCVOnReplicaSet(opCtx, currentFCV);
 
@@ -385,7 +387,7 @@ void AddShardCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const 
 
 const std::string& AddShardCoordinator::getResult(OperationContext* opCtx) const {
     const_cast<AddShardCoordinator*>(this)->getCompletionFuture().get(opCtx);
-    invariant(_result.is_initialized());
+    tassert(10644527, "Expected _result to be initialized", _result.is_initialized());
     return *_result;
 }
 

@@ -49,12 +49,14 @@ MigrationBlockingOperationCoordinator::UUIDSet populateOperations(
     if (operationsVector.empty()) {
         return operationsSet;
     }
-    invariant(doc.getPhase() == MigrationBlockingOperationCoordinatorPhaseEnum::kBlockingMigrations,
-              str::stream() << "Operations should not be ongoing while migrations are running");
+    tassert(10644533,
+            "Operations should not be ongoing while migrations are running",
+            doc.getPhase() == MigrationBlockingOperationCoordinatorPhaseEnum::kBlockingMigrations);
 
     for (const auto& uuid : operationsVector) {
-        invariant(!operationsSet.contains(uuid),
-                  str::stream() << "Duplicate operations found on disk with same UUID: " << uuid);
+        tassert(10644534,
+                str::stream() << "Duplicate operations found on disk with same UUID: " << uuid,
+                !operationsSet.contains(uuid));
         operationsSet.insert(uuid);
     }
     return operationsSet;
@@ -140,9 +142,10 @@ void MigrationBlockingOperationCoordinator::_recoverIfNecessary(WithLock lk,
         return;
     }
 
-    invariant(_operations.size() == 1,
-              str::stream() << "If there is a state document on disk and migrations are not "
-                               "blocked, then there must be only one operation.");
+    tassert(10644530,
+            "If there is a state document on disk and migrations are not "
+            "blocked, then there must be only one operation.",
+            _operations.size() == 1);
 
     if (isBeginOperation) {
         try {

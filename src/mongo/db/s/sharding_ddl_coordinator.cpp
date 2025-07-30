@@ -139,8 +139,12 @@ ShardingDDLCoordinator::ShardingDDLCoordinator(ShardingDDLCoordinatorService* se
       _externalState(_service->createExternalState()) {}
 
 ShardingDDLCoordinator::~ShardingDDLCoordinator() {
-    invariant(_constructionCompletionPromise.getFuture().isReady());
-    invariant(_completionPromise.getFuture().isReady());
+    tassert(10644519,
+            "Expected _constructionCompletionPromise to be ready",
+            _constructionCompletionPromise.getFuture().isReady());
+    tassert(10644520,
+            "Expected _completionPromise to be ready",
+            _completionPromise.getFuture().isReady());
 }
 
 ExecutorFuture<bool> ShardingDDLCoordinator::_removeDocumentUntillSuccessOrStepdown(
@@ -337,7 +341,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
 
-            invariant(!_locker);
+            tassert(10644521, "Expected _locker to be unset", !_locker);
             _locker = std::make_unique<Locker>(opCtx->getServiceContext());
             _locker->unsetThreadId();
             _locker->setDebugInfo(str::stream() << _coordId.toBSON());
@@ -364,7 +368,9 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 auto opCtxHolder = makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 
-                invariant(metadata().getDatabaseVersion());
+                tassert(10644522,
+                        "Expected databaseVersion to be set on the coordinator document metadata",
+                        metadata().getDatabaseVersion());
 
                 ScopedSetShardRole scopedSetShardRole(
                     opCtx,
@@ -396,10 +402,12 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
         .onError([this, token, anchor = shared_from_this()](const Status& status) {
             // The construction of a DDL coordinator recovered from disk can only fail due to
             // stepdown/shutdown.
-            dassert(!_recoveredFromDisk ||
-                    (token.isCanceled() &&
-                     (status.isA<ErrorCategory::CancellationError>() ||
-                      status.isA<ErrorCategory::NotPrimaryError>())));
+            tassert(10644523,
+                    "Expected recovered sharding DDL coordinator to be reconstructed successfully",
+                    !_recoveredFromDisk ||
+                        (token.isCanceled() &&
+                         (status.isA<ErrorCategory::CancellationError>() ||
+                          status.isA<ErrorCategory::NotPrimaryError>())));
 
             // Ensure coordinator cleanup if the document has not been saved.
             _completeOnError = !_recoveredFromDisk;
@@ -487,9 +495,11 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             // If we are stepping down the token MUST be cancelled. Each implementation of the
             // coordinator must retry remote stepping down errors, unless, we allow finalizing the
             // coordinator in the presence of errors.
-            dassert(!(status.isA<ErrorCategory::NotPrimaryError>() ||
+            tassert(10644524,
+                    "Expected the coordinator token to be cancelled on stepdown",
+                    !(status.isA<ErrorCategory::NotPrimaryError>() ||
                       status.isA<ErrorCategory::ShutdownError>()) ||
-                    token.isCanceled() || _completeOnError);
+                        token.isCanceled() || _completeOnError);
 
             auto completionStatus =
                 !status.isOK() ? status : getAbortReason().get_value_or(Status::OK());
@@ -546,7 +556,10 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                     isSteppingDown = completionStatus.isA<ErrorCategory::NotPrimaryError>() ||
                         completionStatus.isA<ErrorCategory::ShutdownError>() ||
                         completionStatus.isA<ErrorCategory::CancellationError>();
-                    dassert(isSteppingDown);
+                    tassert(
+                        10644525,
+                        "Sharding DDL coordinator cleanup failed for a reason other than stepdown",
+                        isSteppingDown);
                 }
             }
 
