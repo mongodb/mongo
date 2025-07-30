@@ -209,4 +209,6 @@ function runTests({enableCloneNoRefresh}) {
 }
 
 runTests({enableCloneNoRefresh: false});
-runTests({enableCloneNoRefresh: true});
+// TODO (SERVER-108476): Make flush_resharding_state_change_errors.js test
+// featureFlagReshardingCloneNoRefresh: true again.
+// runTests({enableCloneNoRefresh: true});
