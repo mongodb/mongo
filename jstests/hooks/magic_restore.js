@@ -244,6 +244,47 @@ function dataConsistencyCheck(sourceNode, restoreNode, consistencyTs) {
 
             let diff = DataConsistencyChecker.getDiff(sourceCursor, restoreCursor);
 
+            // Recursively checks if a document contains at least one array field
+            // where any element is a number type.
+            const hasArrayWithNumber = (doc) => {
+                if (Array.isArray(doc)) {
+                    return doc.some(el => typeof el === 'number' || hasArrayWithNumber(el));
+                } else if (doc && typeof doc === 'object') {
+                    return Object.values(doc).some(hasArrayWithNumber);
+                }
+                return false;
+            };
+
+            // TODO SERVER-5424: Remove code block to recheck docsWithDifferentContents.
+            // When a document with an array field containing NumberInt (int32) values is read by
+            // the shell, the V8 engine automatically optimizes these int32 values into
+            // JavaScript number types, which are 64 bit doubles. Inserting these types of
+            // documents into a restore cluster for a PIT restore causes all the int32 values to be
+            // mischaracterized as doubles. This results in data inconsistency between the two
+            // clusters in the raw BSON byte arrays. To address this edge case, we recheck
+            // docsWithDifferentContents: if the JavaScript representations are equal, we assert
+            // that both documents contain arrays with numbers, confirming this is a benign type
+            // mismatch due to SERVER-5424.
+            if (diff.docsWithDifferentContents.length !== 0) {
+                diff.docsWithDifferentContents = diff.docsWithDifferentContents.filter(({
+                                                                                           first,
+                                                                                           second
+                                                                                       }) => {
+                    // tojson() will omit BSON metadata, such as the distinction between NumberInt
+                    // and NumberLong.
+                    if (tojson(first) === tojson(second)) {
+                        assert(
+                            hasArrayWithNumber(first) && hasArrayWithNumber(second),
+                            "Docs are logically equal but both do not contain an array with a number");
+                        jsTestLog(
+                            `Removing documents from docsWithDifferentContents due to equality: ${
+                                tojson(first)}`);
+                        return false;
+                    }
+                    return true;
+                });
+            }
+
             assert.eq(
                 diff,
                 {
@@ -284,7 +325,10 @@ function performMagicRestore(sourceNode, dbPath, nodeType, name, options) {
     // Increase snapshot history window on the restore node so we don't get a SnapshotTooOld error
     // when doing the consistency checker for long running tests.
     const snapshotHistory = 3600;
-    options.setParameter = {minSnapshotHistoryWindowInSeconds: snapshotHistory};
+    options.setParameter = {
+        minSnapshotHistoryWindowInSeconds: snapshotHistory,
+        logComponentVerbosity: tojson({replication: 3})
+    };
 
     // performRestore returns a read timestamp for snapshot reads in consistency checks.
     const consistencyTs =
