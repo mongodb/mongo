@@ -54,7 +54,7 @@ buildvariants:
   - amazon2-latest-small
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     test_flags: >-
       --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer,requires_ldap_pool
@@ -186,7 +186,7 @@ buildvariants:
   run_on:
   - amazon2023.3-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -309,7 +309,7 @@ buildvariants:
   run_on:
   - amazon2023.3-arm64-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -351,7 +351,7 @@ buildvariants:
   run_on:
   - amazon2023-arm64-latest-small-m8g
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=amazon2023
     compile_all_but_not_unittests_flags: >-
@@ -387,7 +387,7 @@ buildvariants:
   - amazon2-arm64-latest-small
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -434,7 +434,7 @@ buildvariants:
   - amazon2-arm64-latest-small-m8g
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=amazon2

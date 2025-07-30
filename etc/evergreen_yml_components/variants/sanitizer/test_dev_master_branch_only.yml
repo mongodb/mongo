@@ -309,7 +309,7 @@ buildvariants:
   expansions:
     compile_variant: *enterprise-windows-debug-unoptimized
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     exe: ".exe"
     content_type: application/zip
@@ -407,7 +407,7 @@ buildvariants:
   expansions:
     toolchain_version: stable
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     lang_environment: LANG=C
     san_options: *ubsan_options

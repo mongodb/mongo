@@ -38,7 +38,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_latch_analyzer
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     push_path: osx
     push_bucket: downloads.10gen.com
@@ -85,7 +85,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_latch_analyzer
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     push_path: osx
     push_bucket: downloads.10gen.com

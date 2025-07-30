@@ -13,7 +13,7 @@ buildvariants:
   - suse15sp5-small
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com

@@ -174,7 +174,7 @@ buildvariants:
   stepback: false
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -225,7 +225,7 @@ buildvariants:
   stepback: false
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -284,7 +284,7 @@ buildvariants:
   - ubuntu2004-arm64
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -359,7 +359,7 @@ buildvariants:
   run_on:
   - ubuntu2204-arm64-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -437,7 +437,7 @@ buildvariants:
   stepback: false
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -525,7 +525,7 @@ buildvariants:
   run_on:
     - ubuntu2404-arm64-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux

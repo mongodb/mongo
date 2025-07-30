@@ -13,7 +13,7 @@ buildvariants:
   - windows-2022-small
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
       //src/mongo/installer/msi:mongodb-win32-x86_64-windows
     exe: ".exe"

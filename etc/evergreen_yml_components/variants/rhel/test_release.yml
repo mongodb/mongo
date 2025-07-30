@@ -86,7 +86,7 @@ buildvariants:
   - rhel8.8-small
   expansions: &enterprise-rhel-8-64-bit-expansions
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -177,7 +177,7 @@ buildvariants:
   - rhel8.8-arm64-small
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -258,7 +258,7 @@ buildvariants:
   run_on:
   - rhel93-small
   expansions: &enterprise-rhel-93-64-bit-expansions
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -343,7 +343,7 @@ buildvariants:
   - rhel93-arm64-small
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com

@@ -15,7 +15,7 @@ buildvariants:
   stepback: false
   expansions: &enterprise-rhel-81-ppc64le-expansions-template
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=requires_latch_analyzer
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
@@ -82,7 +82,7 @@ buildvariants:
   stepback: false
   expansions: &enterprise-rhel-9-ppc64le-expansions-template
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=requires_latch_analyzer
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
@@ -149,7 +149,7 @@ buildvariants:
   stepback: false
   expansions: &enterprise-rhel-83-s390x-expansions-template
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     release_buid: true
     test_flags: --excludeWithAnyTags=incompatible_with_s390x,requires_latch_analyzer
@@ -215,7 +215,7 @@ buildvariants:
   stepback: false
   expansions: &enterprise-rhel-9-s390x-expansions-template
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     release_buid: true
     test_flags: --excludeWithAnyTags=incompatible_with_s390x,requires_latch_analyzer

@@ -238,7 +238,7 @@ buildvariants:
   stepback: false
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     lang_environment: LANG=C
     san_options: *aubsan_options
@@ -325,7 +325,7 @@ buildvariants:
   stepback: false
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     lang_environment: LANG=C
     san_options: *ubsan_options
@@ -409,7 +409,7 @@ buildvariants:
   stepback: false
   expansions:
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     lang_environment: LANG=C
     toolchain_version: stable
@@ -446,7 +446,7 @@ buildvariants:
   stepback: false
   expansions: &enterprise-rhel8-debug-tsan-expansions-template
     additional_package_targets: >-
-      archive-mongocryptd
+      archive-mongocryptd-stripped
       archive-mongocryptd-debug
     lang_environment: LANG=C
     toolchain_version: stable
