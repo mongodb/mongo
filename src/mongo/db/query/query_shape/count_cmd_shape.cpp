@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/query_shape/count_cmd_shape.h"
 
+#include "mongo/db/pipeline/expression_context_builder.h"
+
 namespace mongo::query_shape {
 
 CountCmdShapeComponents::CountCmdShapeComponents(const ParsedFindCommand& request,
@@ -73,7 +75,7 @@ void CountCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
             bob.append(CountCommandRequest::kQueryFieldName, components.representativeQuery);
         } else {
             // Slow path: We need to re-parse from our representative shapes.
-            auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, nssOrUUID);
+            auto expCtx = makeBlankExpressionContext(opCtx, nssOrUUID);
             auto matchExpr = uassertStatusOK(
                 MatchExpressionParser::parse(components.representativeQuery,
                                              expCtx,

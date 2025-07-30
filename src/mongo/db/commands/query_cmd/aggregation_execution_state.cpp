@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/profile_settings.h"

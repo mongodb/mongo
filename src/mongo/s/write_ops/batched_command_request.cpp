@@ -35,6 +35,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep

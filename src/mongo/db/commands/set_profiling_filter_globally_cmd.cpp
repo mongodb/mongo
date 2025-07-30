@@ -36,6 +36,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/profile_settings.h"

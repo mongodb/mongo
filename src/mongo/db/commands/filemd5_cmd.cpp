@@ -44,6 +44,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/profile_collection.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"

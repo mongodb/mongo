@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 
@@ -248,8 +249,7 @@ FindCmdShape::FindCmdShape(const ParsedFindCommand& findRequest,
 void FindCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
                                                     OperationContext* opCtx,
                                                     const SerializationOptions& opts) const {
-    auto expCtx = ExpressionContext::makeBlankExpressionContext(
-        opCtx, nssOrUUID, _components.let.shapifiedLet);
+    auto expCtx = makeBlankExpressionContext(opCtx, nssOrUUID, _components.let.shapifiedLet);
     if (opts == SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
         // Fast path: we already have this.
         _components.appendTo(bob, opts, expCtx);

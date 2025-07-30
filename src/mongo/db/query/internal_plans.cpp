@@ -42,6 +42,7 @@
 #include "mongo/db/exec/multi_iterator.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/upsert_stage.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor_factory.h"

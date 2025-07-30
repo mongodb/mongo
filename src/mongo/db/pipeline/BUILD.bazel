@@ -704,6 +704,7 @@ mongo_cc_library(
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db:curop_failpoint_helpers",
         "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:expression_context_builder",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:query_matcher",

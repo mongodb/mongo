@@ -30,6 +30,7 @@ mongo_cc_library(
         "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:error_labels",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:expression_context_builder",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:vector_clock",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands/query_cmd:bulk_write_parser",

@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -99,7 +100,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::c
         spec.getSetVariable() == searchMetaStr);
 
     std::unique_ptr<Pipeline> pipeline = Pipeline::parse(
-        spec.getPipeline(), expCtx->copyForSubPipeline(expCtx->getNamespaceString()));
+        spec.getPipeline(),
+        makeCopyForSubPipelineFromExpressionContext(expCtx, expCtx->getNamespaceString()));
 
     return DocumentSourceSetVariableFromSubPipeline::create(
         expCtx, std::move(pipeline), Variables::kSearchMetaId);

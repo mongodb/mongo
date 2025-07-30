@@ -172,6 +172,7 @@ mongo_cc_library(
         ":timeseries_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/bson/column",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:coll_mod_command_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:expression_context_builder",
         "//src/mongo/db:index_commands_idl",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db/catalog:index_catalog",

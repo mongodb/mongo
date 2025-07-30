@@ -47,6 +47,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 #include "mongo/db/repl/read_concern_level.h"

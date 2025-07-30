@@ -46,6 +46,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/path_internal.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"

@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"

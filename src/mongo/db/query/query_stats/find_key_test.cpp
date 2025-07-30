@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/query_stats/find_key.h"
 
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"

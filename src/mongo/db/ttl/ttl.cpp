@@ -55,6 +55,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/internal_plans.h"

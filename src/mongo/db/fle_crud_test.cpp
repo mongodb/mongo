@@ -57,6 +57,7 @@
 #include "mongo/db/fle_query_interface_mock.h"
 #include "mongo/db/fts/unicode/string.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"

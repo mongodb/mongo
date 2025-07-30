@@ -41,6 +41,7 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -605,13 +606,12 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
     BatchItemRef targetingBatchItem(requestPtr, 0);
     std::vector<AsyncRequestsSender::Response> shardResponses;
     commandOpWrite(opCtx, nss, explainCmd, std::move(targetingBatchItem), &shardResponses);
-    uassertStatusOK(ClusterExplain::buildExplainResult(
-        ExpressionContext::makeBlankExpressionContext(opCtx, nss),
-        shardResponses,
-        ClusterExplain::kWriteOnShards,
-        timer.millis(),
-        originalRequestBSON,
-        &bodyBuilder));
+    uassertStatusOK(ClusterExplain::buildExplainResult(makeBlankExpressionContext(opCtx, nss),
+                                                       shardResponses,
+                                                       ClusterExplain::kWriteOnShards,
+                                                       timer.millis(),
+                                                       originalRequestBSON,
+                                                       &bodyBuilder));
 }
 
 bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,

@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -198,7 +199,7 @@ public:
 
     boost::intrusive_ptr<ExpressionContext> expCtx() {
         if (!_expCtx) {
-            _expCtx = ExpressionContext::makeBlankExpressionContext(opCtx(), {NamespaceString()});
+            _expCtx = makeBlankExpressionContext(opCtx(), {NamespaceString()});
         }
 
         return _expCtx;

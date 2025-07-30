@@ -45,6 +45,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/read_concern_args.h"

@@ -30,6 +30,7 @@
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 
 namespace mongo::query_shape {
 
@@ -73,7 +74,7 @@ void DistinctCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
             // Fastpath. Already serialized using the same serialization options.
             bob.append(DistinctCommandRequest::kQueryFieldName, components.representativeQuery);
         } else {
-            auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, nssOrUUID);
+            auto expCtx = makeBlankExpressionContext(opCtx, nssOrUUID);
             auto matchExpr = uassertStatusOK(
                 MatchExpressionParser::parse(components.representativeQuery,
                                              expCtx,

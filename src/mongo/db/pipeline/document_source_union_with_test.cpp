@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
@@ -336,7 +337,7 @@ TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {
 TEST_F(DocumentSourceUnionWithTest, ReturnEOFAfterBeingDisposed) {
     const auto mockInput = DocumentSourceMock::createForTest({Document(), Document()}, getExpCtx());
     const auto mockUnionInput = std::deque<DocumentSource::GetNextResult>{};
-    const auto mockCtx = getExpCtx()->copyWith({});
+    const auto mockCtx = makeCopyFromExpressionContext(getExpCtx(), {});
     mockCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockUnionInput));
     auto unionWith = DocumentSourceUnionWith(
         mockCtx, Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));

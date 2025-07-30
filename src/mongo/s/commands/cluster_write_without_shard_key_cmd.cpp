@@ -49,6 +49,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
@@ -551,13 +552,13 @@ public:
                     const auto millisElapsed = timer.millis();
 
                     auto bodyBuilder = result->getBodyBuilder();
-                    uassertStatusOK(ClusterExplain::buildExplainResult(
-                        ExpressionContext::makeBlankExpressionContext(opCtx, ns()),
-                        {response},
-                        ClusterExplain::kWriteOnShards,
-                        millisElapsed,
-                        writeCmdObj,
-                        &bodyBuilder));
+                    uassertStatusOK(
+                        ClusterExplain::buildExplainResult(makeBlankExpressionContext(opCtx, ns()),
+                                                           {response},
+                                                           ClusterExplain::kWriteOnShards,
+                                                           millisElapsed,
+                                                           writeCmdObj,
+                                                           &bodyBuilder));
                 });
         }
 

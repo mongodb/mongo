@@ -34,6 +34,7 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/count_command_gen.h"
@@ -477,7 +478,7 @@ public:
                 BSONObj targetingQuery = countRequest.getQuery();
                 BSONObj targetingCollation = countRequest.getCollation().value_or(BSONObj());
 
-                auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, nss);
+                auto expCtx = makeBlankExpressionContext(opCtx, nss);
                 auto numShards =
                     getTargetedShardsForQuery(expCtx, cri, targetingQuery, targetingCollation)
                         .size();

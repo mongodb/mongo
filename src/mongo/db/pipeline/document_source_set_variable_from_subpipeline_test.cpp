@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
@@ -131,7 +132,8 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoGetNext) {
         std::vector{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}, Document{{"d", 1}}};
     auto expCtx = getExpCtx();
     const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(inputDocs[1], expCtx);
-    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->getNamespaceString());
+    auto ctxForSubPipeline =
+        makeCopyForSubPipelineFromExpressionContext(expCtx, expCtx->getNamespaceString());
     const auto mockSourceForSubPipeline =
         DocumentSourceMock::createForTest(inputDocs, ctxForSubPipeline);
     auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(
@@ -157,7 +159,8 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, QueryShape) {
         std::vector{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}, Document{{"d", 1}}};
     auto expCtx = getExpCtx();
     const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(inputDocs[1], expCtx);
-    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->getNamespaceString());
+    auto ctxForSubPipeline =
+        makeCopyForSubPipelineFromExpressionContext(expCtx, expCtx->getNamespaceString());
     const auto mockSourceForSubPipeline =
         DocumentSourceMock::createForTest(inputDocs, ctxForSubPipeline);
     auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(
@@ -194,7 +197,8 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, ShouldPropagateDisposeThrou
 
     const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(expCtx);
 
-    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->getNamespaceString());
+    auto ctxForSubPipeline =
+        makeCopyForSubPipelineFromExpressionContext(expCtx, expCtx->getNamespaceString());
     const auto mockSourceForSubPipeline = DocumentSourceMock::createForTest(ctxForSubPipeline);
 
     auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(

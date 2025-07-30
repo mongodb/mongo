@@ -40,6 +40,7 @@
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/db/timeseries/timeseries_constants.h"

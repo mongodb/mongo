@@ -37,6 +37,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -409,10 +410,10 @@ void Explain::explainPipeline(PlanExecutor* exec,
     explain_common::generateMaxUsedMemBytes(exec->getOpCtx(), out);
     explain_common::generateServerInfo(out);
 
-    auto* cq = exec->getCanonicalQuery();
+    auto* cq = pipelineExec->getCanonicalQuery();
     const auto& expCtx = cq
         ? cq->getExpCtx()
-        : ExpressionContext::makeBlankExpressionContext(exec->getOpCtx(), exec->nss());
+        : makeBlankExpressionContext(pipelineExec->getOpCtx(), pipelineExec->nss());
     explain_common::generateServerParameters(expCtx, out);
     explain_common::appendIfRoom(command, "command", out);
 }
@@ -458,9 +459,8 @@ void Explain::explainStages(PlanExecutor* exec,
 
     explain_common::generateServerInfo(out);
     auto* cq = exec->getCanonicalQuery();
-    const auto& expCtx = cq
-        ? cq->getExpCtx()
-        : ExpressionContext::makeBlankExpressionContext(exec->getOpCtx(), exec->nss());
+    const auto& expCtx =
+        cq ? cq->getExpCtx() : makeBlankExpressionContext(exec->getOpCtx(), exec->nss());
     explain_common::generateServerParameters(expCtx, out);
 }
 

@@ -45,6 +45,7 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/collation/collator_interface.h"

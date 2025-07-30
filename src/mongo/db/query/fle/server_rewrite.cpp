@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/fle/query_rewriter.h"
 #include "mongo/db/query/fle/server_rewrite_helper.h"

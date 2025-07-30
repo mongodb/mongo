@@ -40,6 +40,7 @@
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"

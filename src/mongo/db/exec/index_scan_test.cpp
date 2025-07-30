@@ -34,6 +34,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"

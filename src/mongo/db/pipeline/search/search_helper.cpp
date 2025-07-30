@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
@@ -382,7 +383,8 @@ std::unique_ptr<Pipeline> prepareSearchForTopLevelPipelineLegacyExecutor(
             // Construct a duplicate ExpressionContext for our cloned pipeline. This is necessary
             // so that the duplicated pipeline and the cloned pipeline do not accidentally
             // share an OperationContext.
-            auto newExpCtx = expCtx->copyWith(expCtx->getNamespaceString(), expCtx->getUUID());
+            auto newExpCtx = makeCopyFromExpressionContext(
+                expCtx, expCtx->getNamespaceString(), expCtx->getUUID());
             return Pipeline::create({origSearchStage->clone(newExpCtx)}, newExpCtx);
         }
         return nullptr;
@@ -439,8 +441,8 @@ std::unique_ptr<Pipeline> prepareSearchForTopLevelPipelineLegacyExecutor(
                     // Construct a duplicate ExpressionContext for our cloned pipeline. This is
                     // necessary so that the duplicated pipeline and the cloned pipeline do not
                     // accidentally share an OperationContext.
-                    auto newExpCtx =
-                        expCtx->copyWith(expCtx->getNamespaceString(), expCtx->getUUID());
+                    auto newExpCtx = makeCopyFromExpressionContext(
+                        expCtx, expCtx->getNamespaceString(), expCtx->getUUID());
 
                     // Clone the MongotRemote stage and set the metadata cursor.
                     auto newStage =

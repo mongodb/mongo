@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/server_options.h"

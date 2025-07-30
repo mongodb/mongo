@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/util/intrusive_counter.h"
 

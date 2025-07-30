@@ -715,13 +715,12 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     executor::RemoteCommandResponse response(host, bob.obj(), Milliseconds(millisElapsed));
     AsyncRequestsSender::Response arsResponse{*shardId, response, host};
 
-    return ClusterExplain::buildExplainResult(
-        ExpressionContext::makeBlankExpressionContext(opCtx, nss),
-        {arsResponse},
-        ClusterExplain::kSingleShard,
-        millisElapsed,
-        cmdObj,
-        &bodyBuilder);
+    return ClusterExplain::buildExplainResult(makeBlankExpressionContext(opCtx, nss),
+                                              {arsResponse},
+                                              ClusterExplain::kSingleShard,
+                                              millisElapsed,
+                                              cmdObj,
+                                              &bodyBuilder);
 }
 
 bool FindAndModifyCmd::run(OperationContext* opCtx,

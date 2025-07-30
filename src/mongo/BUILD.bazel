@@ -636,6 +636,7 @@ filegroup(
         "//src/mongo/db/pipeline:document_source_out_gen",
         "//src/mongo/db/pipeline:expression.h",
         "//src/mongo/db/pipeline:expression_context.h",
+        "//src/mongo/db/pipeline:expression_context_builder.h",
         "//src/mongo/db/pipeline:expression_visitor.h",
         "//src/mongo/db/pipeline:expression_walker.h",
         "//src/mongo/db/pipeline:field_path.h",

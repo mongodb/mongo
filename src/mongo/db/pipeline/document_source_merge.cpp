@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/document_source_merge_spec.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/explain_options.h"
@@ -394,7 +395,7 @@ Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
             if (!pipeline.has_value()) {
                 return boost::none;
             }
-            auto expCtxWithLetVariables = pExpCtx->copyWith(getOutputNs());
+            auto expCtxWithLetVariables = makeCopyFromExpressionContext(pExpCtx, getOutputNs());
             if (spec.getLet()) {
                 BSONObjBuilder cleanLetSpecBuilder;
                 for (const auto& letVar : letVariables) {

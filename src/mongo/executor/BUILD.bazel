@@ -510,6 +510,7 @@ mongo_cc_library(
         ":network_interface",
         ":task_executor_interface",
         "//src/mongo:base",
+        "//src/mongo/db:expression_context_builder",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:query_matcher",
         "//src/mongo/rpc:metadata",

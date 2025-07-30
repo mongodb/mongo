@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/logv2/log.h"
@@ -80,7 +81,8 @@ Value DocumentSourceListSampledQueries::serialize(const SerializationOptions& op
 
 DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
     if (_pipeline == nullptr) {
-        auto foreignExpCtx = pExpCtx->copyWith(NamespaceString::kConfigSampledQueriesNamespace);
+        auto foreignExpCtx =
+            makeCopyFromExpressionContext(pExpCtx, NamespaceString::kConfigSampledQueriesNamespace);
         std::vector<BSONObj> stages;
         if (auto& nss = _spec.getNamespace()) {
             uassertStatusOK(validateNamespace(*nss));

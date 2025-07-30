@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/s/sharding_state.h"
@@ -190,7 +191,8 @@ protected:
 
     auto setVariableFromSubPipeline() {
         auto expCtx = getExpCtx();
-        auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->getNamespaceString());
+        auto ctxForSubPipeline =
+            makeCopyForSubPipelineFromExpressionContext(expCtx, expCtx->getNamespaceString());
         return DocumentSourceSetVariableFromSubPipeline::create(
             expCtx, Pipeline::create({}, ctxForSubPipeline), Variables::kSearchMetaId);
     }

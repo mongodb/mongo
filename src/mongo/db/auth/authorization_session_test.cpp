@@ -52,6 +52,7 @@
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/service_context.h"

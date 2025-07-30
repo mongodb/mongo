@@ -60,6 +60,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
@@ -777,8 +778,8 @@ boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
     try {
         // Pass empty collator in order avoid inheriting the collator from 'expCtx', which may be
         // different from the collator of the corresponding collection.
-        auto foreignExpCtx =
-            expCtx->copyWith(nss, collectionUUID, std::unique_ptr<CollatorInterface>());
+        auto foreignExpCtx = makeCopyFromExpressionContext(
+            expCtx, nss, collectionUUID, std::unique_ptr<CollatorInterface>());
 
         // If we are here, we are either executing the pipeline normally or running in one of the
         // execution stat explain verbosities. In either case, we disable explain on the foreign

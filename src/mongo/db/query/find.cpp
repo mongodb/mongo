@@ -31,6 +31,7 @@
 #include "mongo/db/query/find.h"
 
 #include "mongo/db/curop.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
@@ -115,8 +116,7 @@ void endQueryOp(OperationContext* opCtx,
         collectQueryStatsMongod(opCtx, *cursor);
     } else {
         auto* cq = exec.getCanonicalQuery();
-        const auto& expCtx =
-            cq ? cq->getExpCtx() : ExpressionContext::makeBlankExpressionContext(opCtx, exec.nss());
+        const auto& expCtx = cq ? cq->getExpCtx() : makeBlankExpressionContext(opCtx, exec.nss());
         collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().queryStatsInfo.key));
     }
 

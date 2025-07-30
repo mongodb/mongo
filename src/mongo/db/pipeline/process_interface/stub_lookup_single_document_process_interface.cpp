@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
@@ -89,7 +90,7 @@ boost::optional<Document> StubLookupSingleDocumentProcessInterface::lookupSingle
     // The namespace 'nss' may be different than the namespace on the ExpressionContext in the
     // case of a change stream on a whole database so we need to make a copy of the
     // ExpressionContext with the new namespace.
-    auto foreignExpCtx = expCtx->copyWith(nss, collectionUUID, boost::none);
+    auto foreignExpCtx = makeCopyFromExpressionContext(expCtx, nss, collectionUUID, boost::none);
     std::unique_ptr<Pipeline> pipeline;
     std::unique_ptr<exec::agg::Pipeline> execPipeline;
     try {

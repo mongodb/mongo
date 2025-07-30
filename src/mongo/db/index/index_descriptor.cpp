@@ -46,6 +46,7 @@
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"

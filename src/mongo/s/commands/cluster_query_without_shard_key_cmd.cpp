@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -640,7 +641,7 @@ public:
 
                     auto bodyBuilder = result->getBodyBuilder();
                     uassertStatusOK(ClusterExplain::buildExplainResult(
-                        ExpressionContext::makeBlankExpressionContext(opCtx, nss),
+                        makeBlankExpressionContext(opCtx, nss),
                         responses,
                         parsedInfoFromRequest.sort ? ClusterExplain::kMergeSortFromShards
                                                    : ClusterExplain::kMergeFromShards,

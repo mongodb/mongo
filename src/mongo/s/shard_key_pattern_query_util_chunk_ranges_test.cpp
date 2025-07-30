@@ -34,6 +34,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/catalog/type_shard.h"

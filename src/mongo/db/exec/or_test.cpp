@@ -35,6 +35,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 

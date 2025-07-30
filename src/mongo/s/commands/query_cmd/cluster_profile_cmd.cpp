@@ -33,6 +33,7 @@
 #include "mongo/db/commands/set_profiling_filter_globally_cmd.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/util/assert_util.h"

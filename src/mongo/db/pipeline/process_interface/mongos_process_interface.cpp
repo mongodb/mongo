@@ -40,6 +40,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_merge.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/process_interface/common_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
@@ -195,7 +196,7 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
     boost::optional<UUID> collectionUUID,
     const Document& filter,
     boost::optional<BSONObj> readConcern) {
-    auto foreignExpCtx = expCtx->copyWith(nss, collectionUUID);
+    auto foreignExpCtx = makeCopyFromExpressionContext(expCtx, nss, collectionUUID);
 
     // Create the find command to be dispatched to the shard(s) in order to return the post-image.
     auto filterObj = filter.toBson();

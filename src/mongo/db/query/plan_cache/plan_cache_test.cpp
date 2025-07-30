@@ -47,6 +47,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_test_util.h"
 #include "mongo/db/query/collation/collator_interface.h"

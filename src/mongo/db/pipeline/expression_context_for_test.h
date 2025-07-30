@@ -96,6 +96,10 @@ public:
         // associated with the current ServiceContext, adopt it. Otherwise, create a
         // new one.
         _setTimeZoneDatabase();
+
+        if (_params.letParameters) {
+            variables.seedVariablesWithLetParameters(this, *_params.letParameters);
+        }
     }
 
     /**
@@ -181,6 +185,10 @@ public:
         if (request.getExplain().get_value_or(false)) {
             setExplain(ExplainOptions::Verbosity::kQueryPlanner);
         }
+
+        if (_params.letParameters) {
+            variables.seedVariablesWithLetParameters(this, *_params.letParameters);
+        }
     }
 
     /**
@@ -206,6 +214,10 @@ public:
           _serviceContext(opCtx->getServiceContext()) {
         // Resolve the TimeZoneDatabase to be used by this ExpressionContextForTest.
         _setTimeZoneDatabase();
+
+        if (_params.letParameters) {
+            variables.seedVariablesWithLetParameters(this, *_params.letParameters);
+        }
     }
 
     /**

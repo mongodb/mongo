@@ -34,6 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -230,7 +231,7 @@ TEST_F(ExpressionContextTest, CopyWithDoesNotInitializeViewByDefault) {
             .build();
 
     auto namespaceCopy = NamespaceString::createNamespaceString_forTest("test"_sd, "coll2"_sd);
-    auto expCtxCopy = expCtxOriginal->copyWith(namespaceCopy);
+    auto expCtxCopy = makeCopyFromExpressionContext(expCtxOriginal, namespaceCopy);
 
     // expCtxCopy doesn't have a view initialized.
     ASSERT_FALSE(expCtxCopy->getView().has_value());
@@ -257,7 +258,8 @@ TEST_F(ExpressionContextTest, CopyWithInitializesViewWhenSpecified) {
             .build();
 
     auto namespaceCopy = NamespaceString::createNamespaceString_forTest("test"_sd, "coll2"_sd);
-    auto expCtxCopy = expCtxOriginal->copyWith(namespaceCopy, boost::none, boost::none, view);
+    auto expCtxCopy = makeCopyFromExpressionContext(
+        expCtxOriginal, namespaceCopy, boost::none, boost::none, view);
 
     // expCtxCopy has a view.
     ASSERT_TRUE(expCtxCopy->getView().has_value());

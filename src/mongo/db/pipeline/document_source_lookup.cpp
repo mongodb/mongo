@@ -62,6 +62,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
@@ -257,8 +258,8 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     _resolvedPipeline = resolvedNamespace.pipeline;
     _fromNsIsAView = resolvedNamespace.involvedNamespaceIsAView;
 
-    _fromExpCtx = expCtx->copyForSubPipeline(
-        resolvedNamespace.ns, resolvedNamespace.uuid, boost::none, _fromNs);
+    _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
+        expCtx, resolvedNamespace.ns, resolvedNamespace.uuid, boost::none, _fromNs);
     _fromExpCtx->setInLookup(true);
 }
 
@@ -417,10 +418,11 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
       _fieldMatchPipelineIdx(original._fieldMatchPipelineIdx),
       _variables(original._variables),
       _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())),
-      _fromExpCtx(original._fromExpCtx->copyWith(_resolvedNs,
-                                                 original._fromExpCtx->getUUID(),
-                                                 boost::none,
-                                                 original._fromExpCtx->getView())),
+      _fromExpCtx(makeCopyFromExpressionContext(original._fromExpCtx,
+                                                _resolvedNs,
+                                                original._fromExpCtx->getUUID(),
+                                                boost::none,
+                                                original._fromExpCtx->getView())),
       _resolvedPipeline(original._resolvedPipeline),
       _userPipeline(original._userPipeline),
       _resolvedIntrospectionPipeline(original._resolvedIntrospectionPipeline->clone(_fromExpCtx)),
@@ -712,10 +714,12 @@ std::unique_ptr<Pipeline> DocumentSourceLookUp::buildPipelineFromViewDefinition(
 
     // Update the expression context with any new namespaces the resolved pipeline has introduced.
     LiteParsedPipeline liteParsedPipeline(resolvedNamespace.ns, resolvedNamespace.pipeline);
-    _fromExpCtx = _fromExpCtx->copyWith(resolvedNamespace.ns,
-                                        resolvedNamespace.uuid,
-                                        boost::none,
-                                        std::make_pair(_fromNs, resolvedNamespace.pipeline));
+    _fromExpCtx =
+        makeCopyFromExpressionContext(_fromExpCtx,
+                                      resolvedNamespace.ns,
+                                      resolvedNamespace.uuid,
+                                      boost::none,
+                                      std::make_pair(_fromNs, resolvedNamespace.pipeline));
     _fromExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
 
     return pipeline;

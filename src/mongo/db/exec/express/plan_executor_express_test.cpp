@@ -30,10 +30,10 @@
 #include "mongo/db/exec/express/plan_executor_express.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
-
 
 namespace mongo {
 namespace {

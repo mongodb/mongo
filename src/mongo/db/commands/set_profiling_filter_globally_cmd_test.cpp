@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/commands/db_command_test_fixture.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/profile_settings.h"
 

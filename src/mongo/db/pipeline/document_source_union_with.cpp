@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
@@ -95,8 +96,8 @@ std::unique_ptr<Pipeline> buildPipelineFromViewDefinition(
     opts.optimize = !resolvedNs.pipeline.empty();
     opts.validator = validatorCallback;
 
-    auto subExpCtx =
-        expCtx->copyForSubPipeline(resolvedNs.ns, resolvedNs.uuid, boost::none, userNss);
+    auto subExpCtx = makeCopyForSubPipelineFromExpressionContext(
+        expCtx, resolvedNs.ns, resolvedNs.uuid, boost::none, userNss);
 
     return Pipeline::makePipelineFromViewDefinition(
         subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
@@ -110,7 +111,8 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     : DocumentSource(kStageName, newExpCtx),
       exec::agg::Stage(kStageName, newExpCtx),
       _pipeline(original._pipeline->clone(
-          newExpCtx ? newExpCtx->copyForSubPipeline(
+          newExpCtx ? makeCopyForSubPipelineFromExpressionContext(
+                          newExpCtx,
                           newExpCtx->getResolvedNamespace(original._userNss).ns,
                           newExpCtx->getResolvedNamespace(original._userNss).uuid)
                     : nullptr)),

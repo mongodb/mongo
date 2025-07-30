@@ -35,6 +35,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
@@ -172,8 +173,7 @@ RepresentativeQueryInfo createRepresentativeInfoFind(OperationContext* opCtx,
             "Collection namespace string must be provided for setQuerySettings command",
             nssOrUuid.isNamespaceString());
 
-    auto expCtx = ExpressionContext::makeBlankExpressionContext(
-        opCtx, nssOrUuid.nss(), findCommandRequest->getLet());
+    auto expCtx = makeBlankExpressionContext(opCtx, nssOrUuid.nss(), findCommandRequest->getLet());
     auto parsedFindCommand = uassertStatusOK(parsed_find_command::parse(
         expCtx,
         ParsedFindCommandParams{.findCommand = std::move(findCommandRequest),
@@ -217,7 +217,7 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(
             "Collection namespace string must be provided for setQuerySettings command",
             nssOrUuid.isNamespaceString());
 
-    auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, nssOrUuid);
+    auto expCtx = makeBlankExpressionContext(opCtx, nssOrUuid);
     auto parsedDistinctCommand =
         parsed_distinct_command::parse(expCtx,
                                        std::move(distinctCommandRequest),
@@ -269,8 +269,7 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
     // When parsing the pipeline, we try to resolve the namespaces, which requires the resolved
     // namespaces to be present in the expression context.
     auto nss = aggregateCommandRequest.getNamespace();
-    auto expCtx =
-        ExpressionContext::makeBlankExpressionContext(opCtx, nss, aggregateCommandRequest.getLet());
+    auto expCtx = makeBlankExpressionContext(opCtx, nss, aggregateCommandRequest.getLet());
     expCtx->addResolvedNamespaces(
         stdx::unordered_set<NamespaceString>{involvedNamespaces.begin(), involvedNamespaces.end()});
 

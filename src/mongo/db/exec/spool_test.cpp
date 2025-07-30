@@ -37,6 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"

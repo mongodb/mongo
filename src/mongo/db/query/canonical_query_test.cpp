@@ -33,6 +33,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_hasher.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"

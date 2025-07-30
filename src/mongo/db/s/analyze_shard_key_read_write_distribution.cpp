@@ -33,6 +33,7 @@
 #include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/write_ops/write_ops.h"

@@ -43,6 +43,7 @@
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/collation/collator_interface.h"

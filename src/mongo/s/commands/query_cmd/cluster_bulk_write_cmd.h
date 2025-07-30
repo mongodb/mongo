@@ -48,6 +48,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/repl/read_concern_args.h"

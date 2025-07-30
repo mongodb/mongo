@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
@@ -127,10 +128,9 @@ public:
     }
 
     boost::intrusive_ptr<ExpressionContext> expressionContext() {
-        return ExpressionContext::makeBlankExpressionContext(
-            operationContext(),
-            NamespaceString::createNamespaceString_forTest(
-                /* tenantId */ boost::none, "test", "test"));
+        return makeBlankExpressionContext(operationContext(),
+                                          NamespaceString::createNamespaceString_forTest(
+                                              /* tenantId */ boost::none, "test", "test"));
     }
 
     BackfillCoordinator* coordinator() {

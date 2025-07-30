@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/query_planner.h"
 
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_test_service_context.h"
 

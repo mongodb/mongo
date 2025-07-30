@@ -40,6 +40,7 @@
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"

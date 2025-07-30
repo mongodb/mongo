@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/json.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
@@ -76,7 +77,7 @@ public:
 
         // Compute the query shape hash.
         auto* opCtx = operationContext();
-        auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, kNss);
+        auto expCtx = makeBlankExpressionContext(opCtx, kNss);
         auto parsedFindCommand = uassertStatusOK(
             parsed_find_command::parse(expCtx, {.findCommand = std::move(findCmd)}));
         auto queryShapeHash =

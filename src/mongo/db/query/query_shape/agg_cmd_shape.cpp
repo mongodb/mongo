@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 
 namespace mongo::query_shape {
@@ -70,8 +71,7 @@ void AggCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
             "shapified and stored the representative query - we've lost the original literals",
             !opts.isKeepingLiteralsUnchanged());
 
-    auto expCtx = ExpressionContext::makeBlankExpressionContext(
-        opCtx, nssOrUUID, _components.let.shapifiedLet);
+    auto expCtx = makeBlankExpressionContext(opCtx, nssOrUUID, _components.let.shapifiedLet);
     if (opts == SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
         // We have this copy stored already!
         _components.appendTo(bob, opts, expCtx);

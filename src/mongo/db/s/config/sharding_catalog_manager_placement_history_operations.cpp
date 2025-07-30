@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/s/config/placement_history_cleaner.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/vector_clock.h"

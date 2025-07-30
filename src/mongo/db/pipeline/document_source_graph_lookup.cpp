@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
@@ -373,7 +374,7 @@ std::unique_ptr<Pipeline> DocumentSourceGraphLookUp::makePipeline(BSONObj match,
         // Update the expression context with any new namespaces the resolved pipeline has
         // introduced.
         LiteParsedPipeline liteParsedPipeline(e->getNamespace(), e->getPipeline());
-        _fromExpCtx = _fromExpCtx->copyWith(e->getNamespace());
+        _fromExpCtx = makeCopyFromExpressionContext(_fromExpCtx, e->getNamespace());
         _fromExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
 
         LOGV2_DEBUG(5865400,
@@ -831,7 +832,8 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     }
 
     const auto& resolvedNamespace = pExpCtx->getResolvedNamespace(_from);
-    _fromExpCtx = pExpCtx->copyForSubPipeline(resolvedNamespace.ns, resolvedNamespace.uuid);
+    _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
+        pExpCtx, resolvedNamespace.ns, resolvedNamespace.uuid);
     _fromExpCtx->setInLookup(true);
 
     // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match
@@ -855,8 +857,9 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _depthField(original._depthField),
       _maxDepth(original._maxDepth),
       _fromExpCtx(
-          original._fromExpCtx->copyWith(original.pExpCtx->getResolvedNamespace(_from).ns,
-                                         original.pExpCtx->getResolvedNamespace(_from).uuid)),
+          makeCopyFromExpressionContext(original._fromExpCtx,
+                                        original.pExpCtx->getResolvedNamespace(_from).ns,
+                                        original.pExpCtx->getResolvedNamespace(_from).uuid)),
       _fromPipeline(original._fromPipeline),
       _memoryUsageTracker(OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
           *newExpCtx,

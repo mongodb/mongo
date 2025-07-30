@@ -52,6 +52,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/query/canonical_distinct.h"
@@ -362,13 +363,12 @@ public:
                 const char* mongosStageName =
                     ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
 
-                return ClusterExplain::buildExplainResult(
-                    ExpressionContext::makeBlankExpressionContext(opCtx, nss),
-                    shardResponses,
-                    mongosStageName,
-                    millisElapsed,
-                    originalCmdObj,
-                    &bodyBuilder);
+                return ClusterExplain::buildExplainResult(makeBlankExpressionContext(opCtx, nss),
+                                                          shardResponses,
+                                                          mongosStageName,
+                                                          millisElapsed,
+                                                          originalCmdObj,
+                                                          &bodyBuilder);
             });
     }
 
