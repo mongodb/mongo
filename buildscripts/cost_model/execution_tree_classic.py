@@ -69,7 +69,7 @@ def build_execution_tree(execution_stats: dict[str, Any]) -> Node:
 def process_stage(stage: dict[str, Any]) -> Node:
     """Parse the given execution stage"""
     processors = {
-        "SUBPLAN": process_subplan,
+        "SUBPLAN": process_passthrough,
         "COLLSCAN": process_collscan,
         "IXSCAN": process_ixscan,
         "FETCH": process_fetch,
@@ -79,8 +79,11 @@ def process_stage(stage: dict[str, Any]) -> Node:
         "MERGE_SORT": process_mergesort,
         "SORT_MERGE": process_mergesort,
         "SORT": process_sort,
-        "LIMIT": process_limit,
+        "LIMIT": process_passthrough,
         "SKIP": process_skip,
+        "PROJECTION_SIMPLE": process_passthrough,
+        "PROJECTION_COVERED": process_passthrough,
+        "PROJECTION_DEFAULT": process_passthrough,
     }
     processor = processors.get(stage["stage"])
     if processor is None:
@@ -90,7 +93,8 @@ def process_stage(stage: dict[str, Any]) -> Node:
     return processor(stage)
 
 
-def process_subplan(stage: dict[str, Any]) -> Node:
+def process_passthrough(stage: dict[str, Any]) -> Node:
+    """Parse internal (non-leaf) execution stages with a single child, which process exactly the documents that they return."""
     input_stage = process_stage(stage["inputStage"])
     return Node(**get_common_fields(stage), n_processed=stage["nReturned"], children=[input_stage])
 
@@ -101,6 +105,13 @@ def process_collscan(stage: dict[str, Any]) -> Node:
 
 def process_ixscan(stage: dict[str, Any]) -> Node:
     return Node(**get_common_fields(stage), n_processed=stage["keysExamined"], children=[])
+
+
+def process_sort(stage: dict[str, Any]) -> Node:
+    input_stage = process_stage(stage["inputStage"])
+    return Node(
+        **get_common_fields(stage), n_processed=input_stage.n_returned, children=[input_stage]
+    )
 
 
 def process_fetch(stage: dict[str, Any]) -> Node:
@@ -124,16 +135,6 @@ def process_intersection(stage: dict[str, Any]) -> Node:
 def process_mergesort(stage: dict[str, Any]) -> Node:
     children = [process_stage(child) for child in stage["inputStages"]]
     return Node(**get_common_fields(stage), n_processed=stage["nReturned"], children=children)
-
-
-def process_sort(stage: dict[str, Any]) -> Node:
-    input_stage = process_stage(stage["inputStage"])
-    return Node(**get_common_fields(stage), n_processed=stage["nReturned"], children=[input_stage])
-
-
-def process_limit(stage: dict[str, Any]) -> Node:
-    input_stage = process_stage(stage["inputStage"])
-    return Node(**get_common_fields(stage), n_processed=stage["nReturned"], children=[input_stage])
 
 
 def process_skip(stage: dict[str, Any]) -> Node:

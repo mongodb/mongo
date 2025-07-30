@@ -323,7 +323,7 @@ workload_execution = config.WorkloadExecutionConfig(
     output_collection_name="calibrationData",
     write_mode=config.WriteMode.REPLACE,
     warmup_runs=5,
-    runs=75,
+    runs=100,
 )
 
 
@@ -356,6 +356,9 @@ qsn_nodes = [
             axis=1,
         ),
     ),
+    config.QsNodeCalibrationConfig(type="PROJECTION_SIMPLE"),
+    config.QsNodeCalibrationConfig(type="PROJECTION_COVERED"),
+    config.QsNodeCalibrationConfig(type="PROJECTION_DEFAULT"),
 ]
 # Calibrator settings
 qs_calibrator = config.QuerySolutionCalibrationConfig(

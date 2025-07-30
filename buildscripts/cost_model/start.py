@@ -37,7 +37,7 @@ import parameters_extractor_classic
 import qsn_calibrator
 import workload_execution
 from calibration_settings import main_config
-from config import WriteMode
+from config import DataType, WriteMode
 from cost_estimator import CostModelParameters, ExecutionStats
 from data_generator import CollectionInfo, DataGenerator
 from database_instance import DatabaseInstance
@@ -175,6 +175,45 @@ async def execute_skips(database: DatabaseInstance, collections: Sequence[Collec
     )
 
 
+async def execute_projections(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    collection = [c for c in collections if c.name.startswith("c_int_05_30")][0]
+    limits = [5, 10, 50, 75, 100, 150, 300, 500, 1000]
+    # We calibrate using projections on the last field since this means the node does a nontrivial amount of work.
+    # This is because non-covered projections iterate over the fields in a given document as part of its work.
+    field = collection.fields[-1]
+    requests = []
+    # Simple projections, these do not contain any computed fields and are not fully covered by an index.
+    for limit in limits:
+        requests.append(
+            Query({"limit": limit, "projection": {field.name: 1}}, note="PROJECTION_SIMPLE")
+        )
+
+    # Covered projections, these are inclusions that are fully covered by an index.
+    field = [f for f in collection.fields if f.indexed][-1]
+    for limit in limits:
+        requests.append(
+            Query(
+                {"limit": limit, "projection": {"_id": 0, field.name: 1}, "hint": {field.name: 1}},
+                note="PROJECTION_COVERED",
+            )
+        )
+        
+    # Default projections, these are the only ones that can handle computed projections,
+    # so that is how we calibrate them. We assume that the computation will be constant across
+    # the enumerated plans and thus keep it very simple.
+    fields = [f for f in collection.fields if f.type == DataType.INTEGER]
+    for limit in limits:
+        requests.append(
+            Query(
+                {"limit": limit, "projection": {"out": {"$add": [f"${f.name}" for f in fields]}}},
+                note="PROJECTION_DEFAULT",
+            )
+        )
+    await workload_execution.execute(
+        database, main_config.workload_execution, [collection], requests
+    )
+
+
 async def main():
     """Entry point function."""
     script_directory = os.path.abspath(os.path.dirname(__file__))
@@ -192,7 +231,12 @@ async def main():
         # and another for backwards ones. To toggle this, change the argument 'forwards' in the signature of
         # 'execute_collection_scans'. We need to do this as otherwise data from both directions will be used
         # for the same calibration, which we explicitly want to avoid.
-        execution_query_functions = [execute_collection_scans, execute_limits, execute_skips]
+        execution_query_functions = [
+            execute_projections,
+            execute_collection_scans,
+            execute_limits,
+            execute_skips,
+        ]
         for execute_query in execution_query_functions:
             await execute_query(database, generator.collection_infos)
             main_config.workload_execution.write_mode = WriteMode.APPEND
