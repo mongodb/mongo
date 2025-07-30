@@ -69,8 +69,12 @@ function runTest(conn) {
 
     // Verify the change stream emits events for the batched deletion, and capture the events so we
     // can test resumability later.
-    for (let docKey = 0; docKey < totalNumDocs; docKey++) {
-        assertWriteVisibleWithCapture(changeStreamCursor, "delete", {_id: docKey}, changeList);
+    // The documents are processed in the reverse order for each batch of a batched delete.
+    for (let batch = 0; batch < serverStatusBatchesAfter; ++batch) {
+        const currBatchStart = Math.min(totalNumDocs - 1, (batch + 1) * docsPerBatch - 1);
+        for (let docKey = currBatchStart; docKey >= batch * docsPerBatch; --docKey) {
+            assertWriteVisibleWithCapture(changeStreamCursor, "delete", {_id: docKey}, changeList);
+        }
     }
 
     assertNoChanges(changeStreamCursor);
