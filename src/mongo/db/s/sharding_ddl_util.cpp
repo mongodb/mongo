@@ -622,14 +622,9 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     // The Internal Transactions API receives the write concern option and osi through the
     // passed Operation context. We opt for creating a new one to avoid any possible side
     // effects.
-    auto newClient = [&]() {
-        if (auto service = opCtx->getServiceContext()->getService(ClusterRole::RouterServer)) {
-            return service->makeClient("ShardingCatalogTransaction");
-        }
-        return opCtx->getServiceContext()
-            ->getService(ClusterRole::ShardServer)
-            ->makeClient("ShardingCatalogTransaction");
-    }();
+    auto newClient = opCtx->getServiceContext()
+                         ->getService(ClusterRole::ShardServer)
+                         ->makeClient("ShardingCatalogTransaction");
 
     AuthorizationSession::get(newClient.get())->grantInternalAuthorization();
     AlternativeClientRegion acr(newClient);
@@ -660,7 +655,8 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
             inlineExecutor,
             sleepInlineExecutor,
             executor,
-            std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(newOpCtx));
+            std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
+                newOpCtx->getServiceContext()));
     }();
 
     if (osi.getSessionId()) {

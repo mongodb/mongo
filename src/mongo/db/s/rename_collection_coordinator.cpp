@@ -323,21 +323,26 @@ void upsertPlacementHistoryDocStatement(const txn_api::TransactionClient& txnCli
     uassertStatusOK(upsertPlacementEntryResponse.toStatus());
 }
 
-std::vector<ShardId> getCurrentCollPlacement(const txn_api::TransactionClient& txnClient,
-                                             const UUID& collUuid) {
+std::vector<ShardId> getCurrentCollPlacement(OperationContext* opCtx, const UUID& collUuid) {
     // Use the content of config.chunks to obtain the placement of the collection being
     // renamed. The request is equivalent to 'configDb.chunks.distinct("shard",
     // {uuid:collectionUuid})'.
     DistinctCommandRequest distinctRequest(NamespaceString::kConfigsvrChunksNamespace);
     distinctRequest.setKey(ChunkType::shard.name());
     distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << collUuid));
+    distinctRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
 
-    auto distinctResponse =
-        txnClient.runCommandSync(DatabaseName::kConfig, distinctRequest.toBSON());
-    uassertStatusOK(getStatusFromWriteCommandReply(distinctResponse));
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto reply = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
+        DatabaseName::kConfig,
+        distinctRequest.toBSON(),
+        Shard::RetryPolicy::kIdempotent));
 
+    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(reply));
     std::vector<ShardId> shardIds;
-    for (const auto& valueElement : distinctResponse.getField("values").Array()) {
+    for (const auto& valueElement : reply.response.getField("values").Array()) {
         shardIds.emplace_back(valueElement.String());
     }
     return shardIds;
@@ -351,11 +356,9 @@ void persistPlacementChangeForCollectionBeingRenamed(
     const Timestamp& clusterTimeUponRename,
     const std::shared_ptr<executor::TaskExecutor>& executor,
     const OperationSessionInfo& osi) {
+    auto shardIds = getCurrentCollPlacement(opCtx, originalUUID);
 
     auto transactionChain = [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-        // Upsert new data to the config.placementHistory collection.
-        auto shardIds = getCurrentCollPlacement(txnClient, originalUUID);
-
         constexpr auto stmtId = 1;
         upsertPlacementHistoryDocStatement(
             txnClient, nss, uuidUponRename, clusterTimeUponRename, std::move(shardIds), stmtId);
@@ -537,7 +540,7 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
             // (Note: a first copy may have been already committed during the
             // kSetupChangeStreamsPreconditions phase, but then deleted as a consequence of a
             // concurrent resetPlacementHistory command).
-            auto shardIds = getCurrentCollPlacement(txnClient, fromUUID);
+            auto shardIds = getCurrentCollPlacement(opCtx, fromUUID);
             if (!shardIds.empty()) {
                 upsertPlacementHistoryDocStatement(txnClient,
                                                    toNss,

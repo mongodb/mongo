@@ -46,29 +46,13 @@
 
 namespace mongo::txn_api::details {
 
-ClusterSEPTransactionClientBehaviors::ClusterSEPTransactionClientBehaviors(
-    OperationContext* opCtx) {
-    _service = opCtx->getService();
-    _isRouterEnabled = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
-
-    if (_isRouterEnabled) {
-        invariant(_service->role().hasExclusively(ClusterRole::RouterServer));
-    }
-}
-
 BSONObj ClusterSEPTransactionClientBehaviors::maybeModifyCommand(BSONObj cmdObj) const {
-    if (!_isRouterEnabled) {
-        return cluster::cmd::translations::replaceCommandNameWithClusterCommandName(cmdObj);
-    }
-    return cmdObj;
+    return cluster::cmd::translations::replaceCommandNameWithClusterCommandName(cmdObj);
 }
 
 Future<DbResponse> ClusterSEPTransactionClientBehaviors::handleRequest(
     OperationContext* opCtx, const Message& request) const {
-    if (!_isRouterEnabled) {
-        return ServiceEntryPointRouterRole::handleRequestImpl(opCtx, request);
-    }
-    return _service->getServiceEntryPoint()->handleRequest(opCtx, request);
+    return ServiceEntryPointRouterRole::handleRequestImpl(opCtx, request);
 }
 
 }  // namespace mongo::txn_api::details

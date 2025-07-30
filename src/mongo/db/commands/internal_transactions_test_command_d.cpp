@@ -72,7 +72,7 @@ public:
                     sleepInlineExecutor,
                     executor,
                     std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
-                        opCtx)));
+                        opCtx->getServiceContext())));
         }
 
         return txn_api::SyncTransactionWithRetries(

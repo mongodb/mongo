@@ -91,13 +91,13 @@ function runTestFailure(sessionOpts) {
     let testCmd = Object.merge(
         {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}, sessionOpts);
 
-    // TODO (SERVER-88107): Simplify this path once 8.0 becomes last LTS.
-    const binVersion = assert.commandWorked(shard0Primary.adminCommand({serverStatus: 1}));
-    let errorCode = MongoRunner.compareBinVersions(binVersion.version, "8.0") >= 0
-        ? ErrorCodes.OperationNotSupportedInTransaction
-        : 6349501;
-    const res = assert.commandFailedWithCode(shard0Primary.adminCommand(testCmd), errorCode);
-    assert(!res.hasOwnProperty("responses"));
+    // TODO (SERVER-88107): Simplify this path once 9.0 becomes last LTS.
+    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+        Boolean(TestData.multiversionBinVersion);
+    if (!isMultiversion) {
+        const res = assert.commandFailedWithCode(shard0Primary.adminCommand(testCmd), 6349501);
+        assert(!res.hasOwnProperty("responses"));
+    }
 
     // Verify the API didn't insert any documents.
     assert.sameMembers(st.s.getCollection(kNs).find().toArray(), [{_id: 1}]);
@@ -140,17 +140,10 @@ function runTestGetMore(sessionOpts) {
     // Verify getMores were used by checking serverStatus metrics.
     const commandMetricsAfter = shard0Primary.getDB(kDbName).serverStatus().metrics.commands;
 
-    // TODO (SERVER-88107): Simplify this path once 8.0 becomes last LTS.
-    const binVersion = assert.commandWorked(shard0Primary.adminCommand({serverStatus: 1}));
-    if (MongoRunner.compareBinVersions(binVersion.version, "8.0") >= 0) {
-        assert.gt(commandMetricsAfter.find.total, commandMetricsBefore.find.total);
-        if (!commandMetricsBefore.getMore) {
-            // The unsharded case runs before any cluster getMores are run.
-            assert.gt(commandMetricsAfter.getMore.total, 0);
-        } else {
-            assert.gt(commandMetricsAfter.getMore.total, commandMetricsBefore.getMore.total);
-        }
-    } else {
+    // TODO (SERVER-88107): Simplify this path once 9.0 becomes last LTS.
+    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+        Boolean(TestData.multiversionBinVersion);
+    if (!isMultiversion) {
         assert.gt(commandMetricsAfter.clusterFind.total, commandMetricsBefore.clusterFind.total);
         if (!commandMetricsBefore.clusterGetMore) {
             // The unsharded case runs before any cluster getMores are run.

@@ -39,32 +39,6 @@
 
 namespace mongo {
 
-// TODO SERVER-86458
-// RAII object that switches an OperationContext's service role to the router role if it isn't
-// already and if the OperationContext's ServiceContext has a router role Service, restoring the
-// original role on destruction. This should be replaced with a formal, public methodology that
-// achieves role switching in either direction.
-class ScopedRouterBehavior {
-public:
-    ScopedRouterBehavior(OperationContext* opCtx)
-        : _opCtx(std::move(opCtx)), _original(_opCtx->getService()) {
-        auto targetService = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
-        if (!targetService)
-            targetService = opCtx->getServiceContext()->getService();
-        ClientLock lk(_opCtx->getClient());
-        _opCtx->getClient()->setService(targetService);
-    }
-
-    ~ScopedRouterBehavior() {
-        ClientLock lk(_opCtx->getClient());
-        _opCtx->getClient()->setService(_original);
-    }
-
-private:
-    OperationContext* _opCtx;
-    Service* _original;
-};
-
 template <typename Impl>
 class InternalTransactionsTestCommandBase : public TypedCommand<Impl> {
 public:
@@ -89,10 +63,6 @@ public:
             const auto executor = Grid::get(opCtx)->isShardingInitialized()
                 ? Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()
                 : getTransactionExecutor();
-
-            boost::optional<ScopedRouterBehavior> scopedRouterBehavior = boost::none;
-            if (Base::request().getUseClusterClient())
-                scopedRouterBehavior.emplace(opCtx);
 
             // If internalTransactionsTestCommand is received by a mongod, it should be instantiated
             // with the TransactionParticipant's resource yielder. If on a mongos, txn should be
