@@ -28,7 +28,7 @@ res = coll.runCommand("listIndexes");
 assert.commandWorked(res);
 assert.eq("object", typeof (res.cursor));
 assert.eq(0, res.cursor.id);
-assert.eq("string", typeof (res.cursor.ns));
+assert.eq(coll.getFullName(), res.cursor.ns);
 assert.eq(1, res.cursor.firstBatch.length);
 assert.eq("_id_", res.cursor.firstBatch[0].name);
 

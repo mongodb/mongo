@@ -267,6 +267,14 @@ public:
      */
     bool runCommand(const DatabaseName& dbName, BSONObj cmd, BSONObj& info, int options = 0);
 
+    /**
+     * Runs a database command that return a cursor to documents (e.g. find, listCollections, ...)
+     * and exhausts the cursor, pulling all returned documents into memory.
+     */
+    StatusWith<std::list<BSONObj>> runExhaustiveCursorCommand(const DatabaseName& dbName,
+                                                              const BSONObj& cmd,
+                                                              int options = 0);
+
     /*
      * Wraps up the runCommand function avove, but returns the DBClient that actually ran the
      * command. When called against a replica set, this will return the specific replica set member
@@ -739,13 +747,6 @@ protected:
 
 private:
     virtual Message _call(Message& toSend, std::string* actualServer) = 0;
-
-    /**
-     * Implementation for getIndexes() and getReadyIndexes().
-     */
-    std::list<BSONObj> _getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
-                                      const BSONObj& cmd,
-                                      int options);
 
     auth::RunCommandHook _makeAuthRunCommandHook();
 

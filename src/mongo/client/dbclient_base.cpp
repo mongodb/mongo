@@ -276,6 +276,47 @@ bool DBClientBase::runCommand(const DatabaseName& dbName, BSONObj cmd, BSONObj& 
     return std::get<0>(res);
 }
 
+StatusWith<std::list<BSONObj>> DBClientBase::runExhaustiveCursorCommand(const DatabaseName& dbName,
+                                                                        const BSONObj& cmd,
+                                                                        int options) {
+    list<BSONObj> docs;
+
+    BSONObj res;
+    if (runCommand(dbName, cmd, res, options)) {
+        BSONObj cursorObj = res["cursor"].Obj();
+        BSONObjIterator it(cursorObj["firstBatch"].Obj());
+        while (it.more()) {
+            BSONElement e = it.next();
+            docs.push_back(e.Obj().getOwned());
+        }
+
+        if (res.hasField(LogicalTime::kOperationTimeFieldName)) {
+            setOperationTime(LogicalTime::fromOperationTime(res).asTimestamp());
+        }
+
+        const long long id = cursorObj["id"].Long();
+
+        if (id != 0) {
+            const NamespaceString nss = NamespaceStringUtil::deserialize(
+                dbName.tenantId(), cursorObj["ns"].String(), SerializationContext::stateDefault());
+            unique_ptr<DBClientCursor> cursor = getMore(nss, id);
+            while (cursor->more()) {
+                docs.push_back(cursor->nextSafe().getOwned());
+            }
+
+            if (cursor->getOperationTime()) {
+                setOperationTime(*(cursor->getOperationTime()));
+            }
+        }
+
+        return docs;
+    }
+
+    // command failed
+    auto status = getStatusFromCommandResult(res);
+    return status.withContext(str::stream() << cmd.firstElementFieldName() << " fails:");
+}
+
 long long DBClientBase::count(const NamespaceStringOrUUID& nsOrUuid,
                               const BSONObj& query,
                               int options,
@@ -476,44 +517,9 @@ bool DBClientBase::createCollection(const NamespaceString& nss,
 list<BSONObj> DBClientBase::getCollectionInfos(const DatabaseName& dbName,
                                                const BSONObj& filter,
                                                bool secondaryOk) {
-    list<BSONObj> infos;
     BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filter << "cursor" << BSONObj());
-
-    BSONObj res;
-    if (runCommand(dbName, cmdObj, res, secondaryOk ? QueryOption_SecondaryOk : 0)) {
-        BSONObj cursorObj = res["cursor"].Obj();
-        BSONObj collections = cursorObj["firstBatch"].Obj();
-        BSONObjIterator it(collections);
-        while (it.more()) {
-            BSONElement e = it.next();
-            infos.push_back(e.Obj().getOwned());
-        }
-
-        if (res.hasField(LogicalTime::kOperationTimeFieldName)) {
-            setOperationTime(LogicalTime::fromOperationTime(res).asTimestamp());
-        }
-
-        const long long id = cursorObj["id"].Long();
-
-        if (id != 0) {
-            const NamespaceString nss = NamespaceStringUtil::deserialize(
-                dbName.tenantId(), cursorObj["ns"].String(), SerializationContext::stateDefault());
-            unique_ptr<DBClientCursor> cursor = getMore(nss, id);
-            while (cursor->more()) {
-                infos.push_back(cursor->nextSafe().getOwned());
-            }
-
-            if (cursor->getOperationTime()) {
-                setOperationTime(*(cursor->getOperationTime()));
-            }
-        }
-
-        return infos;
-    }
-
-    // command failed
-    uassertStatusOKWithContext(getStatusFromCommandResult(res), "'listCollections' failed: ");
-    MONGO_UNREACHABLE;
+    return uassertStatusOK(
+        runExhaustiveCursorCommand(dbName, cmdObj, secondaryOk ? QueryOption_SecondaryOk : 0));
 }
 
 vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
@@ -776,57 +782,17 @@ BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid, bool inclu
 std::list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                                bool includeBuildUUIDs,
                                                int options) {
-    return _getIndexSpecs(nsOrUuid, makeListIndexesCommand(nsOrUuid, includeBuildUUIDs), options);
-}
-
-std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
-                                                const BSONObj& cmd,
-                                                int options) {
-    list<BSONObj> specs;
-    const auto& dbName = nsOrUuid.dbName();
-
-    BSONObj res;
-    if (runCommand(dbName, cmd, res, options)) {
-        BSONObj cursorObj = res["cursor"].Obj();
-        BSONObjIterator i(cursorObj["firstBatch"].Obj());
-        while (i.more()) {
-            specs.push_back(i.next().Obj().getOwned());
-        }
-
-        if (res.hasField(LogicalTime::kOperationTimeFieldName)) {
-            setOperationTime(LogicalTime::fromOperationTime(res).asTimestamp());
-        }
-
-        const long long id = cursorObj["id"].Long();
-        if (id != 0) {
-            const auto cursorNs = NamespaceStringUtil::deserialize(
-                dbName.tenantId(), cursorObj["ns"].String(), SerializationContext::stateDefault());
-            if (nsOrUuid.isNamespaceString()) {
-                invariant(nsOrUuid.nss() == cursorNs);
-            }
-            unique_ptr<DBClientCursor> cursor = getMore(cursorNs, id);
-            while (cursor->more()) {
-                specs.push_back(cursor->nextSafe().getOwned());
-            }
-
-            if (cursor->getOperationTime()) {
-                setOperationTime(*(cursor->getOperationTime()));
-            }
-        }
-
-        return specs;
-    }
-    Status status = getStatusFromCommandResult(res);
+    auto cmd = makeListIndexesCommand(nsOrUuid, includeBuildUUIDs);
+    auto res = runExhaustiveCursorCommand(nsOrUuid.dbName(), cmd, options);
 
     // "NamespaceNotFound" is an error for UUID but returns an empty list for NamespaceString; this
     // matches the behavior for other commands such as 'find' and 'count'.
-    if (nsOrUuid.isNamespaceString() && status.code() == ErrorCodes::NamespaceNotFound) {
-        return specs;
+    if (nsOrUuid.isNamespaceString() && res == ErrorCodes::NamespaceNotFound) {
+        return {};
     }
-    uassertStatusOK(status.withContext(str::stream() << "listIndexes failed: " << res));
-    MONGO_UNREACHABLE;
-}
 
+    return uassertStatusOK(res);
+}
 
 void DBClientBase::dropIndex(const NamespaceString& nss,
                              BSONObj keys,
