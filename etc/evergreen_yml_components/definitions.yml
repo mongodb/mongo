@@ -831,13 +831,25 @@ functions:
       display_name: Pip Requirements
 
   "send benchmark results":
-  - command: perf.send
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      bucket: mciuploads
-      prefix: ${task_id}_${execution}
-      file: src/cedar_report.json
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/perf_submission.sh"
+        env:
+          perf_file_path: src/cedar_report.json
+        include_expansions_in_env:
+          - requester
+          - revision_order_id
+          - project_id
+          - version_id
+          - build_variant
+          - parsed_order_id
+          - task_name
+          - task_id
+          - execution
+          - is_mainline
+      type: test
 
   "analyze benchmark results":
   - *f_expansions_write
@@ -2205,13 +2217,25 @@ functions:
         args:
           - "./src/evergreen/scons_metrics_report.sh"
 
-    - command: perf.send
+    - command: subprocess.exec
       params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        bucket: mciuploads
-        prefix: ${task_id}_${execution}
-        file: src/scons_cedar_report.json
+        binary: bash
+        args:
+          - "./src/evergreen/perf_submission.sh"
+        env:
+          perf_file_path: src/scons_cedar_report.json
+        include_expansions_in_env:
+          - requester
+          - revision_order_id
+          - project_id
+          - version_id
+          - build_variant
+          - parsed_order_id
+          - task_name
+          - task_id
+          - execution
+          - is_mainline
+      type: test
 
   "attach report":
     command: attach.results

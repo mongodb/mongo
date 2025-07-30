@@ -712,9 +712,26 @@ functions:
         ${test_env_vars|} test/csuite/${test_binary}/smoke.sh ${test_args|} 2>&1
 
   "upload test stats":
-    - command: perf.send
+    - command: subprocess.exec
       params:
-        file: ./wiredtiger/cmake_build/${test_path}.json
+        binary: bash
+        args:
+          - ./test/evergreen/perf_submission.sh
+        working_dir: src
+        env:
+          perf_file_path: ./wiredtiger/cmake_build/${test_path}.json
+        include_expansions_in_env:
+          - requester
+          - revision_order_id
+          - project_id
+          - version_id
+          - build_variant
+          - parsed_order_id
+          - task_name
+          - task_id
+          - execution
+          - is_mainline
+      type: test
 
   "upload-perf-test-stats":
     - *gen_github_token
@@ -730,9 +747,26 @@ functions:
           source venv/bin/activate
           ${pip3_binary} install pymongo[srv]==3.12.2
           ${python_binary} ../automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_perf_test_username} -p ${atlas_perf_test_password} -f test_stats/atlas_out_${perf-test-name}.json -t ${created_at}
-    - command: perf.send
+    - command: subprocess.exec
       params:
-        file: ./wiredtiger/cmake_build/bench/wtperf/test_stats/evergreen_out_${perf-test-name}.json
+        binary: bash
+        args:
+          - ./test/evergreen/perf_submission.sh
+        working_dir: src
+        env:
+          perf_file_path: ./wiredtiger/cmake_build/bench/wtperf/test_stats/evergreen_out_${perf-test-name}.json
+        include_expansions_in_env:
+          - requester
+          - revision_order_id
+          - project_id
+          - version_id
+          - build_variant
+          - parsed_order_id
+          - task_name
+          - task_id
+          - execution
+          - is_mainline
+      type: test
     # Push the json results to the 'Files' tab of the task in Evergreen
     # Parameterised using the 'perf-test-name' variable
     - command: s3.put
