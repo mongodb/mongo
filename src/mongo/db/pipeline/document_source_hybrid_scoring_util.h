@@ -36,6 +36,8 @@
 
 namespace mongo::hybrid_scoring_util {
 
+static constexpr StringData kIsHybridSearchFlagFieldName = "$_internalIsHybridSearch"_sd;
+
 /**
  * Checks if this stage is a $score stage, where it has been desugared to $setMetadata with the meta
  * type MetaType::kScore.
@@ -113,6 +115,27 @@ bool pipelineContainsScoreStage(const std::vector<BSONObj>& bsonPipeline);
  * Returns true if the BSON contains a $scoreFusion or $rankFusion and false otherwise.
  */
 bool isHybridSearchPipeline(const std::vector<BSONObj>& bsonPipeline);
+
+/**
+ * Validates that the provided spec does not have the internal-use-only $_internalIsHybridSearch
+ * flag set.
+ *
+ * TODO SERVER-108117 This is currently not called because the validation is broken when running an
+ * explain on a view in a sharded collection. In that scenario, the router desugars the subpipeline,
+ * adds $_internalIsHybridSearch to the serialized BSON, and sends it to the shards. The shards
+ * respond with an error that the view must be executed on the router, and then the router tries
+ * executing the fully-desugared pipeline. However, on this retry, the internal client flag is not
+ * set, and the router fails the explain due to this assertion.
+ */
+void validateIsHybridSearchNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                        const BSONObj& spec);
+
+/**
+ * Validates that a given collection/view namespace is not a timeseries collection for hybrid
+ * search.
+ */
+void assertForeignCollectionIsNotTimeseries(const NamespaceString& nss,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 namespace score_details {
 /**

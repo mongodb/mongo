@@ -56,6 +56,7 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_documents.h"
+#include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
@@ -1312,6 +1313,13 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
         output[getSourceName()]["let"] = Value(exprList.freeze());
 
         output[getSourceName()]["pipeline"] = Value(serializedPipeline);
+
+        if (!opts.isSerializingForExplain() &&
+            hybrid_scoring_util::isHybridSearchPipeline(
+                _userPipeline.value_or(std::vector<BSONObj>()))) {
+            output[getSourceName()][hybrid_scoring_util::kIsHybridSearchFlagFieldName] =
+                Value(true);
+        }
     }
 
     if (opts.isSerializingForExplain()) {
@@ -1552,8 +1560,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     bool hasPipeline = false;
     bool hasLet = false;
 
-    auto lookupSpec = DocumentSourceLookupSpec::parse(IDLParserContext(kStageName), elem.Obj());
+    // TODO SERVER-108117 Validate that the isHybridSearch flag is only set internally. See helper
+    // hybrid_scoring_util::validateIsHybridSearchNotSetByUser to handle this.
 
+    auto lookupSpec = DocumentSourceLookupSpec::parse(IDLParserContext(kStageName), elem.Obj());
 
     if (lookupSpec.getFrom().has_value()) {
         fromNs = parseLookupFromAndResolveNamespace(lookupSpec.getFrom().value().getElement(),
@@ -1582,6 +1592,17 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         fromNs =
             NamespaceString::makeCollectionlessAggregateNSS(pExpCtx->getNamespaceString().dbName());
     }
+
+    if (lookupSpec.getIsHybridSearch() || hybrid_scoring_util::isHybridSearchPipeline(pipeline)) {
+        // If there is a hybrid search stage in our pipeline, then we should validate that we
+        // are not running on a timeseries collection.
+        //
+        // If the hybrid search flag is set to true, this request may have
+        // come from a mongos that does not know if the collection is a valid collection for
+        // hybrid search. Therefore, we must validate it here.
+        hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(fromNs, pExpCtx);
+    }
+
     boost::intrusive_ptr<DocumentSourceLookUp> lookupStage = nullptr;
     if (hasPipeline) {
         if (localField.empty() && foreignField.empty()) {

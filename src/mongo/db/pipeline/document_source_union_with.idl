@@ -46,3 +46,11 @@ structs:
                 description: An optional pipeline to apply to the collection being unioned.
                 optional: true
                 type: pipeline
+            # When a hybrid search stage is de-sugared, then serialized into sub-pipeline BSON to be sent
+            # across the wire (i.e. from mongos to mongod), its unclear from inspecting the BSON that the
+            # original query was a hybrid search, so this internal field preserves that information.
+            $_internalIsHybridSearch:
+                description: An optional internal field specifying if the subpipeline is a hybrid search.
+                type: optionalBool
+                stability: internal
+                cpp_name: isHybridSearch
