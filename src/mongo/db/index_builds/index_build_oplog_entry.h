@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/util/uuid.h"
 
@@ -56,9 +57,7 @@ public:
     repl::OplogEntry::CommandType commandType;
     std::string commandName;
     UUID buildUUID;
-    std::vector<std::string> indexNames;
-    std::vector<BSONObj> indexSpecs;
-    std::vector<std::string> indexIdents;
+    std::vector<IndexBuildInfo> indexes;
     boost::optional<Status> cause;
     repl::OpTime opTime;
 };

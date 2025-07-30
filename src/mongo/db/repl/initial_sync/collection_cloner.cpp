@@ -358,18 +358,13 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
     for (const auto& groupedIndexSpec : groupedIndexSpecs) {
-        std::vector<std::string> indexNames;
-        std::vector<BSONObj> indexSpecs;
+        std::vector<IndexBuildInfo> indexes;
         for (const auto& indexSpec : groupedIndexSpec.second) {
-            std::string indexName =
-                std::string{indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName)};
-            indexNames.push_back(indexName);
-            indexSpecs.push_back(indexSpec.getOwned());
+            // TODO(SERVER-107069): obtain the ident from the sync source rather than generating
+            // them.
+            indexes.push_back(IndexBuildInfo(
+                indexSpec.getOwned(), storageEngine->generateNewIndexIdent(_sourceNss.dbName())));
         }
-
-        // TODO(SERVER-107069): obtain the ident from the sync source rather than generating them
-        std::vector<std::string> indexIdents =
-            storageEngine->generateNewIndexIdents(_sourceNss.dbName(), indexSpecs.size());
 
         UnreplicatedWritesBlock uwb(opCtx.get());
 
@@ -383,9 +378,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
                                         repl::OplogEntry::CommandType::kStartIndexBuild,
                                         "createIndexes",
                                         groupedIndexSpec.first,
-                                        std::move(indexNames),
-                                        std::move(indexSpecs),
-                                        std::move(indexIdents),
+                                        std::move(indexes),
                                         boost::none});
         } catch (const ExceptionFor<ErrorCodes::IndexAlreadyExists>&) {
             // Suppress the IndexAlreadyExists error code.

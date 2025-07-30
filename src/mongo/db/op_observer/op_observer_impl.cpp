@@ -388,15 +388,15 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
 
     indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
 
-    BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
+    BSONArrayBuilder oIndexesArr(oplogEntryBuilder.subarrayStart("indexes"));
     for (const auto& indexBuildInfo : indexes) {
-        indexesArr.append(indexBuildInfo.spec);
+        oIndexesArr.append(indexBuildInfo.spec);
     }
-    indexesArr.done();
+    oIndexesArr.done();
 
-    BSONArrayBuilder identsArr;
+    BSONArrayBuilder o2IndexesArr;
     for (const auto& indexBuildInfo : indexes) {
-        identsArr.append(indexBuildInfo.indexIdent);
+        o2IndexesArr.append(BSON("indexIdent" << indexBuildInfo.indexIdent));
     }
 
     MutableOplogEntry oplogEntry;
@@ -406,7 +406,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
     if (shouldReplicateLocalCatalogIdentifers(opCtx)) {
-        oplogEntry.setObject2(BSON("idents" << identsArr.arr()));
+        oplogEntry.setObject2(BSON("indexes" << o2IndexesArr.arr()));
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());

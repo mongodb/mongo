@@ -107,8 +107,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
         return {ErrorCodes::BadValue, "Field 'indexes' must be an array of index spec objects"};
     }
 
-    std::vector<std::string> indexNames;
-    std::vector<BSONObj> indexSpecs;
+    std::vector<IndexBuildInfo> indexesVec;
     for (auto& indexElem : indexesElem.Array()) {
         if (!indexElem.isABSONObj()) {
             return {ErrorCodes::BadValue, "Element of 'indexes' must be an object"};
@@ -118,8 +117,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
         if (!status.isOK()) {
             return status.withContext("Error extracting 'name' from index spec");
         }
-        indexNames.push_back(indexName);
-        indexSpecs.push_back(indexElem.Obj().getOwned());
+        indexesVec.emplace_back(indexElem.Obj().getOwned(), boost::none);
     }
 
     // Get the reason this index build was aborted on the primary.
@@ -139,24 +137,45 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
     auto collUUID = entry.getUuid();
     invariant(collUUID, str::stream() << redact(entry.toBSONForLogging()));
 
-    std::vector<std::string> indexIdents;
     if (auto o2 = entry.getObject2(); o2 && parseO2) {
-        auto identsElem = o2->getField("idents");
-        if (identsElem.eoo()) {
-            return {ErrorCodes::BadValue, "Missing required field 'idents'"};
+        auto indexesElem = o2->getField("indexes");
+        if (indexesElem.eoo()) {
+            return {ErrorCodes::BadValue, "Missing required field 'indexes'"};
         }
-        if (identsElem.type() != BSONType::array) {
+        if (indexesElem.type() != BSONType::array) {
             return {ErrorCodes::BadValue,
-                    fmt::format("Field 'idents' must be an array of index idents, got '{}'",
-                                identsElem.toString())};
+                    fmt::format("Field 'indexes' must be an array of objects, got '{}'",
+                                indexesElem.toString())};
         }
-        for (auto& identElem : identsElem.Array()) {
-            if (identElem.type() != BSONType::string) {
+
+        auto indexesElemVec = indexesElem.Array();
+        if (indexesVec.size() != indexesElemVec.size()) {
+            return {
+                ErrorCodes::BadValue,
+                fmt::format("'indexes' array sizes differ between o and o2 objects, got {} vs {}",
+                            indexesVec.size(),
+                            indexesElemVec.size())};
+        }
+
+        for (size_t i = 0; i < indexesElemVec.size(); ++i) {
+            auto& indexElem = indexesElemVec[i];
+            if (indexElem.type() != BSONType::object) {
                 return {ErrorCodes::BadValue,
-                        fmt::format("Element of 'idents' must be a string, got '{}'",
-                                    identElem.toString())};
+                        fmt::format("Element of 'indexes' must be an object, got '{}'",
+                                    indexElem.toString())};
             }
-            indexIdents.push_back(identElem.str());
+
+            auto indexElemObj = indexElem.Obj();
+            auto indexIdentElem = indexElemObj.getField("indexIdent");
+            if (indexIdentElem.eoo()) {
+                return {ErrorCodes::BadValue, "Missing required field 'indexIdent'"};
+            }
+            if (indexIdentElem.type() != BSONType::string) {
+                return {ErrorCodes::BadValue,
+                        fmt::format("'indexIdent' must be a string, got '{}'",
+                                    indexIdentElem.toString())};
+            }
+            indexesVec[i].indexIdent = indexIdentElem.str();
         }
     }
 
@@ -164,9 +183,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
                                 commandType,
                                 std::string{commandName},
                                 swBuildUUID.getValue(),
-                                std::move(indexNames),
-                                std::move(indexSpecs),
-                                std::move(indexIdents),
+                                std::move(indexesVec),
                                 cause,
                                 entry.getOpTime()};
 }

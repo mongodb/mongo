@@ -93,6 +93,7 @@ mongo_cc_library(
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
         ":commit_quorum_options",
+        ":index_builds_common",
         "//src/mongo:base",
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db/repl:oplog_entry",

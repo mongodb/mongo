@@ -210,8 +210,11 @@ OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
     oplogEntryBuilder.append("startIndexBuild", nss.coll());
     populateTwoPhaseIndexBuildOplogEntry(oplogEntryBuilder, indexBuildUUID, keyPattern, indexName);
 
-    return makeCommandOplogEntry(
-        opTime, nss, oplogEntryBuilder.obj(), BSON("idents" << BSON_ARRAY(ident)), uuid);
+    return makeCommandOplogEntry(opTime,
+                                 nss,
+                                 oplogEntryBuilder.obj(),
+                                 BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << ident))),
+                                 uuid);
 }
 
 OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,

@@ -5373,7 +5373,8 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
     auto entry1 = assertGet(OplogEntry::parse(oplogEntries[0]));
     auto entry2 = assertGet(OplogEntry::parse(oplogEntries[1]));
 
-    ASSERT_BSONOBJ_EQ(*entry1.getObject2(), BSON("idents" << BSON_ARRAY(indexes[0].indexIdent)));
+    ASSERT_BSONOBJ_EQ(*entry1.getObject2(),
+                      BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << indexes[0].indexIdent))));
     ASSERT_FALSE(entry2.getObject2());
 }
 

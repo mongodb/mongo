@@ -703,23 +703,26 @@ TEST(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
         BSON("v" << 2 << "key" << BSON("y" << 1) << "name" << "y_1"),
     };
     const std::vector<std::string> indexNames = {"x_1", "y_1"};
-    const std::vector<std::string> indexIdents = {"index-0", "index-1"};
+    const std::vector<BSONObj> o2Indexes = {BSON("indexIdent" << "index-0"),
+                                            BSON("indexIdent" << "index-1")};
 
     auto uuid = UUID::gen();
 
     {
         const auto o = BSON("startIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID
                                               << "indexes" << indexSpecs);
-        const auto o2 = BSON("idents" << indexIdents);
+        const auto o2 = BSON("indexes" << o2Indexes);
 
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
         auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(entry));
         ASSERT_EQ(parsed.collUUID, uuid);
         ASSERT_EQ(parsed.commandType, OplogEntry::CommandType::kStartIndexBuild);
         ASSERT_EQ(parsed.commandName, "startIndexBuild");
-        ASSERT_EQ(parsed.indexNames, indexNames);
-        ASSERT_BSONOBJ_VECTOR_EQ(parsed.indexSpecs, indexSpecs);
-        ASSERT_EQ(parsed.indexIdents, indexIdents);
+        ASSERT_EQ(parsed.indexes.size(), 2);
+        ASSERT_EQ(toIndexNames(parsed.indexes), indexNames);
+        ASSERT_BSONOBJ_VECTOR_EQ(toIndexSpecs(parsed.indexes), indexSpecs);
+        ASSERT_EQ(parsed.indexes[0].indexIdent, o2Indexes[0].getField("indexIdent").str());
+        ASSERT_EQ(parsed.indexes[1].indexIdent, o2Indexes[1].getField("indexIdent").str());
         ASSERT_FALSE(parsed.cause);
     }
 
@@ -728,7 +731,9 @@ TEST(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
                                               << "indexes" << indexSpecs);
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, boost::none, uuid);
         auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(entry));
-        ASSERT(parsed.indexIdents.empty());
+        ASSERT_EQ(parsed.indexes.size(), 2);
+        ASSERT(parsed.indexes[0].indexIdent.empty());
+        ASSERT(parsed.indexes[1].indexIdent.empty());
     }
 
     {
@@ -739,9 +744,11 @@ TEST(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
         ASSERT_EQ(parsed.collUUID, uuid);
         ASSERT_EQ(parsed.commandType, OplogEntry::CommandType::kCommitIndexBuild);
         ASSERT_EQ(parsed.commandName, "commitIndexBuild");
-        ASSERT_EQ(parsed.indexNames, indexNames);
-        ASSERT_BSONOBJ_VECTOR_EQ(parsed.indexSpecs, indexSpecs);
-        ASSERT(parsed.indexIdents.empty());
+        ASSERT_EQ(toIndexNames(parsed.indexes), indexNames);
+        ASSERT_BSONOBJ_VECTOR_EQ(toIndexSpecs(parsed.indexes), indexSpecs);
+        ASSERT_EQ(parsed.indexes.size(), 2);
+        ASSERT(parsed.indexes[0].indexIdent.empty());
+        ASSERT(parsed.indexes[1].indexIdent.empty());
         ASSERT_FALSE(parsed.cause);
     }
 
@@ -758,9 +765,11 @@ TEST(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
         ASSERT_EQ(parsed.collUUID, uuid);
         ASSERT_EQ(parsed.commandType, OplogEntry::CommandType::kAbortIndexBuild);
         ASSERT_EQ(parsed.commandName, "abortIndexBuild");
-        ASSERT_EQ(parsed.indexNames, indexNames);
-        ASSERT_BSONOBJ_VECTOR_EQ(parsed.indexSpecs, indexSpecs);
-        ASSERT(parsed.indexIdents.empty());
+        ASSERT_EQ(toIndexNames(parsed.indexes), indexNames);
+        ASSERT_BSONOBJ_VECTOR_EQ(toIndexSpecs(parsed.indexes), indexSpecs);
+        ASSERT_EQ(parsed.indexes.size(), 2);
+        ASSERT(parsed.indexes[0].indexIdent.empty());
+        ASSERT(parsed.indexes[1].indexIdent.empty());
         ASSERT_EQ(parsed.cause, cause);
     }
 }
@@ -794,8 +803,8 @@ TEST(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
     // them here
 
     ASSERT_EQ(parse(baseObj, BSONObj()), ErrorCodes::BadValue);
-    ASSERT_EQ(parse(baseObj, BSON("idents" << 1)), ErrorCodes::BadValue);
-    ASSERT_EQ(parse(baseObj, BSON("idents" << BSON_ARRAY(1))), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(baseObj, BSON("indexes" << 1)), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(baseObj, BSON("indexes" << BSON_ARRAY(1))), ErrorCodes::BadValue);
 
     baseObj =
         BSON("abortIndexBuild" << "test.coll" << "indexBuildUUID" << UUID::gen() << "indexes"
