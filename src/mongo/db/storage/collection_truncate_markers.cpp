@@ -82,7 +82,7 @@ StringData CollectionTruncateMarkers::toString(
 
 boost::optional<CollectionTruncateMarkers::Marker>
 CollectionTruncateMarkers::peekOldestMarkerIfNeeded(OperationContext* opCtx) const {
-    stdx::lock_guard<Latch> lk(_markersMutex);
+    stdx::lock_guard<std::mutex> lk(_markersMutex);
 
     if (!_hasExcessMarkers(opCtx)) {
         return {};
@@ -92,7 +92,7 @@ CollectionTruncateMarkers::peekOldestMarkerIfNeeded(OperationContext* opCtx) con
 }
 
 void CollectionTruncateMarkers::popOldestMarker() {
-    stdx::lock_guard<Latch> lk(_markersMutex);
+    stdx::lock_guard<std::mutex> lk(_markersMutex);
     _markers.pop_front();
 }
 
@@ -114,9 +114,16 @@ void CollectionTruncateMarkers::createNewMarkerIfNeeded(const RecordId& lastReco
     // Try to lock the mutex, if we fail to lock then someone else is either already creating a new
     // marker or popping the oldest one. In the latter case, we let the next insert trigger the new
     // marker's creation.
-    stdx::unique_lock<Latch> lk(_markersMutex, stdx::try_to_lock);
+    stdx::unique_lock<std::mutex> lk(_markersMutex, stdx::try_to_lock);
     if (!lk) {
         logFailedLockAcquisition("_markersMutex");
+        return;
+    }
+
+    if (feature_flags::gOplogSamplingAsyncEnabled.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        !_initialSamplingFinished) {
+        // Must have finished creating initial markers first.
         return;
     }
 
@@ -174,6 +181,11 @@ void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
 void CollectionTruncateMarkers::setMinBytesPerMarker(int64_t size) {
     invariant(size > 0);
     _minBytesPerMarker.store(size);
+}
+
+void CollectionTruncateMarkers::initialSamplingFinished() {
+    stdx::lock_guard<stdx::mutex> lk(_markersMutex);
+    _initialSamplingFinished = true;
 }
 
 CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::createMarkersByScanning(
@@ -509,7 +521,7 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
     // creating a new marker or popping the oldest one. In the latter case, we let the next check
     // trigger the new partial marker's creation.
 
-    stdx::unique_lock<Latch> lk(_markersMutex, stdx::try_to_lock);
+    stdx::unique_lock<std::mutex> lk(_markersMutex, stdx::try_to_lock);
     if (!lk) {
         logFailedLockAcquisition("_markersMutex");
         return;

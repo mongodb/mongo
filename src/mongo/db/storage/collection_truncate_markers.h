@@ -257,6 +257,10 @@ public:
 
     void setMinBytesPerMarker(int64_t size);
 
+    // Sets the _initialSamplingFinished variable to true. Allows other threads to know that initial
+    // sampling of oplog truncate markers during startup has finished.
+    void initialSamplingFinished();
+
     static constexpr uint64_t kRandomSamplesPerMarker = 10;
 
     //
@@ -264,7 +268,7 @@ public:
     //
 
     size_t numMarkers_forTest() const {
-        stdx::lock_guard<Latch> lk(_markersMutex);
+        stdx::lock_guard<std::mutex> lk(_markersMutex);
         return _markers.size();
     }
 
@@ -291,7 +295,7 @@ private:
 
     // Method used to notify the implementation of a new marker being created. Implementations are
     // free to implement this however they see fit by overriding it. By default this is a no-op.
-    virtual void _notifyNewMarkerCreation(){};
+    virtual void _notifyNewMarkerCreation() {};
 
     // Minimum number of bytes the marker being filled should contain before it gets added to the
     // deque of collection markers.
@@ -300,9 +304,13 @@ private:
     AtomicWord<int64_t> _currentRecords;  // Number of records in the marker being filled.
     AtomicWord<int64_t> _currentBytes;    // Number of bytes in the marker being filled.
 
-    // Protects against concurrent access to the deque of collection markers.
-    mutable Mutex _markersMutex = MONGO_MAKE_LATCH("CollectionTruncateMarkers::_markersMutex");
+    // Protects against concurrent access to the deque of collection markers and the
+    // _initialSamplingFinished variable.
+    mutable std::mutex _markersMutex;
     std::deque<Marker> _markers;  // front = oldest, back = newest.
+
+    // Whether or not the initial set of markers has finished being sampled.
+    bool _initialSamplingFinished = false;
 
 protected:
     struct PartialMarkerMetrics {
@@ -336,7 +344,7 @@ protected:
      * markers will be created.
      */
     bool isEmpty() const {
-        stdx::lock_guard<Latch> lk(_markersMutex);
+        stdx::lock_guard<std::mutex> lk(_markersMutex);
         return _markers.size() == 0 && _currentBytes.load() == 0 && _currentRecords.load() == 0;
     }
 

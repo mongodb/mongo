@@ -281,15 +281,17 @@ WiredTigerRecordStore::OplogTruncateMarkers::sampleAndUpdate(OperationContext* o
           "WiredTiger record store oplog processing finished",
           "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
 
-    // Update
-    return std::make_shared<WiredTigerRecordStore::OplogTruncateMarkers>(
-        std::move(initialSetOfMarkers.markers),
-        initialSetOfMarkers.leftoverRecordsCount,
-        initialSetOfMarkers.leftoverRecordsBytes,
-        minBytesPerTruncateMarker,
-        initialSetOfMarkers.timeTaken,
-        initialSetOfMarkers.methodUsed,
-        rs);
+    // This value will eventually replace the empty OplogTruncateMarker object with this newly
+    // populated object now that initial sampling has finished.
+    auto otm = std::make_shared<OplogTruncateMarkers>(std::move(initialSetOfMarkers.markers),
+                                                      initialSetOfMarkers.leftoverRecordsCount,
+                                                      initialSetOfMarkers.leftoverRecordsBytes,
+                                                      minBytesPerTruncateMarker,
+                                                      initialSetOfMarkers.timeTaken,
+                                                      initialSetOfMarkers.methodUsed,
+                                                      rs);
+    otm->initialSamplingFinished();
+    return otm;
 }
 
 std::shared_ptr<WiredTigerRecordStore::OplogTruncateMarkers>
