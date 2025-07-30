@@ -88,8 +88,12 @@ def search_for_modules(deps, deps_installed, lockfile_changed=False):
     wrapper_debug(f"deps_not_found: {deps_not_found}")
     return deps_not_found
 
+def skip_cplusplus_toolchain(args):
+    if any("no_c++_toolchain" in arg for arg in args):
+        return True
+    return False
 
-def install_modules(bazel):
+def install_modules(bazel, args):
     need_to_install = False
     pwd_hash = hashlib.md5(str(REPO_ROOT).encode()).hexdigest()
     lockfile_hash_file = pathlib.Path(tempfile.gettempdir()) / f"{pwd_hash}_lockfile_hash"
@@ -123,6 +127,10 @@ def install_modules(bazel):
             bazel,
             "build",
         ] + ["@poetry//:library_" + dep.replace("-", "_") for dep in deps_needed]
+
+        if skip_cplusplus_toolchain(args):
+            cmd += ["--repo_env=no_c++_toolchain=1"]
+
         proc = subprocess.run(
             cmd
             + [

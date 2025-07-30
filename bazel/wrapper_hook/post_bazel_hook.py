@@ -13,7 +13,7 @@ BAZEL_CI_NAMESPACE = "ci-prod"
 
 
 def main():
-    install_modules(sys.argv[1])
+    install_modules(sys.argv[1], sys.argv[1:])
 
     from bazel.wrapper_hook.flag_sync import sync_flags
 

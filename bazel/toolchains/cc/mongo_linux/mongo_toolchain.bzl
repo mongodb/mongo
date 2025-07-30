@@ -2,8 +2,16 @@ load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retr
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 load("//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
 
+SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE = "no_c++_toolchain"
+
 def _toolchain_download(ctx):
     distro, arch, substitutions = get_toolchain_subs(ctx)
+
+    skip_toolchain = ctx.os.environ.get(SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE, None)
+    if skip_toolchain:
+        generate_noop_toolchain(ctx, substitutions)
+        print("Skipping c++ toolchain download and defining noop toolchain due to " + SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE + " being defined.")
+        return None
 
     toolchain_key = "{distro}_{arch}".format(distro = distro, arch = arch)
 
@@ -50,6 +58,7 @@ def _toolchain_download(ctx):
 
 toolchain_download = repository_rule(
     implementation = _toolchain_download,
+    environ = [SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE],
     attrs = {
         "os": attr.string(
             values = ["macos", "linux", "windows"],
