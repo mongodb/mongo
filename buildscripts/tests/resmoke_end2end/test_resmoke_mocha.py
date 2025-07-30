@@ -224,3 +224,28 @@ class TestMochaRunner(unittest.TestCase):
         pattern = r".*".join(arr) + r".*"
         pattern = re.compile(pattern, re.DOTALL)
         self.assertRegex(result.stdout, pattern)
+
+
+    def test_mocha_runner_only(self):
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_mocha_runner.yml",
+            "jstests/noPassthrough/shell/js/mochalite_only.js",
+        ]
+
+        result = execute_resmoke(resmoke_args)
+
+        self.assertEqual(result.returncode, 0)
+
+        arr = [
+            "test4",
+            "test9",
+            "test11",
+            "test13",
+        ]
+        for output in arr:
+            self.assertIn(output, result.stdout)
+
+        # verify ordering
+        pattern = r".*".join(arr) + r".*"
+        pattern = re.compile(pattern, re.DOTALL)
+        self.assertRegex(result.stdout, pattern)

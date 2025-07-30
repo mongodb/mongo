@@ -110,42 +110,62 @@ The [mochalite.js](../jstests/libs/mochalite.js) library ports over a subset of 
 
 - `it` test contruction
 - `describe` suite structures
+- `it.only` and `describe.only` to run only those suites and tests
+- `it.skip` and `describe.skip` to skip those suites and tests
 - `before` and `after` hooks, to run _once_ around _all_ `it` tests
 - `beforeEach` and `afterEach` hooks, to run around _each_ `it` test
-- The above (excluding `describe`) support `async` functions
+- The above (excluding `describe` variants) also support `async` functions
 - Resmoke test filtering using the `--mochagrep` flag, which mirrors the [`grep`](https://mochajs.org/#-grep-regexp-g-regexp) flag from MochaJS
 
-Example using all APIs:
+Example using several APIs:
 
-```
-import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+```js
+import {
+  after,
+  afterEach,
+  before,
+  beforeEach,
+  describe,
+  it,
+} from "jstests/libs/mochalite.js";
 
 describe("simple inserts and finds", () => {
-    before(() => {
-        this.fixtureDB = startupNewDB();
-    });
-    beforeEach(() => {
-        this.fixtureDB.seed();
-    });
-    afterEach(async () => {
-        await this.fixtureDB.clear();
-    });
-    after(() => {
-        this.fixtureDB.shutdown();
-    });
-    it("should do something", () => {
-        this.fixtureDB.insert({ name: "test" });
-        assert.eq(this.fixtureDB.find({ name: "test" }).count(), 1);
-    });
-    it("should error on invalid data", () => {
-        const e = assert.throws(() => this.fixtureDB.insert({ "notafield": undefined }));
-        assert.eq(e.message, "Field 'notafield' not found");
-    });
+  before(() => {
+    this.fixtureDB = startupNewDB();
+  });
+  beforeEach(() => {
+    this.fixtureDB.seed();
+  });
+  afterEach(async () => {
+    await this.fixtureDB.clear();
+  });
+  after(() => {
+    this.fixtureDB.shutdown();
+  });
+  it("should do something", () => {
+    this.fixtureDB.insert({name: "test"});
+    assert.eq(this.fixtureDB.find({name: "test"}).count(), 1);
+  });
+  it("should error on invalid data", () => {
+    const e = assert.throws(() =>
+      this.fixtureDB.insert({notafield: undefined}),
+    );
+    assert.eq(e.message, "Field 'notafield' not found");
+  });
 });
 ```
 
-Use the filter on resmoke to run just the one test:
+Use `it.only` to run just the one test (eg. during debugging):
 
+```js
+it.only("should do something", () => {
+  this.fixtureDB.insert({name: "test"});
+  assert.eq(this.fixtureDB.find({name: "test"}).count(), 1);
+});
 ```
+
+or use the filter from resmoke to avoid any file edits:
+
+```sh
 buildscripts/resmoke.py run --suites=no_passthrough --mochagrep "do something" jstests/noPassthrough/mytest.js
 ```

@@ -76,9 +76,10 @@ class Printer {
 class Context {}
 
 class Scope {
-    constructor(title = [], fn = null) {
+    constructor(title = [], fn = null, modifiers = {only: false}) {
         this.title = title;
         this.fn = fn;
+        this.only = modifiers.only;
 
         this.ctx = new Context();
 
@@ -101,7 +102,24 @@ class Scope {
      * @async
      */
     async run() {
-        for (const child of this.children) {
+        let children = this.children;
+
+        // look for "only" marked scopes
+        children = children.filter(child => child.containsOnly());
+
+        if (children.length > 0) {
+            // prioritize direct it.only scopes
+            let directTestOnly = children.filter(child => child instanceof TestScope);
+            if (directTestOnly.length > 0) {
+                // this breaks any ties with sibling describe.only scopes
+                children = directTestOnly;
+            }
+        } else {
+            // Either no "only" was used, or came from ancestors: treat these all the same
+            children = this.children;
+        }
+
+        for (const child of children) {
             await child.run();
         }
     }
@@ -110,8 +128,8 @@ class Scope {
 // Scope to group tests and hooks together with relevant context
 // This is a Composite pattern where DescribeScope can contain other DescribeScopes or TestScopes
 class DescribeScope extends Scope {
-    constructor(title = [], fn = null) {
-        super(title, fn);
+    constructor(title = [], fn = null, modifiers = {only: false}) {
+        super(title, fn, modifiers);
 
         // hooks
         this.before = [];
@@ -153,7 +171,11 @@ class DescribeScope extends Scope {
      * @returns {boolean}
      */
     containsTests() {
-        return this.children.some(node => node.containsTests());
+        return this.children.some(child => child.containsTests());
+    }
+
+    containsOnly() {
+        return this.only || this.children.some(child => child.containsOnly());
     }
 
     /**
@@ -191,16 +213,16 @@ class TestScope extends Scope {
      * Create a new TestScope for a single test.
      * @param {Test} test test element
      */
-    constructor(title, fn) {
-        super(title, fn);
+    constructor(title, fn, modifiers = {only: false}) {
+        super(title, fn, modifiers);
     }
 
     fullTitle() {
         let titleArray = [this.title];
-        let node = this;
-        while (node.parent?.parent) {
-            titleArray.unshift(node.parent.title);
-            node = node.parent;
+        let child = this;
+        while (child.parent?.parent) {
+            titleArray.unshift(child.parent.title);
+            child = child.parent;
         }
         return titleArray.join(TestScope.#titleSep);
     }
@@ -211,6 +233,10 @@ class TestScope extends Scope {
      */
     containsTests() {
         return GREP.test(this.fullTitle());
+    }
+
+    containsOnly() {
+        return this.only;
     }
 
     /**
@@ -262,9 +288,33 @@ let currScope = new DescribeScope();
  * });
  */
 function it(title, fn) {
+    addTest(title, fn, {});
+}
+
+/**
+ * Variant of "it" that runs only this test case.
+ * @param {string} title Test title
+ * @param {function} fn Test content
+ */
+it.only = function(title, fn) {
+    addTest(title, fn, {only: true});
+};
+
+/**
+ * Variant of "it" that skips a test case.
+ * @param {string} title Test title
+ * @param {function} fn Test content
+ */
+it.skip = function(title, fn) {
+    // no-op
+};
+
+function addTest(title, fn, options = {
+    only: false
+}) {
     assertNoFunctionArgs(fn);
     markUsage();
-    const scope = new TestScope(title, fn);
+    const scope = new TestScope(title, fn, options);
     currScope.addChild(scope);
 }
 
@@ -281,8 +331,34 @@ function it(title, fn) {
  * });
  */
 function describe(title, fn) {
+    addDescribe(title, fn, {});
+}
+
+/**
+ * Variant of "describe" that runs only this test suite.
+ *
+ * @param {*} title
+ * @param {*} fn
+ */
+describe.only = function(title, fn) {
+    addDescribe(title, fn, {only: true});
+};
+
+/**
+ * Variant of "describe" that skips a test suite.
+ *
+ * @param {*} title
+ * @param {*} fn
+ */
+describe.skip = function(title, fn) {
+    // no-op
+};
+
+function addDescribe(title, fn, options = {
+    only: false
+}) {
     markUsage();
-    const scope = new DescribeScope(title, fn);
+    const scope = new DescribeScope(title, fn, options);
     const oldScope = currScope;
     scope.discover(currScope);
     oldScope.addChild(scope);
