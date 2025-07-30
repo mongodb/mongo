@@ -115,6 +115,11 @@ void CollectionTruncateMarkers::createNewMarkerIfNeeded(const RecordId& lastReco
         return;
     }
 
+    if (feature_flags::gOplogSamplingAsyncEnabled.isEnabled() && !_initialSamplingFinished) {
+        // Must have finished creating initial markers first.
+        return;
+    }
+
     if (_currentBytes.load() < _minBytesPerMarker.load()) {
         // Must have raced to create a new marker, someone else already triggered it.
         return;
@@ -169,6 +174,11 @@ void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
 void CollectionTruncateMarkers::setMinBytesPerMarker(int64_t size) {
     invariant(size > 0);
     _minBytesPerMarker.store(size);
+}
+
+void CollectionTruncateMarkers::initialSamplingFinished() {
+    stdx::lock_guard<stdx::mutex> lk(_markersMutex);
+    _initialSamplingFinished = true;
 }
 
 CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::createMarkersByScanning(
