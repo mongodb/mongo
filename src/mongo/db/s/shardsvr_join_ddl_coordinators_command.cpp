@@ -103,23 +103,6 @@ public:
                     }
                     return true;
                 });
-
-            // Before leaving, we have to ensure that this node is not operating in a split-brain
-            // scenario (where another primary node could be serving DDL operations that cannot be
-            // drained within this context); a majority dummy write is performed here to persist the
-            // session ID and TXN number received by the caller (and allowing the execution of the
-            // replay protection check).
-            DBDirectClient dbClient(opCtx);
-            dbClient.update(NamespaceString::kServerConfigurationNamespace,
-                            BSON("_id" << Request::kCommandName),
-                            BSON("$inc" << BSON("count" << 1)),
-                            true /* upsert */,
-                            false /* multi */);
-
-            WriteConcernResult ignoreResult;
-            auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-            uassertStatusOK(waitForWriteConcern(
-                opCtx, latestOpTime, defaultMajorityWriteConcern(), &ignoreResult));
         }
 
     private:
