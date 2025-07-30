@@ -2,7 +2,7 @@
  * Test that references to "score" are correctly validated with the $score stage in different
  * relative positions.
  *
- * TODO SERVER-100946 Enable this test to be run in $facets.
+ * TODO SERVER-100945 Enable this test to be run in $facets.
  *
  * featureFlagRankFusionBasic is required to enable use of "score".
  * featureFlagSearchHybridScoringFull is required to enable use of $score.
