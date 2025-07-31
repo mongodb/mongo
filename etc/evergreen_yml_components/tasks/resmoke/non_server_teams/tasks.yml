@@ -365,7 +365,7 @@ tasks:
           <<: *jstestfuzz_config_vars
           num_files: 2
           num_tasks: 2
-          jstestfuzz_vars: --jsTestsDir jstests
+          jstestfuzz_vars: --jsTestsDir ../jstests
           suite: //buildscripts/resmokeconfig:jstestfuzz
           npm_command: jstestfuzz
           bazel_args: >-
