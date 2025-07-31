@@ -173,7 +173,7 @@ buildvariants:
     build_mongot: true
     download_mongot_release: true
   tasks:
-  - name: .search_e2e_tests
+  - name: .mongot_e2e_tests
   - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
   - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
 
@@ -484,7 +484,7 @@ buildvariants:
       --excludeWithAnyTags=tsan_incompatible,requires_latch_analyzer
       --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
   tasks:
-  - name: .search_e2e_tests
+  - name: .mongot_e2e_tests
   - name: compile_test_serial_TG
   - name: run_unit_tests_TG
   - name: compile_integration_and_test_parallel_stream_TG
