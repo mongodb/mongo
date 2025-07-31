@@ -3966,10 +3966,76 @@ void EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(
     uassert(
         10431800,
         fmt::format("Cannot create a collection where the worst case total Queryable Encryption "
-                    "tag storage size ({}) exceeds the max BSON size ({})",
+                    "tag storage size ({}) exceeds the max BSON size ({}). Consider reducing the "
+                    "number of encrypted fields in the schema, or tuning the indexing parameters.",
                     totalTagStorage,
                     BSONObjMaxUserSize),
         shouldOverrideTotalTagOverheadLimit || totalTagStorage <= BSONObjMaxUserSize);
+}
+
+void EncryptionInformationHelpers::checkSubstringPreviewParameterLimitsNotExceeded(
+    const EncryptedFieldConfig& ef) {
+    static_assert(kSubstringPreviewLowerBoundMin <= kSubstringPreviewUpperBoundMax);
+    static_assert(kSubstringPreviewUpperBoundMax <= kSubstringPreviewMaxLengthMax);
+
+    static constexpr StringData bypassMsg =
+        "Consider setting the fleDisableSubstringPreviewParameterLimits cluster parameter to true "
+        "to bypass this limit.";
+    if (ServerParameterSet::getClusterParameterSet()
+            ->get<ClusterParameterWithStorage<FLEOverrideSubstringPreviewLimits>>(
+                "fleDisableSubstringPreviewParameterLimits")
+            ->getValue(boost::none)
+            .getShouldOverride()) {
+        return;
+    }
+
+    auto checkOneQueryType = [](StringData path, const QueryTypeConfig& qtc) {
+        if (qtc.getQueryType() != QueryTypeEnum::SubstringPreview) {
+            return;
+        }
+        int32_t ub = qtc.getStrMaxQueryLength().get();
+        int32_t lb = qtc.getStrMinQueryLength().get();
+        int32_t max = qtc.getStrMaxLength().get();
+        uassert(10453200,
+                fmt::format("strMinQueryLength ({}) must be >= {} for substringPreview query "
+                            "type of field {}. {}",
+                            lb,
+                            kSubstringPreviewLowerBoundMin,
+                            path,
+                            bypassMsg),
+                lb >= kSubstringPreviewLowerBoundMin);
+        uassert(10453201,
+                fmt::format("strMaxQueryLength ({}) must be >= {} for substringPreview query "
+                            "type of field {}. {}",
+                            ub,
+                            kSubstringPreviewUpperBoundMax,
+                            path,
+                            bypassMsg),
+                ub <= kSubstringPreviewUpperBoundMax);
+        uassert(10453202,
+                fmt::format("strMaxLength ({}) must be >= {} for substringPreview query "
+                            "type of field {}. {}",
+                            max,
+                            kSubstringPreviewMaxLengthMax,
+                            path,
+                            bypassMsg),
+                max <= kSubstringPreviewMaxLengthMax);
+    };
+
+    for (const auto& field : ef.getFields()) {
+        if (!field.getQueries()) {
+            continue;
+        }
+
+        visit(
+            OverloadedVisitor{[&](QueryTypeConfig qtc) { checkOneQueryType(field.getPath(), qtc); },
+                              [&](std::vector<QueryTypeConfig> queries) {
+                                  for (auto& qtc : queries) {
+                                      checkOneQueryType(field.getPath(), qtc);
+                                  }
+                              }},
+            field.getQueries().get());
+    }
 }
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr) {

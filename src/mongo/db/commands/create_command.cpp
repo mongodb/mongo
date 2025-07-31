@@ -401,6 +401,8 @@ public:
                 } else {
                     EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(
                         cmd.getEncryptedFields().get());
+                    EncryptionInformationHelpers::checkSubstringPreviewParameterLimitsNotExceeded(
+                        cmd.getEncryptedFields().get());
                 }
             }
 

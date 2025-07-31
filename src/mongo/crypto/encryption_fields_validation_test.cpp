@@ -537,31 +537,6 @@ TEST(FLEValidationUtils, ValidateTextSearchIndexSubstring) {
                            BSONType::string, "foo"_sd, qtc, boost::none, boost::none, boost::none),
                        AssertionException,
                        9783408);
-    // min query length < 2
-    qtc.setStrMaxLength(400);
-    qtc.setStrMinQueryLength(1);
-    qtc.setStrMaxQueryLength(10);
-    ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::string, "foo", qtc, boost::none, boost::none, boost::none),
-                       AssertionException,
-                       10453200);
-    // max query length > 10
-    qtc.setStrMaxLength(400);
-    qtc.setStrMinQueryLength(2);
-    qtc.setStrMaxQueryLength(11);
-    ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::string, "foo", qtc, boost::none, boost::none, boost::none),
-                       AssertionException,
-                       10453201);
-    // max length > 400
-    qtc.setStrMaxLength(401);
-    qtc.setStrMinQueryLength(2);
-    qtc.setStrMaxQueryLength(10);
-    ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::string, "foo", qtc, boost::none, boost::none, boost::none),
-                       AssertionException,
-                       10453202);
-
     // Make sure valid configuration passes.
     qtc.setStrMaxLength(400);
     qtc.setStrMinQueryLength(2);
