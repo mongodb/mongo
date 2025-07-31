@@ -78,15 +78,13 @@ protected:
 
     void createCoordinatorInCatalog(OperationContext* opCtx,
                                     LogicalSessionId lsid,
-                                    TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-                                    CancellationToken cancelToken) {
+                                    TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
         auto newCoordinator = std::make_shared<TransactionCoordinator>(
             operationContext(),
             lsid,
             txnNumberAndRetryCounter,
             std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-            Date_t::max(),
-            cancelToken);
+            Date_t::max());
         newCoordinator->start(operationContext());
 
         _coordinatorCatalog->insert(opCtx, lsid, txnNumberAndRetryCounter, newCoordinator);
@@ -107,9 +105,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{2, 0};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinatorInCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter2);
     ASSERT(coordinatorInCatalog == nullptr);
@@ -120,9 +116,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinatorInCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter2);
     ASSERT(coordinatorInCatalog == nullptr);
@@ -131,9 +125,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
 TEST_F(TransactionCoordinatorCatalogTest, CreateFollowedByGetReturnsCoordinator) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter{1, 0};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter);
     auto coordinatorInCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter);
     ASSERT(coordinatorInCatalog != nullptr);
@@ -146,10 +138,8 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{2, 0};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1, cancelToken);
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
     auto coordinator1InCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
@@ -164,19 +154,16 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
-
     // Can only create a new TransactionCoordinator after the previous TransactionCoordinator with
     // the same txnNumber has reached abort decision.
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinator1InCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
     coordinator1InCatalog->runCommit(operationContext(), kOneShardIdList);
     assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     coordinator1InCatalog->getDecision().wait();
 
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
     coordinator1InCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
@@ -201,11 +188,9 @@ DEATH_TEST_F(TransactionCoordinatorCatalogTest,
              "Invariant failure") {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter{1, 0};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter);
     // Re-creating w/ same session id and txn number should cause invariant failure
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter);
 }
 
 TEST_F(TransactionCoordinatorCatalogTest, GetLatestOnSessionWithNoCoordinatorsReturnsNone) {
@@ -220,10 +205,8 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{2, 0};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1, cancelToken);
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
     auto latestTxnNumberRetryCounterAndCoordinator =
         _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
@@ -241,19 +224,17 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
 
     // Can only create a new TransactionCoordinator after the previous TransactionCoordinator with
     // the same txnNumber has reached abort decision.
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinator1InCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
     coordinator1InCatalog->runCommit(operationContext(), kOneShardIdList);
     assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     coordinator1InCatalog->getDecision().wait();
 
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
     auto latestTxnNumberRetryCounterAndCoordinator =
         _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
@@ -275,9 +256,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
 TEST_F(TransactionCoordinatorCatalogTest, CoordinatorsRemoveThemselvesFromCatalogWhenTheyComplete) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter{1, 0};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter);
     auto coordinator = _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter);
 
     coordinator->cancelIfCommitNotYetStarted();
@@ -298,11 +277,9 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{2, 0};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
 
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1, cancelToken);
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
     auto latestTxnNumberRetryCounterAndCoordinator =
         _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
@@ -321,19 +298,17 @@ TEST_F(
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
 
     // Can only create a new TransactionCoordinator after the previous TransactionCoordinator with
     // the same txnNumber has reached abort decision.
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinator1InCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
     coordinator1InCatalog->runCommit(operationContext(), kOneShardIdList);
     assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     coordinator1InCatalog->getDecision().wait();
 
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
     auto latestTxnNumberRetryCounterAndCoordinator =
         _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
@@ -358,10 +333,8 @@ TEST_F(
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
 
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinator1 =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
     coordinator1->runCommit(operationContext(), kOneShardIdList);
@@ -371,8 +344,7 @@ TEST_F(
         lsid,
         txnNumberAndRetryCounter2,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max(),
-        cancelToken);
+        Date_t::max());
     coordinator2->start(operationContext());
 
     ASSERT_THROWS_CODE(_coordinatorCatalog->insert(
@@ -399,10 +371,8 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
 
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1, cancelToken);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinator1 =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
     coordinator1->runCommit(operationContext(), kOneShardIdList);
@@ -414,8 +384,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
         lsid,
         txnNumberAndRetryCounter2,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max(),
-        cancelToken);
+        Date_t::max());
     coordinator2->start(operationContext());
 
     ASSERT_THROWS_CODE(_coordinatorCatalog->insert(
@@ -438,8 +407,6 @@ TEST_F(TransactionCoordinatorCatalogTest,
 TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoCatalog) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter{1, 0};
-    CancellationSource cancelSource;
-    CancellationToken cancelToken{cancelSource.token()};
 
     txn::AsyncWorkScheduler aws(getServiceContext());
     TransactionCoordinatorCatalog catalog;
@@ -449,8 +416,7 @@ TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoC
                                                                 lsid,
                                                                 txnNumberAndRetryCounter,
                                                                 aws.makeChildScheduler(),
-                                                                network()->now() + Seconds{5},
-                                                                cancelToken);
+                                                                network()->now() + Seconds{5});
     coordinator->start(operationContext());
 
     aws.shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Test step down"});
