@@ -57,7 +57,11 @@ MONGO_REVISION_ENV_VAR = "REVISION"
 def _get_repos_and_revisions() -> Tuple[List[Repo], RevisionMap]:
     """Get the repo object and a map of revisions to compare against."""
 
-    repos = [Repo(git.get_base_dir())]
+    repo_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY", None)
+    if repo_dir:
+        repos = [Repo(repo_dir)]
+    else:
+        repos = [Repo(git.get_base_dir())]
 
     revision_map = generate_revision_map(repos, {"mongo": os.environ.get(MONGO_REVISION_ENV_VAR)})
     return repos, revision_map

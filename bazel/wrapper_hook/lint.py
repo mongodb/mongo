@@ -10,6 +10,7 @@ from typing import List
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
+LARGE_FILE_THRESHOLD = 10 * 1024 * 1024 #10MiB
 
 def create_build_files_in_new_js_dirs() -> None:
     base_dirs = ["src/mongo/db/modules/enterprise/jstests", "jstests"]
@@ -207,7 +208,7 @@ def get_parsed_args(args):
     )
     parser.add_argument(
         "--fail-on-validation",
-        type=bool,
+        action="store_true",
         default=False,
     )
     parser.add_argument(
@@ -215,6 +216,11 @@ def get_parsed_args(args):
         type=str,
         default="origin/master",
         help="Base branch to compare changes against",
+    )
+    parser.add_argument(
+        "--large-files",
+        action="store_true",
+        default=False
     )
     return parser.parse_known_args(args)
 
@@ -281,6 +287,15 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
 
     if lint_all or any(file.endswith(".yml") for file in files_to_lint):
         subprocess.run([bazel_bin, "run", "//buildscripts:validate_evg_project_config", "--", f"--evg-project-name={parsed_args.lint_yaml_project}", "--evg-auth-config=.evergreen.yml"], check=True)
+
+    if lint_all or parsed_args.large_files:
+        subprocess.run([bazel_bin, "run", "//buildscripts:large_file_check", "--", "--exclude", "src/third_party/*"], check=True)
+    else:
+        # simple check
+        for file in files_to_lint:
+            if os.path.getsize(file) > LARGE_FILE_THRESHOLD:
+                print(f"File {file} exceeds large file threshold of {LARGE_FILE_THRESHOLD}")
+                return False
 
     # Default to linting everything in rules_lint if no path was passed in.
     if len([arg for arg in args if not arg.startswith("--")]) == 0:
