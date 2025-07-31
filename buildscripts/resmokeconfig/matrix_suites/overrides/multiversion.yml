@@ -128,39 +128,37 @@
 
 - name: multiversion_future_git_tag_exclude_files
   value:
-    selector:
-      exclude_files:
-        # Do not execute files with helper functions.
-        - jstests/multiVersion/libs/*.js
+    exclude_files:
+      # Do not execute files with helper functions.
+      - jstests/multiVersion/libs/*.js
 
-        # TODO: SERVER-28104
-        - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
+      # TODO: SERVER-28104
+      - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
 
-        # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
-        # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
-        - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
-      exclude_with_any_tags:
-        - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+      # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
+      # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
+      - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
+    exclude_with_any_tags:
+      - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
 
 - name: multiversion_auth_future_git_tag_exclude_files
   value:
-    selector:
-      exclude_files:
-        # Do not execute files with helper functions.
-        - jstests/multiVersion/libs/*.js
+    exclude_files:
+      # Do not execute files with helper functions.
+      - jstests/multiVersion/libs/*.js
 
-        # TODO: SERVER-28104
-        - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
+      # TODO: SERVER-28104
+      - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
 
-        # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
-        # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
-        - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
+      # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
+      # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
+      - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
 
-        # Skip any tests that run with auth explicitly.
-        - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
-        - jstests/multiVersion/targetedTestsLastLtsFeatures/server-security/dollar_audit_mixed_version_mongods.js
-      exclude_with_any_tags:
-        - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+      # Skip any tests that run with auth explicitly.
+      - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
+      - jstests/multiVersion/targetedTestsLastLtsFeatures/server-security/dollar_audit_mixed_version_mongods.js
+    exclude_with_any_tags:
+      - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
 
 - name: multiversion_sanity_check_selector
   value:
