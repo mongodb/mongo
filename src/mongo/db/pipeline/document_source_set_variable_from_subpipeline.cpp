@@ -122,7 +122,7 @@ DocumentSourceSetVariableFromSubPipeline::create(
 };
 
 void DocumentSourceSetVariableFromSubPipeline::doDispose() {
-    // TODO SERVER-104225: Remove the following if-block when DocumentSourceCursor is split into
+    // TODO SERVER-102417: Remove the following if-block when all sources are split into
     // QO and QE parts and the QO stage auto-disposes resources in destructor.
     if (_subPipeline && !_subExecPipeline) {
         // Create an execution pipeline to make sure the resources are correctly disposed.

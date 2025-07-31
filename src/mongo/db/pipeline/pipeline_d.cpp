@@ -38,6 +38,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/exec/agg/cursor_stage.h"
 #include "mongo/db/exec/classic/cached_plan.h"
 #include "mongo/db/exec/classic/collection_scan.h"
 #include "mongo/db/exec/classic/index_scan.h"
@@ -2105,17 +2106,17 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
     }
 }
 
-Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {
+Timestamp PipelineD::getLatestOplogTimestamp(const exec::agg::Pipeline* pipeline) {
     if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(pipeline->_sources.front().get())) {
+            dynamic_cast<exec::agg::CursorStage*>(pipeline->getStages().front().get())) {
         return docSourceCursor->getLatestOplogTimestamp();
     }
     return Timestamp();
 }
 
-BSONObj PipelineD::getPostBatchResumeToken(const Pipeline* pipeline) {
+BSONObj PipelineD::getPostBatchResumeToken(const exec::agg::Pipeline* pipeline) {
     if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(pipeline->_sources.front().get())) {
+            dynamic_cast<exec::agg::CursorStage*>(pipeline->getStages().front().get())) {
         return docSourceCursor->getPostBatchResumeToken();
     }
     return BSONObj{};

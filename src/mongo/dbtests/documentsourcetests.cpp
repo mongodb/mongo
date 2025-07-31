@@ -40,6 +40,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/agg/cursor_stage.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/classic/collection_scan.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -162,6 +164,7 @@ protected:
                                                     PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                     QueryPlannerParams::RETURN_OWNED_DATA));
         _source = makeAndInitializeCursor(MultipleCollectionAccessor(*_coll), std::move(exec));
+        _stage = exec::agg::buildStage(_source);
     }
 
     intrusive_ptr<ExpressionContextForTest> ctx() {
@@ -172,12 +175,16 @@ protected:
         return _source.get();
     }
 
+    exec::agg::Stage* stage() {
+        return _stage.get();
+    }
+
     OperationContext* opCtx() {
         return _opCtx.get();
     }
 
     void exhaustCursor() {
-        while (!_source->getNext().isEOF()) {
+        while (!_stage->getNext().isEOF()) {
             // Just pull everything out of the cursor.
         }
     }
@@ -190,6 +197,7 @@ private:
     // It is important that these are ordered to ensure correct destruction order.
     intrusive_ptr<ExpressionContextForTest> _ctx;
     intrusive_ptr<DocumentSourceCursor> _source;
+    intrusive_ptr<exec::agg::Stage> _stage;
     boost::optional<CollectionAcquisition> _coll;
 };
 
@@ -199,7 +207,7 @@ TEST_F(DocumentSourceCursorTest, Empty) {
     // The DocumentSourceCursor doesn't hold a read lock.
     ASSERT(!shard_role_details::getLocker(opCtx())->isReadLocked());
     // The collection is empty, so the source produces no results.
-    ASSERT(source()->getNext().isEOF());
+    ASSERT(stage()->getNext().isEOF());
     // Exhausting the source releases the read lock.
     ASSERT(!shard_role_details::getLocker(opCtx())->isReadLocked());
 }
@@ -211,11 +219,11 @@ TEST_F(DocumentSourceCursorTest, Iterate) {
     // The DocumentSourceCursor doesn't hold a read lock.
     ASSERT(!shard_role_details::getLocker(opCtx())->isReadLocked());
     // The cursor will produce the expected result.
-    auto next = source()->getNext();
+    auto next = stage()->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_VALUE_EQ(Value(1), next.getDocument().getField("a"));
     // There are no more results.
-    ASSERT(source()->getNext().isEOF());
+    ASSERT(stage()->getNext().isEOF());
     // Exhausting the source releases the read lock.
     ASSERT(!shard_role_details::getLocker(opCtx())->isReadLocked());
 }
@@ -225,11 +233,11 @@ TEST_F(DocumentSourceCursorTest, Dispose) {
     createSource();
     // The DocumentSourceCursor doesn't hold a read lock.
     ASSERT(!shard_role_details::getLocker(opCtx())->isReadLocked());
-    source()->dispose();
+    stage()->dispose();
     // Releasing the cursor releases the read lock.
     ASSERT(!shard_role_details::getLocker(opCtx())->isReadLocked());
     // The source is marked as exhausted.
-    ASSERT(source()->getNext().isEOF());
+    ASSERT(stage()->getNext().isEOF());
 }
 
 /** Iterate a DocumentSourceCursor and then dispose of it. */
@@ -239,20 +247,20 @@ TEST_F(DocumentSourceCursorTest, IterateDispose) {
     client.insert(nss, BSON("a" << 3));
     createSource();
     // The result is as expected.
-    auto next = source()->getNext();
+    auto next = stage()->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_VALUE_EQ(Value(1), next.getDocument().getField("a"));
     // The next result is as expected.
-    next = source()->getNext();
+    next = stage()->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_VALUE_EQ(Value(2), next.getDocument().getField("a"));
     // The DocumentSourceCursor doesn't hold a read lock.
     ASSERT(!shard_role_details::getLocker(opCtx())->isReadLocked());
-    source()->dispose();
+    stage()->dispose();
     // Disposing of the source releases the lock.
     ASSERT(!shard_role_details::getLocker(opCtx())->isReadLocked());
     // The source cannot be advanced further.
-    ASSERT(source()->getNext().isEOF());
+    ASSERT(stage()->getNext().isEOF());
 }
 
 /** Set a value or await an expected value. */
@@ -283,7 +291,7 @@ TEST_F(DocumentSourceCursorTest, SerializationNoExplainLevel) {
     auto explainResult = source()->serialize();
     ASSERT_TRUE(explainResult.missing());
 
-    source()->dispose();
+    stage()->dispose();
 }
 
 TEST_F(DocumentSourceCursorTest, SerializationQueryPlannerExplainLevel) {
@@ -296,7 +304,7 @@ TEST_F(DocumentSourceCursorTest, SerializationQueryPlannerExplainLevel) {
     ASSERT_FALSE(explainResult["$cursor"]["queryPlanner"].missing());
     ASSERT_TRUE(explainResult["$cursor"]["executionStats"].missing());
 
-    source()->dispose();
+    stage()->dispose();
 }
 
 TEST_F(DocumentSourceCursorTest, SerializationExecStatsExplainLevel) {
@@ -313,7 +321,7 @@ TEST_F(DocumentSourceCursorTest, SerializationExecStatsExplainLevel) {
     ASSERT_FALSE(explainResult["$cursor"]["executionStats"].missing());
     ASSERT_TRUE(explainResult["$cursor"]["executionStats"]["allPlansExecution"].missing());
 
-    source()->dispose();
+    stage()->dispose();
 }
 
 TEST_F(DocumentSourceCursorTest, SerializationExecAllPlansExplainLevel) {
@@ -332,7 +340,7 @@ TEST_F(DocumentSourceCursorTest, SerializationExecAllPlansExplainLevel) {
     ASSERT_FALSE(explainResult["$cursor"]["executionStats"].missing());
     ASSERT_FALSE(explainResult["$cursor"]["executionStats"]["allPlansExecution"].missing());
 
-    source()->dispose();
+    stage()->dispose();
 }
 
 TEST_F(DocumentSourceCursorTest, ExpressionContextAndSerializeVerbosityMismatch) {
@@ -401,10 +409,9 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
         return cursor;
     }();
 
-
-    ON_BLOCK_EXIT([cursor]() { cursor->dispose(); });
-    ASSERT_THROWS_CODE(
-        cursor->getNext().isEOF(), AssertionException, ErrorCodes::ExceededTimeLimit);
+    intrusive_ptr<exec::agg::Stage> stage = exec::agg::buildStage(cursor);
+    ON_BLOCK_EXIT([stage]() { stage->dispose(); });
+    ASSERT_THROWS_CODE(stage->getNext().isEOF(), AssertionException, ErrorCodes::ExceededTimeLimit);
 }
 
 TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
@@ -450,9 +457,9 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
         return cursor;
     }();
 
-    ON_BLOCK_EXIT([cursor]() { cursor->dispose(); });
-    ASSERT_THROWS_CODE(
-        cursor->getNext().isEOF(), AssertionException, ErrorCodes::ExceededTimeLimit);
+    intrusive_ptr<exec::agg::Stage> stage = exec::agg::buildStage(cursor);
+    ON_BLOCK_EXIT([stage]() { stage->dispose(); });
+    ASSERT_THROWS_CODE(stage->getNext().isEOF(), AssertionException, ErrorCodes::ExceededTimeLimit);
 }
 
 TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKilled) {
@@ -508,8 +515,9 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
         return cursor;
     }();
 
-    ON_BLOCK_EXIT([cursor]() { cursor->dispose(); });
-    ASSERT_THROWS_CODE(cursor->getNext().isEOF(), AssertionException, ErrorCodes::QueryPlanKilled);
+    intrusive_ptr<exec::agg::Stage> stage = exec::agg::buildStage(cursor);
+    ON_BLOCK_EXIT([stage]() { stage->dispose(); });
+    ASSERT_THROWS_CODE(stage->getNext().isEOF(), AssertionException, ErrorCodes::QueryPlanKilled);
 }
 
 TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
@@ -552,8 +560,9 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
         return cursor;
     }();
 
-    ON_BLOCK_EXIT([cursor]() { cursor->dispose(); });
-    ASSERT_THROWS_CODE(cursor->getNext().isEOF(), AssertionException, ErrorCodes::QueryPlanKilled);
+    intrusive_ptr<exec::agg::Stage> stage = exec::agg::buildStage(cursor);
+    ON_BLOCK_EXIT([stage]() { stage->dispose(); });
+    ASSERT_THROWS_CODE(stage->getNext().isEOF(), AssertionException, ErrorCodes::QueryPlanKilled);
 }
 
 }  // namespace

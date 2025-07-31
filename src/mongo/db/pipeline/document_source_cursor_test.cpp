@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/storage/exceptions.h"
@@ -369,18 +370,19 @@ TEST_F(DSCursorTest, TestSaveAndRestoreThrowing) {
                                                  catalogResourceHandle,
                                                  getExpCtx(),
                                                  DocumentSourceCursor::CursorType::kRegular);
+                auto cursorStage = exec::agg::buildStage(cursor);
 
                 for (const auto& expectedBson : bsons) {
-                    DocumentSource::GetNextResult next = cursor->getNext();
+                    DocumentSource::GetNextResult next = cursorStage->getNext();
                     ASSERT(next.isAdvanced());
                     auto doc = next.getDocument();
                     ASSERT_BSONOBJ_EQ(doc.toBson(), expectedBson);
                 }
 
-                DocumentSource::GetNextResult next = cursor->getNext();
+                DocumentSource::GetNextResult next = cursorStage->getNext();
                 ASSERT(next.isEOF());
 
-                cursor->dispose();
+                cursorStage->dispose();
                 testsThatDidNotThrow++;
             } catch (const DBException&) {
                 // We're allowed to throw exceptions here due to the save()/restore() functions

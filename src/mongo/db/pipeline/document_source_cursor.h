@@ -31,15 +31,12 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -52,15 +49,11 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 
-#include <cstddef>
-#include <deque>
 #include <memory>
 #include <set>
-#include <string>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -70,10 +63,28 @@
 
 namespace mongo {
 
+struct CursorSharedState {
+    // The underlying query plan which feeds this pipeline. Must be destroyed while holding the
+    // collection lock.
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
+
+    // Status of the underlying executor, exec. Used for explain queries if exec produces an
+    // error. Since exec may not finish running (if there is a limit, for example), we store
+    // OK as the default.
+    Status execStatus;
+
+    // Specific stats for $cursor stage.
+    DocumentSourceCursorStats stats;
+
+    // Updated at most once. 'true' if a CursorStage is created.
+    bool execStageCreated{false};
+};
+
 /**
- * Constructs and returns Documents from the BSONObj objects produced by a supplied PlanExecutor.
+ * Constructs and returns Documents from the BSONObj objects produced by a supplied
+ * PlanExecutor.
  */
-class DocumentSourceCursor : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceCursor : public DocumentSource {
 public:
     /**
      * Interface for acquiring and releasing catalog resources needed for DS Cursor.
@@ -88,9 +99,9 @@ public:
     static constexpr StringData kStageName = "$cursor"_sd;
 
     /**
-     * Indicates whether or not this is a count-like operation. If the operation is count-like, then
-     * the cursor can produce empty documents since the subsequent stages need only the count of
-     * these documents (not the actual data).
+     * Indicates whether or not this is a count-like operation. If the operation is count-like,
+     * then the cursor can produce empty documents since the subsequent stages need only the
+     * count of these documents (not the actual data).
      */
     enum class CursorType { kRegular, kEmptyDocuments };
 
@@ -105,9 +116,9 @@ public:
      * Create a document source based on a passed-in PlanExecutor. 'exec' must be a yielding
      * PlanExecutor, and must be registered with the associated collection's CursorManager.
      *
-     * If 'cursorType' is 'kEmptyDocuments', then we inform the $cursor stage that this is a count
-     * scenario -- the dependency set is fully known and is empty. In this case, the newly created
-     * $cursor stage can return a sequence of empty documents for the caller to count.
+     * If 'cursorType' is 'kEmptyDocuments', then we inform the $cursor stage that this is a
+     * count scenario -- the dependency set is fully known and is empty. In this case, the newly
+     * created $cursor stage can return a sequence of empty documents for the caller to count.
      */
     static boost::intrusive_ptr<DocumentSourceCursor> create(
         const MultipleCollectionAccessor& collections,
@@ -145,49 +156,19 @@ public:
         return boost::none;
     }
 
-    void detachFromOperationContext() final;
-
     void detachSourceFromOperationContext() final;
-
-    void reattachToOperationContext(OperationContext* opCtx) final;
 
     void reattachSourceToOperationContext(OperationContext* opCtx) final;
 
-    Timestamp getLatestOplogTimestamp() const {
-        return _latestOplogTimestamp;
-    }
-
-    /**
-     * Returns a postBatchResumeToken compatible with resharding oplog sync, if available.
-     * Otherwise, returns an empty object.
-     */
-    BSONObj getPostBatchResumeToken() const;
-
-    const std::string& getPlanSummaryStr() const {
-        return _planSummary;
-    }
-
-    const PlanSummaryStats& getPlanSummaryStats() const {
-        return _stats.planSummaryStats;
-    }
-
-    bool usedDisk() const final {
-        return _stats.planSummaryStats.usedDisk;
-    }
-
-    const SpecificStats* getSpecificStats() const final {
-        return &_stats;
-    }
-
     const PlanExplainer::ExplainVersion& getExplainVersion() const {
-        return _exec->getPlanExplainer().getVersion();
+        return _sharedState->exec->getPlanExplainer().getVersion();
     }
 
     boost::optional<const PlanExplainer&> getPlanExplainer() const {
-        if (!_exec) {
+        if (!_sharedState->exec) {
             return boost::none;
         }
-        return _exec->getPlanExplainer();
+        return _sharedState->exec->getPlanExplainer();
     }
 
     PlanExecutor::QueryFramework getQueryFramework() const {
@@ -214,194 +195,36 @@ protected:
                          CursorType cursorType,
                          ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
 
-    GetNextResult doGetNext() final;
-
-    void doForceSpill() final;
-
     ~DocumentSourceCursor() override;
 
-    /**
-     * Disposes of '_exec' if it hasn't been disposed already. This involves taking a collection
-     * lock.
-     */
-    void doDispose() final;
-
-    /**
-     * If '_shouldProduceEmptyDocs' is false, this function hook is called on each 'obj' returned by
-     * '_exec' when loading a batch and returns a Document to be added to '_currentBatch'.
-     *
-     * The default implementation is the identity function.
-     */
-    virtual Document transformDoc(Document&& doc) const {
-        return std::move(doc);
-    }
-
 private:
-    /**
-     * A $cursor stage loads documents from the underlying PlanExecutor in batches. An object of
-     * this class represents one such batch. Acts like a queue into which documents can be queued
-     * and dequeued in FIFO order.
-     */
-    class Batch {
-    public:
-        Batch(CursorType type) : _type(type) {}
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceCursorToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceGeoNearCursorToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
 
-        /**
-         * Adds a new document to the batch.
-         * The resume token is used to track the resume token for this document for non-oplog
-         * queries.
-         */
-        void enqueue(Document&& doc, boost::optional<BSONObj> resumeToken);
-
-        /**
-         * Removes the first document from the batch.
-         */
-        Document dequeue();
-
-        void clear();
-
-        bool isEmpty() const;
-
-        /**
-         * Returns the approximate memory footprint of this batch, measured in bytes. Even after
-         * documents are dequeued from the batch, continues to indicate the batch's peak memory
-         * footprint. Resets to zero once the final document in the batch is dequeued.
-         */
-        size_t memUsageBytes() const {
-            return _memUsageBytes;
-        }
-
-        /**
-         * Illegal to call unless the CursorType is 'kRegular'.
-         */
-        const Document& peekFront() const {
-            invariant(_type == CursorType::kRegular);
-            return _batchOfDocs.front();
-        }
-
-        const BSONObj& peekFrontResumeToken() const {
-            invariant(_type == CursorType::kRegular);
-            return _resumeTokens.front();
-        }
-
-        /**
-         * Returns the number of documents currently in the batch.
-         */
-        size_t count() const {
-            return _type == CursorType::kRegular ? _batchOfDocs.size() : _count;
-        }
-
-    private:
-        // If 'kEmptyDocuments', then dependency analysis has indicated that all we need to execute
-        // the query is a count of the incoming documents.
-        const CursorType _type;
-
-        // Used only if '_type' is 'kRegular'. A deque of the documents comprising the batch.
-        std::deque<Document> _batchOfDocs;
-
-        // Used only if '_type' is 'kRegular' and this is a resumable query for a non-oplog
-        // collection
-        std::deque<BSONObj> _resumeTokens;
-
-        // Used only if '_type' is 'kEmptyDocuments'. In this case, we don't need to keep the
-        // documents themselves, only a count of the number of documents in the batch.
-        size_t _count = 0;
-
-        // The approximate memory footprint of the batch in bytes. Always kept at zero when '_type'
-        // is 'kEmptyDocuments'.
-        size_t _memUsageBytes = 0;
-    };
-
-    /**
-     * Acquires the appropriate locks, then destroys and de-registers '_exec'. '_exec' must be
-     * non-null.
-     */
-    void cleanupExecutor();
-
-    /**
-     * Reads a batch of data from '_exec'. Subclasses can specify custom behavior to be performed on
-     * each document by overloading transformBSONObjToDocument().
-     */
-    void loadBatch();
-
-    /**
-     * Records stats about the plan used by '_exec' into '_stats'.
-     */
-    void recordPlanSummaryStats();
-
-    /**
-     * If we are tailing the oplog, this method updates the cached timestamp to that of the latest
-     * document returned, or the latest timestamp observed in the oplog if we have no more results.
-     */
-    void _updateOplogTimestamp();
-
-    /**
-     * If we are tracking resume tokens for non-oplog scans, this method updates our cached resume
-     * token.
-     */
-    void _updateNonOplogResumeToken();
-
-    /**
-     * Initialize the exponential growth batch size which allows for batching a small number of
-     * documents when no $limit is pushed down into underlying executor. This approach can offer a
-     * performance benefit when only a limited amount of data is required. However, small batching
-     * may necessitate multiple yields in a potentially fast query, that's why we avoid to do so
-     * when $limit is pushed down. Note that we still maintain a separate size limit in bytes
-     * controlled by 'internalDocumentSourceCursorBatchSizeBytes' parameter.
-     */
-    void initializeBatchSizeCounts();
-
-    /**
-     * Helper function that reads data out of the underlying executor and into the current
-     * batch. Returns a boolean indicating whether the executor can be destroyed.
-     */
-    bool pullDataFromExecutor(OperationContext* opCtx);
-
-    // Batches results returned from the underlying PlanExecutor.
-    Batch _currentBatch;
-
-    // Handle on catalog state that can be acquired and released during loadBatch().
+    // Handle to catalog state.
     boost::intrusive_ptr<CatalogResourceHandle> _catalogResourceHandle;
 
-    // The underlying query plan which feeds this pipeline. Must be destroyed while holding the
-    // collection lock.
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
-
-    // Status of the underlying executor, _exec. Used for explain queries if _exec produces an
-    // error. Since _exec may not finish running (if there is a limit, for example), we store OK as
-    // the default.
-    Status _execStatus = Status::OK();
-
-    std::string _planSummary;
-
     // Used only for explain() queries. Stores the stats of the winning plan when a plan was
-    // selected by the multi-planner. When the query is executed (with exec->executePlan()), it will
-    // wipe out its own copy of the winning plan's statistics, so they need to be saved here.
+    // selected by the multi-planner. When the query is executed (with exec->executePlan()), it
+    // will wipe out its own copy of the winning plan's statistics, so they need to be saved
+    // here.
     boost::optional<PlanExplainer::PlanStatsDetails> _winningPlanTrialStats;
 
     // Whether we are tracking the latest observed oplog timestamp, the resume token from the
     // (non-oplog) scan, or neither.
     ResumeTrackingType _resumeTrackingType = ResumeTrackingType::kNone;
 
-    // If we are tracking the latest observed oplog time, this is the latest timestamp seen in the
-    // oplog. Otherwise, this is a null timestamp.
-    Timestamp _latestOplogTimestamp;
-
-    // If we are tracking a non-oplog resume token, the resume token for the last document we
-    // returned, or the current resume token at EOF.
-    BSONObj _latestNonOplogResumeToken;
-
-    // Specific stats for $cursor stage.
-    DocumentSourceCursorStats _stats;
+    // Whether or not this is a count-like operation (the cursor can then produce empty documents
+    // since the subsequent stages need only the count of these documents).
+    CursorType _cursorType;
 
     PlanExecutor::QueryFramework _queryFramework;
 
-    // The size of each batch, grows exponentially. 0 means unlimited.
-    size_t _batchSizeCount = 0;
-    // The size limit in bytes of each batch.
-    size_t _batchSizeBytes = 0;
-
     boost::optional<Explain::PlannerContext> _plannerContext;
+
+    const std::shared_ptr<CursorSharedState> _sharedState;
 };
 
 class DSCursorCatalogResourceHandle : public DocumentSourceCursor::CatalogResourceHandle {

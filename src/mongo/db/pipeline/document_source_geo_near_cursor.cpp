@@ -31,14 +31,11 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 #include <memory>
 #include <utility>
@@ -48,6 +45,8 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+
+ALLOCATE_DOCUMENT_SOURCE_ID(geoNearCursor, DocumentSourceGeoNearCursor::id);
 
 boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::create(
     const MultipleCollectionAccessor& collections,
@@ -87,37 +86,5 @@ DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
 
 const char* DocumentSourceGeoNearCursor::getSourceName() const {
     return DocumentSourceGeoNearCursor::kStageName.data();
-}
-
-Document DocumentSourceGeoNearCursor::transformDoc(Document&& objInput) const {
-    MutableDocument output(std::move(objInput));
-
-    // Scale the distance by the requested factor.
-    tassert(9911902,
-            str::stream()
-                << "Query returned a document that is unexpectedly missing the geoNear distance: "
-                << output.peek().toString(),
-            output.peek().metadata().hasGeoNearDistance());
-    const auto distance = output.peek().metadata().getGeoNearDistance() * _distanceMultiplier;
-
-    if (_distanceField) {
-        output.setNestedField(*_distanceField, Value(distance));
-    }
-    if (_locationField) {
-        tassert(9911903,
-                str::stream()
-                    << "Query returned a document that is unexpectedly missing the geoNear point: "
-                    << output.peek().toString(),
-                output.peek().metadata().hasGeoNearPoint());
-        output.setNestedField(*_locationField, output.peek().metadata().getGeoNearPoint());
-    }
-
-    // Always set the sort key. Sometimes it will be needed in a sharded cluster to perform a merge
-    // sort. Other times it will be needed by $rankFusion. It is not expensive, so just make it
-    // unconditionally available.
-    const bool isSingleElementKey = true;
-    output.metadata().setSortKey(Value(distance), isSingleElementKey);
-
-    return output.freeze();
 }
 }  // namespace mongo

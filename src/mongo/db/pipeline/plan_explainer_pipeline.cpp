@@ -29,7 +29,7 @@
 
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 
-#include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/exec/agg/cursor_stage.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/util/assert_util.h"
 
@@ -49,9 +49,9 @@ const PlanExplainer::ExplainVersion& PlanExplainerPipeline::getVersion() const {
 }
 
 std::string PlanExplainerPipeline::getPlanSummary() const {
-    if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().front().get())) {
-        return docSourceCursor->getPlanSummaryStr();
+    if (auto cursorStage =
+            dynamic_cast<exec::agg::CursorStage*>(_execPipeline->getStages().front().get())) {
+        return cursorStage->getPlanSummaryStr();
     }
 
     return "";
@@ -60,15 +60,9 @@ std::string PlanExplainerPipeline::getPlanSummary() const {
 void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
     tassert(9378603, "Encountered unexpected nullptr for PlanSummaryStats", statsOut);
 
-    auto source_it = _pipeline->getSources().cbegin();
     auto stage_it = _execPipeline->getStages().cbegin();
-    tassert(10422600,
-            "Pipelines are not equal",
-            _pipeline->size() == _execPipeline->getStages().size());
-
-    if (auto docSourceCursor = dynamic_cast<DocumentSourceCursor*>(source_it->get())) {
-        *statsOut = docSourceCursor->getPlanSummaryStats();
-        ++source_it;
+    if (auto cursorStage = dynamic_cast<exec::agg::CursorStage*>(stage_it->get())) {
+        *statsOut = cursorStage->getPlanSummaryStats();
         ++stage_it;
     };
 

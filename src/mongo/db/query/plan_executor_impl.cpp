@@ -249,14 +249,7 @@ void PlanExecutorImpl::restoreStateWithoutRetrying(const RestoreContext& context
 }
 
 void PlanExecutorImpl::detachFromOperationContext() {
-    if (_currentState == kDetached) {
-        invariant(_opCtx == nullptr);
-        // This early exit allows the executor to be 'detached' twice without consequences during
-        // SPM-4106.
-        // TODO SERVER-104225: Change this early exit back to 'invariant(_currentState == kSaved)'
-        // once 'DocumentSourceCursor' is split into QO and QE components.
-        return;
-    }
+    invariant(_currentState == kSaved);
     _opCtx = nullptr;
     _root->detachFromOperationContext();
     if (_expCtx) {
@@ -266,14 +259,7 @@ void PlanExecutorImpl::detachFromOperationContext() {
 }
 
 void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
-    if (_currentState == kSaved) {
-        invariant(_opCtx == opCtx);
-        // This early exit allows the executor to be 're-attached' to the same 'opCtx' twice without
-        // consequences during SPM-4106.
-        // TODO SERVER-104225: Change this early exit back to 'invariant(_currentState ==
-        // kDetached)' once 'DocumentSourceCursor' is split into QO and QE components.
-        return;
-    }
+    invariant(_currentState == kDetached);
     invariant(_opCtx == nullptr);
 
     // We're reattaching for a getMore now.  Reset the yield timer in order to prevent from

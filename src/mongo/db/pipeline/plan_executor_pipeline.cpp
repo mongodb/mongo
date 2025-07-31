@@ -211,7 +211,7 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
         // While we have more results to return, we track both the timestamp and the resume token of
         // the latest event observed in the oplog, the latter via its sort key metadata field.
         _validateChangeStreamsResumeToken(*doc);
-        _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_pipeline.get());
+        _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_execPipeline.get());
         _postBatchResumeToken = doc->metadata().getSortKey().getDocument().toBson();
         _setSpeculativeReadTimestamp();
     } else {
@@ -220,7 +220,7 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
         // return, if the new time is higher than the last then we are guaranteed not to have
         // already returned any events at this timestamp. We can set _postBatchResumeToken to a new
         // high-water-mark token at the current clusterTime.
-        auto highWaterMark = PipelineD::getLatestOplogTimestamp(_pipeline.get());
+        auto highWaterMark = PipelineD::getLatestOplogTimestamp(_execPipeline.get());
         if (highWaterMark > _latestOplogTimestamp) {
             auto token = ResumeToken::makeHighWaterMarkToken(
                 highWaterMark, _pipeline->getContext()->getChangeStreamTokenVersion());
@@ -254,8 +254,8 @@ void PlanExecutorPipeline::_performResumableOplogScanAccounting() {
             ResumableScanType::kOplogScan == _resumableScanType);
 
     // Update values of latest oplog timestamp and postBatchResumeToken.
-    _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_pipeline.get());
-    _postBatchResumeToken = PipelineD::getPostBatchResumeToken(_pipeline.get());
+    _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_execPipeline.get());
+    _postBatchResumeToken = PipelineD::getPostBatchResumeToken(_execPipeline.get());
     _setSpeculativeReadTimestamp();
 }
 
@@ -265,7 +265,7 @@ void PlanExecutorPipeline::_performResumableNaturalOrderScanAccounting() {
             ResumableScanType::kNaturalOrderScan == _resumableScanType);
 
     // Update value of postBatchResumeToken.
-    _postBatchResumeToken = PipelineD::getPostBatchResumeToken(_pipeline.get());
+    _postBatchResumeToken = PipelineD::getPostBatchResumeToken(_execPipeline.get());
 }
 
 void PlanExecutorPipeline::_setSpeculativeReadTimestamp() {

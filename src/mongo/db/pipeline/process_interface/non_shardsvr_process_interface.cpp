@@ -371,15 +371,15 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
         ownedPipeline = nullptr;
     } else {
         auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);
-        // TODO SERVER-104225: When the cursor stage is split, we can move exec::agg::Pipeline
-        // building into the following 'if' statement.
-        auto execPipelineWithCursor = exec::agg::buildPipeline(pipelineWithCursor->freeze());
         // If we need execution stats, this runs the plan in order to gather the stats.
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            auto execPipelineWithCursor = exec::agg::buildPipeline(pipelineWithCursor->freeze());
             while (execPipelineWithCursor->getNext()) {
             }
+            pipelineVec = mergeExplains(*pipelineWithCursor, *execPipelineWithCursor, opts);
+        } else {
+            pipelineVec = pipelineWithCursor->writeExplainOps(opts);
         }
-        pipelineVec = mergeExplains(*pipelineWithCursor, *execPipelineWithCursor, opts);
     }
     BSONArrayBuilder bab;
     for (auto&& stage : pipelineVec) {

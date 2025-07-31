@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -171,13 +172,13 @@ public:
             transactionResourcesStasher,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
 
-    static Timestamp getLatestOplogTimestamp(const Pipeline* pipeline);
+    static Timestamp getLatestOplogTimestamp(const exec::agg::Pipeline* pipeline);
 
     /**
      * Retrieves postBatchResumeToken from the 'pipeline' if it is available. Returns an empty
      * object otherwise.
      */
-    static BSONObj getPostBatchResumeToken(const Pipeline* pipeline);
+    static BSONObj getPostBatchResumeToken(const exec::agg::Pipeline* pipeline);
 
     // Returns true if it is a $search pipeline, 'featureFlagSearchInSbe' is enabled and
     // forceClassicEngine is false.
