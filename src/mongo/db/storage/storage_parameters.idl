@@ -220,7 +220,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: "AtomicWord<int>"
         cpp_varname: gCachePressureEvictionStallDetectionWindowSeconds
-        default: 30
+        default: 20
         validator: {gte: 1}
         redact: false
 
