@@ -23,17 +23,13 @@ def create_build_files_in_new_js_dirs() -> None:
                     js_files = [f for f in os.listdir(full_dir) if f.endswith(".js")]
                     if js_files:
                         with open(build_file_path, "w", encoding="utf-8") as build_file:
-                            build_file.write("""load("@aspect_rules_js//js:defs.bzl", "js_library")
+                            build_file.write("""load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 
-js_library(
+mongo_js_library(
     name = "all_javascript_files",
     srcs = glob([
         "*.js",
     ]),
-    target_compatible_with = select({
-        "//bazel/config:ppc_or_s390x": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
     visibility = ["//visibility:public"],
 )
 """)
