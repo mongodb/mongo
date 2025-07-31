@@ -33,6 +33,7 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/str_escape.h"
 
 #include <algorithm>
@@ -300,7 +301,9 @@ bool handleAutoUpdate(const std::string& expected,
         out.close();
         in.close();
 
-        std::rename(tempFileName.c_str(), fileName.c_str());
+        if (std::rename(tempFileName.c_str(), fileName.c_str())) {
+            throw std::system_error(lastSystemError());
+        }
     } catch (const std::exception& ex) {
         // Print and re-throw exception.
         std::cout << "Caught an exception while manipulating files: " << ex.what();
@@ -378,7 +381,9 @@ bool expandNoPlanMacro(const std::string& fileName, const size_t lineNumber) {
         out.close();
         in.close();
 
-        std::rename(tempFileName.c_str(), fileName.c_str());
+        if (std::rename(tempFileName.c_str(), fileName.c_str())) {
+            throw std::system_error(lastSystemError());
+        }
     } catch (const std::exception& ex) {
         // Print and re-throw exception.
         std::cout << "Caught an exception while manipulating files: " << ex.what();
