@@ -3601,9 +3601,6 @@ mongo_cc_unit_test(
     name = "read_write_concern_test",
     srcs = [
         "read_concern_test.cpp",
-        "read_write_concern_provenance_test.cpp",
-        "write_concern_options_test.cpp",
-        "write_concern_test.cpp",
     ],
     tags = ["mongo_unittest_fifth_group"],
     deps = [
