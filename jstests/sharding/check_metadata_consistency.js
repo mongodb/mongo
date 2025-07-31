@@ -6,6 +6,10 @@
  * ]
  */
 
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -1180,7 +1184,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 (function testEmptyChunkHistory() {
     jsTest.log("Executing testEmptyChunkHistory");
 
-    // TODO SERVER-xyz to be blocked on the backport: do not skip test in multiversion suites
+    // TODO SERVER-107821: do not skip test in multiversion suites
     const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
     if (isMultiVersion) {
         jsTestLog(
@@ -1260,6 +1264,125 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
                   inconsistencies[0].details.issue,
                   tojson(inconsistencies));
     }
+
+    db.dropDatabase();
+})();
+
+(function testBucketCollectionWithoutValidView() {
+    // TODO SERVER-xyz to be blocked on the backport: do not ignore
+    // MalformedTimeseriesBucketsCollection in multiversion suites
+    const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+    if (isMultiVersion) {
+        return;
+    }
+
+    const db = getNewDb();
+    if (areViewlessTimeseriesEnabled(db)) {
+        return;
+    }
+
+    jsTest.log("Executing testBucketCollectionWithoutValidView");
+
+    const collName = 'coll';
+    const bucketsCollName = getTimeseriesBucketsColl(collName);
+    const fullNs = db.getName() + '.' + bucketsCollName;
+
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+
+    // Create bucket collection without view backing it
+    assert.commandWorked(st.rs0.getPrimary().getDB(db.getName()).runCommand({
+        applyOps: [{
+            op: "c",
+            ns: db.getName() + ".$cmd",
+            o: {create: bucketsCollName, timeseries: {timeField: 't'}}
+        }]
+    }));
+
+    // Test missing view
+    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(fullNs + " is a bucket collection but is missing a valid view backing it",
+              inconsistencies[0].details.issue,
+              tojson(inconsistencies));
+
+    // Test view in invalid format
+    assert.commandWorked(db.createView(collName, bucketsCollName, []));
+
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(fullNs + " is a bucket collection but is missing a valid view backing it",
+              inconsistencies[0].details.issue,
+              tojson(inconsistencies));
+
+    // Test collection instead of view
+    assert.commandWorked(db.runCommand({drop: collName}));
+    assert.commandWorked(st.rs0.getPrimary().getDB(db.getName()).runCommand({
+        applyOps: [{
+            op: "c",
+            ns: db.getName() + ".$cmd",
+            o: {create: bucketsCollName, timeseries: {timeField: 't'}}
+        }]
+    }));
+    assert.commandWorked(db.createCollection(collName));
+
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(fullNs + " is a bucket collection but is missing a valid view backing it",
+              inconsistencies[0].details.issue,
+              tojson(inconsistencies));
+
+    db.dropDatabase();
+})();
+
+(function testBucketCollectionWithoutTimeseriesOptions() {
+    // TODO SERVER-xyz to be blocked on the backport: do not ignore
+    // MalformedTimeseriesBucketsCollection in multiversion suites
+    const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+    if (isMultiVersion) {
+        return;
+    }
+
+    const db = getNewDb();
+    if (areViewlessTimeseriesEnabled(db)) {
+        return;
+    }
+
+    jsTest.log("Executing testBucketCollectionWithoutTimeseriesOptions");
+
+    const collName = 'coll';
+    const bucketsCollName = getTimeseriesBucketsColl(collName);
+    const fullNs = db.getName() + '.' + bucketsCollName;
+
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+
+    configureFailPoint(st.rs0.getPrimary(), "skipCreateTimeseriesBucketsWithoutOptionsCheck");
+    assert.commandWorked(db.createCollection(bucketsCollName));
+
+    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(fullNs + " is a bucket collection but is missing the timeseries options",
+              inconsistencies[0].details.issue,
+              tojson(inconsistencies));
+
+    assert.commandWorked(db.createView(collName, bucketsCollName, []));
+
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq(
+        "MalformedTimeseriesBucketsCollection", inconsistencies[0].type, tojson(inconsistencies));
+    assert.eq(fullNs + " is a bucket collection but is missing the timeseries options",
+              inconsistencies[0].details.issue,
+              tojson(inconsistencies));
 
     db.dropDatabase();
 })();

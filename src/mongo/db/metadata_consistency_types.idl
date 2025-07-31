@@ -64,6 +64,7 @@ enums:
             kMissingDatabaseMetadataInShardCatalogCache: "MissingDatabaseMetadataInShardCatalogCache"
             kMisplacedDatabaseMetadataInShardCatalog: "MisplacedDatabaseMetadataInShardCatalog"
             kShardCatalogCacheCollectionMetadataMismatch: "ShardCatalogCacheCollectionMetadataMismatch"
+            kMalformedTimeseriesBucketsCollection: "MalformedTimeseriesBucketsCollection"
 
     MetadataInconsistencyDescription:
         description: "Description of each metadata inconsistency."
@@ -95,6 +96,7 @@ enums:
             kMissingDatabaseMetadataInShardCatalogCache: "Found database metadata in the global catalog but not in shard catalog cache"
             kMisplacedDatabaseMetadataInShardCatalog: "Found some database metadata in the shard catalog that is not owned by this shard"
             kShardCatalogCacheCollectionMetadataMismatch: "Found inconsistencies between collection information in the global catalog and the shard catalog cache"
+            kMalformedTimeseriesBucketsCollection: "Found malformed timeseries collection"
 
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."
@@ -531,6 +533,21 @@ structs:
             details:
                 type: array<object>
                 description: "A list of the different mismatched information between the two locations."
+
+    MalformedTimeseriesBucketsCollectionDetails:
+        description: "Details about a malformed timeseries collection."
+        strict: false
+        fields:
+            namespace:
+                cpp_name: nss
+                type: namespacestring
+                description: "The namespace of the buckets collection."
+            issue:
+                type: string
+                description: "The type of corruption."
+            options:
+                type: object
+                description: "Collection options not matching the expeced format."
 
     MetadataInconsistencyItem:
         description: "Object representing a single metadata inconsistency found in a specific shard"

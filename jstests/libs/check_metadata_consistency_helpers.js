@@ -57,12 +57,22 @@ export var MetadataConsistencyChecker = (function() {
 
             var inconsistencies = adminDB.checkMetadataConsistency(checkOptions).toArray();
 
-            // TODO SERVER-xyz to be blocked on the backport: do not ignore CorruptedChunkHistory in
-            // multiversion suites
+            // TODO SERVER-107821: do not ignore CorruptedChunkHistory in multiversion suites
             const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
             if (isMultiVersion) {
                 for (let i = inconsistencies.length - 1; i >= 0; i--) {
                     if (inconsistencies[i].type == "CorruptedChunkHistory") {
+                        inconsistencies.splice(i, 1);  // Remove inconsistency
+                    }
+                }
+            }
+
+            // Since bucket collections are not created atomically with their view, it may happen
+            // that checkMetadataConsistency interleaves with the creation steps in case of stepdown
+            const isStepdownSuite = Boolean(jsTest.options().runningWithShardStepdowns);
+            if (isStepdownSuite) {
+                for (let i = inconsistencies.length - 1; i >= 0; i--) {
+                    if (inconsistencies[i].type == "MalformedTimeseriesBucketsCollection") {
                         inconsistencies.splice(i, 1);  // Remove inconsistency
                     }
                 }
