@@ -23,7 +23,7 @@ import {
 } from "jstests/query_golden/test_inputs/simple_plan_stability_dataset.js";
 
 if (checkSbeFullyEnabled(db)) {
-    jsTestLog("Skipping the test because CBR only applies to the classic engine.");
+    jsTest.log.info("Skipping the test because CBR only applies to the classic engine.");
     quit();
 }
 
@@ -31,7 +31,7 @@ if (db.getServerBuildInfo().isAddressSanitizerActive() ||
     db.getServerBuildInfo().isLeakSanitizerActive() ||
     db.getServerBuildInfo().isThreadSanitizerActive() ||
     db.getServerBuildInfo().isUndefinedBehaviorSanitizerActive()) {
-    jsTestLog("Skipping the test because a sanitizer is active.");
+    jsTest.log.info("Skipping the test because a sanitizer is active.");
     quit();
 }
 
@@ -45,7 +45,7 @@ const collName = "plan_stability";
  */
 const collSize = 100_000;
 
-jsTestLog("See README.plan_stability.md for more information.");
+jsTest.log.info("See README.plan_stability.md for more information.");
 
 populateSimplePlanStabilityDataset(collName, collSize);
 
@@ -84,9 +84,6 @@ let totalErrors = 0;
 
 print('{">>>pipelines":[');
 pipelines.forEach((pipeline, index) => {
-    print();
-    print(`{">>>pipeline": ${JSON.stringify(pipeline)},`);
-
     // JSON does not allow trailing commas.
     const separator = index === pipelines.length - 1 ? "" : ",";
 
@@ -98,7 +95,6 @@ pipelines.forEach((pipeline, index) => {
 
     if (explain.ok !== 1) {
         totalErrors++;
-        print(`    "error": ${JSON.stringify(explain.errmsg)}}${separator}`);
         return;
     }
 
@@ -120,6 +116,8 @@ pipelines.forEach((pipeline, index) => {
     const sorts = extractSortEffort(executionStats.executionStages);
     totalSorts += sorts;
 
+    print();
+    print(`{">>>pipeline": ${JSON.stringify(pipeline)},`);
     print(`    "winningPlan": ${JSON.stringify(winningPlan)},`);
     print(`    "keys" : ${padNumber(keys)},`);
     print(`    "docs" : ${padNumber(docs)},`);
@@ -130,7 +128,8 @@ pipelines.forEach((pipeline, index) => {
 print("],");
 
 print('">>>totals": {' +
-      `"plans": ${padNumber(totalPlans)}, ` +
+      `"pipelines": ${pipelines.length}, ` +
+      `"plans": ${(totalPlans)}, ` +
       `"keys": ${padNumber(totalKeys)}, ` +
       `"docs": ${padNumber(totalDocs)}, ` +
       `"sorts": ${padNumber(totalSorts)}, ` +
@@ -141,7 +140,8 @@ const parameters = {
     planRankerMode: null,
     samplingMarginOfError: null,
     samplingConfidenceInterval: null,
-    internalQuerySamplingCEMethod: null
+    internalQuerySamplingCEMethod: null,
+    internalQuerySamplingBySequentialScan: null
 };
 
 for (const param in parameters) {

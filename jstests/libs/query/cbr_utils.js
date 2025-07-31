@@ -30,3 +30,18 @@ export function planEstimatedWithHistogram(plan) {
 export function assertPlanNotCosted(plan) {
     assert(!plan.hasOwnProperty('costEstimate'), plan);
 }
+
+export function getPlanRankerMode(db) {
+    if (db !== null) {
+        const getParam = db.adminCommand({
+            getParameter: 1,
+            planRankerMode: 1,
+        });
+
+        return getParam.hasOwnProperty("planRankerMode") ? getParam.planRankerMode
+                                                         : "multiPlanning";
+    } else {
+        return TestData.setParameters.planRankerMode ? TestData.setParameters.planRankerMode
+                                                     : "multiPlanning";
+    }
+}

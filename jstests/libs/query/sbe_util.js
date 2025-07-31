@@ -71,25 +71,47 @@ function discoverNodesAndCheck(theDB, checkFunction) {
  * Quits test if there is no primary node and we are running in a mixed configuration.
  */
 export function checkSbeStatus(theDB) {
-    return discoverNodesAndCheck(theDB, (conn) => {
-        const getParam = conn.adminCommand({
-            getParameter: 1,
-            internalQueryFrameworkControl: 1,
-        });
+    if (theDB !== null) {
+        return discoverNodesAndCheck(theDB, (conn) => {
+            const getParam = conn.adminCommand({
+                getParameter: 1,
+                internalQueryFrameworkControl: 1,
+            });
 
-        if (!getParam.hasOwnProperty("internalQueryFrameworkControl")) {
+            if (!getParam.hasOwnProperty("internalQueryFrameworkControl")) {
+                return kSbeDisabled;
+            } else if (getParam.internalQueryFrameworkControl === "forceClassicEngine") {
+                return kSbeDisabled;
+            } else if (FeatureFlagUtil.isPresentAndEnabled(conn, "SbeFull")) {
+                return kFeatureFlagSbeFullEnabled;
+            } else if (getParam.internalQueryFrameworkControl === "trySbeRestricted") {
+                return kSbeRestricted;
+            } else if (getParam.internalQueryFrameworkControl === "trySbeEngine") {
+                return kSbeFullyEnabled;
+            }
             return kSbeDisabled;
-        } else if (getParam.internalQueryFrameworkControl === "forceClassicEngine") {
+        });
+    } else {
+        // If we don't have a database available, we can only look at the TestData to see what
+        // parameters resmoke was given.
+        const frameworkControl = TestData.setParameters.internalQueryFrameworkControl
+            ? TestData.setParameters.internalQueryFrameworkControl
+            : "trySbeRestricted";
+        if (frameworkControl == "forceClassicEngine") {
+            // Always overrides anything else.
             return kSbeDisabled;
-        } else if (FeatureFlagUtil.isPresentAndEnabled(conn, "SbeFull")) {
+        } else if (TestData.setParameters.featureFlagSbeFull &&
+                   TestData.setParameters.featureFlagSbeFull == "true") {
+            // Otherwise, if this feature flag is enabled, we ignore the query knob.
             return kFeatureFlagSbeFullEnabled;
-        } else if (getParam.internalQueryFrameworkControl === "trySbeRestricted") {
-            return kSbeRestricted;
-        } else if (getParam.internalQueryFrameworkControl === "trySbeEngine") {
+        } else if (frameworkControl === "trySbeEngine") {
             return kSbeFullyEnabled;
+        } else {
+            // If we're here, we must be using 'trySbeRestricted'.
+            assert.eq(frameworkControl, "trySbeRestricted");
+            return kSbeRestricted;
         }
-        return kSbeDisabled;
-    });
+    }
 }
 
 /**

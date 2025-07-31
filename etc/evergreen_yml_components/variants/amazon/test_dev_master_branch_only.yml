@@ -346,6 +346,8 @@ buildvariants:
       - name: noPassthroughWithMongod_gen
       - name: initial_sync_fuzzer_sanity_patch_gen
       - name: rollback_fuzzer_sanity_patch_gen
+      - name: query_golden_cbr_automatic
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_heuristic_jscore_passthrough
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_heuristic_aggregation_passthrough
@@ -354,9 +356,13 @@ buildvariants:
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_sampling_aggregation_passthrough
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_golden_cbr_sampling
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_histogram_jscore_passthrough
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_histogram_aggregation_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_golden_cbr_histogram
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
 
   - <<: *amazon_linux2023_arm64_static_compile_variant_dependency

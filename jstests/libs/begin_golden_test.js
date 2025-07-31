@@ -1,9 +1,8 @@
 import {
+    getPlanRankerMode,
+} from "jstests/libs/query/cbr_utils.js";
+import {
     checkSbeStatus,
-    kFeatureFlagSbeFullEnabled,
-    kSbeDisabled,
-    kSbeFullyEnabled,
-    kSbeRestricted
 } from "jstests/libs/query/sbe_util.js";
 
 // Run any set-up necessary for a golden jstest. This function should be called from the suite
@@ -26,39 +25,24 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
 
     outputName += fileExtension;
 
-    // We may have different output files for different SBE configurations. If that is the case, we
-    // need to pick the correct directory for the curent configuration.
-    if (typeof db !== 'undefined') {
-        let sbeStatus = checkSbeStatus(db);
-        if (fileExists(relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName)) {
-            relativePathToExpectedOutput += "/" + sbeStatus;
-        }
+    // We may have different output files for different SBE or CBR configurations. If that is the
+    // case, we need to pick the correct directory for the curent configuration.
+    const sbeStatus = checkSbeStatus(typeof db === "undefined" ? null : db);
+    const planRankerMode = getPlanRankerMode(typeof db === "undefined" ? null : db);
 
-    } else {
-        // If we don't have a database available, we can only look at the TestData to see what
-        // parameters resmoke was given.
-        let sbeStatus;
-        const frameworkControl = TestData.setParameters.internalQueryFrameworkControl
-            ? TestData.setParameters.internalQueryFrameworkControl
-            : "trySbeRestricted";
-        if (frameworkControl == "forceClassicEngine") {
-            // Always overrides anything else.
-            sbeStatus = kSbeDisabled;
-        } else if (TestData.setParameters.featureFlagSbeFull &&
-                   TestData.setParameters.featureFlagSbeFull == "true") {
-            // Otherwise, if this feature flag is enabled, we ignore the query knob.
-            sbeStatus = kFeatureFlagSbeFullEnabled;
-        } else if (frameworkControl === "trySbeEngine") {
-            sbeStatus = kSbeFullyEnabled;
-        } else {
-            // If we're here, we must be using 'trySbeRestricted'.
-            assert.eq(frameworkControl, "trySbeRestricted");
-            sbeStatus = kSbeRestricted;
-        }
+    const sbeExpectedExists =
+        fileExists(relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName);
+    const planRankerModeExpectedExits =
+        fileExists(relativePathToExpectedOutput + "/" + planRankerMode + "/" + outputName);
 
-        if (fileExists(relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName)) {
-            relativePathToExpectedOutput += "/" + sbeStatus;
-        }
+    if (sbeExpectedExists && planRankerModeExpectedExits) {
+        // Both SBE and CBR expected outputs exist, bail.
+        assert.fail("Both SBE and CBR expected outputs exist for " + outputName +
+                    ", cannot determine which one to use. ");
+    } else if (sbeExpectedExists) {
+        relativePathToExpectedOutput += "/" + sbeStatus;
+    } else if (planRankerModeExpectedExits) {
+        relativePathToExpectedOutput += "/" + planRankerMode;
     }
 
     _openGoldenData(outputName, {relativePath: relativePathToExpectedOutput});

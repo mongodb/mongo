@@ -2181,6 +2181,19 @@ tasks:
           suite: query_tester_manual_test
 
   - <<: *task_template
+    name: query_golden_cbr_automatic
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_golden_cbr_automatic
+
+  - <<: *task_template
     name: query_cbr_heuristic_jscore_passthrough
     tags: [
         "assigned_to_jira_team_server_query_optimization",
@@ -2233,6 +2246,19 @@ tasks:
           suite: query_cbr_sampling_aggregation_passthrough
 
   - <<: *task_template
+    name: query_golden_cbr_sampling
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_golden_cbr_sampling
+
+  - <<: *task_template
     name: query_cbr_histogram_jscore_passthrough
     tags: [
         "assigned_to_jira_team_server_query_optimization",
@@ -2257,6 +2283,19 @@ tasks:
       - func: "run tests"
         vars:
           suite: query_cbr_histogram_aggregation_passthrough
+
+  - <<: *task_template
+    name: query_golden_cbr_histogram
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_golden_cbr_histogram
 
   ################################################
   #           Query Integration tasks            #
