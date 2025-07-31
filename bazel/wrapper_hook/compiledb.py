@@ -11,6 +11,8 @@ import sys
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
+from bazel.wrapper_hook.set_mongo_version import write_mongo_version_bazelrc
+
 
 def run_pty_command(cmd):
     stdout = None
@@ -43,6 +45,9 @@ def run_pty_command(cmd):
 
 
 def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
+
+    # compiledb ignores command line args so just make a version rc file in anycase
+    write_mongo_version_bazelrc([])
     if persistent_compdb:
         info_proc = subprocess.run(
             [bazel_bin, "info", "output_base"], capture_output=True, text=True

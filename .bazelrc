@@ -513,9 +513,6 @@ common:fission --remote_download_regex=.*\.dwo$
 # Avoid failing builds when BES metadata fails to upload.
 common --bes_upload_mode=fully_async
 
-# Default Mongo Version if a version is not specified.
-common --define=MONGO_VERSION=8.2.0-alpha
-
 # Default distmod if not specified.
 common --define=MONGO_DISTMOD=""
 
@@ -530,6 +527,9 @@ try-import %workspace%/.bazelrc.evergreen
 
 # local default dev settings
 try-import %workspace%/.bazelrc.common_bes
+
+# local default dev settings
+try-import %workspace%/.bazelrc.mongo_version
 
 # local git version info
 try-import %workspace%/.bazelrc.git
