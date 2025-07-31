@@ -1112,15 +1112,16 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesFo
 }
 
 repl::OpTimeWith<std::vector<ShardType>> ShardingCatalogClientImpl::getAllShards(
-    OperationContext* opCtx, repl::ReadConcernLevel readConcern, bool excludeDraining) {
-    const auto& findRes = uassertStatusOK(
-        _exhaustiveFindOnConfig(opCtx,
-                                getConfigReadPreference(opCtx),
-                                readConcern,
-                                NamespaceString::kConfigsvrShardsNamespace,
-                                excludeDraining ? BSON(ShardType::draining.ne(true)) : BSONObj(),
-                                BSONObj() /* No sorting */,
-                                boost::none /* No limit */));
+    OperationContext* opCtx, repl::ReadConcernLevel readConcern, BSONObj filter) {
+
+    const auto& findRes =
+        uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
+                                                getConfigReadPreference(opCtx),
+                                                readConcern,
+                                                NamespaceString::kConfigsvrShardsNamespace,
+                                                filter,
+                                                BSONObj() /* No sorting */,
+                                                boost::none /* No limit */));
 
     std::vector<ShardType> shards;
     shards.reserve(findRes.value.size());

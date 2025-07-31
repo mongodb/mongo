@@ -506,6 +506,7 @@ ddl:
     - src/mongo/s/request_types/*reshard_collection*
     - src/mongo/s/commands/cluster_set_allow_migrations_cmd.cpp
     - src/mongo/s/commands/cluster_untrack_unsplittable_collection.cpp
+    - src/mongo/s/request_types/list_shards.idl
 
     # unsorted: Everything else.
     - src/mongo/s/cluster_ddl.*

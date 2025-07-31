@@ -335,6 +335,7 @@ mongo_cc_library(
         "cluster_stop_shard_draining_cmd.cpp",
         "cluster_update_zone_key_range_cmd.cpp",
         "cluster_user_management_commands.cpp",
+        "//src/mongo/s/request_types:list_shards_gen",
     ],
     deps = [
         ":cluster_commands",

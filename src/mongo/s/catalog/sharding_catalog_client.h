@@ -293,7 +293,7 @@ public:
     virtual repl::OpTimeWith<std::vector<ShardType>> getAllShards(
         OperationContext* opCtx,
         repl::ReadConcernLevel readConcern,
-        bool excludeDraining = false) = 0;
+        BSONObj filter = BSONObj()) = 0;
 
     /**
      * Runs a user management command on the config servers. Do not use for general write command

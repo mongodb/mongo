@@ -162,7 +162,7 @@ private:
             repl::OpTimeWith<std::vector<ShardType>> getAllShards(
                 OperationContext* opCtx,
                 repl::ReadConcernLevel readConcern,
-                bool excludeDraining) override {
+                BSONObj filter) override {
 
                 ShardType donorShard;
                 donorShard.setName(kDonorConnStr.getSetName());

@@ -330,7 +330,9 @@ ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
     const auto shardsAndOpTime = [&] {
         try {
             return Grid::get(opCtx)->catalogClient()->getAllShards(
-                opCtx, repl::ReadConcernLevel::kSnapshotReadConcern, true /* excludeDraining */);
+                opCtx,
+                repl::ReadConcernLevel::kSnapshotReadConcern,
+                BSON(ShardType::draining.ne(true)) /* excludeDraining */);
         } catch (DBException& ex) {
             ex.addContext("Cannot retrieve updated shard list from config server");
             throw;

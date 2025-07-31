@@ -44,6 +44,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/list_shards_gen.h"
 #include "mongo/util/assert_util.h"
 
 #include <string>
@@ -54,6 +55,8 @@ namespace {
 
 class ListShardsCmd : public BasicCommand {
 public:
+    // using Request = ListShardsRequest;
+
     ListShardsCmd() : BasicCommand("listShards", "listshards") {}
 
     std::string help() const override {
@@ -88,8 +91,26 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+
+        const auto request =
+            ListShardsRequest::parse(IDLParserContext("listShardsRequest"), cmdObj);
+
+        const BSONObj filter = [&] {
+            const auto request_filter = request.getFilter();
+            if (!request_filter) {
+                return BSONObj();
+            }
+            // If filter is draining: false, we transform it to $ne: true to ensure all non-draining
+            // shards are returned as the draining field is either unset or false when a shard isn't
+            // draining.
+            if (request_filter->getDraining().is_initialized() &&
+                !(*request_filter->getDraining())) {
+                return BSON(ShardType::draining.ne(true));
+            }
+            return request_filter->toBSON();
+        }();
         const auto opTimeWithShards = Grid::get(opCtx)->catalogClient()->getAllShards(
-            opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
+            opCtx, repl::ReadConcernLevel::kMajorityReadConcern, filter);
 
         BSONArrayBuilder shardsArr(result.subarrayStart("shards"));
         for (const auto& shard : opTimeWithShards.value) {

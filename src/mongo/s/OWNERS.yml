@@ -171,3 +171,6 @@ filters:
   - "balancer_feature_flag*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "list_shards.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing

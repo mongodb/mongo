@@ -165,7 +165,7 @@ std::vector<NamespaceString> ShardingCatalogClientMock::getAllNssThatHaveZonesFo
 }
 
 repl::OpTimeWith<std::vector<ShardType>> ShardingCatalogClientMock::getAllShards(
-    OperationContext* opCtx, repl::ReadConcernLevel readConcern, bool excludeDraining) {
+    OperationContext* opCtx, repl::ReadConcernLevel readConcern, BSONObj filter) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 

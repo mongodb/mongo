@@ -95,7 +95,9 @@ std::vector<ShardId> getAllNonDrainingShardIds(OperationContext* opCtx) {
     const auto shardsAndOpTime = [&] {
         try {
             return Grid::get(opCtx)->catalogClient()->getAllShards(
-                opCtx, repl::ReadConcernLevel::kMajorityReadConcern, true /* excludeDraining */);
+                opCtx,
+                repl::ReadConcernLevel::kMajorityReadConcern,
+                BSON(ShardType::draining.ne(true)) /* excludeDraining */);
         } catch (DBException& ex) {
             ex.addContext("Cannot retrieve updated shard list from config server");
             throw;
