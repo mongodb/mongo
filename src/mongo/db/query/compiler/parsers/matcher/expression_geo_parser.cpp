@@ -135,6 +135,17 @@ bool parseLegacyQuery(const BSONObj& obj, GeoNearExpression& expr) {
                 uassert(18522, "max distance must be non-negative", expr.maxDistance >= 0.0);
                 hasGeometry = true;
                 expr.isNearSphere = (e.fieldNameStringData() == kNearSphereField);
+            } else {
+                // We couldn't parse out a query point. This could mean that the provided argument
+                // was in the new, not the legacy, format, or it could mean that the point was
+                // malformed. If the latter, returning and redirecting to parseNewPoint() will
+                // result in a confusing error message. This check is a best effort attempt at
+                // inferring what the user was trying to do so that we can return a helpful error if
+                // it appears to be an invalid legacy point.
+                const auto isLegacyFormat = !e.Obj().hasField(kGeometryField);
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << "invalid point provided to geo near query: " << e.Obj(),
+                        !isLegacyFormat);
             }
         } else if (fieldName == kMinDistanceField) {
             uassert(16893, "$minDistance must be a number", e.isNumber());

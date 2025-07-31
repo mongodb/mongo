@@ -1,7 +1,9 @@
 // $geoNear with invalid arguments fails.
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
+//   requires_fcv_83
 // ]
+import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 
 var coll = db[jsTestName()];
 coll.drop();
@@ -102,3 +104,33 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
     cursor: {}
 }),
                              ErrorCodes.BadValue);
+
+// Verify that incorrect 'coordinates' array throws a BAD_VALUE error.
+assertErrCodeAndErrMsgContains(coll,
+                               [{
+                                   $geoNear: {
+                                       near: {type: "Point", coordinates: []},
+                                       distanceField: "distance",
+                                       spherical: true,
+                                       maxDistance: 1337,
+                                       key: "location",
+                                   }
+                               }],
+                               ErrorCodes.BadValue,
+                               "invalid point provided to geo near query");
+assertErrCodeAndErrMsgContains(coll,
+                               [{
+                                   $geoNear: {
+                                       near: {type: "Point", coordinates: []},
+                                   }
+                               }],
+                               ErrorCodes.BadValue,
+                               "invalid point provided to geo near query");
+assertErrCodeAndErrMsgContains(coll,
+                               [{
+                                   $geoNear: {
+                                       near: {type: "Point", coordinates: [1]},
+                                   }
+                               }],
+                               ErrorCodes.BadValue,
+                               "invalid point provided to geo near query");
