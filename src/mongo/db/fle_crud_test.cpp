@@ -2350,5 +2350,79 @@ TEST_F(QETextSearchCrudTest, BasicPrefixAndSuffixMultipleInserts) {
                                     {"aaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaa"}});
 }
 
+// Test insert update payloads containing text search token sets ('b') with embedded encryptedTokens
+// of invalid length in the exact/substring/prefix/suffix token sets are rejected.
+TEST_F(QETextSearchCrudTest, InsertPayloadHasInvalidExactEncryptedTokensForTextSearch) {
+    addSchema({.type = QueryTypeEnum::SubstringPreview,
+               .lb = 2,
+               .ub = 10,
+               .mlen = 400,
+               .casef = false,
+               .diacf = false});
+    auto doc = BSON(kTestFieldName << "abcdef");
+    auto element = doc.firstElement();
+    auto buf = generatePlaceholder(element);
+    auto efc = getEFC();
+
+    BSONObjBuilder builder;
+    builder.append("_id", 1);
+    builder.append("counter", 1);
+    builder.append("plainText", "sample");
+    builder.append(transformElementForInsertUpdate(element, buf, efc).firstElement());
+    auto result = builder.obj();
+
+    auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
+    ASSERT_EQ(serverPayload.size(), 1);
+    auto& exactSet = serverPayload[0].payload.getTextSearchTokenSets().value().getExactTokenSet();
+    exactSet.setEncryptedTokens(
+        StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
+                                    exactSet.getEscDerivedToken().asPrfBlock()),
+                                boost::none,
+                                boost::none /* msize */)
+            .encrypt({{}}));
+    ASSERT_THROWS_CODE_AND_WHAT(
+        processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false),
+        DBException,
+        ErrorCodes::BadValue,
+        "Invalid length for EncryptedStateCollectionTokensV2 for text "
+        "search: Expected 51, got 48");
+}
+
+TEST_F(QETextSearchCrudTest, InsertPayloadHasInvalidSubstringEncryptedTokensForTextSearch) {
+    addSchema({.type = QueryTypeEnum::SubstringPreview,
+               .lb = 2,
+               .ub = 10,
+               .mlen = 400,
+               .casef = false,
+               .diacf = false});
+    auto doc = BSON(kTestFieldName << "abcdef");
+    auto element = doc.firstElement();
+    auto buf = generatePlaceholder(element);
+    auto efc = getEFC();
+
+    BSONObjBuilder builder;
+    builder.append("_id", 1);
+    builder.append("counter", 1);
+    builder.append("plainText", "sample");
+    builder.append(transformElementForInsertUpdate(element, buf, efc).firstElement());
+    auto result = builder.obj();
+
+    auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
+    ASSERT_EQ(serverPayload.size(), 1);
+    auto& ts =
+        serverPayload[0].payload.getTextSearchTokenSets().value().getSubstringTokenSets().back();
+    ts.setEncryptedTokens(StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
+                                                      ts.getEscDerivedToken().asPrfBlock()),
+                                                  boost::none,
+                                                  boost::none /* msize */)
+                              .encrypt({{}}));
+    ASSERT_THROWS_CODE_AND_WHAT(
+        processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false),
+        DBException,
+        ErrorCodes::BadValue,
+        "Invalid length for EncryptedStateCollectionTokensV2 for text "
+        "search: Expected 51, got 48");
+}
+
 }  // namespace
 }  // namespace mongo
