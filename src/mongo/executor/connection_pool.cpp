@@ -278,7 +278,7 @@ public:
      * It is *always* safe to reference the original specific pool in the guarded function object.
      *
      * For a function object of signature:
-     * void riskyBusiness(stdx::unique_lock<stdx::mutex>&, ArgTypes...);
+     * void riskyBusiness(stdx::unique_lock<ObservableMutex<stdx::mutex>>&, ArgTypes...);
      *
      * It returns a function object of signature:
      * void safeCallback(ArgTypes...);
@@ -324,7 +324,7 @@ public:
      * Completely shuts down this pool. Use `initiateShutdown` and `processFailure` for
      * finer-grained control. Destruction is deferred to when the ConnectionHandles are deleted.
      */
-    void shutdown(stdx::unique_lock<stdx::mutex>& lk, const Status& status);
+    void shutdown(stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk, const Status& status);
 
     /**
      * Initiates the shutdown process and returns true if it has not already been initiated.
@@ -339,7 +339,7 @@ public:
      * this function drops all current connections and fails all current
      * requests with the passed status.
      */
-    void processFailure(stdx::unique_lock<stdx::mutex>& lk, const Status& status);
+    void processFailure(stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk, const Status& status);
 
     /**
      * Returns the number of connections currently checked out of the pool.
@@ -518,15 +518,15 @@ private:
      */
     void spawnConnections(WithLock lk);
 
-    void finishRefresh(stdx::unique_lock<stdx::mutex>& lk,
+    void finishRefresh(stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk,
                        ConnectionInterface* connPtr,
                        Status status);
 
     void addToReady(WithLock, OwnedConnection conn);
 
-    void fulfillRequests(stdx::unique_lock<stdx::mutex>& lk);
+    void fulfillRequests(stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk);
 
-    void returnConnection(stdx::unique_lock<stdx::mutex>& lk,
+    void returnConnection(stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk,
                           ConnectionInterface* connPtr,
                           bool isLeased);
 
@@ -547,7 +547,7 @@ private:
     void updateEventTimer();
 
     // Update the controller and potentially change the controls
-    void updateController(stdx::unique_lock<stdx::mutex>& lk);
+    void updateController(stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk);
 
 private:
     /**
@@ -640,6 +640,7 @@ ConnectionPool::ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> im
       _options(std::move(options)),
       _controller(_options.controllerFactory()),
       _manager(_options.egressConnectionCloserManager) {
+    // TODO SERVER-108397: Add mutex to the registry
     if (_manager) {
         _manager->add(this);
     }
@@ -1147,9 +1148,10 @@ ConnectionPool::ConnectionHandle ConnectionPool::SpecificPool::tryGetConnection(
     return {};
 }
 
-void ConnectionPool::SpecificPool::finishRefresh(stdx::unique_lock<stdx::mutex>& lk,
-                                                 ConnectionInterface* connPtr,
-                                                 Status status) {
+void ConnectionPool::SpecificPool::finishRefresh(
+    stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk,
+    ConnectionInterface* connPtr,
+    Status status) {
     auto conn = takeFromProcessingPool(lk, connPtr);
 
     // We increment the total number of refreshed connections right upfront to track all completed
@@ -1203,9 +1205,10 @@ void ConnectionPool::SpecificPool::finishRefresh(stdx::unique_lock<stdx::mutex>&
     fulfillRequests(lk);
 }
 
-void ConnectionPool::SpecificPool::returnConnection(stdx::unique_lock<stdx::mutex>& lk,
-                                                    ConnectionInterface* connPtr,
-                                                    bool isLeased) {
+void ConnectionPool::SpecificPool::returnConnection(
+    stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk,
+    ConnectionInterface* connPtr,
+    bool isLeased) {
     auto needsRefreshTP = connPtr->getLastUsed() + _parent->_controller->toRefreshTimeout();
 
     auto conn = takeFromPool(lk, isLeased ? _leasedPool : _checkedOutPool, connPtr);
@@ -1346,7 +1349,7 @@ bool ConnectionPool::SpecificPool::initiateShutdown(WithLock lk) {
 }
 
 // Sets state to shutdown and kicks off the failure protocol to tank existing connections
-void ConnectionPool::SpecificPool::shutdown(stdx::unique_lock<stdx::mutex>& lk,
+void ConnectionPool::SpecificPool::shutdown(stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk,
                                             const Status& status) {
     if (!initiateShutdown(lk)) {
         return;
@@ -1361,8 +1364,8 @@ void ConnectionPool::SpecificPool::shutdown(stdx::unique_lock<stdx::mutex>& lk,
 }
 
 // Drop connections and fail all requests
-void ConnectionPool::SpecificPool::processFailure(stdx::unique_lock<stdx::mutex>& lk,
-                                                  const Status& status) {
+void ConnectionPool::SpecificPool::processFailure(
+    stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk, const Status& status) {
     // Bump the generation so we don't reuse any pending or checked out connections
     _generation++;
 
@@ -1414,7 +1417,8 @@ void ConnectionPool::SpecificPool::processFailure(stdx::unique_lock<stdx::mutex>
 }
 
 // fulfills as many outstanding requests as possible
-void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex>& lk) {
+void ConnectionPool::SpecificPool::fulfillRequests(
+    stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk) {
     if (MONGO_unlikely(connectionPoolDoesNotFulfillRequests.shouldFail())) {
         return;
     }
@@ -1617,7 +1621,8 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
     _eventTimer->setTimeout(timeout, std::move(deferredStateUpdateFunc));
 }
 
-void ConnectionPool::SpecificPool::updateController(stdx::unique_lock<stdx::mutex>& lk) {
+void ConnectionPool::SpecificPool::updateController(
+    stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk) {
     if (_health.isShutdown) {
         return;
     }

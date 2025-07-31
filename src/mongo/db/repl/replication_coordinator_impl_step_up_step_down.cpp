@@ -59,7 +59,7 @@ MONGO_FAIL_POINT_DEFINE(stepdownHangAfterGrabbingRSTL);
 
 void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {
     auto isSteppingDown = [&]() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock lk(_mutex);
         // If true, we know that a stepdown is underway.
         return (_topCoord->isSteppingDown());
     };
@@ -177,7 +177,7 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_killOpThreadFn()
         // X mode for the first time. This ensures that no writing operations will continue
         // after the node's term change.
         {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            stdx::unique_lock lock(_mutex);
             if (_stopKillingOps.wait_for(
                     lock, Milliseconds(10).toSystemDuration(), [this] { return _killSignaled; })) {
                 LOGV2(21344, "Stopped killing user operations");
@@ -195,7 +195,7 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_stopAndWaitForKi
         return;
 
     {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::unique_lock lock(_mutex);
         _killSignaled = true;
         _stopKillingOps.notify_all();
     }
@@ -306,7 +306,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     stepdownHangAfterGrabbingRSTL.pauseWhileSet();
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock lk(_mutex);
 
     opCtx->checkForInterrupt();
 
@@ -345,7 +345,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 stepdownHangBeforePerformingPostMemberStateUpdateActions.shouldFail())) {
                 mongo::sleepsecs(1);
                 {
-                    stdx::lock_guard<stdx::mutex> lock(_mutex);
+                    stdx::lock_guard lock(_mutex);
                     if (_inShutdown) {
                         break;
                     }
@@ -581,7 +581,7 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible(bool skipDryRun) {
 
     EventHandle finishEvent;
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard lk(_mutex);
         // A null _electionState indicates that the election has already completed.
         if (_electionState) {
             finishEvent = _electionState->getElectionFinishedEvent(lk);
@@ -595,7 +595,7 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible(bool skipDryRun) {
         // Step up is considered successful only if we are currently a primary and we are not in the
         // process of stepping down. If we know we are going to step down, we should fail the
         // replSetStepUp command so caller can retry if necessary.
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard lk(_mutex);
         if (!_getMemberState(lk).primary())
             return Status(ErrorCodes::CommandFailed, "Election failed.");
         else if (_topCoord->isSteppingDown())

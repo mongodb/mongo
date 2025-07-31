@@ -39,6 +39,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/observable_mutex.h"
 
 #include <functional>
 #include <memory>
@@ -195,7 +196,7 @@ private:
     AtomicWord<bool> _shardingInitialized{false};
     AtomicWord<bool> _isGridInitialized{false};
 
-    mutable stdx::mutex _mutex;
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
     CustomConnectionPoolStatsFn _customConnectionPoolStatsFn;
 };

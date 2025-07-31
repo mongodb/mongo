@@ -48,7 +48,9 @@ namespace {
 const auto grid = ServiceContext::declareDecoration<Grid>();
 }  // namespace
 
-Grid::Grid() = default;
+Grid::Grid() {
+    // TODO SERVER-108397: Add mutex to the registry
+}
 
 Grid::~Grid() = default;
 
@@ -108,12 +110,12 @@ void Grid::setShardingInitialized() {
 }
 
 Grid::CustomConnectionPoolStatsFn Grid::getCustomConnectionPoolStatsFn() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
     return _customConnectionPoolStatsFn;
 }
 
 void Grid::setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
     invariant(!_customConnectionPoolStatsFn || !statsFn);
     _customConnectionPoolStatsFn = std::move(statsFn);
 }

@@ -41,6 +41,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
@@ -163,12 +164,12 @@ protected:
     std::shared_ptr<CatalogAndScheduler> getCatalogAndScheduler(OperationContext* opCtx);
 
     virtual long long getInitTerm() const {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard lg(_mutex);
         return _initTerm;
     };
 
     virtual bool pendingCleanup() const {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard lg(_mutex);
         return _catalogAndSchedulerToCleanup != NULL;
     };
 
@@ -197,7 +198,7 @@ private:
     std::shared_ptr<CatalogAndScheduler> _catalogAndSchedulerToCleanup;
 
     // Protects the state below
-    mutable stdx::mutex _mutex;
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
     // The catalog + scheduler instantiated at the last initialization attempt. When nullptr, it
     // means initializeIfNeeded() has not been called yet after the last interruption (or

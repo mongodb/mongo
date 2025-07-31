@@ -93,6 +93,7 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -1315,7 +1316,7 @@ private:
      * When prioritized is set to true, the reporter will try to schedule an updatePosition request
      * even there is already one in flight.
      */
-    void _reportUpstream(stdx::unique_lock<stdx::mutex> lock, bool prioritized);
+    void _reportUpstream(stdx::unique_lock<ObservableMutex<stdx::mutex>> lock, bool prioritized);
 
     /**
      * Helpers to set the last written, applied and durable OpTime.
@@ -1635,10 +1636,10 @@ private:
      *
      * Requires "lock" to own _mutex, and returns the same unique_lock.
      */
-    stdx::unique_lock<stdx::mutex> _handleHeartbeatResponseAction(
+    stdx::unique_lock<ObservableMutex<stdx::mutex>> _handleHeartbeatResponseAction(
         const HeartbeatResponseAction& action,
         const StatusWith<ReplSetHeartbeatResponse>& responseStatus,
-        stdx::unique_lock<stdx::mutex> lock);
+        stdx::unique_lock<ObservableMutex<stdx::mutex>> lock);
 
     /**
      * Updates the last committed OpTime to be 'committedOpTime' if it is more recent than the
@@ -1897,7 +1898,7 @@ private:
     // (I)  Independently synchronized, see member variable comment.
 
     // Protects member data of this ReplicationCoordinator.
-    mutable stdx::mutex _mutex;  // (S)
+    mutable ObservableMutex<stdx::mutex> _mutex;  // (S)
 
     // Handles to actively queued heartbeats.
     size_t _maxSeenHeartbeatQSize = 0;

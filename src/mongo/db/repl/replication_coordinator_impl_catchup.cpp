@@ -45,7 +45,7 @@ namespace repl {
 
 
 boost::optional<Date_t> ReplicationCoordinatorImpl::getCatchupTakeover_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
     if (!_catchupTakeoverCbh.isValid()) {
         return boost::none;
     }
@@ -84,7 +84,7 @@ void ReplicationCoordinatorImpl::CatchupState::start(WithLock lk) {
         if (!cbData.status.isOK()) {
             return;
         }
-        stdx::lock_guard<stdx::mutex> lk(*mutex);
+        stdx::lock_guard lk(*mutex);
         // Check whether the callback has been cancelled while holding mutex.
         if (cbData.myHandle.isCanceled()) {
             return;
@@ -213,7 +213,7 @@ void ReplicationCoordinatorImpl::CatchupState::incrementNumCatchUpOps(WithLock, 
 }
 
 Status ReplicationCoordinatorImpl::abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
     if (_catchupState) {
         _catchupState->abort(lk, reason);
         return Status::OK();
@@ -222,7 +222,7 @@ Status ReplicationCoordinatorImpl::abortCatchupIfNeeded(PrimaryCatchUpConclusion
 }
 
 void ReplicationCoordinatorImpl::incrementNumCatchUpOpsIfCatchingUp(long numOps) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
     if (_catchupState) {
         _catchupState->incrementNumCatchUpOps(lk, numOps);
     }

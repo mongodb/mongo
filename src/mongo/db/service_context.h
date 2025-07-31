@@ -47,6 +47,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/tick_source.h"
@@ -189,7 +190,8 @@ public:
  * This is for internal use by `ServiceContext`. Avoid using it to lock `ServiceContext` as it will
  * block normal server operations.
  */
-using ServiceContextLock = service_context_detail::ObjectLock<ServiceContext, stdx::mutex>;
+using ServiceContextLock =
+    service_context_detail::ObjectLock<ServiceContext, ObservableMutex<stdx::mutex>>;
 
 /**
  * Classes that implement this interface can receive notification on killOp.
@@ -815,7 +817,7 @@ private:
      */
     void _delistOperation(OperationContext* opCtx);
 
-    stdx::mutex _mutex;
+    ObservableMutex<stdx::mutex> _mutex;
 
     /**
      * The periodic runner.

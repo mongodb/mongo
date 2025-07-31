@@ -72,7 +72,9 @@ const auto transactionCoordinatorServiceDecoration =
 
 }  // namespace
 
-TransactionCoordinatorService::TransactionCoordinatorService() = default;
+TransactionCoordinatorService::TransactionCoordinatorService() {
+    // TODO SERVER-108397: Add mutex to the registry
+}
 
 TransactionCoordinatorService::~TransactionCoordinatorService() {
     _joinAndCleanup();
@@ -107,7 +109,7 @@ void TransactionCoordinatorService::createCoordinator(
     auto coordinator = std::make_shared<TransactionCoordinator>(
         opCtx, lsid, txnNumberAndRetryCounter, scheduler.makeChildScheduler(), commitDeadline);
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard lock(_mutex);
         _activeTransactionCoordinators.insert(coordinator);
     }
     coordinator->start(opCtx);
@@ -322,7 +324,7 @@ void TransactionCoordinatorService::_scheduleRecoveryTask(OperationContext* opCt
 void TransactionCoordinatorService::initializeIfNeeded(OperationContext* opCtx,
                                                        long long term,
                                                        Milliseconds recoveryDelay) {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock ul(_mutex);
     LOGV2(9307800,
           "Starting TransactionCoordinatorService initialization for specified term if needed.",
           "Current Initialized Term"_attr = _initTerm,
@@ -364,7 +366,7 @@ void TransactionCoordinatorService::interrupt() {
     std::vector<std::shared_ptr<TransactionCoordinator>> coordinatorsToCancel;
 
     {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard lg(_mutex);
         if (_catalogAndScheduler) {
             _catalogAndSchedulerToCleanup = std::move(_catalogAndScheduler);
         }
@@ -387,7 +389,7 @@ void TransactionCoordinatorService::interrupt() {
 
 void TransactionCoordinatorService::shutdown() {
     {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard lg(_mutex);
         _isShuttingDown = true;
     }
     interrupt();
@@ -396,7 +398,7 @@ void TransactionCoordinatorService::shutdown() {
 
 std::shared_ptr<TransactionCoordinatorService::CatalogAndScheduler>
 TransactionCoordinatorService::getCatalogAndScheduler(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    stdx::unique_lock ul(_mutex);
     uassert(ErrorCodes::NotWritablePrimary,
             "Transaction coordinator is not a primary",
             _catalogAndScheduler);
@@ -407,7 +409,7 @@ TransactionCoordinatorService::getCatalogAndScheduler(OperationContext* opCtx) {
 void TransactionCoordinatorService::_joinAndCleanup() {
     std::shared_ptr<CatalogAndScheduler> schedulerToCleanup;
     {
-        stdx::lock_guard<stdx::mutex> _lock(_mutex);
+        stdx::lock_guard _lock(_mutex);
         // checking this invariant requires holding _mutex
         invariant(!_catalogAndScheduler);
         if (!_catalogAndSchedulerToCleanup)
@@ -436,7 +438,7 @@ void TransactionCoordinatorService::CatalogAndScheduler::join() {
 
 void TransactionCoordinatorService::notifyCoordinatorFinished(
     const std::shared_ptr<TransactionCoordinator> coordinator) {
-    std::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard lock(_mutex);
     // we don't need to know or care if we actually erased this weak ptr. its valid for this
     // service to cancel and clear its set of coordinators and have already erased them when
     // this continuation executes. all we're trying to do is bound memory usage.
