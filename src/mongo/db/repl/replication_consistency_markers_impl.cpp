@@ -114,9 +114,7 @@ boost::optional<MinValidDocument> ReplicationConsistencyMarkersImpl::_getMinVali
 
 void ReplicationConsistencyMarkersImpl::_updateMinValidDocument(OperationContext* opCtx,
                                                                 const BSONObj& updateSpec) {
-    // Writes on minValid document should always be untimestamped. We allow an untimestamped write
-    // in this instance so that WT doesn't complain about timestamp violations.
-    shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
+    // Writes on minValid document should always be untimestamped.
     Status status = _storageInterface->putSingleton(opCtx, _minValidNss, {updateSpec, Timestamp()});
     invariant(status);
 }
@@ -134,7 +132,7 @@ void ReplicationConsistencyMarkersImpl::initializeMinValidDocument(OperationCont
     BSONObj upsert = BSON("$max" << BSON(MinValidDocument::kMinValidTimestampFieldName
                                          << Timestamp() << MinValidDocument::kMinValidTermFieldName
                                          << OpTime::kUninitializedTerm));
-    _updateMinValidDocument(opCtx, upsert);
+    fassert(40467, _storageInterface->putSingleton(opCtx, _minValidNss, {upsert, Timestamp()}));
 }
 
 bool ReplicationConsistencyMarkersImpl::getInitialSyncFlag(OperationContext* opCtx) const {
