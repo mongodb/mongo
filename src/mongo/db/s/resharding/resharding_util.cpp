@@ -716,7 +716,7 @@ Milliseconds getMajorityReplicationLag(OperationContext* opCtx) {
     if (!lastAppliedWallTime.isFormattable() || !lastCommittedWallTime.isFormattable()) {
         return Milliseconds(0);
     }
-    return lastAppliedWallTime - lastCommittedWallTime;
+    return std::max(Milliseconds(0), lastAppliedWallTime - lastCommittedWallTime);
 }
 
 boost::optional<int> getIndexCount(OperationContext* opCtx,

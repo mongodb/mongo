@@ -517,7 +517,11 @@ void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result,
 void ReplicationCoordinatorMock::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {}
 
 void ReplicationCoordinatorMock::advanceCommitPoint(
-    const OpTimeAndWallTime& committedOptimeAndWallTime, bool fromSyncSource) {}
+    const OpTimeAndWallTime& committedOptimeAndWallTime, bool fromSyncSource) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _lastCommittedOpTime = committedOptimeAndWallTime.opTime;
+    _lastCommittedWallTime = committedOptimeAndWallTime.wallTime;
+}
 
 void ReplicationCoordinatorMock::cancelAndRescheduleElectionTimeout() {}
 
@@ -661,11 +665,13 @@ ChangeSyncSourceAction ReplicationCoordinatorMock::shouldChangeSyncSourceOnError
 }
 
 OpTime ReplicationCoordinatorMock::getLastCommittedOpTime() const {
-    return OpTime();
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _lastCommittedOpTime;
 }
 
 OpTimeAndWallTime ReplicationCoordinatorMock::getLastCommittedOpTimeAndWallTime() const {
-    return {OpTime(), Date_t()};
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return {_lastCommittedOpTime, _lastCommittedWallTime};
 }
 
 Status ReplicationCoordinatorMock::processReplSetRequestVotes(
