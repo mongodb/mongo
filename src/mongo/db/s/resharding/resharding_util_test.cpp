@@ -236,23 +236,48 @@ TEST(ReshardingUtilTest, AssertDonorOplogIdSerialization) {
     ASSERT_FALSE(it.more());
 }
 
-TEST_F(ReshardingUtilTest, GetMajorityReplicationLag) {
-    repl::ReplicationCoordinator::set(
-        getServiceContext(),
-        std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
-    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
-                  ->setFollowerMode(repl::MemberState::RS_PRIMARY));
+TEST_F(ReshardingUtilTest, GetMajorityReplicationLag_Basic) {
     auto replCoord = repl::ReplicationCoordinator::get(operationContext());
 
     auto expectedReplicationLag = Milliseconds(1500);
-    auto lastCommittedOpTimeAndWallTime = replCoord->getLastCommittedOpTimeAndWallTime();
-    auto lastAppliedOpTime = repl::OpTime(lastCommittedOpTimeAndWallTime.opTime.getTimestamp() + 10,
-                                          lastCommittedOpTimeAndWallTime.opTime.getTerm() + 1);
-    auto lastAppliedWallTime = lastCommittedOpTimeAndWallTime.wallTime + expectedReplicationLag;
-    replCoord->setMyLastAppliedOpTimeAndWallTimeForward({lastAppliedOpTime, lastAppliedWallTime});
+    auto lastCommittedOpTimeAndWallTime =
+        repl::OpTimeAndWallTime{repl::OpTime(Timestamp(100, 1), 1), Date_t::now()};
+    auto lastAppliedOpTimeAndWallTime =
+        repl::OpTimeAndWallTime{repl::OpTime(Timestamp(120, 1), 2),
+                                lastCommittedOpTimeAndWallTime.wallTime + expectedReplicationLag};
+    replCoord->setMyLastAppliedOpTimeAndWallTimeForward(lastAppliedOpTimeAndWallTime);
+    replCoord->advanceCommitPoint(lastCommittedOpTimeAndWallTime, false /* fromSyncSource */);
 
     auto actualReplicationLag = getMajorityReplicationLag(operationContext());
-    ASSERT_EQ(expectedReplicationLag, actualReplicationLag);
+    ASSERT_EQ(actualReplicationLag, expectedReplicationLag);
+}
+
+TEST_F(ReshardingUtilTest, GetMajorityReplicationLag_LastAppliedEqualToLastCommitted) {
+    auto replCoord = repl::ReplicationCoordinator::get(operationContext());
+
+    auto lastCommittedOpTimeAndWallTime =
+        repl::OpTimeAndWallTime{repl::OpTime(Timestamp(100, 1), 1), Date_t::now()};
+    auto lastAppliedOpTimeAndWallTime = lastCommittedOpTimeAndWallTime;
+    replCoord->setMyLastAppliedOpTimeAndWallTimeForward(lastAppliedOpTimeAndWallTime);
+    replCoord->advanceCommitPoint(lastCommittedOpTimeAndWallTime, false /* fromSyncSource */);
+
+    auto actualReplicationLag = getMajorityReplicationLag(operationContext());
+    ASSERT_EQ(actualReplicationLag, Milliseconds(0));
+}
+
+TEST_F(ReshardingUtilTest, GetMajorityReplicationLag_LastAppliedLessThanLastCommitted) {
+    auto replCoord = repl::ReplicationCoordinator::get(operationContext());
+
+    auto lastCommittedOpTimeAndWallTime =
+        repl::OpTimeAndWallTime{repl::OpTime(Timestamp(100, 1), 1), Date_t::now()};
+    auto lastAppliedOpTimeAndWallTime =
+        repl::OpTimeAndWallTime{repl::OpTime(Timestamp(80, 1), 1),
+                                lastCommittedOpTimeAndWallTime.wallTime - Milliseconds(5)};
+    replCoord->setMyLastAppliedOpTimeAndWallTimeForward(lastAppliedOpTimeAndWallTime);
+    replCoord->advanceCommitPoint(lastCommittedOpTimeAndWallTime, false /* fromSyncSource */);
+
+    auto actualReplicationLag = getMajorityReplicationLag(operationContext());
+    ASSERT_EQ(actualReplicationLag, Milliseconds(0));
 }
 
 class ReshardingTxnCloningPipelineTest : public AggregationContextFixture {

@@ -540,6 +540,8 @@ private:
     Date_t _myLastDurableWallTime;
     OpTime _myLastAppliedOpTime;
     Date_t _myLastAppliedWallTime;
+    OpTime _lastCommittedOpTime;
+    Date_t _lastCommittedWallTime;
     OpTime _currentCommittedSnapshotOpTime;
     BSONObj _latestReconfig;
 
