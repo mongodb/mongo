@@ -333,10 +333,8 @@ void dropReadyIndexes(OperationContext* opCtx,
                     const auto& shardKey = collDescription.getShardKeyPattern();
                     const bool skipDropIndex =
                         skipDroppingHashedShardKeyIndex || !shardKey.isHashedPattern();
-                    // TODO(SERVER-103398): Investigate usage validity of
-                    // CollectionPtr::CollectionPtr_UNSAFE
                     if (isCompatibleWithShardKey(opCtx,
-                                                 CollectionPtr::CollectionPtr_UNSAFE(collection),
+                                                 CollectionPtr(collection),
                                                  desc->getEntry(),
                                                  shardKey.toBSON(),
                                                  false /* requiresSingleKey */) &&
@@ -372,15 +370,11 @@ void dropReadyIndexes(OperationContext* opCtx,
 
     for (const auto& indexName : indexNames) {
         if (collDescription.isSharded()) {
-            // TODO(SERVER-103398): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
             uassert(
                 ErrorCodes::CannotDropShardKeyIndex,
                 "Cannot drop the only compatible index for this collection's shard key",
-                !isLastNonHiddenRangedShardKeyIndex(opCtx,
-                                                    CollectionPtr::CollectionPtr_UNSAFE(collection),
-                                                    indexName,
-                                                    collDescription.getKeyPattern()));
+                !isLastNonHiddenRangedShardKeyIndex(
+                    opCtx, CollectionPtr(collection), indexName, collDescription.getKeyPattern()));
         }
 
         auto writableEntry = indexCatalog->getWritableEntryByName(

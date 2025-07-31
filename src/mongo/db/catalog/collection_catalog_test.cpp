@@ -91,7 +91,6 @@ namespace {
  */
 class CollectionCatalogTest : public ServiceContextMongoDTest {
 public:
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     CollectionCatalogTest()
         : nss(NamespaceString::createNamespaceString_forTest("testdb", "testcol")),
           col(CollectionPtr::CollectionPtr_UNSAFE(nullptr)),
@@ -114,7 +113,8 @@ public:
         globalLock.emplace(opCtx.get());
 
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(colUUID, nss);
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        // The lifetime of the collection returned by the lookup is guaranteed to be valid as
+        // it's controlled by the test. The initialization is therefore safe.
         col = CollectionPtr::CollectionPtr_UNSAFE(collection.get());
         // Register dummy collection in catalog.
         catalog.registerCollection(opCtx.get(), collection, boost::none);
@@ -156,8 +156,8 @@ public:
             std::shared_ptr<Collection> fooColl = std::make_shared<CollectionMock>(fooNss);
             std::shared_ptr<Collection> barColl = std::make_shared<CollectionMock>(barNss);
 
-            // TODO(SERVER-103398): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
+            // The lifetime of the collection returned by the lookup is guaranteed to be valid as
+            // it's controlled by the test. The initialization is therefore safe.
             dbMap["foo"].insert(std::make_pair(fooColl->uuid(),
                                                CollectionPtr::CollectionPtr_UNSAFE(fooColl.get())));
             dbMap["bar"].insert(std::make_pair(barColl->uuid(),
@@ -394,7 +394,8 @@ TEST_F(CollectionCatalogTest, InsertAfterLookup) {
 }
 
 TEST_F(CollectionCatalogTest, OnDropCollection) {
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // The lifetime of the collection returned by the lookup is guaranteed to be valid as
+    // it's controlled by the test. The initialization is therefore safe.
     CollectionPtr yieldableColl =
         CollectionPtr::CollectionPtr_UNSAFE(catalog.lookupCollectionByUUID(opCtx.get(), colUUID));
     ASSERT(yieldableColl);
@@ -438,11 +439,11 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     std::shared_ptr<Collection> collShared = std::make_shared<CollectionMock>(uuid, oldNss);
     auto collection = collShared.get();
     catalog.registerCollection(opCtx.get(), std::move(collShared), boost::none);
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // The lifetime of the collection returned by the lookup is guaranteed to be valid as
+    // it's controlled by the test. The initialization is therefore safe.
     CollectionPtr yieldableColl =
         CollectionPtr::CollectionPtr_UNSAFE(catalog.lookupCollectionByUUID(opCtx.get(), uuid));
     ASSERT(yieldableColl);
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     ASSERT_EQUALS(yieldableColl, CollectionPtr::CollectionPtr_UNSAFE(collection));
 
     // Make the CollectionPtr yieldable by setting yield impl
@@ -462,7 +463,6 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     // Before renaming collection, confirm that the CollectionPtr can be restored successfully.
     yieldableColl.restore();
     ASSERT(yieldableColl);
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     ASSERT_EQUALS(yieldableColl, CollectionPtr::CollectionPtr_UNSAFE(collection));
 
     // Reset CollectionPtr for post-rename restore test.
@@ -976,7 +976,8 @@ public:
         auto writableColl = collection.getWritableCollection(opCtx);
         auto storageEngine = getServiceContext()->getStorageEngine();
 
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        // The lifetime of the collection returned by the lookup is guaranteed to be valid as
+        // it's controlled by the test. The initialization is therefore safe.
         StatusWith<BSONObj> statusWithSpec = writableColl->getIndexCatalog()->prepareSpecForCreate(
             opCtx, CollectionPtr::CollectionPtr_UNSAFE(writableColl), indexSpec, boost::none);
         uassertStatusOK(statusWithSpec.getStatus());

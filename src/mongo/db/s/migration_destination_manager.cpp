@@ -1070,120 +1070,137 @@ void _cloneCollectionIndexesAndOptions(
     const NamespaceString& nss,
     const CollectionOptionsAndIndexes& collectionOptionsAndIndexes,
     bool strictIndexSync) {
+    // 1. Create the collection (if it doesn't already exist) and create any indexes we are
+    // missing (auto-heal indexes).
+
+    // Checks that the collection's UUID matches the donor's.
+    auto checkUUIDsMatch = [&](const Collection* collection) {
+        uassert(ErrorCodes::NotWritablePrimary,
+                str::stream() << "Unable to create collection " << nss.toStringForErrorMsg()
+                              << " because the node is not primary",
+                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
+
+        uassert(ErrorCodes::InvalidUUID,
+                str::stream()
+                    << "Cannot create collection " << nss.toStringForErrorMsg()
+                    << " because we already have an identically named collection with UUID "
+                    << collection->uuid() << ", which differs from the donor's UUID "
+                    << collectionOptionsAndIndexes.uuid
+                    << ". Manually drop the collection on this shard if it contains data from "
+                       "a previous incarnation of "
+                    << nss.toStringForErrorMsg(),
+                collection->uuid() == collectionOptionsAndIndexes.uuid);
+    };
+
+    // If synchronizing indexes strictly, drop any indexes not in the specified index specs.
+    if (strictIndexSync) {
+        _dropLocalIndexes(opCtx, nss, collectionOptionsAndIndexes.indexSpecs);
+    }
+
+    // Check if there are missing indexes on the recipient shard from the donor.
+    // For strict index synchronization, do not consider in-progress index builds. Otherwise,
+    // consider in-progress index builds as ready. Then, if there are missing indexes and the
+    // collection is not empty, fail the migration. On the other hand, if the collection is
+    // empty, wait for index builds to finish if synchronizing indexes strictly.
+    bool waitForInProgressIndexBuildCompletion = false;
+
+    auto checkEmptyOrGetMissingIndexesFromDonor = [&](const CollectionPtr& collection) {
+        auto indexCatalog = collection->getIndexCatalog();
+        // We force the index comparison to only use the fields allowed by listIndexes and to
+        // repair our index. Otherwise we might unnecessary fail the chunk migration due to
+        // having some invalid/unused fields in the index spec.
+        IndexCatalog::RemoveExistingIndexesFlags opts{!strictIndexSync,
+                                                      &kAllowedListIndexesFieldNames};
+        auto indexSpecs = indexCatalog->removeExistingIndexesNoChecks(
+            opCtx, collection, collectionOptionsAndIndexes.indexSpecs, opts);
+        if (!indexSpecs.empty()) {
+            // Only allow indexes to be copied if the collection does not have any documents.
+            uassert(ErrorCodes::CannotCreateCollection,
+                    str::stream() << "aborting, shard is missing " << indexSpecs.size()
+                                  << " indexes and "
+                                  << "collection is not empty. Non-trivial "
+                                  << "index creation should be scheduled manually",
+                    collection->isEmpty(opCtx));
+
+            // If synchronizing indexes strictly, mark waitForInProgressIndexBuildCompletion as
+            // true to wait for index builds to be finished after releasing the locks.
+            waitForInProgressIndexBuildCompletion = strictIndexSync;
+        }
+        return indexSpecs;
+    };
+
     {
-        // 1. Create the collection (if it doesn't already exist) and create any indexes we are
-        // missing (auto-heal indexes).
+        auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+            MODE_IS);
 
-        // Checks that the collection's UUID matches the donor's.
-        auto checkUUIDsMatch = [&](const Collection* collection) {
-            uassert(ErrorCodes::NotWritablePrimary,
-                    str::stream() << "Unable to create collection " << nss.toStringForErrorMsg()
-                                  << " because the node is not primary",
-                    repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
-
-            uassert(ErrorCodes::InvalidUUID,
-                    str::stream()
-                        << "Cannot create collection " << nss.toStringForErrorMsg()
-                        << " because we already have an identically named collection with UUID "
-                        << collection->uuid() << ", which differs from the donor's UUID "
-                        << collectionOptionsAndIndexes.uuid
-                        << ". Manually drop the collection on this shard if it contains data from "
-                           "a previous incarnation of "
-                        << nss.toStringForErrorMsg(),
-                    collection->uuid() == collectionOptionsAndIndexes.uuid);
-        };
-
-        // If synchronizing indexes strictly, drop any indexes not in the specified index specs.
-        if (strictIndexSync) {
-            _dropLocalIndexes(opCtx, nss, collectionOptionsAndIndexes.indexSpecs);
-        }
-
-        // Check if there are missing indexes on the recipient shard from the donor.
-        // For strict index synchronization, do not consider in-progress index builds. Otherwise,
-        // consider in-progress index builds as ready. Then, if there are missing indexes and the
-        // collection is not empty, fail the migration. On the other hand, if the collection is
-        // empty, wait for index builds to finish if synchronizing indexes strictly.
-        bool waitForInProgressIndexBuildCompletion = false;
-
-        auto checkEmptyOrGetMissingIndexesFromDonor = [&](const CollectionPtr& collection) {
-            auto indexCatalog = collection->getIndexCatalog();
-            // We force the index comparison to only use the fields allowed by listIndexes and to
-            // repair our index. Otherwise we might unnecessary fail the chunk migration due to
-            // having some invalid/unused fields in the index spec.
-            IndexCatalog::RemoveExistingIndexesFlags opts{!strictIndexSync,
-                                                          &kAllowedListIndexesFieldNames};
-            auto indexSpecs = indexCatalog->removeExistingIndexesNoChecks(
-                opCtx, collection, collectionOptionsAndIndexes.indexSpecs, opts);
-            if (!indexSpecs.empty()) {
-                // Only allow indexes to be copied if the collection does not have any documents.
-                uassert(ErrorCodes::CannotCreateCollection,
-                        str::stream()
-                            << "aborting, shard is missing " << indexSpecs.size() << " indexes and "
-                            << "collection is not empty. Non-trivial "
-                            << "index creation should be scheduled manually",
-                        collection->isEmpty(opCtx));
-
-                // If synchronizing indexes strictly, mark waitForInProgressIndexBuildCompletion as
-                // true to wait for index builds to be finished after releasing the locks.
-                waitForInProgressIndexBuildCompletion = strictIndexSync;
-            }
-            return indexSpecs;
-        };
-
-        {
-            AutoGetCollection collection(opCtx, nss, MODE_IS);
-
-            if (collection) {
-                checkUUIDsMatch(collection.getCollection().get());
-                auto indexSpecs =
-                    checkEmptyOrGetMissingIndexesFromDonor(collection.getCollection());
-                if (indexSpecs.empty()) {
-                    return;
-                }
+        if (collection.exists()) {
+            checkUUIDsMatch(collection.getCollectionPtr().get());
+            auto indexSpecs = checkEmptyOrGetMissingIndexesFromDonor(collection.getCollectionPtr());
+            if (indexSpecs.empty()) {
+                return;
             }
         }
+    }
 
-        // Before acquiring the exclusive collection lock for cloning the remaining indexes, wait
-        // for index builds to finish if synchronizing indexes strictly.
-        if (waitForInProgressIndexBuildCompletion) {
-            if (MONGO_unlikely(
-                    hangMigrationRecipientBeforeWaitingNoIndexBuildInProgress.shouldFail())) {
-                LOGV2(7677900, "Hanging before waiting for in-progress index builds to finish");
-                hangMigrationRecipientBeforeWaitingNoIndexBuildInProgress.pauseWhileSet();
-            }
-
-            IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
-                opCtx, collectionOptionsAndIndexes.uuid);
+    // Before acquiring the exclusive collection lock for cloning the remaining indexes, wait
+    // for index builds to finish if synchronizing indexes strictly.
+    if (waitForInProgressIndexBuildCompletion) {
+        if (MONGO_unlikely(
+                hangMigrationRecipientBeforeWaitingNoIndexBuildInProgress.shouldFail())) {
+            LOGV2(7677900, "Hanging before waiting for in-progress index builds to finish");
+            hangMigrationRecipientBeforeWaitingNoIndexBuildInProgress.pauseWhileSet();
         }
 
-        // Acquire the exclusive collection lock to eventually create the collection and clone the
-        // remaining indexes.
-        AutoGetCollection autoColl(opCtx,
-                                   nss,
-                                   MODE_X,
-                                   AutoGetCollection::Options{}.deadline(
-                                       opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                                       Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
-        auto db = autoColl.ensureDbExists(opCtx);
+        IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
+            opCtx, collectionOptionsAndIndexes.uuid);
+    }
 
-        auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-        if (collection) {
-            checkUUIDsMatch(collection);
-        } else {
-            if (auto collectionByUUID = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(
-                    opCtx, collectionOptionsAndIndexes.uuid)) {
+    // Acquire the exclusive collection lock to eventually create the collection and clone the
+    // remaining indexes.
+    auto lockDeadline = opCtx->getServiceContext()->getPreciseClockSource()->now() +
+        Milliseconds(migrationLockAcquisitionMaxWaitMS.load());
+    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX, lockDeadline);
+    auto db = autoDb.ensureDbExists(opCtx);
+
+    auto collection =
+        acquireCollection(opCtx,
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx, nss, AcquisitionPrerequisites::kWrite, lockDeadline),
+                          MODE_X);
+
+    if (collection.exists()) {
+        checkUUIDsMatch(collection.getCollectionPtr().get());
+    } else {
+        auto& dbName = nss.dbName();
+        auto& uuid = collectionOptionsAndIndexes.uuid;
+        try {
+            auto acquisitionByUuid = acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                        NamespaceStringOrUUID{dbName, uuid},
+                                                        AcquisitionPrerequisites::kWrite,
+                                                        lockDeadline),
+                MODE_X);
+            if (acquisitionByUuid.exists()) {
                 uasserted(5860300,
                           str::stream()
                               << "Cannot create collection " << nss.toStringForErrorMsg()
-                              << " with UUID " << collectionOptionsAndIndexes.uuid
+                              << " with UUID " << uuid
                               << " because it conflicts with the UUID of an existing collection "
-                              << collectionByUUID->ns().toStringForErrorMsg());
+                              << acquisitionByUuid.nss().toStringForErrorMsg());
             }
+            MONGO_UNREACHABLE_TASSERT(10339800);
+        } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
 
             // We do not have a collection by this name. Create it with the donor's options.
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(opCtx, true /* forceCSRAsUnknownAfterCollectionCreation */);
             WriteUnitOfWork wuow(opCtx);
+            // The write fence will invalid and reload the acquisition on destruction, leaving the
+            // acquisition pointing to the latest collection instance
+            ScopedLocalCatalogWriteFence writeFence(opCtx, &collection);
             CollectionOptions collectionOptions = uassertStatusOK(
                 CollectionOptions::parse(collectionOptionsAndIndexes.options,
                                          CollectionOptions::ParseKind::parseForStorage));
@@ -1194,20 +1211,17 @@ void _cloneCollectionIndexesAndOptions(
                                              collectionOptionsAndIndexes.idIndexSpec,
                                              true /* fromMigrate */));
             wuow.commit();
-
-            collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         }
+    }
 
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        auto indexSpecs =
-            checkEmptyOrGetMissingIndexesFromDonor(CollectionPtr::CollectionPtr_UNSAFE(collection));
-        if (!indexSpecs.empty()) {
-            WriteUnitOfWork wunit(opCtx);
-            CollectionWriter collWriter(opCtx, collection->uuid());
-            IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                opCtx, collWriter, indexSpecs, true /* fromMigrate */);
-            wunit.commit();
-        }
+
+    auto indexSpecs = checkEmptyOrGetMissingIndexesFromDonor(collection.getCollectionPtr());
+    if (!indexSpecs.empty()) {
+        WriteUnitOfWork wunit(opCtx);
+        CollectionWriter collWriter(opCtx, &collection);
+        IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+            opCtx, collWriter, indexSpecs, true /* fromMigrate */);
+        wunit.commit();
     }
 }
 }  // namespace

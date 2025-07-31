@@ -85,7 +85,8 @@ protected:
     }
 
     CollectionPtr lookupCollectionFromCatalog() {
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        // The lifetime of the collection returned by the lookup is guaranteed to be valid as
+        // it's controlled by the test. The initialization is therefore safe.
         return CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(operationContext())
                 ->lookupCollectionByNamespace(operationContext(), kNss));

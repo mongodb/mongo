@@ -281,8 +281,10 @@ public:
                             if (!coll) {
                                 continue;
                             }
-                            // TODO(SERVER-103398): Investigate usage validity of
-                            // CollectionPtr::CollectionPtr_UNSAFE
+                            // The collection catalog snapshot will be in scope until the end of
+                            // the command execution, so we can safely use CollectionPtr_UNSAFE as
+                            // the instance pointed by Collection* will stay in scope as a
+                            // consequence.
                             localCatalogCollections.emplace_back(
                                 CollectionPtr::CollectionPtr_UNSAFE(coll));
                         }
@@ -312,10 +314,12 @@ public:
                             return CollectionCatalog::get(opCtx);
                         }();
 
+                        // The collection catalog snapshot will be in scope until the end of
+                        // the command execution, so we can safely use CollectionPtr_UNSAFE as
+                        // the instance pointed by Collection* will stay in scope as a
+                        // consequence.
                         if (auto coll =
                                 collCatalogSnapshot->lookupCollectionByNamespace(opCtx, nss)) {
-                            // TODO(SERVER-103398): Investigate usage validity of
-                            // CollectionPtr::CollectionPtr_UNSAFE
                             localCatalogCollections.emplace_back(
                                 CollectionPtr::CollectionPtr_UNSAFE(coll));
                         }

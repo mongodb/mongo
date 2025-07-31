@@ -169,6 +169,8 @@ CollectionPtr CollectionPtr::CollectionPtr_UNSAFE(const Collection* coll) {
     return CollectionPtr(coll);
 }
 
+CollectionPtr::CollectionPtr(Collection* coll) : _collection(ConsistentCollection{nullptr, coll}) {}
+
 CollectionPtr::CollectionPtr(const Collection* coll)
     : _collection(ConsistentCollection{nullptr, coll}) {}
 

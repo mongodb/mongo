@@ -736,7 +736,8 @@ TEST_F(CatalogTestFixture, CollectionPtrYieldable) {
 
     int numRestoreCalls = 0;
 
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // The lifetime of the collection returned by the lookup is guaranteed to be valid as
+    // it's controlled by the test. The initialization is therefore safe.
     CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(&beforeYield);
     coll.makeYieldable(operationContext(), [&](OperationContext*, boost::optional<UUID>) {
         ++numRestoreCalls;

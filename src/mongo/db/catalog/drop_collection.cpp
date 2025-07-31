@@ -236,9 +236,8 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
     // which may have changed when we released the collection lock temporarily.
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, startingNss));
+    CollectionPtr coll = CollectionPtr(CollectionCatalog::get(opCtx)->establishConsistentCollection(
+        opCtx, startingNss, boost::none /* readTimestamp */));
 
     // Even if the collection doesn't exist, UUID mismatches must return an error.
     Status status = _checkUUIDAndReplState(opCtx, coll, startingNss, expectedUUID);
@@ -297,9 +296,10 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         // disk state, which may have changed when we released the collection lock temporarily.
         shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        coll = CollectionPtr::CollectionPtr_UNSAFE(
-            CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collectionUUID));
+        coll = CollectionPtr(CollectionCatalog::get(opCtx)->establishConsistentCollection(
+            opCtx,
+            NamespaceStringOrUUID{startingNss.dbName(), collectionUUID},
+            boost::none /* readTimestamp */));
 
         // Even if the collection doesn't exist, UUID mismatches must return an error.
         status = _checkUUIDAndReplState(opCtx, coll, startingNss, expectedUUID);
@@ -337,7 +337,6 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
 
     return Status::OK();
 }
-
 Status _dropCollectionForApplyOps(OperationContext* opCtx,
                                   Database* db,
                                   const NamespaceString& collectionName,
@@ -345,37 +344,41 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
                                   DropCollectionSystemCollectionMode systemCollectionMode,
                                   DropReply* reply) {
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName));
-
-    // Even if the collection doesn't exist, UUID mismatches must return an error.
-    Status status = _checkUUIDAndReplState(opCtx, coll, collectionName);
-    if (!status.isOK()) {
-        return status;
-    } else if (!coll) {
-        return Status::OK();
-    }
-
-    if (MONGO_unlikely(hangDuringDropCollection.shouldFail())) {
-        LOGV2(20331,
-              "hangDuringDropCollection fail point enabled. Blocking until fail point is "
-              "disabled.");
-        hangDuringDropCollection.pauseWhileSet();
-    }
-
+    boost::optional<UUID> uuid;
     AutoStatsTracker statsTracker(opCtx,
                                   collectionName,
                                   Top::LockType::NotLocked,
                                   AutoStatsTracker::LogMode::kUpdateCurOp,
                                   DatabaseProfileSettings::get(opCtx->getServiceContext())
                                       .getDatabaseProfileLevel(collectionName.dbName()));
+    int numIndexes;
+    {
+        CollectionPtr coll =
+            CollectionPtr(CollectionCatalog::get(opCtx)->establishConsistentCollection(
+                opCtx, collectionName, boost::none /*readTimestamp*/));
+
+        // Even if the collection doesn't exist, UUID mismatches must return an error.
+        Status status = _checkUUIDAndReplState(opCtx, coll, collectionName);
+        if (!status.isOK()) {
+            return status;
+        } else if (!coll) {
+            return Status::OK();
+        }
+
+        if (MONGO_unlikely(hangDuringDropCollection.shouldFail())) {
+            LOGV2(20331,
+                  "hangDuringDropCollection fail point enabled. Blocking until fail point is "
+                  "disabled.");
+            hangDuringDropCollection.pauseWhileSet();
+        }
+        uuid = coll->uuid();
+        numIndexes = coll->getIndexCatalog()->numIndexesTotal();
+    }
 
     WriteUnitOfWork wunit(opCtx);
 
-    int numIndexes = coll->getIndexCatalog()->numIndexesTotal();
-    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
-    status =
+    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(*uuid);
+    Status status =
         systemCollectionMode == DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops
         ? db->dropCollection(opCtx, collectionName, dropOpTime)
         : db->dropCollectionEvenIfSystem(opCtx, collectionName, dropOpTime);
@@ -636,12 +639,17 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
             return Status::OK();
         }
 
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName));
+        bool isView = [&]() {
+            auto coll =
+                acquireCollectionOrView(opCtx,
+                                        CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                            opCtx, collectionName, AcquisitionPrerequisites::kRead),
+                                        MODE_IS);
+            return coll.isView();
+        }();
 
         DropReply unusedReply;
-        if (!coll) {
+        if (isView) {
             Lock::CollectionLock viewLock(opCtx, collectionName, MODE_IX);
             return _dropView(opCtx, db, collectionName, boost::none, &unusedReply);
         } else {
@@ -652,7 +660,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
 }
 
 void checkForIdIndexes(OperationContext* opCtx, const DatabaseName& dbName) {
-    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_X));
 
     if (dbName == DatabaseName::kLocal) {
         // Collections in the local database are not replicated, so we do not need an _id index on
@@ -666,9 +674,8 @@ void checkForIdIndexes(OperationContext* opCtx, const DatabaseName& dbName) {
         if (nss.isSystem())
             continue;
 
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        CollectionPtr coll =
-            CollectionPtr::CollectionPtr_UNSAFE(catalog->lookupCollectionByNamespace(opCtx, nss));
+        CollectionPtr coll = CollectionPtr(
+            catalog->establishConsistentCollection(opCtx, nss, boost::none /* readTimestamp */));
         if (!coll)
             continue;
 

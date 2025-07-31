@@ -587,8 +587,8 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                 return Status::OK();
             }
 
-            // TODO(SERVER-103398): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
+            // The target collection instance is protected by a MODE_X lock and can't go out of
+            // scope. The initialization of the CollectionPtr is therefore safe.
             ret = renameCollectionAndDropTarget(opCtx,
                                                 db,
                                                 sourceColl.uuid(),

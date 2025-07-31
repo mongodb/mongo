@@ -844,8 +844,8 @@ Collection* DatabaseImpl::_createCollection(
             invariant(catalogIdentifierForColl);
             invariant(catalogIdentifierForColl->idIndexIdent);
 
-            // TODO(SERVER-103398): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
+            // The instance of the Collection is owned by this function and the initialization of
+            // the CollectionPtr is therefore safe.
             auto collectionPtr = CollectionPtr::CollectionPtr_UNSAFE(collection);
             auto* ic = collection->getIndexCatalog();
             fullIdIndexSpec = uassertStatusOK(ic->prepareSpecForCreate(

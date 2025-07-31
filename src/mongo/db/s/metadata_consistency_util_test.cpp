@@ -126,7 +126,8 @@ std::vector<CollectionPtr> getLocalCatalogCollections(OperationContext* opCtx,
     }();
 
     if (auto coll = collCatalogSnapshot->lookupCollectionByNamespace(opCtx, nss)) {
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        // The lifetime of the collection returned by the lookup is guaranteed to be valid as
+        // it's controlled by the test. The initialization is therefore safe.
         localCatalogCollections.emplace_back(CollectionPtr::CollectionPtr_UNSAFE(coll));
     }
     return localCatalogCollections;

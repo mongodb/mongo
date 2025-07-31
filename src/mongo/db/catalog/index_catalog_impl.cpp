@@ -369,8 +369,7 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
     // shared state, so we clear the query plan cache and rebuild it.
     CollectionQueryInfo& info = CollectionQueryInfo::get(collection);
     if (isPointInTimeRead) {
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        info.clearQueryCache(opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection));
+        info.clearQueryCache(opCtx, CollectionPtr(collection));
     }
     info.init(opCtx, collection);
 }
@@ -631,9 +630,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     invariant(!descriptor.getEntry());
     dassert(!findIndexByName(opCtx, descriptor.indexName(), InclusionPolicy::kAll));
 
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    Status status =
-        _isSpecOk(opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection), descriptor.infoObj());
+    Status status = _isSpecOk(opCtx, CollectionPtr(collection), descriptor.infoObj());
     if (!status.isOK()) {
         // If running inside a --repair operation, throw an error so the operation can attempt to
         // remove any invalid options from the index specification. Any other types of invalid index
@@ -661,13 +658,8 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     bool frozen = CreateIndexEntryFlags::kFrozen & flags;
     invariant(!frozen || !isReadyIndex);
 
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    auto entry =
-        std::make_shared<IndexCatalogEntryImpl>(opCtx,
-                                                CollectionPtr::CollectionPtr_UNSAFE(collection),
-                                                ident,
-                                                std::move(descriptor),
-                                                frozen);
+    auto entry = std::make_shared<IndexCatalogEntryImpl>(
+        opCtx, CollectionPtr(collection), ident, std::move(descriptor), frozen);
 
     IndexDescriptor* desc = entry->descriptor();
 
@@ -734,11 +726,12 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
                             << " UUID: " << collection->uuid()
                             << " Count (from size storer): " << collection->numRecords(opCtx));
 
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     StatusWith<BSONObj> statusWithSpec =
-        prepareSpecForCreate(opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection), spec);
+
+        prepareSpecForCreate(opCtx, CollectionPtr(collection), spec);
     if (!statusWithSpec.isOK())
         return statusWithSpec;
+
     spec = statusWithSpec.getValue();
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
@@ -1332,10 +1325,8 @@ void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
 
     if (!didExclude) {
         if (numIndexesTotal() || numIndexesInCollectionCatalogEntry || _readyIndexes.size()) {
-            // TODO(SERVER-103398): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
             _logInternalState(opCtx,
-                              CollectionPtr::CollectionPtr_UNSAFE(collection),
+                              CollectionPtr(collection),
                               numIndexesInCollectionCatalogEntry,
                               indexNamesToDrop);
         }

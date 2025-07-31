@@ -873,6 +873,11 @@ public:
         "instead.")]] static CollectionPtr
     CollectionPtr_UNSAFE(const Collection* coll);
 
+    // As opposed to constructing a CollectionPtr with a const Collection*, this constructor is safe
+    // because a non-const collection is guaranteed to be protected by a MODE_X lock. This means
+    // that the collection instance cannot be deleted while the CollectionPtr is alive and cannot be
+    // stale.
+    CollectionPtr(Collection* coll);
     CollectionPtr(const CollectionPtr&) = delete;
     CollectionPtr(CollectionPtr&&);
     ~CollectionPtr() override;

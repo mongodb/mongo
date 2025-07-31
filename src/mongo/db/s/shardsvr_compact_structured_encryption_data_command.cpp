@@ -126,41 +126,61 @@ public:
         CompactStructuredEncryptionDataState makeRequest(OperationContext* opCtx) {
             const auto& req = request();
             const auto& nss = req.getNamespace();
-
-            AutoGetCollection baseColl(opCtx, nss, MODE_IX);
+            // Routers route DDLS to the db-primary shard, with a 'databaseVersion' attached to
+            // the command but no 'shardVersion'. This is okay, because the db-primary shard
+            // will coordinate the operation. However, we need to attach an IGNORED Shard Role
+            // so that we are able to access the collection metadata. This is ok as long as we
+            // don't access user data.
+            boost::optional<ScopedSetShardRole> optShardRoleIgnore;
+            if (!OperationShardingState::get(opCtx).getShardVersion(nss)) {
+                ShardVersion shardVersionIgnored;
+                shardVersionIgnored.setPlacementVersionIgnored();
+                optShardRoleIgnore.emplace(opCtx, nss, shardVersionIgnored, boost::none);
+            }
+            auto baseColl = acquireCollection(opCtx,
+                                              CollectionAcquisitionRequest::fromOpCtx(
+                                                  opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                              MODE_IX);
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Unknown collection: " << nss.toStringForErrorMsg(),
-                    baseColl.getCollection());
+                    baseColl.exists());
 
-            validateCompactRequest(req, *(baseColl.getCollection().get()));
+            validateCompactRequest(req, *(baseColl.getCollectionPtr().get()));
 
             auto namespaces =
                 uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(
-                    *(baseColl.getCollection().get())));
+                    *(baseColl.getCollectionPtr().get())));
 
             CompactStructuredEncryptionDataState compact;
 
             // To avoid deadlock, IX locks for ecocRenameNss and ecocNss must be acquired in the
             // same order they'd be acquired during renameCollection (ascending ResourceId order).
-            // Providing ecocRenameNss as a secondary to ecocNss in AutoGetCollection ensures the
-            // locks for both namespaces are acquired in correct order.
+            // The 2 collections are unrouted so we need to specify a version. By design, these
+            // collections are always unsharded (untracked) and therefore on the primary shard.
             {
-                std::vector<NamespaceStringOrUUID> secondaryNss = {namespaces.ecocRenameNss};
-                AutoGetCollection ecocColl(opCtx,
-                                           namespaces.ecocNss,
-                                           MODE_IX,
-                                           AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                               secondaryNss.cbegin(), secondaryNss.cend()));
-                if (ecocColl.getCollection()) {
-                    compact.setEcocUuid(ecocColl->uuid());
+                auto dbVersion = OperationShardingState::get(opCtx).getDbVersion(nss.dbName());
+                auto pc = PlacementConcern(dbVersion, ShardVersion::UNSHARDED());
+                CollectionAcquisitionRequests requests = {
+                    CollectionAcquisitionRequest(namespaces.ecocNss,
+                                                 pc,
+                                                 repl::ReadConcernArgs::get(opCtx),
+                                                 AcquisitionPrerequisites::kWrite),
+                    CollectionAcquisitionRequest(namespaces.ecocRenameNss,
+                                                 pc,
+                                                 repl::ReadConcernArgs::get(opCtx),
+                                                 AcquisitionPrerequisites::kWrite),
+                };
+
+                auto allAcquisitions =
+                    makeAcquisitionMap(acquireCollections(opCtx, requests, MODE_IX));
+                auto ecocColl = allAcquisitions.extract(namespaces.ecocNss).mapped();
+                if (ecocColl.exists()) {
+                    compact.setEcocUuid(ecocColl.uuid());
                 }
-                auto catalog = CollectionCatalog::get(opCtx);
-                // TODO(SERVER-103398): Investigate usage validity of
-                // CollectionPtr::CollectionPtr_UNSAFE
-                auto ecocTempColl = CollectionPtr::CollectionPtr_UNSAFE(
-                    catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss));
-                if (ecocTempColl) {
-                    compact.setEcocRenameUuid(ecocTempColl->uuid());
+
+                auto ecocTempColl = allAcquisitions.extract(namespaces.ecocRenameNss).mapped();
+                if (ecocTempColl.exists()) {
+                    compact.setEcocRenameUuid(ecocTempColl.uuid());
                 }
             }
 

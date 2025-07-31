@@ -190,33 +190,37 @@ Status createIndexOnCollection(OperationContext* opCtx,
                                const BSONObj& keys,
                                bool unique) {
     try {
-        AutoGetCollection autoColl(opCtx, ns, MODE_X);
-        const Collection* collection = autoColl.getCollection().get();
-        if (!collection) {
+        auto acquisition = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        if (!acquisition.exists()) {
             CollectionOptions options;
             options.uuid = UUID::gen();
             writeConflictRetry(opCtx, "createIndexOnCollection", ns, [&] {
                 WriteUnitOfWork wunit(opCtx);
-                auto db = autoColl.ensureDbExists(opCtx);
-                collection = db->createCollection(opCtx, ns, options);
+                AutoGetDb autodb(opCtx, ns.dbName(), MODE_IX);
+                ScopedLocalCatalogWriteFence fence(opCtx, &acquisition);
+                auto db = autodb.ensureDbExists(opCtx);
+                auto collection = db->createCollection(opCtx, ns, options);
                 invariant(collection,
                           str::stream() << "Failed to create collection "
                                         << ns.toStringForErrorMsg() << " for indexes: " << keys);
                 wunit.commit();
             });
         }
-        auto indexCatalog = collection->getIndexCatalog();
+        auto indexCatalog = acquisition.getCollectionPtr()->getIndexCatalog();
         IndexSpec index;
         index.addKeys(keys);
         index.unique(unique);
         index.version(int(IndexConfig::kLatestIndexVersion));
         auto removeIndexBuildsToo = false;
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
         auto indexSpecs = indexCatalog->removeExistingIndexes(
             opCtx,
-            CollectionPtr::CollectionPtr_UNSAFE(collection),
-            uassertStatusOK(collection->addCollationDefaultsToIndexSpecsForCreate(
-                opCtx, std::vector<BSONObj>{index.toBSON()})),
+            acquisition.getCollectionPtr(),
+            uassertStatusOK(
+                acquisition.getCollectionPtr()->addCollationDefaultsToIndexSpecsForCreate(
+                    opCtx, std::vector<BSONObj>{index.toBSON()})),
             removeIndexBuildsToo);
 
         if (indexSpecs.empty()) {
@@ -224,7 +228,7 @@ Status createIndexOnCollection(OperationContext* opCtx,
         }
 
         auto fromMigrate = false;
-        if (!collection->isEmpty(opCtx)) {
+        if (!acquisition.getCollectionPtr()->isEmpty(opCtx)) {
             // We typically create indexes on config/admin collections for sharding while setting up
             // a sharded cluster, so we do not expect to see data in the collection.
             // Therefore, it is ok to log this index build.
@@ -232,15 +236,15 @@ Status createIndexOnCollection(OperationContext* opCtx,
             LOGV2(5173300,
                   "Creating index on sharding collection with existing data",
                   logAttrs(ns),
-                  "uuid"_attr = collection->uuid(),
+                  "uuid"_attr = acquisition.uuid(),
                   "index"_attr = indexSpec);
             auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
             IndexBuildsCoordinator::get(opCtx)->createIndex(
-                opCtx, collection->uuid(), indexSpec, indexConstraints, fromMigrate);
+                opCtx, acquisition.uuid(), indexSpec, indexConstraints, fromMigrate);
         } else {
             writeConflictRetry(opCtx, "createIndexOnConfigCollection", ns, [&] {
                 WriteUnitOfWork wunit(opCtx);
-                CollectionWriter collWriter(opCtx, collection->uuid());
+                CollectionWriter collWriter(opCtx, &acquisition);
                 IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
                     opCtx, collWriter, indexSpecs, fromMigrate);
                 wunit.commit();

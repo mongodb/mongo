@@ -363,7 +363,6 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     // fully committed entry. As a result, if the UUID->NSS mappping was incorrect we'd detect it as
     // part of this NSS resolution.
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     _coll = CollectionPtr::CollectionPtr_UNSAFE(
         catalog->lookupCollectionByNamespace(opCtx, _resolvedNss));
     _coll.makeYieldable(opCtx, LockedCollectionYieldRestore{opCtx, _coll});
@@ -499,9 +498,8 @@ struct CollectionWriter::SharedImpl {
 CollectionWriter::CollectionWriter(OperationContext* opCtx, CollectionAcquisition* acquisition)
     : _acquisition(acquisition), _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, _acquisition->nss()));
+    _storedCollection = CollectionPtr(CollectionCatalog::get(opCtx)->establishConsistentCollection(
+        opCtx, _acquisition->nss(), boost::none /*readTimestamp*/));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
     _sharedImpl->_writableCollectionInitializer = [this, opCtx]() mutable {
@@ -517,7 +515,8 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, CollectionAcquisitio
 CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
     : _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // The CollectionWriter is guaranteed to hold a MODE_X lock. The Collection* returned by the
+    // lookup can't disappear. The initialization here is therefore safe.
     _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(
         CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
@@ -530,9 +529,8 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
 CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceString& nss)
     : _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
+    _storedCollection = CollectionPtr(CollectionCatalog::get(opCtx)->establishConsistentCollection(
+        opCtx, nss, boost::none /*readTimestamp*/));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
     _sharedImpl->_writableCollectionInitializer = [opCtx, nss]() {
@@ -544,7 +542,8 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceStrin
 CollectionWriter::CollectionWriter(OperationContext* opCtx, AutoGetCollection& autoCollection)
     : _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // The CollectionWriter is guaranteed to hold a MODE_X lock. The Collection* within the
+    // AutoGetCollection can't disappear. The initialization here is therefore safe.
     _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(autoCollection._coll.get());
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
@@ -559,12 +558,11 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, AutoGetCollection& a
         // new write unit of work is opened.
         shard_role_details::getRecoveryUnit(opCtx)->registerChange(
             [&](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
-                // TODO(SERVER-103398): Investigate usage validity of
-                // CollectionPtr::CollectionPtr_UNSAFE
                 auto& nss = autoCollection.getNss();
-                // Restore with the just committed instance. This is safe because we still hold the
-                // lock on the collection after commit meaning we're the only ones that can modify
-                // the collection.
+                // This lookup happens after commit while the  CollectionWriter is guaranteed to
+                // hold a MODE_X lock. The Collection* can't disappear and we are guranteed to see
+                // the lastest change from the in-memory catalog. The initialization here is
+                // therefore safe.
                 auto collection =
                     CollectionCatalog::latest(opCtx)->lookupCollectionByNamespace(opCtx, nss);
                 autoCollection._coll = CollectionPtr::CollectionPtr_UNSAFE(collection);
@@ -574,23 +572,22 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, AutoGetCollection& a
                     opCtx, LockedCollectionYieldRestore(opCtx, autoCollection._coll));
             },
             [&autoCollection, originalColl](OperationContext* opCtx) {
-                // TODO(SERVER-103398): Investigate usage validity of
-                // CollectionPtr::CollectionPtr_UNSAFE
+                // The CollectionWriter is guaranteed to hold a MODE_X lock. The Collection* within
+                // the AutoGetCollection can't disappear. The initialization here is therefore safe.
                 autoCollection._coll = CollectionPtr::CollectionPtr_UNSAFE(originalColl);
                 autoCollection._coll.makeYieldable(
                     opCtx, LockedCollectionYieldRestore(opCtx, autoCollection._coll));
             });
 
-        // Invalidate the collection pointer during modifications. This matches the behavior in the
-        // acquisition case
+        // Invalidate the collection pointer during modifications. This matches the behavior in
+        // the acquisition case
         autoCollection._coll.reset();
         return writableColl;
     };
 }
 
-// TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
 CollectionWriter::CollectionWriter(Collection* writableCollection)
-    : _storedCollection(CollectionPtr::CollectionPtr_UNSAFE(writableCollection)),
+    : _storedCollection(CollectionPtr(writableCollection)),
       _writableCollection(writableCollection),
       _managed(false) {}
 
@@ -637,9 +634,7 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
                     }
                 });
 
-            // TODO(SERVER-103398): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(_writableCollection);
+            _storedCollection = CollectionPtr(_writableCollection);
         }
     }
     return _writableCollection;
@@ -707,7 +702,11 @@ AutoGetOplogFastPath::AutoGetOplogFastPath(OperationContext* opCtx,
 
     _stashedCatalog = CollectionCatalog::get(opCtx);
     _oplogInfo = LocalOplogInfo::get(opCtx);
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // The oplog is a special collection that is always present in the catalog and can't be dropped,
+    // so it will be found by the lookup.
+    // We also stash the catalog, so the Collection* returned by the lookup will not be invalidated
+    // by any catalog changes.
+    // The initialization here is therefore safe.
     _oplog = CollectionPtr::CollectionPtr_UNSAFE(
         _stashedCatalog->lookupCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace));
 }
@@ -741,10 +740,9 @@ AutoGetChangeCollection::AutoGetChangeCollection(OperationContext* opCtx,
             str::stream() << "Lock not held in IX mode for the tenant " << tenantId,
             shard_role_details::getLocker(opCtx)->isLockHeldForMode(
                 ResourceId(ResourceType::RESOURCE_TENANT, tenantId), LockMode::MODE_IX));
-    auto changeCollectionPtr = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-        opCtx, changeCollectionNamespaceString);
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    _changeCollection = CollectionPtr::CollectionPtr_UNSAFE(changeCollectionPtr);
+    auto changeCollectionPtr = CollectionCatalog::get(opCtx)->establishConsistentCollection(
+        opCtx, changeCollectionNamespaceString, boost::none /*readTimestamp=*/);
+    _changeCollection = CollectionPtr(changeCollectionPtr);
     _changeCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _changeCollection));
 }
 

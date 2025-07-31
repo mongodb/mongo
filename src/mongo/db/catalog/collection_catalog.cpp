@@ -289,7 +289,9 @@ ViewsForDatabase loadViewsForDatabase(OperationContext* opCtx,
                                       const DatabaseName& dbName) {
     ViewsForDatabase viewsForDb;
     auto systemDotViews = NamespaceString::makeSystemDotViewsNamespace(dbName);
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // The system.views is a special collection that is always present in the catalog and can't be
+    // modified or dropped. The Collection* returned by the lookup can't disappear. The
+    // initialization here is therefore safe.
     if (auto status =
             viewsForDb.reload(opCtx,
                               CollectionPtr::CollectionPtr_UNSAFE(
@@ -783,7 +785,9 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
     IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
     assertViewCatalogValid(viewsForDb);
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // The system.views is a special collection that is always present in the catalog and can't be
+    // modified or dropped. The Collection* returned by the lookup can't disappear. The
+    // initialization here is therefore safe.
     CollectionPtr systemViews =
         CollectionPtr::CollectionPtr_UNSAFE(_lookupSystemViews(opCtx, viewName.dbName()));
 
@@ -840,7 +844,9 @@ Status CollectionCatalog::modifyView(
     auto systemViews = _lookupSystemViews(opCtx, viewName.dbName());
 
     ViewsForDatabase writable{viewsForDb};
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // The system.views is a special collection that is always present in the catalog and can't be
+    // modified or dropped. The Collection* returned by the lookup can't disappear. The
+    // initialization here is therefore safe.
     auto status = writable.update(opCtx,
                                   CollectionPtr::CollectionPtr_UNSAFE(systemViews),
                                   viewName,
@@ -881,7 +887,9 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
     {
         IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        // The system.views is a special collection that is always present in the catalog and can't
+        // be modified or dropped. The Collection* returned by the lookup can't disappear. The
+        // initialization here is therefore safe.
         CollectionPtr systemViews =
             CollectionPtr::CollectionPtr_UNSAFE(_lookupSystemViews(opCtx, viewName.dbName()));
 

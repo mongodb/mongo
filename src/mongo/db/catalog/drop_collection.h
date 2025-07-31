@@ -95,7 +95,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
  * If we are in a replset, every replicated collection must have an _id index. Issues a warning if
  * one is not found.
  *
- * The caller must have the database locked in at least IX mode.
+ * The caller must have the database locked in X mode.
  */
 void checkForIdIndexes(OperationContext* opCtx, const DatabaseName& dbName);
 

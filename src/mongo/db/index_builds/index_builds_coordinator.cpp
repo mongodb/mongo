@@ -2200,9 +2200,8 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
     //
     // For more information on assigning timestamps to multiple index builds, please see
     // SERVER-35780 and SERVER-35070.
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     auto writeableCollection = collection.getWritableCollection(opCtx);
-    auto collectionPtr = CollectionPtr::CollectionPtr_UNSAFE(writeableCollection);
+    auto collectionPtr = CollectionPtr(writeableCollection);
 
     for (auto indexBuildInfo : indexes) {
         if (indexBuildInfo.spec.getBoolField(IndexDescriptor::kClusteredFieldName)) {
