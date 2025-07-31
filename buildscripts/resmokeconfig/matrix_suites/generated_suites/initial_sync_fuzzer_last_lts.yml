@@ -20,6 +20,7 @@ executor:
               initialSync: 4
               rollback: 0
               verbosity: 3
+          mongosBinVersion: last-lts
           nonClusteredConfigTransactions: true
           setParameters:
             numInitialSyncAttempts: 10000000

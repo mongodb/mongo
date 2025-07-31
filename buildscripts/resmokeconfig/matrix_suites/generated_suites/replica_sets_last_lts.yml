@@ -11,6 +11,7 @@ executor:
     shell_options:
       global_vars:
         TestData:
+          mongosBinVersion: last-lts
           nonClusteredConfigTransactions: true
           useRandomBinVersionsWithinReplicaSet: last-lts
       nodb: ''

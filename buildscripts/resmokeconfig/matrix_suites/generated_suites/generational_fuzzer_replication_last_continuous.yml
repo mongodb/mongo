@@ -14,6 +14,7 @@ executor:
       global_vars:
         TestData:
           clusterType: replset
+          mongosBinVersion: last-lts
           nonClusteredConfigTransactions: true
           useRandomBinVersionsWithinReplicaSet: last-continuous
       nodb: ''
