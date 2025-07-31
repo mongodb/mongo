@@ -14,6 +14,7 @@
  * requires_fcv_82,
  * # The spool stage is only used with updates/deletes on time-series collections.
  * featureFlagTimeseriesUpdatesSupport,
+ * assumes_against_mongod_not_mongos,
  * ]
  */
 import {

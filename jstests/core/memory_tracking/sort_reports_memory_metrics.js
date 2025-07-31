@@ -12,6 +12,7 @@
  * queries_system_profile_collection,
  * # The test runs the profile and getLog commands, which are not supported in Serverless.
  * command_not_supported_in_serverless,
+ * assumes_against_mongod_not_mongos,
  * requires_fcv_82,
  * ]
  */
