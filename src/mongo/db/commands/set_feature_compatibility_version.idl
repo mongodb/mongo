@@ -103,3 +103,9 @@ commands:
                     FCV upgrade or downgrade would fail if it were to be executed."
                 type: safeBool
                 optional: true
+            skipDryRun:
+                description:
+                    "Internal parameter that skips the automatic dry-run validation performed
+                    upon starting an upgrade or downgrade"
+                type: safeBool
+                optional: true

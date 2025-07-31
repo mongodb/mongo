@@ -82,6 +82,7 @@ filters:
   - "set_feature_compatibility_version.js":
     approvers:
       - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing
   - "set_feature_compatibility_version_confirm.js":
     approvers:
       - 10gen/server-fcv
@@ -94,3 +95,8 @@ filters:
   - "set_fcv_dry_run_mode.js":
     approvers:
       - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing
+  - "set_fcv_automatic_dryRun.js":
+    approvers:
+      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing

@@ -468,8 +468,20 @@ public:
 
         uassert(ErrorCodes::InvalidOptions,
                 "dry-run mode is not enabled",
-                !request.getDryRun() ||
+                !request.getDryRun().has_value() ||
                     repl::feature_flags::gFeatureFlagSetFcvDryRunMode.isEnabled());
+
+        auto skipDryRun = request.getSkipDryRun().value_or(false);
+
+        uassert(ErrorCodes::InvalidOptions,
+                "skipDryRun can not be used because dry-run mode is not enabled",
+                !request.getSkipDryRun().has_value() ||
+                    repl::feature_flags::gFeatureFlagSetFcvDryRunMode.isEnabled());
+
+        // Ensure that `dryRun` and `skipDryRun` are not both set to `true`
+        uassert(ErrorCodes::InvalidOptions,
+                "The 'dryRun' and 'skipDryRun' options cannot both be set to true.",
+                !(isDryRun && skipDryRun));
 
         auto isFromConfigServer = request.getFromConfigServer().value_or(false);
 
@@ -578,6 +590,14 @@ public:
             processDryRun(opCtx, request, requestedVersion, actualVersion);
             return true;
         }
+
+        // Automatic dryRun processing only if skipDryRun is false and the role is either the config
+        // server or not part of a sharded cluster
+        if (repl::feature_flags::gFeatureFlagSetFcvDryRunMode.isEnabled() && !skipDryRun &&
+            (!role || !role->isShardOnly())) {
+            processDryRun(opCtx, request, requestedVersion, actualVersion);
+        }
+
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
             {
@@ -1883,12 +1903,13 @@ private:
             }
         }
     }
-    void _forwardSetFCVRequestToShards(OperationContext* opCtx,
+    void _forwardDryRunRequestToShards(OperationContext* opCtx,
                                        const SetFeatureCompatibilityVersion& request) {
-        auto requestSetFCV = request;
-        requestSetFCV.setFromConfigServer(true);
+        auto requestDryRun = request;
+        requestDryRun.setFromConfigServer(true);
+        requestDryRun.setDryRun(true);
         uassertStatusOK(ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-            opCtx, CommandHelpers::filterCommandRequestForPassthrough(requestSetFCV.toBSON())));
+            opCtx, CommandHelpers::filterCommandRequestForPassthrough(requestDryRun.toBSON())));
     }
 
     void processDryRun(OperationContext* opCtx,
@@ -1908,7 +1929,7 @@ private:
 
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         if (role && role->has(ClusterRole::ConfigServer)) {
-            _forwardSetFCVRequestToShards(opCtx, request);
+            _forwardDryRunRequestToShards(opCtx, request);
         }
 
         LOGV2(10710701,

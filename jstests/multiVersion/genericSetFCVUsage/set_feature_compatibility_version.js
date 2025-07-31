@@ -13,6 +13,7 @@ import {stopServerReplication, restartServerReplication} from "jstests/libs/writ
 import {reconfig} from "jstests/replsets/rslib.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 let dbpath = MongoRunner.dataPath + "feature_compatibility_version";
 resetDbpath(dbpath);
@@ -483,8 +484,15 @@ function runShardingTest(downgradeVersion) {
         "EXPECTED TO FAIL: setFeatureCompatibilityVersion cannot be set because the shard primary is not reachable");
     assert.commandFailed(mongosAdminDB.runCommand(
         {setFeatureCompatibilityVersion: downgradeFCV, confirm: true, maxTimeMS: 1000}));
-    checkFCV(
-        configPrimaryAdminDB, downgradeFCV, downgradeFCV /* indicates downgrade in progress */);
+
+    // If dry-run mode is enabled and a downgrade fails, then the FCV version should still be
+    // latestFCV. If it is not enabled, then the FCV should be in downgrading state
+    if (FeatureFlagUtil.isPresentAndEnabled(mongosAdminDB, "SetFcvDryRunMode")) {
+        checkFCV(configPrimaryAdminDB, latestFCV);
+    } else {
+        checkFCV(
+            configPrimaryAdminDB, downgradeFCV, downgradeFCV /* indicates downgrade in progress */);
+    }
     st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 0.0);
 
     // FCV can be set to 'downgradeFCV' on mongos.

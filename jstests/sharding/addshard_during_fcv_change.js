@@ -21,8 +21,7 @@ const rs = new ReplSetTest({nodes: 1});
 rs.startSet({shardsvr: ""});
 rs.initiate();
 
-const addShardFP = configureFailPoint(cluster.configRS.getPrimary(),
-                                      "hangAddShardBeforeUpdatingClusterCardinalityParameter");
+const addShardFP = configureFailPoint(cluster.configRS.getPrimary(), "hangAfterLockingNewShard");
 const addShardParallelShell =
     startParallelShell(funWithArgs(function(url) {
                            assert.commandWorked(db.adminCommand({addShard: url, name: "newShard"}));
