@@ -46,7 +46,6 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -103,42 +102,65 @@ std::unique_ptr<Pipeline> buildPipelineFromViewDefinition(
         subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
 }
 
+MONGO_COMPILER_NOINLINE void logShardedViewFound(
+    const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e,
+    const std::vector<BSONObj>& pipeline) {
+    LOGV2_DEBUG(4556300,
+                3,
+                "$unionWith found view definition. ns: {namespace}, pipeline: {pipeline}. New "
+                "$unionWith sub-pipeline: {new_pipe}",
+                logAttrs(e->getNamespace()),
+                "pipeline"_attr = Value(e->getPipeline()),
+                "new_pipe"_attr = pipeline);
+}
 }  // namespace
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
     const DocumentSourceUnionWith& original,
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
     : DocumentSource(kStageName, newExpCtx),
-      exec::agg::Stage(kStageName, newExpCtx),
-      _pipeline(original._pipeline->clone(
-          newExpCtx ? makeCopyForSubPipelineFromExpressionContext(
-                          newExpCtx,
-                          newExpCtx->getResolvedNamespace(original._userNss).ns,
-                          newExpCtx->getResolvedNamespace(original._userNss).uuid)
-                    : nullptr)),
+      _sharedState(std::make_shared<UnionWithSharedState>(
+          original._sharedState->_pipeline->clone(
+              newExpCtx ? makeCopyForSubPipelineFromExpressionContext(
+                              newExpCtx,
+                              newExpCtx->getResolvedNamespace(original._userNss).ns,
+                              newExpCtx->getResolvedNamespace(original._userNss).uuid)
+                        : nullptr),
+          nullptr,
+          UnionWithSharedState::ExecutionProgress::kIteratingSource,
+          original._sharedState->_variables,
+          original._sharedState->_variablesParseState)),
       _userNss(original._userNss),
-      _userPipeline(original._userPipeline),
-      _variables(original._variables),
-      _variablesParseState(original._variablesParseState) {
-    _pipeline->getContext()->setInUnionWith(true);
+      _userPipeline(original._userPipeline) {
+
+    _sharedState->_pipeline->getContext()->setInUnionWith(true);
+
     tassert(10577700,
             "explain settings are different for $unionWith and its sub-pipeline",
-            pExpCtx->getExplain() == _pipeline->getContext()->getExplain());
+            getExpCtx()->getExplain() == _sharedState->_pipeline->getContext()->getExplain());
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, std::unique_ptr<Pipeline> pipeline)
-    : DocumentSource(kStageName, expCtx),
-      exec::agg::Stage(kStageName, expCtx),
-      _pipeline(std::move(pipeline)),
-      _variablesParseState(_variables.useIdGenerator()) {
-    if (!_pipeline->getContext()->getNamespaceString().isOnInternalDb()) {
-        serviceOpCounters(expCtx->getOperationContext()).gotNestedAggregate();
+    : DocumentSource(kStageName, expCtx) {
+
+    auto variables = Variables();
+    auto variablesParseState = VariablesParseState(variables.useIdGenerator());
+
+    _sharedState = std::make_shared<UnionWithSharedState>(
+        std::move(pipeline),
+        nullptr,
+        UnionWithSharedState::ExecutionProgress::kIteratingSource,
+        std::move(variables),
+        std::move(variablesParseState));
+
+    if (!_sharedState->_pipeline->getContext()->getNamespaceString().isOnInternalDb()) {
+        serviceOpCounters(getExpCtx()->getOperationContext()).gotNestedAggregate();
     }
-    _pipeline->getContext()->setInUnionWith(true);
+    _sharedState->_pipeline->getContext()->setInUnionWith(true);
     tassert(10577701,
             "explain settings are different for $unionWith and its sub-pipeline",
-            pExpCtx->getExplain() == _pipeline->getContext()->getExplain());
+            getExpCtx()->getExplain() == _sharedState->_pipeline->getContext()->getExplain());
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
@@ -167,9 +189,9 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 DocumentSourceUnionWith::~DocumentSourceUnionWith() {
     // When in explain command, the sub-pipeline was not disposed in 'doDispose()', so we need to
     // dispose it here.
-    if (pExpCtx->getExplain()) {
-        if (_execPipeline) {
-            _execPipeline->dispose(pExpCtx->getOperationContext());
+    if (getExpCtx()->getExplain()) {
+        if (_sharedState->_execPipeline) {
+            _sharedState->_execPipeline->dispose(getExpCtx()->getOperationContext());
         }
     }
 }
@@ -302,112 +324,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         expCtx, std::move(unionNss), std::move(pipeline));
 }
 
-DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
-    if (!_pipeline) {
-        // We must have already been disposed, so we're finished.
-        return GetNextResult::makeEOF();
-    }
-
-    if (_executionState == ExecutionProgress::kIteratingSource) {
-        auto nextInput = pSource->getNext();
-        if (!nextInput.isEOF()) {
-            return nextInput;
-        }
-        _executionState = ExecutionProgress::kStartingSubPipeline;
-        // All documents from the base collection have been returned, switch to iterating the sub-
-        // pipeline by falling through below.
-    }
-
-    if (_executionState == ExecutionProgress::kStartingSubPipeline) {
-        // Since the subpipeline will be executed again for explain, we store the starting state of
-        // the variables to reset them later.
-        if (pExpCtx->getExplain()) {
-            auto expCtx = _pipeline->getContext();
-            _variables = expCtx->variables;
-            _variablesParseState =
-                expCtx->variablesParseState.copyWith(_variables.useIdGenerator());
-        }
-
-        auto serializedPipe = _pipeline->serializeToBson();
-        logStartingSubPipeline(serializedPipe);
-        try {
-            // Query settings are looked up after parsing and therefore are not populated in the
-            // context of the unionWith '_pipeline' as part of DocumentSourceUnionWith constructor.
-            // Attach query settings to the '_pipeline->getContext()' by copying them from the
-            // parent query ExpressionContext.
-            _pipeline->getContext()->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
-
-            LOGV2_DEBUG(9497002,
-                        5,
-                        "$unionWith before pipeline prep: ",
-                        "pipeline"_attr = _pipeline->serializeToBson());
-            _pipeline = pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
-                _pipeline.release());
-            LOGV2_DEBUG(9497003,
-                        5,
-                        "$unionWith POST pipeline prep: ",
-                        "pipeline"_attr = _pipeline->serializeToBson());
-
-            _executionState = ExecutionProgress::kIteratingSubPipeline;
-        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
-            _pipeline = buildPipelineFromViewDefinition(
-                pExpCtx,
-                ResolvedNamespace{e->getNamespace(), e->getPipeline()},
-                std::move(serializedPipe),
-                _userNss);
-            logShardedViewFound(e);
-            return doGetNext();
-        }
-        _execPipeline = exec::agg::buildPipeline(_pipeline->freeze());
-
-        // The $unionWith stage takes responsibility for disposing of its Pipeline. When the outer
-        // Pipeline that contains the $unionWith is disposed of, it will propagate dispose() to its
-        // subpipeline.
-        _execPipeline->dismissDisposal();
-    }
-
-    auto res = _execPipeline->getNext();
-    if (res)
-        return std::move(*res);
-
-    // Record the plan summary stats after $unionWith operation is done.
-    _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
-
-    // stats update (previously done in usedDisk())
-    _stats.planSummaryStats.usedDisk =
-        _stats.planSummaryStats.usedDisk || _execPipeline->usedDisk();
-
-    _executionState = ExecutionProgress::kFinished;
-    return GetNextResult::makeEOF();
-}
-
-// The use of these logging macros is done in separate NOINLINE functions to reduce the stack space
-// used on the hot getNext() path. This is done to avoid stack overflows.
-MONGO_COMPILER_NOINLINE void DocumentSourceUnionWith::logStartingSubPipeline(
-    const std::vector<BSONObj>& serializedPipe) {
-    LOGV2_DEBUG(23869,
-                1,
-                "$unionWith attaching cursor to pipeline {pipeline}",
-                "pipeline"_attr = serializedPipe);
-}
-
-MONGO_COMPILER_NOINLINE void DocumentSourceUnionWith::logShardedViewFound(
-    const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) const {
-    LOGV2_DEBUG(4556300,
-                3,
-                "$unionWith found view definition. ns: {namespace}, pipeline: {pipeline}. New "
-                "$unionWith sub-pipeline: {new_pipe}",
-                logAttrs(e->getNamespace()),
-                "pipeline"_attr = Value(e->getPipeline()),
-                "new_pipe"_attr = _pipeline->serializeToBson());
-}
-
 DocumentSourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     auto duplicateAcrossUnion = [&](auto&& nextStage) {
-        _pipeline->addFinalSource(nextStage->clone(_pipeline->getContext()));
+        _sharedState->_pipeline->addFinalSource(
+            nextStage->clone(_sharedState->_pipeline->getContext()));
         // Apply the same rewrite to the cached pipeline if available.
-        if (pExpCtx->getExplain() >= ExplainOptions::Verbosity::kExecStats) {
+        if (getExpCtx()->getExplain() >= ExplainOptions::Verbosity::kExecStats) {
             _pushedDownStages.push_back(nextStage->serialize().getDocument().toBson());
         }
         auto newStageItr = container->insert(itr, std::move(nextStage));
@@ -424,34 +347,9 @@ DocumentSourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
     return std::next(itr);
 };
 
-bool DocumentSourceUnionWith::usedDisk() const {
-    return _execPipeline && _execPipeline->usedDisk();
-}
-
-void DocumentSourceUnionWith::doDispose() {
-    // Update execution statistics.
-    if (_execPipeline) {
-        _stats.planSummaryStats.usedDisk =
-            _stats.planSummaryStats.usedDisk || _execPipeline->usedDisk();
-        _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
-    }
-
-    // When not in explain command, propagate disposal to the subpipeline, otherwise the subpipeline
-    // will be disposed in '~DocumentSourceUnionWith()'.
-    if (!pExpCtx->getExplain()) {
-        if (_execPipeline) {
-            _execPipeline->dispose(pExpCtx->getOperationContext());
-        }
-        _userPipeline.clear();
-        _pushedDownStages.clear();
-        _pipeline.reset();
-        _execPipeline.reset();
-    }
-}
-
 Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const {
     auto collectionless =
-        _pipeline->getContext()->getNamespaceString().isCollectionlessAggregateNS();
+        _sharedState->_pipeline->getContext()->getNamespaceString().isCollectionlessAggregateNS();
     if (opts.isSerializingForExplain()) {
         // There are several different possible states depending on the explain verbosity as well as
         // the other stages in the pipeline:
@@ -463,9 +361,12 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         //  branch and not the sub-pipeline.
         Pipeline* pipeCopy = nullptr;
         if (*opts.verbosity == ExplainOptions::Verbosity::kQueryPlanner) {
-            pipeCopy = Pipeline::create(_pipeline->getSources(), _pipeline->getContext()).release();
+            pipeCopy = Pipeline::create(_sharedState->_pipeline->getSources(),
+                                        _sharedState->_pipeline->getContext())
+                           .release();
         } else if (*opts.verbosity >= ExplainOptions::Verbosity::kExecStats &&
-                   _executionState > ExecutionProgress::kIteratingSource) {
+                   _sharedState->_executionState >
+                       UnionWithSharedState::ExecutionProgress::kIteratingSource) {
             std::vector<BSONObj> recoveredPipeline;
             // We've either exhausted the sub-pipeline or at least started iterating it. Use the
             // cached user pipeline and pushed down stages to get the explain output since the
@@ -480,7 +381,8 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             // We reset the variables to their inital state for another execution.
             // TODO SERVER-94227 we probably don't need to do any validation as part of this parsing
             // pass?
-            _variables.copyToExpCtx(_variablesParseState, _pipeline->getContext().get());
+            _sharedState->_variables.copyToExpCtx(_sharedState->_variablesParseState,
+                                                  _sharedState->_pipeline->getContext().get());
 
             // Resolve the view definition, if there is one.
             if (_resolvedNsForView.has_value()) {
@@ -488,25 +390,27 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                 // the full catalog information, so we can resolve the view.
                 pipeCopy =
                     buildPipelineFromViewDefinition(
-                        pExpCtx,
+                        getExpCtx(),
                         ResolvedNamespace{_resolvedNsForView->ns, _resolvedNsForView->pipeline},
                         std::move(recoveredPipeline),
                         _userNss)
                         .release();
             } else {
-                pipeCopy = Pipeline::parse(recoveredPipeline, _pipeline->getContext()).release();
+                pipeCopy = Pipeline::parse(recoveredPipeline, _sharedState->_pipeline->getContext())
+                               .release();
             }
         } else {
             // The plan does not require reading from the sub-pipeline, so just include the
             // serialization in the explain output.
             BSONArrayBuilder bab;
-            for (auto&& stage : _pipeline->serialize(opts))
+            for (auto&& stage : _sharedState->_pipeline->serialize(opts))
                 bab << stage;
             auto spec = collectionless
                 ? DOC("pipeline" << bab.arr())
-                : DOC("coll" << opts.serializeIdentifier(
-                                    _pipeline->getContext()->getNamespaceString().coll())
-                             << "pipeline" << bab.arr());
+                : DOC("coll"
+                      << opts.serializeIdentifier(
+                             _sharedState->_pipeline->getContext()->getNamespaceString().coll())
+                      << "pipeline" << bab.arr());
             return Value(DOC(getSourceName() << spec));
         }
 
@@ -521,10 +425,11 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             // NOTE: this is done here, as opposed to at the beginning of the serialize() method
             // because serialize() is called when generating query shape, however, at that
             // moment no query settings are present in the parent context.
-            _pipeline->getContext()->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
+            _sharedState->_pipeline->getContext()->setQuerySettingsIfNotPresent(
+                getExpCtx()->getQuerySettings());
 
-            return pExpCtx->getMongoProcessInterface()->preparePipelineAndExplain(ownedPipeline,
-                                                                                  *opts.verbosity);
+            return getExpCtx()->getMongoProcessInterface()->preparePipelineAndExplain(
+                ownedPipeline, *opts.verbosity);
         };
 
         BSONObj explainLocal = [&] {
@@ -532,11 +437,11 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             try {
                 return preparePipelineAndExplain(pipeCopy);
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
-                logShardedViewFound(e);
+                logShardedViewFound(e, _sharedState->_pipeline->serializeToBson());
                 // This takes care of the case where this code is executing on mongos and we had to
                 // get the view pipeline from a shard.
                 auto resolvedPipeline = buildPipelineFromViewDefinition(
-                    pExpCtx,
+                    getExpCtx(),
                     ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                     std::move(serializedPipe),
                     _userNss);
@@ -551,7 +456,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         auto spec = collectionless
             ? DOC("pipeline" << explainLocal.firstElement())
             : DOC("coll" << opts.serializeIdentifier(
-                                _pipeline->getContext()->getNamespaceString().coll())
+                                _sharedState->_pipeline->getContext()->getNamespaceString().coll())
                          << "pipeline" << explainLocal.firstElement());
         return Value(DOC(getSourceName() << spec));
     } else if (opts.isSerializingForQueryStats()) {
@@ -560,7 +465,8 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         // return the current (optimized) pipeline for introspection with explain, etc.
         // TODO SERVER-94227: we don't need to do any validation as part of this parsing pass.
         const auto serializedPipeline =
-            Pipeline::parse(_userPipeline, _pipeline->getContext())->serializeToBson(opts);
+            Pipeline::parse(_userPipeline, _sharedState->_pipeline->getContext())
+                ->serializeToBson(opts);
         auto spec = collectionless ? DOC("pipeline" << serializedPipeline)
                                    : DOC("coll" << opts.serializeIdentifier(_userNss.coll())
                                                 << "pipeline" << serializedPipeline);
@@ -572,10 +478,10 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             // underlying namespace rather than _userNss, since the pipeline is already resolved.
             // Using _userNss here could incorrectly retain the view name, leading to duplicated
             // view resolution and stages (e.g. $search applied twice).
-            const auto underlyingNss = _pipeline->getContext()->getNamespaceString();
+            const auto underlyingNss = _sharedState->_pipeline->getContext()->getNamespaceString();
             spec["coll"] = Value(opts.serializeIdentifier(underlyingNss.coll()));
         }
-        spec["pipeline"] = Value(_pipeline->serializeToBson(opts));
+        spec["pipeline"] = Value(_sharedState->_pipeline->serializeToBson(opts));
         bool isHybridSearch = hybrid_scoring_util::isHybridSearchPipeline(_userPipeline);
         if (isHybridSearch) {
             spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(isHybridSearch);
@@ -587,13 +493,13 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
 // Extracting dependencies for the outer collection. Although, this method walks the inner pipeline,
 // the field dependencies are not collected - only variable dependencies are.
 DepsTracker::State DocumentSourceUnionWith::getDependencies(DepsTracker* deps) const {
-    if (!_pipeline) {
+    if (!_sharedState->_pipeline) {
         return DepsTracker::State::SEE_NEXT;
     }
 
     DepsTracker subDeps;
     // Get the subpipeline dependencies.
-    for (auto&& source : _pipeline->getSources()) {
+    for (auto&& source : _sharedState->_pipeline->getSources()) {
         source->getDependencies(&subDeps);
     }
 
@@ -604,7 +510,7 @@ void DocumentSourceUnionWith::addVariableRefs(std::set<Variables::Id>* refs) con
     // Add sub-pipeline variable dependencies. Do not add SEARCH_META as a dependency, since it is
     // scoped to one pipeline.
     std::set<Variables::Id> subPipeRefs;
-    _pipeline->addVariableRefs(&subPipeRefs);
+    _sharedState->_pipeline->addVariableRefs(&subPipeRefs);
     for (auto&& varId : subPipeRefs) {
         if (varId != Variables::kSearchMetaId)
             refs->insert(varId);
@@ -614,77 +520,42 @@ void DocumentSourceUnionWith::addVariableRefs(std::set<Variables::Id>* refs) con
 void DocumentSourceUnionWith::detachSourceFromOperationContext() {
     // We have an execution pipeline we're going to execute across multiple commands, so we need to
     // detach it from the operation context when it goes out of scope.
-    if (_execPipeline) {
-        _execPipeline->detachFromOperationContext();
+    if (_sharedState->_execPipeline) {
+        _sharedState->_execPipeline->detachFromOperationContext();
     }
     // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
     // corresponding execution pipeline share the same expression context containing a pointer to
     // the operation context, but it might not be the case anymore when a pipeline is cloned with
     // another expression context.
-    if (_pipeline) {
-        _pipeline->detachFromOperationContext();
-    }
-}
-
-void DocumentSourceUnionWith::detachFromOperationContext() {
-    // We have an execution pipeline we're going to execute across multiple commands, so we need to
-    // detach it from the operation context when it goes out of scope.
-    if (_execPipeline) {
-        _execPipeline->detachFromOperationContext();
-    }
-    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
-    // corresponding execution pipeline share the same expression context containing a pointer to
-    // the operation context, but it might not be the case anymore when a pipeline is cloned with
-    // another expression context.
-    if (_pipeline) {
-        _pipeline->detachFromOperationContext();
+    if (_sharedState->_pipeline) {
+        _sharedState->_pipeline->detachFromOperationContext();
     }
 }
 
 void DocumentSourceUnionWith::reattachSourceToOperationContext(OperationContext* opCtx) {
     // We have an execution pipeline we're going to execute across multiple commands, so we need to
     // propagate the new operation context to the pipeline stages.
-    if (_execPipeline) {
-        _execPipeline->reattachToOperationContext(opCtx);
+    if (_sharedState->_execPipeline) {
+        _sharedState->_execPipeline->reattachToOperationContext(opCtx);
     }
     // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
     // corresponding execution pipeline share the same expression context containing a pointer to
     // the operation context, but it might not be the case anymore when a pipeline is cloned with
     // another expression context.
-    if (_pipeline) {
-        _pipeline->reattachToOperationContext(opCtx);
+    if (_sharedState->_pipeline) {
+        _sharedState->_pipeline->reattachToOperationContext(opCtx);
     }
-}
-
-void DocumentSourceUnionWith::reattachToOperationContext(OperationContext* opCtx) {
-    // We have an execution pipeline we're going to execute across multiple commands, so we need to
-    // propagate the new operation context to the pipeline stages.
-    if (_execPipeline) {
-        _execPipeline->reattachToOperationContext(opCtx);
-    }
-    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
-    // corresponding execution pipeline share the same expression context containing a pointer to
-    // the operation context, but it might not be the case anymore when a pipeline is cloned with
-    // another expression context.
-    if (_pipeline) {
-        _pipeline->reattachToOperationContext(opCtx);
-    }
-}
-
-bool DocumentSourceUnionWith::validateOperationContext(const OperationContext* opCtx) const {
-    return getContext()->getOperationContext() == opCtx &&
-        (!_execPipeline || _execPipeline->validateOperationContext(opCtx));
 }
 
 bool DocumentSourceUnionWith::validateSourceOperationContext(const OperationContext* opCtx) const {
-    return getContext()->getOperationContext() == opCtx &&
-        (!_pipeline || _pipeline->validateOperationContext(opCtx));
+    return getExpCtx()->getOperationContext() == opCtx &&
+        (!_sharedState->_pipeline || _sharedState->_pipeline->validateOperationContext(opCtx));
 }
 
 void DocumentSourceUnionWith::addInvolvedCollections(
     stdx::unordered_set<NamespaceString>* collectionNames) const {
-    collectionNames->insert(_pipeline->getContext()->getNamespaceString());
-    collectionNames->merge(_pipeline->getInvolvedCollections());
+    collectionNames->insert(_sharedState->_pipeline->getContext()->getNamespaceString());
+    collectionNames->merge(_sharedState->_pipeline->getInvolvedCollections());
 }
 
 }  // namespace mongo

@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
@@ -78,15 +79,7 @@ using DocumentSourceUnionWithTest = AggregationContextFixture;
 
 auto makeUnion(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                std::unique_ptr<Pipeline> pipeline) {
-    return std::unique_ptr<DocumentSourceUnionWith, DocumentSourceDeleter>(
-        new DocumentSourceUnionWith(expCtx, std::move(pipeline)), DocumentSourceDeleter());
-}
-
-auto makeUnionFromBson(BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto docSource = DocumentSourceUnionWith::createFromBson(elem, expCtx);
-    auto unionWith = static_cast<DocumentSourceUnionWith*>(docSource.detach());
-    return std::unique_ptr<DocumentSourceUnionWith, DocumentSourceDeleter>(unionWith,
-                                                                           DocumentSourceDeleter());
+    return make_intrusive<DocumentSourceUnionWith>(expCtx, std::move(pipeline));
 }
 
 TEST_F(DocumentSourceUnionWithTest, BasicSerialUnions) {
@@ -94,14 +87,14 @@ TEST_F(DocumentSourceUnionWithTest, BasicSerialUnions) {
     const auto mock = DocumentSourceMock::createForTest(doc, getExpCtx());
     const auto mockDeque = std::deque<DocumentSource::GetNextResult>{Document{doc}};
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockDeque));
-    auto unionWithOne =
-        makeUnion(getExpCtx(),
-                  Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
-    auto unionWithTwo =
-        makeUnion(getExpCtx(),
-                  Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
-    unionWithOne->setSource(mock.get());
-    unionWithTwo->setSource(unionWithOne.get());
+    auto unionWithOneStage = exec::agg::buildStage(makeUnion(
+        getExpCtx(),
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
+    auto unionWithTwo = exec::agg::buildStage(makeUnion(
+        getExpCtx(),
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
+    unionWithOneStage->setSource(mock.get());
+    unionWithTwo->setSource(unionWithOneStage.get());
 
     auto comparator = DocumentComparator();
     const auto expectedResults = 3;
@@ -114,6 +107,8 @@ TEST_F(DocumentSourceUnionWithTest, BasicSerialUnions) {
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
+
+    unionWithTwo->dispose();
 }
 
 TEST_F(DocumentSourceUnionWithTest, BasicNestedUnions) {
@@ -124,10 +119,10 @@ TEST_F(DocumentSourceUnionWithTest, BasicNestedUnions) {
     auto unionWithOne = make_intrusive<DocumentSourceUnionWith>(
         getExpCtx(),
         Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
-    auto unionWithTwo =
+    auto unionWithTwo = exec::agg::buildStage(
         makeUnion(getExpCtx(),
                   Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{unionWithOne},
-                                   getExpCtx()));
+                                   getExpCtx())));
     unionWithTwo->setSource(mock.get());
 
     auto comparator = DocumentComparator();
@@ -141,6 +136,8 @@ TEST_F(DocumentSourceUnionWithTest, BasicNestedUnions) {
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
+
+    unionWithTwo->dispose();
 }
 
 TEST_F(DocumentSourceUnionWithTest, UnionsWithNonEmptySubPipelines) {
@@ -151,12 +148,12 @@ TEST_F(DocumentSourceUnionWithTest, UnionsWithNonEmptySubPipelines) {
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockDeque));
     const auto filter = DocumentSourceMatch::create(BSON("d" << 1), getExpCtx());
     const auto proj = DocumentSourceAddFields::create(BSON("d" << 1), getExpCtx());
-    auto unionWithOne = makeUnion(
+    auto unionWithOne = exec::agg::buildStage(makeUnion(
         getExpCtx(),
-        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{filter}, getExpCtx()));
-    auto unionWithTwo = makeUnion(
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{filter}, getExpCtx())));
+    auto unionWithTwo = exec::agg::buildStage(makeUnion(
         getExpCtx(),
-        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{proj}, getExpCtx()));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{proj}, getExpCtx())));
     unionWithOne->setSource(mock.get());
     unionWithTwo->setSource(unionWithOne.get());
 
@@ -174,6 +171,8 @@ TEST_F(DocumentSourceUnionWithTest, UnionsWithNonEmptySubPipelines) {
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
+
+    unionWithTwo->dispose();
 }
 
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithPipeline) {
@@ -315,12 +314,12 @@ TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {
                                           getExpCtx());
     const auto mockDeque = std::deque<DocumentSource::GetNextResult>{};
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockDeque));
-    auto unionWithOne =
-        makeUnion(getExpCtx(),
-                  Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
-    auto unionWithTwo =
-        makeUnion(getExpCtx(),
-                  Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
+    auto unionWithOne = exec::agg::buildStage(makeUnion(
+        getExpCtx(),
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
+    auto unionWithTwo = exec::agg::buildStage(makeUnion(
+        getExpCtx(),
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
     unionWithOne->setSource(mock.get());
     unionWithTwo->setSource(unionWithOne.get());
 
@@ -332,6 +331,8 @@ TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
     ASSERT_TRUE(unionWithTwo->getNext().isEOF());
+
+    unionWithTwo->dispose();
 }
 
 TEST_F(DocumentSourceUnionWithTest, ReturnEOFAfterBeingDisposed) {
@@ -339,16 +340,18 @@ TEST_F(DocumentSourceUnionWithTest, ReturnEOFAfterBeingDisposed) {
     const auto mockUnionInput = std::deque<DocumentSource::GetNextResult>{};
     const auto mockCtx = makeCopyFromExpressionContext(getExpCtx(), {});
     mockCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockUnionInput));
-    auto unionWith = DocumentSourceUnionWith(
-        mockCtx, Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
-    unionWith.setSource(mockInput.get());
+    auto unionWith = exec::agg::buildStage(make_intrusive<DocumentSourceUnionWith>(
+        mockCtx, Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
+    unionWith->setSource(mockInput.get());
 
-    ASSERT_TRUE(unionWith.getNext().isAdvanced());
+    ASSERT_TRUE(unionWith->getNext().isAdvanced());
 
-    unionWith.dispose();
-    ASSERT_TRUE(unionWith.getNext().isEOF());
-    ASSERT_TRUE(unionWith.getNext().isEOF());
-    ASSERT_TRUE(unionWith.getNext().isEOF());
+    unionWith->dispose();
+    ASSERT_TRUE(unionWith->getNext().isEOF());
+    ASSERT_TRUE(unionWith->getNext().isEOF());
+    ASSERT_TRUE(unionWith->getNext().isEOF());
+
+    unionWith->dispose();
 }
 
 TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsFullDoc) {
@@ -401,7 +404,8 @@ TEST_F(DocumentSourceUnionWithTest, RespectsViewDefinition) {
     const auto localMock =
         DocumentSourceMock::createForTest({Document{{"_id"_sd, "local"_sd}}}, getExpCtx());
     auto bson = BSON("$unionWith" << nsToUnionWith.coll());
-    auto unionWith = makeUnionFromBson(bson.firstElement(), expCtx);
+    auto unionWith =
+        exec::agg::buildStage(DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx));
     unionWith->setSource(localMock.get());
 
     auto result = unionWith->getNext();
@@ -413,6 +417,8 @@ TEST_F(DocumentSourceUnionWithTest, RespectsViewDefinition) {
     ASSERT_DOCUMENT_EQ(result.getDocument(), (Document{{"_id"_sd, 2}}));
 
     ASSERT_TRUE(unionWith->getNext().isEOF());
+
+    unionWith->dispose();
 }
 
 TEST_F(DocumentSourceUnionWithTest, ConcatenatesViewDefinitionToPipeline) {
@@ -437,7 +443,8 @@ TEST_F(DocumentSourceUnionWithTest, ConcatenatesViewDefinitionToPipeline) {
                          "coll" << viewNsToUnionWith.coll() << "pipeline"
                                 << BSON_ARRAY(fromjson(
                                        "{$set: {originalId: '$_id', _id: {$add: [1, '$_id']}}}"))));
-    auto unionWith = makeUnionFromBson(bson.firstElement(), expCtx);
+    auto unionWith =
+        exec::agg::buildStage(DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx));
     unionWith->setSource(localMock.get());
 
     auto result = unionWith->getNext();
@@ -451,6 +458,8 @@ TEST_F(DocumentSourceUnionWithTest, ConcatenatesViewDefinitionToPipeline) {
     ASSERT_DOCUMENT_EQ(result.getDocument(), (Document{{"_id"_sd, 3}, {"originalId"_sd, 2}}));
 
     ASSERT_TRUE(unionWith->getNext().isEOF());
+
+    unionWith->dispose();
 }
 
 TEST_F(DocumentSourceUnionWithTest, RejectUnionWhenDepthLimitIsExceeded) {

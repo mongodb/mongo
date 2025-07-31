@@ -104,21 +104,22 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnNetworkError) {
 
     auto pipeline = Pipeline::create(
         {DocumentSourceMatch::create(fromjson("{_id: 'unionResult'}"), expCtx())}, expCtx());
-    auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
+    auto unionWith = exec::agg::buildStage(
+        make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
-    unionWith.setSource(queue.get());
+    unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, "unionResult"_sd}};
 
     auto future = launchAsync([&] {
-        auto next = unionWith.getNext();
+        auto next = unionWith->getNext();
         ASSERT_TRUE(next.isAdvanced());
         auto result = next.releaseDocument();
         ASSERT_DOCUMENT_EQ(result, expectedResult);
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
     });
 
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -133,7 +134,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnNetworkError) {
 
     future.default_timed_get();
 
-    unionWith.dispose();
+    unionWith->dispose();
 }
 
 TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
@@ -142,10 +143,11 @@ TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
     loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
 
     auto pipeline = Pipeline::create({}, expCtx());
-    auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
+    auto unionWith = exec::agg::buildStage(
+        make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
-    unionWith.setSource(queue.get());
+    unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
 
@@ -154,19 +156,19 @@ TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
 
     auto future = launchAsync([&] {
         // Expect one result from each host.
-        auto next = unionWith.getNext();
+        auto next = unionWith->getNext();
         ASSERT_TRUE(next.isAdvanced());
         auto result = next.releaseDocument();
         ASSERT_DOCUMENT_EQ(result, expectedResult);
 
-        next = unionWith.getNext();
+        next = unionWith->getNext();
         ASSERT_TRUE(next.isAdvanced());
         result = next.releaseDocument();
         ASSERT_DOCUMENT_EQ(result, expectedResult);
 
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
     });
 
     const auto assertHasExpectedMaxTimeMSAndReturnResult =
@@ -182,7 +184,7 @@ TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
 
     future.default_timed_get();
 
-    unionWith.dispose();
+    unionWith->dispose();
 }
 
 TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
@@ -192,21 +194,22 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
 
     auto pipeline = Pipeline::create(
         {DocumentSourceMatch::create(fromjson("{_id: 'unionResult'}"), expCtx())}, expCtx());
-    auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
+    auto unionWith = exec::agg::buildStage(
+        make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
-    unionWith.setSource(queue.get());
+    unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, "unionResult"_sd}};
 
     auto future = launchAsync([&] {
-        auto next = unionWith.getNext();
+        auto next = unionWith->getNext();
         ASSERT_TRUE(next.isAdvanced());
         auto result = next.releaseDocument();
         ASSERT_DOCUMENT_EQ(result, expectedResult);
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
     });
 
     // Mock out one error response, then expect a refresh of the sharding catalog for that
@@ -255,7 +258,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
 
     future.default_timed_get();
 
-    unionWith.dispose();
+    unionWith->dispose();
 }
 
 TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequiresIt) {
@@ -275,21 +278,22 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
                                      {countStatement},
                                      false)},
         expCtx().get());
-    auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
+    auto unionWith = exec::agg::buildStage(
+        make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
-    unionWith.setSource(queue.get());
+    unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
 
     auto future = launchAsync([&] {
-        auto next = unionWith.getNext();
+        auto next = unionWith->getNext();
         ASSERT_TRUE(next.isAdvanced());
         auto result = next.releaseDocument();
         ASSERT_DOCUMENT_EQ(result, expectedResult);
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
     });
 
     // With the $match at the front of the sub-pipeline, we should be able to target the request to
@@ -354,7 +358,7 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
 
     future.default_timed_get();
 
-    unionWith.dispose();
+    unionWith->dispose();
 }
 
 TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNotRequire) {
@@ -373,21 +377,22 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
                                      {countStatement},
                                      false)},
         expCtx().get());
-    auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
+    auto unionWith = exec::agg::buildStage(
+        make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
-    unionWith.setSource(queue.get());
+    unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
 
     auto future = launchAsync([&] {
-        auto next = unionWith.getNext();
+        auto next = unionWith->getNext();
         ASSERT_TRUE(next.isAdvanced());
         auto result = next.releaseDocument();
         ASSERT_DOCUMENT_EQ(result, expectedResult);
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
     });
 
     // Mock out an error response from both shards, then expect a refresh of the sharding catalog
@@ -436,7 +441,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
 
     future.default_timed_get();
 
-    unionWith.dispose();
+    unionWith->dispose();
 }
 
 TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceived) {
@@ -548,10 +553,11 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
                                      {countStatement},
                                      false)},
         expCtx().get());
-    auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
+    auto unionWith = exec::agg::buildStage(
+        make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
-    unionWith.setSource(queue.get());
+    unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 2}};
 
@@ -561,13 +567,13 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
         repl::ReadConcernArgs::get(expCtx()->getOperationContext()) = readConcernArgs;
     }
     auto future = launchAsync([&] {
-        auto next = unionWith.getNext();
+        auto next = unionWith->getNext();
         ASSERT_TRUE(next.isAdvanced());
         auto result = next.releaseDocument();
         ASSERT_DOCUMENT_EQ(result, expectedResult);
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
-        ASSERT(unionWith.getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWith->getNext().isEOF());
     });
 
     const auto assertHasExpectedReadConcernAndReturnResult =
@@ -586,7 +592,7 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
 
     future.default_timed_get();
 
-    unionWith.dispose();
+    unionWith->dispose();
 }
 }  // namespace
 }  // namespace mongo

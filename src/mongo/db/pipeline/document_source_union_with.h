@@ -70,7 +70,38 @@
 
 namespace mongo {
 
-class DocumentSourceUnionWith final : public DocumentSource, public exec::agg::Stage {
+struct UnionWithSharedState {
+    enum ExecutionProgress {
+        // We haven't yet iterated 'pSource' to completion.
+        kIteratingSource,
+
+        // We finished iterating 'pSource', but haven't started on the sub pipeline and need to do
+        // some setup first.
+        kStartingSubPipeline,
+
+        // We finished iterating 'pSource' and are now iterating '_pipeline', but haven't finished
+        // yet.
+        kIteratingSubPipeline,
+
+        // There are no more results.
+        kFinished
+    };
+    std::unique_ptr<Pipeline> _pipeline;
+    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
+    // The aggregation pipeline defined with the user request, prior to optimization and view
+    // resolution.
+    ExecutionProgress _executionState = ExecutionProgress::kIteratingSource;
+
+    // $unionWith will execute the subpipeline twice for explain with execution stats - once for
+    // results and once for explain info. During the first execution, built in variables (such as
+    // SEARCH_META) might be set, which are not allowed to be set at the start of the second
+    // execution. We need to store the initial state of the variables to reset them for the second
+    // execution
+    Variables _variables;
+    VariablesParseState _variablesParseState;
+};
+
+class DocumentSourceUnionWith final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$unionWith"_sd;
 
@@ -143,12 +174,12 @@ public:
         // it's sub-pipeline has it set to false.
         unionConstraints.noFieldModifications = true;
 
-        if (_pipeline) {
+        if (_sharedState->_pipeline) {
             // The constraints of the sub-pipeline determine the constraints of the $unionWith
             // stage. We want to forward the strictest requirements of the stages in the
             // sub-pipeline.
-            unionConstraints = StageConstraints::getStrictestConstraints(_pipeline->getSources(),
-                                                                         unionConstraints);
+            unionConstraints = StageConstraints::getStrictestConstraints(
+                _sharedState->_pipeline->getSources(), unionConstraints);
         }
         // DocumentSourceUnionWith cannot directly swap with match but it contains custom logic in
         // the doOptimizeAt() member function to allow itself to duplicate any match ahead in the
@@ -169,107 +200,70 @@ public:
 
     void addInvolvedCollections(stdx::unordered_set<NamespaceString>* collectionNames) const final;
 
-    void detachFromOperationContext() final;
-
     void detachSourceFromOperationContext() final;
-
-    void reattachToOperationContext(OperationContext* opCtx) final;
 
     void reattachSourceToOperationContext(OperationContext* opCtx) final;
 
-    bool validateOperationContext(const OperationContext* opCtx) const final;
-
     bool validateSourceOperationContext(const OperationContext* opCtx) const final;
 
-    bool usedDisk() const final;
-
-    const SpecificStats* getSpecificStats() const final {
-        return &_stats;
-    }
-
     bool hasNonEmptyPipeline() const {
-        return _pipeline && !_pipeline->empty();
+        return _sharedState->_pipeline && !_sharedState->_pipeline->empty();
     }
 
     const Pipeline& getPipeline() const {
-        tassert(7113100, "Pipeline has been already disposed", _pipeline);
-        return *_pipeline;
+        tassert(7113100, "Pipeline has been already disposed", _sharedState->_pipeline);
+        return *_sharedState->_pipeline;
     }
 
     Pipeline& getPipeline() {
-        tassert(7113101, "Pipeline has been already disposed", _pipeline);
-        return *_pipeline;
+        tassert(7113101, "Pipeline has been already disposed", _sharedState->_pipeline);
+        return *_sharedState->_pipeline;
     }
 
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
     const DocumentSourceContainer* getSubPipeline() const final {
-        if (_pipeline) {
-            return &_pipeline->getSources();
+        if (_sharedState->_pipeline) {
+            return &_sharedState->_pipeline->getSources();
         }
         return nullptr;
     }
 
-protected:
-    GetNextResult doGetNext() final;
+    std::shared_ptr<UnionWithSharedState> getSharedState() const {
+        return _sharedState;
+    }
 
+protected:
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
                                                    DocumentSourceContainer* container) final;
 
     boost::intrusive_ptr<DocumentSource> optimize() final {
-        _pipeline->optimizePipeline();
+        _sharedState->_pipeline->optimizePipeline();
         return this;
     }
 
-    void doDispose() final;
-
 private:
-    enum ExecutionProgress {
-        // We haven't yet iterated 'pSource' to completion.
-        kIteratingSource,
-
-        // We finished iterating 'pSource', but haven't started on the sub pipeline and need to do
-        // some setup first.
-        kStartingSubPipeline,
-
-        // We finished iterating 'pSource' and are now iterating '_pipeline', but haven't finished
-        // yet.
-        kIteratingSubPipeline,
-
-        // There are no more results.
-        kFinished
-    };
+    friend exec::agg::StagePtr documentSourceUnionWithToStageFn(
+        const boost::intrusive_ptr<const DocumentSource>& documentSource);
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     void addViewDefinition(NamespaceString nss, std::vector<BSONObj> viewPipeline);
 
-    void logStartingSubPipeline(const std::vector<BSONObj>& serializedPipeline);
-    void logShardedViewFound(
-        const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) const;
+    std::shared_ptr<UnionWithSharedState> _sharedState;
 
-    std::unique_ptr<Pipeline> _pipeline;
-    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     // The original, unresolved namespace to union.
     NamespaceString _userNss;
+
     // The aggregation pipeline defined with the user request, prior to optimization and view
     // resolution.
     std::vector<BSONObj> _userPipeline;
+
     // Match and/or project stages after a $unionWith can be pushed down into the $unionWith (and
     // the head of the pipeline). If we're doing an explain with execution stats, we will need
     // copies of these stages as they may be pushed down to the find layer.
     std::vector<BSONObj> _pushedDownStages;
-    ExecutionProgress _executionState = ExecutionProgress::kIteratingSource;
-    UnionWithStats _stats;
-
-    // $unionWith will execute the subpipeline twice for explain with execution stats - once for
-    // results and once for explain info. During the first execution, built in variables (such as
-    // SEARCH_META) might be set, which are not allowed to be set at the start of the second
-    // execution. We need to store the initial state of the variables to reset them for the second
-    // execution
-    Variables _variables;
-    VariablesParseState _variablesParseState;
 
     // State that we preserve in the case where we are running explain with 'executionStats' on a
     // $unionWith with a view. Otherwise we wouldn't be able to see details about the execution of
