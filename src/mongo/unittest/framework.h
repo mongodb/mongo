@@ -434,6 +434,27 @@ private:
  */
 std::vector<std::string> getAllSuiteNames();
 
+/**
+ * Returns the test info of the test currently executing.
+ */
+inline const TestInfo* getTestInfo() {
+    return UnitTest::getInstance()->currentTestInfo();
+}
+
+/**
+ * Returns the suite name of the test currently executing.
+ */
+inline StringData getSuiteName() {
+    return getTestInfo()->suiteName();
+}
+
+/**
+ * Returns the name of the test currently executing.
+ */
+inline StringData getTestName() {
+    return getTestInfo()->testName();
+}
+
 /** Invocation info (used e.g. by death test to exec). */
 struct SpawnInfo {
     /** Copy of the original `argv` from main. */

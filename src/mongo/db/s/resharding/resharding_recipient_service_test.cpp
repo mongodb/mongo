@@ -1156,7 +1156,7 @@ TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(5551105,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         auto removeRecipientDocFailpoint =
@@ -1254,7 +1254,7 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(5551106,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
@@ -1348,7 +1348,7 @@ TEST_F(ReshardingRecipientServiceTest, ReportForCurrentOpAfterCompletion) {
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(9297801,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         const auto recipientState = RecipientStateEnum::kCreatingCollection;
@@ -1406,7 +1406,7 @@ TEST_F(ReshardingRecipientServiceTest, OpCtxKilledWhileRestoringMetrics) {
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(5992701,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         // Initialize recipient.
@@ -1458,7 +1458,7 @@ DEATH_TEST_REGEX_F(ReshardingRecipientServiceTest, CommitFn, "4457001.*tripwire"
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(9297802,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
         auto doc = makeRecipientDocument(testOptions);
         auto opCtx = makeOperationContext();
@@ -1480,7 +1480,7 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(5551107,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
@@ -1562,7 +1562,7 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
     for (bool skipCloningAndApplying : {false, true}) {
         LOGV2(9297803,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "skipCloningAndApplying"_attr = skipCloningAndApplying);
         PauseDuringStateTransitions stateTransitionsGuard{
             controller(), {RecipientStateEnum::kApplying, RecipientStateEnum::kStrictConsistency}};
@@ -1621,7 +1621,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(9297804,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{
@@ -1684,7 +1684,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(9297805,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
         PauseDuringStateTransitions stateTransitionsGuard{
             controller(), {RecipientStateEnum::kStrictConsistency, RecipientStateEnum::kDone}};
@@ -1744,7 +1744,7 @@ TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(5568600,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         std::string xlErrMsg(6000, 'x');
@@ -1791,7 +1791,7 @@ TEST_F(ReshardingRecipientServiceTest, SkipCloningAndApplying) {
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(9110903,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
         auto doc = makeRecipientDocument(testOptions);
         auto opCtx = makeOperationContext();
@@ -1818,7 +1818,7 @@ TEST_F(ReshardingRecipientServiceTest, MetricsSuccessfullyShutDownOnUserCancelat
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(9297806,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
         auto doc = makeRecipientDocument(testOptions);
         auto opCtx = makeOperationContext();
@@ -1846,7 +1846,7 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(9297807,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
         setNoChunksToCopy(testOptions);
 
@@ -1978,7 +1978,7 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(9297808,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
         setNoChunksToCopy(testOptions);
 
@@ -2088,7 +2088,7 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgr
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(9297809,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
         auto doc = makeRecipientDocument(testOptions);
         auto instanceId =
@@ -2176,7 +2176,7 @@ TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordi
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(8743301,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         auto removeRecipientDocFailpoint =
@@ -2234,7 +2234,7 @@ TEST_F(ReshardingRecipientServiceTest, FailoverDuringErrorState) {
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(8916100,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         std::string errMsg("Simulating an unrecoverable error for testing");
@@ -2287,7 +2287,7 @@ TEST_F(ReshardingRecipientServiceTest, TestVerifyCollectionOptionsHappyPath) {
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(9799201,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(),
@@ -2319,7 +2319,7 @@ TEST_F(ReshardingRecipientServiceTest,
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(9799202,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         auto doc = makeRecipientDocument(testOptions);
@@ -2361,7 +2361,7 @@ TEST_F(ReshardingRecipientServiceTest,
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(9799203,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(),
@@ -2402,7 +2402,7 @@ TEST_F(ReshardingRecipientServiceTest, VerifyRecipientRetriesOnLockTimeoutError)
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(10568802,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         PauseDuringStateTransitions phaseTransitionsGuard{controller(), {recipientPhases}};

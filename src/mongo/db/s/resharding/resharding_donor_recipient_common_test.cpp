@@ -656,7 +656,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ConstructDonorDocumentFromRe
         for (bool enableVerification : {true, false}) {
             LOGV2(9849100,
                   "Running case",
-                  "test"_attr = _agent.getTestName(),
+                  "test"_attr = unittest::getTestName(),
                   "performVerification"_attr = performVerification,
                   "enableVerification"_attr = enableVerification);
 
@@ -700,7 +700,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest,
         for (bool enableVerification : {true, false}) {
             LOGV2(9849101,
                   "Running case",
-                  "test"_attr = _agent.getTestName(),
+                  "test"_attr = unittest::getTestName(),
                   "performVerification"_attr = performVerification,
                   "enableVerification"_attr = enableVerification);
 

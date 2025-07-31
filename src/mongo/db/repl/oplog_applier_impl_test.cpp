@@ -1298,11 +1298,15 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
     return opApplied.isForCappedCollection();
 }
 
+NamespaceString makeNamespace(StringData prefix, StringData suffix = "") {
+    return NamespaceString::createNamespaceString_forTest(fmt::format(
+        "{}.{}_{}{}", prefix, unittest::getSuiteName(), unittest::getTestName(), suffix));
+}
+
 TEST_F(
     OplogApplierImplTest,
     MultiApplyDoesNotSetOplogEntryIsForCappedCollectionWhenProcessingNonCappedCollectionInsertOperation) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("local");
     ASSERT_FALSE(_testOplogEntryIsForCappedCollection(_opCtx.get(),
                                                       ReplicationCoordinator::get(_opCtx.get()),
                                                       getConsistencyMarkers(),
@@ -1313,8 +1317,7 @@ TEST_F(
 
 TEST_F(OplogApplierImplTest,
        MultiApplySetsOplogEntryIsForCappedCollectionWhenProcessingCappedCollectionInsertOperation) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("local");
     ASSERT_TRUE(_testOplogEntryIsForCappedCollection(_opCtx.get(),
                                                      ReplicationCoordinator::get(_opCtx.get()),
                                                      getConsistencyMarkers(),
@@ -1325,8 +1328,7 @@ TEST_F(OplogApplierImplTest,
 
 TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncUsesApplyOplogEntryOrGroupedInsertsToApplyOperation) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("local");
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
 
     std::vector<ApplierOperation> ops = {ApplierOperation{&op}};
@@ -3582,8 +3584,7 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsWorkerMultikeyPathInf
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
 
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "test." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("test");
 
     {
         auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
@@ -3607,8 +3608,7 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsMultipleWorkerMultike
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
 
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "test." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("test");
 
     {
         auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
@@ -3650,8 +3650,7 @@ TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncDoesNotAddWorkerMultikeyPathInfoOnCreateIndex) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "test." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("test");
 
     {
         auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
@@ -3681,8 +3680,7 @@ TEST_F(OplogApplierImplTest,
 TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncFailsWhenCollectionCreationTriesToMakeUUID) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "foo." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("foo");
     auto op =
         makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, CollectionOptions{});
 
@@ -3697,8 +3695,7 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncFailsWhenCollectionCreati
 
 TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncDisablesDocumentValidationWhileApplyingOperations) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("local");
     bool onInsertsCalled = false;
     _opObserver->onInsertsFn =
         [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
@@ -3714,8 +3711,7 @@ TEST_F(OplogApplierImplTest,
 
 TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncSetsVersionContextDecorationWhileApplyingOperations) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("local");
     VersionContext vCtx{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()};
     auto op =
         BSON("op" << "c"
@@ -3744,8 +3740,7 @@ TEST_F(OplogApplierImplTest,
 TEST_F(
     OplogApplierImplTest,
     OplogApplicationThreadFuncPassesThroughApplyOplogEntryOrGroupedInsertsErrorAfterFailingToApplyOperation) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("local");
     // Delete operation without _id in 'o' field.
     auto op = makeDeleteDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, {});
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, runOpSteadyState(op));
@@ -3753,8 +3748,7 @@ TEST_F(
 
 TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncPassesThroughApplyOplogEntryOrGroupedInsertsException) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("local");
     bool onInsertsCalled = false;
     _opObserver->onInsertsFn =
         [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
@@ -3821,10 +3815,8 @@ TEST_F(OplogApplierImplTest,
         auto t = seconds++;
         return makeInsertDocumentOplogEntry({Timestamp(Seconds(t), 0), 1LL}, nss, BSON("_id" << t));
     };
-    NamespaceString nss1 = NamespaceString::createNamespaceString_forTest(
-        "test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "_1");
-    NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(
-        "test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "_2");
+    NamespaceString nss1 = makeNamespace("test", "_1");
+    NamespaceString nss2 = makeNamespace("test", "_2");
     auto createOp1 = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss1);
     auto createOp2 = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss2);
     auto insertOp1a = makeOp(nss1);
@@ -3865,8 +3857,7 @@ TEST_F(OplogApplierImplTest,
         auto t = seconds++;
         return makeInsertDocumentOplogEntry({Timestamp(Seconds(t), 0), 1LL}, nss, BSON("_id" << t));
     };
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "_1");
+    NamespaceString nss = makeNamespace("test", "_1");
     auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
     // Generate operations to apply:
@@ -3918,8 +3909,7 @@ OplogEntry makeSizedInsertOp(const NamespaceString& nss, int size, int id) {
 TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncLimitsBatchSizeWhenGroupingInsertOperations) {
     int seconds = 1;
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "test." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("test");
     auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
     // Create a sequence of insert ops that are too large to fit in one group.
@@ -3969,8 +3959,7 @@ TEST_F(OplogApplierImplTest,
 TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncAppliesOpIndividuallyWhenOpIndividuallyExceedsBatchSize) {
     int seconds = 1;
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "test." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString nss = makeNamespace("test");
     auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
     int maxBatchSize = write_ops::insertVectorMaxBytes;
@@ -4010,7 +3999,7 @@ TEST_F(OplogApplierImplTest,
         return makeInsertDocumentOplogEntry({Timestamp(Seconds(t), 0), 1LL}, nss, BSON("_id" << t));
     };
 
-    auto testNs = "test." + _agent.getSuiteName() + "_" + _agent.getTestName();
+    auto testNs = "test." + unittest::getSuiteName() + "_" + unittest::getTestName();
 
     // Create a sequence of 3 'insert' ops that can't be grouped because they are from different
     // namespaces.
@@ -4050,8 +4039,7 @@ TEST_F(OplogApplierImplTest,
         auto t = seconds++;
         return makeInsertDocumentOplogEntry({Timestamp(Seconds(t), 0), 1LL}, nss, BSON("_id" << t));
     };
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "_1");
+    NamespaceString nss = makeNamespace("test", "_1");
     auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
     // Generate operations to apply:
@@ -4127,10 +4115,8 @@ TEST_F(OplogApplierImplTest,
     BSONObj emptyDoc;
     TestApplyOplogGroupApplier oplogApplier(
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kInitialSync));
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    NamespaceString badNss = NamespaceString::createNamespaceString_forTest(
-        "local." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
+    NamespaceString nss = makeNamespace("local");
+    NamespaceString badNss = makeNamespace("local", "bad");
     auto doc1 = BSON("_id" << 1);
     auto doc2 = BSON("_id" << 2);
     auto doc3 = BSON("_id" << 3);
@@ -4160,10 +4146,8 @@ TEST_F(OplogApplierImplTest,
     BSONObj emptyDoc;
     TestApplyOplogGroupApplier oplogApplier(
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kInitialSync));
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "test." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    NamespaceString badNss = NamespaceString::createNamespaceString_forTest(
-        "test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
+    NamespaceString nss = makeNamespace("test");
+    NamespaceString badNss = makeNamespace("test", "bad");
     auto doc1 = BSON("_id" << 1);
     auto keyPattern = BSON("a" << 1);
     auto doc3 = BSON("_id" << 3);

@@ -114,10 +114,9 @@ Client* OplogBufferCollectionTest::getClient() const {
 /**
  * Generates a unique namespace from the test registration agent.
  */
-template <typename T>
-NamespaceString makeNamespace(const T& t, const char* suffix = "") {
-    return NamespaceString::createNamespaceString_forTest("local." + t.getSuiteName() + "_" +
-                                                          t.getTestName() + suffix);
+NamespaceString makeNamespace(StringData suffix = "") {
+    return NamespaceString::createNamespaceString_forTest(
+        fmt::format("local.{}_{}{}", unittest::getSuiteName(), unittest::getTestName(), suffix));
 }
 
 /**
@@ -137,7 +136,7 @@ TEST_F(OplogBufferCollectionTest, DefaultNamespace) {
 }
 
 TEST_F(OplogBufferCollectionTest, GetNamespace) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     ASSERT_EQUALS(nss, OplogBufferCollection(_storageInterface, nss).getNamespace());
 }
 
@@ -170,7 +169,7 @@ TEST_F(OplogBufferCollectionTest, StartupWithDefaultNamespaceCreatesCollection) 
 }
 
 TEST_F(OplogBufferCollectionTest, StartupWithUserProvidedNamespaceCreatesCollection) {
-    testStartupCreatesCollection(_opCtx.get(), _storageInterface, makeNamespace(_agent));
+    testStartupCreatesCollection(_opCtx.get(), _storageInterface, makeNamespace());
 }
 
 TEST_F(OplogBufferCollectionTest, StartupWithOplogNamespaceTriggersUassert) {
@@ -183,7 +182,7 @@ TEST_F(OplogBufferCollectionTest, StartupWithOplogNamespaceTriggersUassert) {
 }
 
 TEST_F(OplogBufferCollectionTest, ShutdownDropsCollection) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -193,7 +192,7 @@ TEST_F(OplogBufferCollectionTest, ShutdownDropsCollection) {
 }
 
 TEST_F(OplogBufferCollectionTest, extractEmbeddedOplogDocumentChangesIdToTimestamp) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     const BSONObj expectedOp = makeOplogEntry(1);
@@ -255,7 +254,7 @@ void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
 }
 
 TEST_F(OplogBufferCollectionTest, StartupWithExistingCollectionInitializesCorrectly) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     const std::vector<BSONObj> oplog = {makeOplogEntry(1)};
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     ASSERT_OK(_storageInterface->insertDocument(
@@ -291,7 +290,7 @@ TEST_F(OplogBufferCollectionTest, StartupWithExistingCollectionInitializesCorrec
 }
 
 TEST_F(OplogBufferCollectionTest, StartupWithEmptyExistingCollectionInitializesCorrectly) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {});
 
@@ -318,7 +317,7 @@ TEST_F(OplogBufferCollectionTest, StartupWithEmptyExistingCollectionInitializesC
 }
 
 TEST_F(OplogBufferCollectionTest, ShutdownWithDropCollectionAtShutdownFalseDoesNotDropCollection) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     const std::vector<BSONObj> oplog = {makeOplogEntry(1)};
     {
         OplogBufferCollection::Options opts;
@@ -343,7 +342,7 @@ TEST_F(OplogBufferCollectionTest, ShutdownWithDropCollectionAtShutdownFalseDoesN
 }
 
 TEST_F(OplogBufferCollectionTest, StartupWithExistingCollectionFailsWhenEntryHasNoId) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     CollectionOptions collOpts;
     collOpts.setNoIdIndex();
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, collOpts));
@@ -365,7 +364,7 @@ TEST_F(OplogBufferCollectionTest, StartupWithExistingCollectionFailsWhenEntryHas
 DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
                    StartupWithExistingCollectionFailsWhenEntryHasNoTimestamp,
                    R"#(Fatal assertion.*40405.*NoSuchKey: Missing expected field \\"ts\\")#") {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     ASSERT_OK(_storageInterface->insertDocument(_opCtx.get(),
                                                 nss,
@@ -379,7 +378,7 @@ DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
 }
 
 TEST_F(OplogBufferCollectionTest, PeekWithExistingCollectionReturnsEmptyObjectWhenEntryHasNoEntry) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     ASSERT_OK(_storageInterface->insertDocument(
         _opCtx.get(),
@@ -399,7 +398,7 @@ TEST_F(OplogBufferCollectionTest, PeekWithExistingCollectionReturnsEmptyObjectWh
 
 TEST_F(OplogBufferCollectionTest,
        StartupDefaultDropsExistingCollectionBeforeCreatingNewCollection) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     const std::vector<BSONObj> oplog = {makeOplogEntry(1)};
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     ASSERT_OK(_storageInterface->insertDocument(
@@ -419,7 +418,7 @@ TEST_F(OplogBufferCollectionTest,
 }
 
 TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocument) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -433,7 +432,7 @@ TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocum
 
 TEST_F(OplogBufferCollectionTest,
        PushAllNonBlockingIgnoresOperationContextIfNoDocumentsAreProvided) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -444,7 +443,7 @@ TEST_F(OplogBufferCollectionTest,
 }
 
 TEST_F(OplogBufferCollectionTest, PeekDoesNotRemoveDocument) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -473,7 +472,7 @@ TEST_F(OplogBufferCollectionTest, PeekDoesNotRemoveDocument) {
 }
 
 TEST_F(OplogBufferCollectionTest, PeekingFromExistingCollectionReturnsDocument) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     const auto entry1 = makeOplogEntry(1);
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     ASSERT_OK(_storageInterface->insertDocument(
@@ -509,7 +508,7 @@ TEST_F(OplogBufferCollectionTest, PeekingFromExistingCollectionReturnsDocument) 
 }
 
 TEST_F(OplogBufferCollectionTest, PeekWithNoDocumentsReturnsFalse) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -524,7 +523,7 @@ TEST_F(OplogBufferCollectionTest, PeekWithNoDocumentsReturnsFalse) {
 }
 
 TEST_F(OplogBufferCollectionTest, PopDoesNotRemoveDocumentFromCollection) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -542,7 +541,7 @@ TEST_F(OplogBufferCollectionTest, PopDoesNotRemoveDocumentFromCollection) {
 }
 
 TEST_F(OplogBufferCollectionTest, PopWithNoDocumentsReturnsFalse) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -557,7 +556,7 @@ TEST_F(OplogBufferCollectionTest, PopWithNoDocumentsReturnsFalse) {
 }
 
 TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -602,7 +601,7 @@ TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
 }
 
 TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNewestOplogEntry) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -622,7 +621,7 @@ TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNewestOplogEntry) {
 
 TEST_F(OplogBufferCollectionTest,
        LastObjectPushedReturnsNewestOplogEntryWhenStartedWithExistingCollection) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     auto firstDoc = makeOplogEntry(1);
     ASSERT_OK(_storageInterface->insertDocument(
@@ -660,7 +659,7 @@ TEST_F(OplogBufferCollectionTest,
 }
 
 TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNoneWithNoEntries) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -670,7 +669,7 @@ TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNoneWithNoEntries) {
 }
 
 TEST_F(OplogBufferCollectionTest, IsEmptyReturnsTrueWhenEmptyAndFalseWhenNot) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -681,7 +680,7 @@ TEST_F(OplogBufferCollectionTest, IsEmptyReturnsTrueWhenEmptyAndFalseWhenNot) {
 }
 
 TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -730,7 +729,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
 }
 
 TEST_F(OplogBufferCollectionTest, WaitForDataReturnsImmediatelyWhenStartedWithExistingCollection) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     ASSERT_OK(_storageInterface->insertDocument(
         _opCtx.get(),
@@ -748,7 +747,7 @@ TEST_F(OplogBufferCollectionTest, WaitForDataReturnsImmediatelyWhenStartedWithEx
 }
 
 TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsDocument) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_opCtx.get());
 
@@ -777,7 +776,7 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsDocument) {
 }
 
 TEST_F(OplogBufferCollectionTest, TwoWaitForDataInvocationsBlockAndFindSameDocument) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_opCtx.get());
 
@@ -819,7 +818,7 @@ TEST_F(OplogBufferCollectionTest, TwoWaitForDataInvocationsBlockAndFindSameDocum
 }
 
 TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndTimesOutWhenItDoesNotFindDocument) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_opCtx.get());
 
@@ -845,7 +844,7 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndTimesOutWhenItDoesNotFindD
 DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
                    PushAllNonBlockingWithOutOfOrderDocumentsTriggersInvariantFailure,
                    R"#(Invariant failure.*ts > previousTimestamp)#") {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -858,7 +857,7 @@ DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
 }
 
 TEST_F(OplogBufferCollectionTest, PreloadAllNonBlockingSucceeds) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
@@ -894,7 +893,7 @@ void _assertDocumentsEqualCache(const std::vector<BSONObj>& expectedDocs,
 }
 
 TEST_F(OplogBufferCollectionTest, PeekFillsCacheWithDocumentsFromCollection) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     std::size_t peekCacheSize = 3U;
     OplogBufferCollection oplogBuffer(_storageInterface, nss, _makeOptions(3));
     ASSERT_EQUALS(peekCacheSize, oplogBuffer.getOptions().peekCacheSize);
@@ -970,7 +969,7 @@ TEST_F(OplogBufferCollectionTest, PeekFillsCacheWithDocumentsFromCollection) {
 }
 
 TEST_F(OplogBufferCollectionTest, FindByTimestampFindsDocuments) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_opCtx.get());
 
@@ -1006,7 +1005,7 @@ TEST_F(OplogBufferCollectionTest, FindByTimestampFindsDocuments) {
 }
 
 TEST_F(OplogBufferCollectionTest, FindByTimestampNotFound) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_opCtx.get());
 
@@ -1035,7 +1034,7 @@ TEST_F(OplogBufferCollectionTest, FindByTimestampNotFound) {
 }
 
 TEST_F(OplogBufferCollectionTest, SeekToTimestamp) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss, _makeOptions(3));
     oplogBuffer.startup(_opCtx.get());
 
@@ -1080,7 +1079,7 @@ TEST_F(OplogBufferCollectionTest, SeekToTimestamp) {
 }
 
 TEST_F(OplogBufferCollectionTest, SeekToTimestampFails) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss, _makeOptions(3));
     oplogBuffer.startup(_opCtx.get());
 
@@ -1115,7 +1114,7 @@ TEST_F(OplogBufferCollectionTest, SeekToTimestampFails) {
 }
 
 TEST_F(OplogBufferCollectionTest, SeekToTimestampInexact) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss, _makeOptions(3));
     oplogBuffer.startup(_opCtx.get());
 
@@ -1148,7 +1147,7 @@ TEST_F(OplogBufferCollectionTest, SeekToTimestampInexact) {
 }
 
 TEST_F(OplogBufferCollectionTest, CannotGetSizeAfterSeek) {
-    auto nss = makeNamespace(_agent);
+    auto nss = makeNamespace();
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_opCtx.get());
 

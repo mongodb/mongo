@@ -55,6 +55,11 @@ namespace {
 // Tests for Sorter framework internals
 //
 
+unittest::TempDir makeTempDir() {
+    return unittest::TempDir{
+        fmt::format("{}_{}", unittest::getSuiteName(), unittest::getTestName())};
+}
+
 using InMemIterTest = unittest::Test;
 
 TEST_F(InMemIterTest, Empty) {
@@ -331,7 +336,7 @@ TEST_F(SorterMakeFromExistingRangesTest, MissingFile) {
 }
 
 TEST_F(SorterMakeFromExistingRangesTest, EmptyFile) {
-    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    unittest::TempDir tempDir = makeTempDir();
     auto tempFilePath = boost::filesystem::path(tempDir.path()) / "empty_sorter_file";
     ASSERT(std::ofstream(tempFilePath.string()))
         << "failed to create empty temporary file: " << tempFilePath.string();
@@ -345,7 +350,7 @@ TEST_F(SorterMakeFromExistingRangesTest, EmptyFile) {
 }
 
 TEST_F(SorterMakeFromExistingRangesTest, CorruptedFile) {
-    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    unittest::TempDir tempDir = makeTempDir();
     auto tempFilePath = boost::filesystem::path(tempDir.path()) / "corrupted_sorter_file";
     {
         std::ofstream ofs(tempFilePath.string());
@@ -367,7 +372,7 @@ TEST_F(SorterMakeFromExistingRangesTest, CorruptedFile) {
 }
 
 TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
-    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    unittest::TempDir tempDir = makeTempDir();
     SorterTracker sorterTracker;
 
     auto opts = SortOptions()
@@ -431,7 +436,7 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
 }
 
 TEST_F(SorterMakeFromExistingRangesTest, NextWithDeferredValues) {
-    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    unittest::TempDir tempDir = makeTempDir();
     auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path());
 
     IWPair pair1(1, 100);
@@ -459,7 +464,7 @@ TEST_F(SorterMakeFromExistingRangesTest, NextWithDeferredValues) {
 }
 
 TEST_F(SorterMakeFromExistingRangesTest, ChecksumVersion) {
-    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    unittest::TempDir tempDir = makeTempDir();
     auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path());
 
     // By default checksum version should be v2
@@ -509,7 +514,7 @@ void corruptChecksum(SpillFileState& state) {
 }
 
 TEST_F(SorterMakeFromExistingRangesTest, ValidChecksumValidation) {
-    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    unittest::TempDir tempDir = makeTempDir();
     auto state = makeSpillFile(tempDir);
     auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)
                   ->done();
@@ -517,7 +522,7 @@ TEST_F(SorterMakeFromExistingRangesTest, ValidChecksumValidation) {
 }
 
 TEST_F(SorterMakeFromExistingRangesTest, IncompleteReadDoesNotReportChecksumError) {
-    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    unittest::TempDir tempDir = makeTempDir();
     auto state = makeSpillFile(tempDir);
     corruptChecksum(state);
     auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)
@@ -530,7 +535,7 @@ TEST_F(SorterMakeFromExistingRangesTest, IncompleteReadDoesNotReportChecksumErro
 DEATH_TEST_F(SorterMakeFromExistingRangesTest,
              CompleteReadReportsChecksumError,
              "Data read from disk does not match what was written to disk.") {
-    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    unittest::TempDir tempDir = makeTempDir();
     auto state = makeSpillFile(tempDir);
     corruptChecksum(state);
     auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)
@@ -542,7 +547,7 @@ DEATH_TEST_F(SorterMakeFromExistingRangesTest,
 DEATH_TEST_F(SorterMakeFromExistingRangesTest,
              CompleteReadReportsChecksumErrorFromIncorrectChecksumVersion,
              "Data read from disk does not match what was written to disk.") {
-    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    unittest::TempDir tempDir = makeTempDir();
     auto state = makeSpillFile(tempDir);
     state.ranges[0].setChecksumVersion(boost::none);
     auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)

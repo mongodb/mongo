@@ -1084,7 +1084,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApplyBasic) {
         for (bool movingAvgServerParameter : {false, true}) {
             LOGV2(10655503,
                   "Running case",
-                  "test"_attr = _agent.getTestName(),
+                  "test"_attr = unittest::getTestName(),
                   "movingAvgFeatureFlag"_attr = movingAvgFeatureFlag,
                   "movingAvgServerParameter"_attr = movingAvgServerParameter);
 

@@ -1026,7 +1026,7 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicateQueriesAfterOtherWriteError) {
     for (auto batchSize : {2, 3, 5}) {
         LOGV2(9881701,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "batchSize"_attr = batchSize);
 
         RAIIServerParameterControllerForTest maxBatchSize{"queryAnalysisWriterMaxBatchSize",
@@ -1114,7 +1114,7 @@ TEST_F(QueryAnalysisWriterTest, RemoveBadQueriesTopLevelError) {
 
         LOGV2(9885201,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "errorCode"_attr = errorCode);
 
         auto sampleId0 = UUID::gen();
@@ -1153,7 +1153,7 @@ TEST_F(QueryAnalysisWriterTest, RemoveBadQueriesWriteError) {
 
         LOGV2(9885202,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "errorCode"_attr = errorCode);
 
         auto sampleId0 = UUID::gen();
@@ -1642,7 +1642,7 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicateDiffsAfterOtherWriteError) {
     for (auto batchSize : {2, 3, 5}) {
         LOGV2(9881702,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "batchSize"_attr = batchSize);
 
         RAIIServerParameterControllerForTest maxBatchSize{"queryAnalysisWriterMaxBatchSize",
@@ -1726,7 +1726,7 @@ TEST_F(QueryAnalysisWriterTest, RemoveBadDiffsTopLevelError) {
 
         LOGV2(9881703,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "errorCode"_attr = errorCode);
 
         auto sampleId0 = UUID::gen();
@@ -1766,7 +1766,7 @@ TEST_F(QueryAnalysisWriterTest, RemoveBadDiffsWriteError) {
 
         LOGV2(9885204,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "errorCode"_attr = errorCode);
 
         auto sampleId0 = UUID::gen();

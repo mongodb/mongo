@@ -1442,7 +1442,7 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_Targ
     // the cancellation. In that case, schedule a response for the killCursor command.
     auto makeKillCursorResponse = [&](const executor::RemoteCommandRequest& request) {
         auto parsedRequest = KillCursorsCommandRequest::parse(
-            IDLParserContext(_agent.getTestName()),
+            IDLParserContext(unittest::getTestName()),
             request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())));
 
         ASSERT_EQ(parsedRequest.getNamespace().ns_forTest(),
@@ -1543,7 +1543,7 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_NotT
     // The fetcher should kill the cursor after exhausting it.
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         auto parsedRequest = KillCursorsCommandRequest::parse(
-            IDLParserContext(_agent.getTestName()),
+            IDLParserContext(unittest::getTestName()),
             request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())));
 
         ASSERT_EQ(parsedRequest.getNamespace().ns_forTest(),
@@ -1751,7 +1751,7 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionAfterFetchingFinalOp
         // with the next test case.
         onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
             auto parsedRequest = KillCursorsCommandRequest::parse(
-                IDLParserContext(_agent.getTestName()),
+                IDLParserContext(unittest::getTestName()),
                 request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())));
 
             ASSERT_EQ(parsedRequest.getNamespace().ns_forTest(),
@@ -2427,7 +2427,7 @@ TEST_F(
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10635001,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         testNum++;
@@ -2450,7 +2450,7 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10635002,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         testNum++;
@@ -2485,7 +2485,7 @@ TEST_F(
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10635003,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         testNum++;
@@ -2533,7 +2533,7 @@ TEST_F(
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10634900,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         testNum++;
@@ -2580,7 +2580,7 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10635004,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         testNum++;
@@ -2636,7 +2636,7 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10635005,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         testNum++;
@@ -2697,7 +2697,7 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10634901,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         testNum++;
@@ -2742,7 +2742,7 @@ TEST_F(
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10634902,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         testNum++;
@@ -2781,7 +2781,7 @@ TEST_F(
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10634903,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         testNum++;
@@ -2831,7 +2831,7 @@ TEST_F(
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10634904,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         testNum++;
@@ -2884,7 +2884,7 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10634905,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         testNum++;

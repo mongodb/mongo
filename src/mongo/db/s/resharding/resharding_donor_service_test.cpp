@@ -403,7 +403,7 @@ TEST_F(ReshardingDonorServiceTest, CanTransitionThroughEachStateToCompletion) {
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5641800,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         auto doc = makeStateDocument(testOptions);
@@ -575,7 +575,7 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5641801,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), donorStates};
@@ -734,7 +734,7 @@ DEATH_TEST_REGEX_F(ReshardingDonorServiceTest, CommitFn, "4457001.*tripwire") {
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(9858405,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
         auto doc = makeStateDocument(testOptions);
         auto opCtx = makeOperationContext();
@@ -853,7 +853,7 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5641802,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
@@ -921,7 +921,7 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5641803,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         auto doc = makeStateDocument(testOptions);
@@ -975,7 +975,7 @@ TEST_F(ReshardingDonorServiceTest, TruncatesXLErrorOnDonorDocument) {
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5568601,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         std::string xlErrMsg(6000, 'x');
@@ -1130,7 +1130,7 @@ TEST_F(ReshardingDonorServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinato
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(8743302,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         auto removeDonorDocFailpoint = globalFailPointRegistry().find("removeDonorDocFailpoint");
@@ -1189,7 +1189,7 @@ TEST_F(ReshardingDonorServiceTest, FailoverAfterDonorErrorsPriorToObtainingTimes
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(8743303,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         std::string errMsg("Simulating an unrecoverable error for testing");

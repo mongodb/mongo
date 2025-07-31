@@ -384,7 +384,7 @@ TEST_F(ReshardingUtilTest, CreateCoordinatorDocPerformVerification) {
         for (bool enableVerification : {true, false}) {
             LOGV2(9849102,
                   "Running case",
-                  "test"_attr = _agent.getTestName(),
+                  "test"_attr = unittest::getTestName(),
                   "performVerification"_attr = performVerification,
                   "enableVerification"_attr = enableVerification);
             RAIIServerParameterControllerForTest featureFlagController(

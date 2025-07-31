@@ -362,7 +362,7 @@ TEST_F(CoordinatorCommitMonitorTest,
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10393202,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         RAIIServerParameterControllerForTest accountForDonorReplLag{
@@ -433,7 +433,7 @@ TEST_F(CoordinatorCommitMonitorTest,
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10393203,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         RAIIServerParameterControllerForTest accountForDonorReplLag{
@@ -510,7 +510,7 @@ TEST_F(CoordinatorCommitMonitorTest,
     for (const auto& testOptions : makeAllTestOptions()) {
         LOGV2(10393204,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         RAIIServerParameterControllerForTest accountForDonorReplLag{
