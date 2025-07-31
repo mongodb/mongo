@@ -164,13 +164,9 @@ Run the following automation and verify results:
 
 ```sh
 sed -i "s/stream: mongo.master/stream: mongo.v$VERSION/g" etc/coverity.yml
-
-sed -i 's/development_critical_single_variant/auxiliary/g'  etc/evergreen_yml_components/variants/coverity.yml
 ```
 
 In the file [`etc/coverity.yml`](../../etc/coverity.yml), the "stream" should be updated to the new branch.
-
-In the file [`etc/evergreen_yml_components/variants/coverity.yml`](../../etc/evergreen_yml_components/variants/coverity.yml), the "development_critical_single_variant" tag should be replaced with "auxiliary".
 
 #### Finally: format and lint
 

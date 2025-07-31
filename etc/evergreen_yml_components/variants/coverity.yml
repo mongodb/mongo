@@ -45,9 +45,10 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_devprod_build",
-        "development_critical_single_variant",
         "requires_large_host",
+        "auxiliary",
         "coverity",
+        "HOT_TASK",
       ]
     exec_timeout_secs: 28800 # Max scan time of 8 hours
     commands:
