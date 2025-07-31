@@ -626,6 +626,70 @@ private:
     IteratorStats* _stats{nullptr};
 };
 
+template <typename CollectonType>
+struct FetchFromIndexKey {
+    bool operator()(OperationContext* opCtx,
+                    const CollectonType& _,
+                    const IndexCatalogEntry* indexCatalogEntry,
+                    const SortedDataKeyValueView& keyEntry,
+                    const projection_ast::Projection* projection,
+                    Snapshotted<BSONObj>& obj,
+                    IteratorStats* stats) {
+        tassert(10399101,
+                "Only simple inclusion projections are supported",
+                projection && projection->isSimple() && projection->isInclusionOnly());
+
+        StringSet projFields{projection->getRequiredFields().begin(),
+                             projection->getRequiredFields().end()};
+
+        const auto& keyPattern = indexCatalogEntry->descriptor()->keyPattern();
+        auto dehydratedKey = key_string::toBson(keyEntry.getKeyStringWithoutRecordIdView(),
+                                                Ordering::make(keyPattern),
+                                                keyEntry.getTypeBitsView(),
+                                                keyEntry.getVersion());
+
+        BSONObjBuilder bob;
+        BSONObjIterator keyIter(keyPattern);
+        BSONObjIterator valueIter(dehydratedKey);
+
+        while (keyIter.more() && valueIter.more()) {
+            StringData fieldName = keyIter.next().fieldNameStringData();
+            auto nextValue = valueIter.next();
+
+            // Erase the element to support indexes with duplicate fields.
+            if (projFields.erase(fieldName) > 0) {
+                bob.appendAs(nextValue, fieldName);
+                if (projFields.empty()) {
+                    break;
+                }
+            }
+        }
+
+        tassert(10399102, "Selected index did not cover the projection", projFields.empty());
+
+        obj.setValue(bob.obj());
+        return true;
+    }
+};
+
+template <typename CollectonType>
+struct FetchFromCollectionCallback {
+    bool operator()(OperationContext* opCtx,
+                    const CollectonType& collection,
+                    const IndexCatalogEntry* _,
+                    const SortedDataKeyValueView& keyEntry,
+                    const projection_ast::Projection* projection,
+                    Snapshotted<BSONObj>& obj,
+                    IteratorStats* stats) {
+        auto rid = keyEntry.getRecordId();
+        tassert(8884402, "Index entry with null record id", rid && !rid->isNull());
+        // Projection is applied later by the executor.
+        bool found = accessCollection(collection).findDoc(opCtx, *rid, &obj);
+        stats->incNumDocumentsFetched(found);
+        return found;
+    }
+};
+
 /**
  * A document iterator that uses an arbitrary index to iterate over documents in a collection that
  * match a simple equality predicate on the first field in the index key pattern. There is no
@@ -639,7 +703,7 @@ private:
  * PlanExecutors use CollectionAcquisition exclusively, this class will no longer need to be
  * templated.
  */
-template <class CollectionType>
+template <class CollectionType, class FetchCallback>
 class LookupViaUserIndex {
 public:
     using CollectionTypeChoice = CollectionType;
@@ -647,11 +711,13 @@ public:
     LookupViaUserIndex(const BSONElement& filterValue,
                        std::string indexIdent,
                        std::string indexName,
-                       const CollatorInterface* collator)
+                       const CollatorInterface* collator,
+                       const projection_ast::Projection* projection)
         : _filterValue(filterValue),
           _indexIdent(std::move(indexIdent)),
           _indexName(std::move(indexName)),
-          _collator(collator) {}
+          _collator(collator),
+          _projection(projection) {}
 
     void open(OperationContext* opCtx, CollectionType collection, IteratorStats* stats) {
         _indexCatalogEntry = LookupViaUserIndex::getIndexCatalogEntryForUserIndex(
@@ -714,11 +780,9 @@ public:
         }
         _stats->incNumKeysExamined(1);
 
-        auto rid = keyEntry.getRecordId();
-        tassert(8884402, "Index entry with null record id", rid && !rid->isNull());
-
         Snapshotted<BSONObj> obj;
-        bool found = accessCollection(collection).findDoc(opCtx, *rid, &obj);
+        bool found = FetchCallback{}(
+            opCtx, collection, _indexCatalogEntry, keyEntry, _projection, obj, _stats);
         if (!found) {
             const auto& keyPattern = _indexCatalogEntry->descriptor()->keyPattern();
             auto dehydratedKp = key_string::toBson(keyEntry.getKeyStringWithoutRecordIdView(),
@@ -727,16 +791,14 @@ public:
                                                    keyEntry.getVersion());
 
             logRecordNotFound(opCtx,
-                              *rid,
+                              *keyEntry.getRecordId(),
                               IndexKeyEntry::rehydrateKey(keyPattern, dehydratedKp),
                               keyPattern,
                               accessCollection(collection).ns());
             return Ready();
         }
 
-        _stats->incNumDocumentsFetched(1);
-
-        auto progress = continuation(collection, *rid, std::move(obj));
+        auto progress = continuation(collection, *keyEntry.getRecordId(), std::move(obj));
 
         // Only advance the iterator if the continuation completely processed its item, as indicated
         // by its return value.
@@ -805,7 +867,8 @@ private:
     uint64_t _catalogEpoch{0};
     const IndexCatalogEntry* _indexCatalogEntry{nullptr};  // Unowned.
 
-    const CollatorInterface* _collator;  // Owned by the query's ExpressionContext.
+    const CollatorInterface* _collator;             // Owned by the query's ExpressionContext.
+    const projection_ast::Projection* _projection;  // Owned by the CanonicalQuery.
 
     bool _exhausted{false};
 
