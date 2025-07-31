@@ -511,18 +511,10 @@ std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
                 if (mongo::stats::compareValues(sbeValLow[i].getTag(),
                                                 sbeValLow[i].getValue(),
                                                 sbeValHigh[i].getTag(),
-                                                sbeValHigh[i].getValue()) > 0) {
+                                                sbeValHigh[i].getValue()) >= 0) {
                     auto temp = sbeValHigh[i];
                     sbeValHigh[i] = sbeValLow[i];
                     sbeValLow[i] = temp;
-                } else if (mongo::stats::compareValues(sbeValLow[i].getTag(),
-                                                       sbeValLow[i].getValue(),
-                                                       sbeValHigh[i].getTag(),
-                                                       sbeValHigh[i].getValue()) == 0) {
-                    // Remove elements from both vectors
-                    sbeValLow.erase(sbeValLow.begin() + i);
-                    sbeValHigh.erase(sbeValHigh.begin() + i);
-                    i--;
                 }
             }
             break;

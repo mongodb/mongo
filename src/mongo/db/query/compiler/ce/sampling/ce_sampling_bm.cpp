@@ -94,6 +94,13 @@ std::map<int, std::vector<CollectionFieldConfiguration>> collectionFieldConfigur
          /*dataDistribution*/ stats::DistrType::kUniform,
          /*seed*/ seed_value1)}}};
 
+/**
+ * This map defines the set of attributes queries will evaluate predicates on.
+ * The seeds represent the seeds for the lower and upper values for a range.
+ * For a point query only the first seed is used whereas for range query both seeds are relevant.
+ * For range queries, ensure that the two seed values differ, otherwise the queries become in
+ * essence point queries.
+ */
 auto queryConfig1 = WorkloadConfiguration(
     /*numberOfQueries*/ 1000,
     QueryConfiguration({DataFieldDefinition(
@@ -101,8 +108,8 @@ auto queryConfig1 = WorkloadConfiguration(
                            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
                            /*ndv*/ 500,
                            /*dataDistribution*/ stats::DistrType::kUniform,
-                           /*seed*/ {seed_value1, 1724178})},
-                       /*queryTypes*/ {kPoint}));
+                           /*seed*/ {seed_value1, 79456178})},
+                       /*queryTypes*/ {kRange}));
 
 auto queryConfig2 = WorkloadConfiguration(
     /*numberOfQueries*/ 1000,
@@ -209,9 +216,6 @@ void BM_CreateSample(benchmark::State& state) {
 }
 
 void BM_RunCardinalityEstimationOnSample(benchmark::State& state) {
-
-    // queryFieldsConfigurations.emplace(1, config1);
-
     // Translate the fields and positions configurations based on the defined map.
     auto fieldsConfig = collectionFieldConfigurations[state.range(1)];
 

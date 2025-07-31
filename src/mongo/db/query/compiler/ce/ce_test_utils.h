@@ -393,6 +393,8 @@ std::vector<std::unique_ptr<MatchExpression>> createQueryMatchExpressionOnMultip
  * Generates query intervals randomly according to testing configuration.
  * In case of point queries, this function still returns a pair containing the same value twice. In
  * this case, the consumer may disregard the second value.
+ * For range queries, the function generates separately the lower and the higher values. The
+ * function ensures lowerValue <= higherValue.
  *
  * @param queryType The type of query intervals. It can be either kPoint or kRange.
  * @param interval A pair representing the overall range [min, max] within which all generated
