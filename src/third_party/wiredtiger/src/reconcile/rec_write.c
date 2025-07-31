@@ -2572,9 +2572,9 @@ __rec_write_delta(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
             WT_STAT_CONN_DSRC_INCR(session, rec_pages_with_internal_deltas);
 
         if (multi->block_meta.delta_count >
-          __wt_atomic_load64(&conn->disaggregated_storage.max_internal_delta_count))
+          __wt_atomic_load64(&conn->page_delta.max_internal_delta_count))
             __wt_atomic_store64(
-              &conn->disaggregated_storage.max_internal_delta_count, multi->block_meta.delta_count);
+              &conn->page_delta.max_internal_delta_count, multi->block_meta.delta_count);
     } else if (F_ISSET(r->ref, WT_REF_FLAG_LEAF)) {
         WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_leaf);
         WT_STAT_CONN_INCRV(
@@ -2598,9 +2598,9 @@ __rec_write_delta(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
             WT_STAT_CONN_DSRC_INCR(session, rec_pages_with_leaf_deltas);
 
         if (multi->block_meta.delta_count >
-          __wt_atomic_load64(&conn->disaggregated_storage.max_leaf_delta_count))
+          __wt_atomic_load64(&conn->page_delta.max_leaf_delta_count))
             __wt_atomic_store64(
-              &conn->disaggregated_storage.max_leaf_delta_count, multi->block_meta.delta_count);
+              &conn->page_delta.max_leaf_delta_count, multi->block_meta.delta_count);
     }
 
     return (0);
@@ -2714,6 +2714,7 @@ static int
 __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chunk, bool last_block)
 {
     WT_BTREE *btree;
+    WT_CONNECTION_IMPL *conn;
     WT_MULTI *multi;
     WT_PAGE *page;
     WT_PAGE_BLOCK_META *block_meta;
@@ -2725,6 +2726,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
     bool verify_image;
 #endif
 
+    conn = S2C(session);
     btree = S2BT(session);
     page = r->page;
     build_delta = false;
@@ -2857,13 +2859,13 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
 
     if (WT_DELTA_ENABLED_FOR_PAGE(session, r->page->type) && last_block && r->multi_next == 1 &&
       block_meta->page_id != WT_BLOCK_INVALID_PAGE_ID &&
-      block_meta->delta_count < btree->max_consecutive_delta) {
+      block_meta->delta_count < conn->page_delta.max_consecutive_delta) {
         WT_RET(__rec_build_delta(session, r, chunk->image.mem, &build_delta));
         /*
          * Discard the delta if it is larger than the configured percentage of the size of the full
          * image.
          */
-        if (build_delta && ((r->delta.size * 100) / chunk->image.size) > btree->delta_pct)
+        if (build_delta && ((r->delta.size * 100) / chunk->image.size) > conn->page_delta.delta_pct)
             build_delta = false;
     }
 

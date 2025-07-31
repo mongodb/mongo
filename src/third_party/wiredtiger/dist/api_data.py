@@ -108,10 +108,15 @@ source_meta = [
         application'''),
 ]
 
-connection_disaggregated_config_common = [
-    Config('checkpoint_meta', '', r'''
-        the checkpoint metadata from which to start (or restart) the node''',
-        undoc=True),
+connection_page_delta_config_common = [
+    Config('delta_pct', '20', r'''
+        the size threshold (as a percentage) at which a delta will cease to be emitted
+        when reconciling a page. For example, if this is set to 20, the size of a delta
+        is 20 bytes, and the size of the full page image is 100 bytes, reconciliation
+        can emit a delta for the page (if various other preconditions are met).
+        Conversely, if the delta came to 21 bytes, reconciliation would not emit a
+        delta. Deltas larger than full pages are permitted for measurement and testing
+        reasons, and may be disallowed in future.''', min='1', max='1000', type='int', undoc=True),
     Config('flatten_leaf_page_delta', 'false', r'''
         When enabled, page read rewrites the leaf pages with deltas to a new
         disk image if successful''',
@@ -120,13 +125,22 @@ connection_disaggregated_config_common = [
         When enabled, reconciliation may write deltas for internal pages
         instead of writing entire pages every time''',
         type='boolean', undoc=True),
-    Config('last_materialized_lsn', '', r'''
-        the page LSN indicating that all pages up until this LSN are available for reading''',
-        type='int', undoc=True),
     Config('leaf_page_delta', 'true', r'''
         When enabled, reconciliation may write deltas for leaf pages
         instead of writing entire pages every time''',
         type='boolean', undoc=True),
+    Config('max_consecutive_delta', '32', r'''
+        the max consecutive deltas allowed for a single page. The maximum value is set
+        at 32 (WT_DELTA_LIMIT). If we need to change that, please change WT_DELTA_LIMIT
+        as well.''', min='1', max='32', type='int', undoc=True),
+]
+connection_disaggregated_config_common = [
+    Config('checkpoint_meta', '', r'''
+        the checkpoint metadata from which to start (or restart) the node''',
+        undoc=True),
+    Config('last_materialized_lsn', '', r'''
+        the page LSN indicating that all pages up until this LSN are available for reading''',
+        type='int', undoc=True),
     Config('lose_all_my_data', 'false', r'''
         This setting skips file system syncs, and will cause data loss outside of a
         disaggregated storage context.''',
@@ -147,23 +161,15 @@ connection_disaggregated_config = [
         type='category', subconfig=connection_disaggregated_config_common +\
               disaggregated_config_common),
 ]
+connection_page_delta_config = [
+    Config('page_delta', '', r'''
+        configure page delta settings for this connection''',
+        type='category', subconfig=connection_page_delta_config_common),
+]
 file_disaggregated_config = [
     Config('disaggregated', '', r'''
         configure disaggregated storage for this file''',
-        type='category', subconfig=disaggregated_config_common + [
-            Config('delta_pct', '20', r'''
-                the size threshold (as a percentage) at which a delta will cease to be emitted
-                when reconciling a page. For example, if this is set to 20, the size of a delta
-                is 20 bytes, and the size of the full page image is 100 bytes, reconciliation
-                can emit a delta for the page (if various other preconditions are met).
-                Conversely, if the delta came to 21 bytes, reconciliation would not emit a
-                delta. Deltas larger than full pages are permitted for measurement and testing
-                reasons, and may be disallowed in future.''', min='1', max='1000'),
-            Config('max_consecutive_delta', '32', r'''
-                the max consecutive deltas allowed for a single page. The maximum value is set
-                at 32 (WT_DELTA_LIMIT). If we need to change that, please change WT_DELTA_LIMIT
-                as well.''', min='1', max='32')
-        ]
+        type='category', subconfig=disaggregated_config_common
     ),
 ]
 wiredtiger_open_disaggregated_storage_configuration = connection_disaggregated_config
@@ -171,6 +177,12 @@ connection_reconfigure_disaggregated_configuration = [
     Config('disaggregated', '', r'''
         configure disaggregated storage for this connection''',
         type='category', subconfig=connection_disaggregated_config_common),
+]
+wiredtiger_open_page_delta_configuration = connection_page_delta_config
+connection_reconfigure_page_delta_configuration = [
+    Config('page_delta', '', r'''
+        configure page delta settings for this connection''',
+        type='category', subconfig=connection_page_delta_config_common),
 ]
 
 format_meta = common_meta + [
@@ -1242,6 +1254,7 @@ wiredtiger_open_common =\
     wiredtiger_open_chunk_cache_configuration +\
     wiredtiger_open_compatibility_configuration +\
     wiredtiger_open_disaggregated_storage_configuration +\
+    wiredtiger_open_page_delta_configuration +\
     wiredtiger_open_log_configuration +\
     wiredtiger_open_live_restore_configuration +\
     wiredtiger_open_tiered_storage_configuration +\
@@ -2064,6 +2077,7 @@ methods = {
     connection_reconfigure_chunk_cache_configuration +\
     connection_reconfigure_compatibility_configuration +\
     connection_reconfigure_disaggregated_configuration +\
+    connection_reconfigure_page_delta_configuration +\
     connection_reconfigure_log_configuration +\
     connection_reconfigure_statistics_log_configuration +\
     connection_reconfigure_tiered_storage_configuration +\

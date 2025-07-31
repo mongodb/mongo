@@ -41,7 +41,7 @@ class test_layered19(wttest.WiredTigerTestCase, DisaggConfigMixin):
     ]
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'disaggregated=(page_log=palm),'
+                     + 'page_delta=(max_consecutive_delta=1),disaggregated=(page_log=palm),'
     disagg_storages = gen_disagg_storages('test_layered19', disagg_only = True)
 
     nitems = 1000
@@ -56,7 +56,7 @@ class test_layered19(wttest.WiredTigerTestCase, DisaggConfigMixin):
     def session_create_config(self):
         # The delta percentage of 200 is an arbitrary large value, intended to produce
         # deltas a lot of the time.
-        cfg = 'disaggregated=(max_consecutive_delta=1),key_format=S,value_format=S'
+        cfg = 'key_format=S,value_format=S'
         if self.uri.startswith('file'):
             cfg += ',block_manager=disagg'
         return cfg

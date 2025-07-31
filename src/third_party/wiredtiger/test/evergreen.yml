@@ -994,12 +994,18 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
-        format_args=""  # Generally, format arguments are in CONFIG.disagg.
+        # Fail, show the configuration file.
+        fail() {
+          echo "======= FAILURE =========="
+          [ -f RUNDIR/CONFIG ] && cat RUNDIR/CONFIG
+          exit 1
+        }
+
         for i in $(seq ${times}); do
           echo Iteration $i/${times}
           rm -rf RUNDIR
-          ./t -c ../../../test/format/CONFIG.disagg $format_args ${extra_args}
-          ./t -R $format_args ${extra_args}
+          ./t -c ../../../test/format/CONFIG.disagg ${format_args|} ${extra_arg|} || fail
+          ./t -R $format_args ${extra_args|} || fail
         done
   "many dbs test":
     command: shell.exec
@@ -3546,6 +3552,39 @@ tasks:
             set -o verbose
 
             RW_LOCK_FILE=$(pwd)/../../cmake_build/test/csuite/rwlock/test_rwlock ./time_shift_test.sh /usr/local/lib/faketime/libfaketimeMT.so.1 0-1 2>&1
+
+  - name: format-disagg-leader-test
+    tags: ["stress-disagg-test"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.mode=leader
+          times: 10
+
+  - name: format-disagg-follower-test
+    tags: ["stress-disagg-test"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.mode=follower
+          times: 10
+
+  - name: format-disagg-switch-test
+    tags: ["stress-disagg-test"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.mode=switch
+          times: 10
 
   - name: format-mirror-test
     commands:

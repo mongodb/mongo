@@ -1217,18 +1217,6 @@ struct __wt_session {
      * default \c 0.}
      * @config{disaggregated = (, configure disaggregated storage for this file., a set of related
      * configuration options defined as follows.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;delta_pct, the
-     * size threshold (as a percentage) at which a delta will cease to be emitted when reconciling a
-     * page.  For example\, if this is set to 20\, the size of a delta is 20 bytes\, and the size of
-     * the full page image is 100 bytes\, reconciliation can emit a delta for the page (if various
-     * other preconditions are met). Conversely\, if the delta came to 21 bytes\, reconciliation
-     * would not emit a delta.  Deltas larger than full pages are permitted for measurement and
-     * testing reasons\, and may be disallowed in future., an integer between \c 1 and \c 1000;
-     * default \c 20.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;max_consecutive_delta, the max consecutive
-     * deltas allowed for a single page.  The maximum value is set at 32 (WT_DELTA_LIMIT). If we
-     * need to change that\, please change WT_DELTA_LIMIT as well., an integer between \c 1 and \c
-     * 32; default \c 32.}
      * @config{ ),,}
      * @config{encryption = (, configure an encryptor for file blocks.  When a table is created\,
      * its encryptor is not implicitly used for any related indices or column groups., a set of
@@ -2387,6 +2375,9 @@ struct __wt_connection {
      * If the value is not an absolute path\, the path is relative to the database home (see @ref
      * absolute_path for more information)., a string; default \c ".".}
      * @config{ ),,}
+     * @config{page_delta = (, configure page delta settings for this connection., a set of related
+     * configuration options defined as follows.}
+     * @config{ ),,}
      * @config{rollback_to_stable = (, rollback tables to an earlier point in time\, discarding all
      * updates to checkpoint durable tables that have durable times more recent than the current
      * global stable timestamp., a set of related configuration options defined as follows.}
@@ -3321,6 +3312,9 @@ struct __wt_connection {
  * into which operation tracking files are written.  The directory must already exist.  If the value
  * is not an absolute path\, the path is relative to the database home (see @ref absolute_path for
  * more information)., a string; default \c ".".}
+ * @config{ ),,}
+ * @config{page_delta = (, configure page delta settings for this connection., a set of related
+ * configuration options defined as follows.}
  * @config{ ),,}
  * @config{prefetch = (, Enable automatic detection of scans by applications\, and attempt to
  * pre-fetch future content into the cache., a set of related configuration options defined as

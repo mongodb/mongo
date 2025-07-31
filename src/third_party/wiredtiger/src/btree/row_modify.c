@@ -243,11 +243,12 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
             __wt_upd_value_assign(cbt->modify_update, upd);
         } else {
             /*
-             * We either insert a tombstone with a standard update or only a standard update to the
-             * history store if we write a prepared update to the data store.
+             * If this refers to the delta-enabled case, we can skip the following checks. We either
+             * insert a tombstone with a standard update or only a standard update to the history
+             * store if we write a prepared update to the data store.
              */
             WT_ASSERT(session,
-              !WT_IS_HS(S2BT(session)->dhandle) ||
+              WT_DELTA_LEAF_ENABLED(session) || !WT_IS_HS(S2BT(session)->dhandle) ||
                 (upd_arg->type == WT_UPDATE_TOMBSTONE && upd_arg->next != NULL &&
                   upd_arg->next->type == WT_UPDATE_STANDARD && upd_arg->next->next == NULL) ||
                 (upd_arg->type == WT_UPDATE_STANDARD && upd_arg->next == NULL));

@@ -1492,16 +1492,23 @@ config_disagg_storage(void)
 
     g.disagg_storage_config = (strcmp(page_log, "off") != 0 && strcmp(page_log, "none") != 0);
     if (g.disagg_storage_config) {
-        if (config_explicit(NULL, "disagg.mode")) {
-            mode = GVS(DISAGG_MODE);
-            if (strcmp(mode, "leader") != 0 && strcmp(mode, "follower") != 0)
-                testutil_die(EINVAL, "illegal disagg.mode configuration: %s", mode);
-        } else {
+        if (!config_explicit(NULL, "disagg.mode")) {
             /* Randomly assign "leader" or "follower" to disagg.mode with equal probability. */
             testutil_snprintf(buf, sizeof(buf), "disagg.mode=%s",
               mmrand(&g.data_rnd, 1, 100) <= 50 ? "leader" : "follower");
             config_single(NULL, buf, false);
         }
+
+        mode = GVS(DISAGG_MODE);
+        if (strcmp(mode, "leader") != 0 && strcmp(mode, "follower") != 0 &&
+          strcmp(mode, "switch") != 0)
+            testutil_die(EINVAL, "illegal disagg.mode configuration: %s", mode);
+
+        if (strcmp(mode, "switch") == 0)
+            /* Randomly assign "leader" or "follower". */
+            g.disagg_leader = mmrand(&g.data_rnd, 0, 1);
+        else
+            g.disagg_leader = strcmp(mode, "leader") == 0;
 
         /* Disaggregated storage requires timestamps. */
         config_off(NULL, "transaction.implicit");

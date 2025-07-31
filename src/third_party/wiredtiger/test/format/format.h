@@ -91,6 +91,9 @@
 #define STR(s) #s
 #define XSTR(s) STR(s)
 
+/* Duration of the follower run in disagg switch mode. */
+#define DISAGG_SWITCH_FOLLOWER_OPS_SEC 10
+
 /* Session configuration to enable prefetch. */
 #define SESSION_PREFETCH_CFG_ON "prefetch=(enabled=true)"
 
@@ -305,6 +308,8 @@ typedef struct {
 #define PREFIX_LEN_CONFIG_MAX 80
     uint32_t prefix_len_max;
 
+    bool disagg_leader; /* If disaggregated storage role is configured as a leader. */
+
     bool column_store_config;           /* At least one column-store table configured */
     bool disagg_storage_config;         /* If disaggregated storage is configured */
     bool multi_table_config;            /* If configuring multiple tables */
@@ -449,6 +454,8 @@ void config_run(void);
 void config_single(TABLE *, const char *, bool);
 void create_database(const char *home, WT_CONNECTION **connp);
 void cursor_dump_page(WT_CURSOR *, const char *);
+bool disagg_is_mode_switch(void);
+int disagg_switch_roles(void);
 bool enable_session_prefetch(void);
 void fclose_and_clear(FILE **);
 void key_gen_common(TABLE *, WT_ITEM *, uint64_t, const char *);
