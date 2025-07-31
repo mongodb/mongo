@@ -1,9 +1,3 @@
-#include <boost/unordered_map.hpp>
-#include <condition_variable>
-#include <future>
-#include <mutex>
-#include <unordered_map>
-
 #include "mongo/platform/compiler.h"
 
 namespace mongo {
