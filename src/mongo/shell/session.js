@@ -197,8 +197,6 @@ function SessionAwareClient(client) {
     function gossipClusterTime(cmdObj, clusterTime) {
         cmdObj = Object.assign({}, cmdObj);
 
-        const cmdName = Object.keys(cmdObj)[0];
-
         if (!cmdObj.hasOwnProperty("$clusterTime")) {
             cmdObj.$clusterTime = clusterTime;
         }
@@ -558,8 +556,6 @@ function ServerSession(client) {
     this.injectSessionId = function injectSessionId(cmdObj) {
         cmdObj = Object.assign({}, cmdObj);
 
-        const cmdName = Object.keys(cmdObj)[0];
-
         if (!cmdObj.hasOwnProperty("lsid")) {
             if (isAcknowledged(cmdObj)) {
                 cmdObj.lsid = this.handle.getId();
@@ -575,8 +571,6 @@ function ServerSession(client) {
 
     this.assignTransactionNumber = function assignTransactionNumber(cmdObj) {
         cmdObj = Object.assign({}, cmdObj);
-
-        const cmdName = Object.keys(cmdObj)[0];
 
         if (!cmdObj.hasOwnProperty("txnNumber")) {
             this.handle.incrementTxnNumber();

@@ -360,7 +360,6 @@ tests.push(function soonNoExceptEventuallyPassesEvenWithExceptions() {
 });
 
 tests.push(function soonNoExceptFailsIfExceptionAlwaysThrown() {
-    let count = 0;
     assert.throws(() => {
         assert.soonNoExcept(() => {
             throw new Error('failed');

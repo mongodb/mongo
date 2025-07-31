@@ -6,7 +6,6 @@ rst.startSet();
 rst.initiate();
 
 let mongoUri = "mongodb://" + rst.nodes.map((node) => node.host).join(",") + "/test";
-let conn = rst.nodes[0];
 
 // There are three ways to enable retryable writes in the mongo shell.
 // 1. (cmdline flag) start mongo shell with --retryWrites

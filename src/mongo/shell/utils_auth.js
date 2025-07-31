@@ -24,13 +24,12 @@ authutil.logout = function(conn, dbname) {
  * in "conns" in the logged-out-of-dbName state.
  */
 authutil.assertAuthenticate = function(conns, dbName, authParams) {
-    let conn, i, ex, ex2;
     if (conns.length == null)
         conns = [conns];
 
     try {
-        for (i = 0; i < conns.length; ++i) {
-            conn = conns[i];
+        for (let i = 0; i < conns.length; ++i) {
+            let conn = conns[i];
             // Bypass the implicit auth call in getDB();
             const db = new DB(conn, dbName);
             try {
@@ -78,8 +77,6 @@ authutil.assertAuthenticateFails = function(conns, dbName, authParams) {
  * user.
  */
 authutil.asCluster = function(conn, keyfile, action) {
-    let ex;
-
     // put a connection in an array for uniform processing.
     let connArray = conn;
     if (conn.length == null)

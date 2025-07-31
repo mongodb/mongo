@@ -231,23 +231,6 @@ function hasErrorCode(response, errorCodes) {
     return false;
 }
 
-/**
- * Run the passed function and catch any network error, otherwise throw the exception back to the
- * caller.
- * @param {Function} func that will run and catch any network error otherwise throws.
- * @returns returns the result of the function that was passed as a parameter or the exception.
- */
-function executeNoThrowNetworkError(func) {
-    try {
-        return func();
-    } catch (e) {
-        if (isNetworkError(e)) {
-            return e;
-        }
-        throw e;
-    }
-}
-
 // Please consider using bsonWoCompare instead of this as much as possible.
 function friendlyEqual(a, b) {
     if (a == b)
@@ -293,29 +276,6 @@ function setVerboseShell(value) {
     _verboseShell = value;
 };
 
-// Formats a simple stacked horizontal histogram bar in the shell.
-// @param data array of the form [[ratio, symbol], ...] where ratio is between 0 and 1 and
-//             symbol is a string of length 1
-// @param width width of the bar (excluding the left and right delimiters [ ] )
-// e.g. _barFormat([[.3, "="], [.5, '-']], 80) returns
-//      "[========================----------------------------------------                ]"
-function _barFormat(data, width) {
-    let remaining = width;
-    let res = "[";
-    for (let i = 0; i < data.length; i++) {
-        for (let x = 0; x < data[i][0] * width; x++) {
-            if (remaining-- > 0) {
-                res += data[i][1];
-            }
-        }
-    }
-    while (remaining-- > 0) {
-        res += " ";
-    }
-    res += "]";
-    return res;
-};
-
 // these two are helpers for Array.sort(func)
 function compare(l, r) {
     return (l == r ? 0 : (l < r ? -1 : 1));
@@ -326,21 +286,6 @@ function compareOn(field) {
     return function(l, r) {
         return compare(l[field], r[field]);
     };
-};
-
-function shellPrint(x) {
-    const it = x;
-    if (x != undefined)
-        shellPrintHelper(x);
-};
-
-let _originalPrint = print;
-function disablePrint() {
-    print = Function.prototype;
-};
-
-function enablePrint() {
-    print = _originalPrint;
 };
 
 print.captureAllOutput = function(fn, args) {
@@ -1233,7 +1178,7 @@ shellHelper.show = function(what) {
     }
 
     if (what == "startupWarnings") {
-        let dbDeclared, ex;
+        let dbDeclared;
         try {
             // !!db essentially casts db to a boolean
             // Will throw a reference exception if db hasn't been declared.
@@ -1288,7 +1233,7 @@ shellHelper.show = function(what) {
     }
 
     if (what == "automationNotices") {
-        let dbDeclared, ex;
+        let dbDeclared;
         try {
             // !!db essentially casts db to a boolean
             // Will throw a reference exception if db hasn't been declared.
@@ -2106,24 +2051,17 @@ export {
     __promptWrapper__,
     __prompt__,
     _awaitRSHostViaRSMonitor,
-    _barFormat,
     _getErrorWithCode,
     _isSpiderMonkeyDebugEnabled,
-    _originalPrint,
     _shouldRetryWrites,
     _shouldUseImplicitSessions,
-    _validateMemberIndex,
     _verboseShell,
     chatty,
     compare,
     compareOn,
     defaultPrompt,
-    disablePrint,
-    enablePrint,
-    executeNoThrowNetworkError,
     friendlyEqual,
     hasErrorCode,
-    helloStatePrompt,
     help,
     indentStr,
     isNetworkError,
@@ -2133,13 +2071,11 @@ export {
     jsTestLog,
     jsTestName,
     printStackTrace,
-    replSetMemberStatePrompt,
     retryOnNetworkError,
     retryOnRetryableError,
     rs,
     shellAutocomplete,
     shellHelper,
-    shellPrint,
     shellPrintHelper,
     setVerboseShell,
     timestampCmp,

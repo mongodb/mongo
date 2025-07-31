@@ -1,15 +1,11 @@
 
 // Batch types
-let NONE = 0;
-let INSERT = 1;
-let UPDATE = 2;
-let REMOVE = 3;
+const INSERT = 1;
+const UPDATE = 2;
+const REMOVE = 3;
 
 // Error codes
-let UNKNOWN_ERROR = 8;
-let WRITE_CONCERN_FAILED = 64;
-let UNKNOWN_REPL_WRITE_CONCERN = 79;
-let NOT_MASTER = 10107;
+const WRITE_CONCERN_FAILED = 64;
 
 /**
  * Helper function to define properties
@@ -519,7 +515,6 @@ let Batch = function(batchType, originalZeroIndex) {
  * Wraps the operations done for the batch
  ***********************************************************/
 let Bulk = function(collection, ordered) {
-    let self = this;
     let coll = collection;
     let executed = false;
 
@@ -955,9 +950,6 @@ let Bulk = function(collection, ordered) {
         // If we have current batch
         if (currentBatch)
             batches.push(currentBatch);
-
-        // Total number of batches to execute
-        let totalNumberToExecute = batches.length;
 
         // Execute all the batches
         for (let i = 0; i < batches.length; i++) {

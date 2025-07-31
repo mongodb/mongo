@@ -10,6 +10,8 @@ if ((typeof DBCollection) == "undefined") {
      * @param {string} shortName
      * @param {string} fullName
      */
+
+    // eslint-disable-next-line no-unused-vars
     function DBCollection(mongo, db, shortName, fullName) {
         this._mongo = mongo;
         this._db = db;

@@ -988,56 +988,6 @@ function printShardingStatus(configDB, verbose) {
     print(raw);
 }
 
-function printShardingSizes(configDB) {
-    // configDB is a DB object that contains the sharding metadata of interest.
-    // Defaults to the db named "config" on the current connection.
-    if (configDB === undefined) {
-        configDB = globalThis.db.getSiblingDB('config');
-    }
-
-    let version = configDB.getCollection("version").findOne();
-    if (version == null) {
-        print("printShardingSizes : not a shard db!");
-        return;
-    }
-
-    let raw = "";
-    let output = function(indent, s) {
-        raw += sh._shardingStatusStr(indent, s);
-    };
-    output(0, "--- Sharding Sizes --- ");
-    output(1, "sharding version: " + tojson(configDB.getCollection("version").findOne()));
-
-    output(1, "shards:");
-    configDB.shards.find().forEach(function(z) {
-        output(2, tojson(z));
-    });
-
-    let saveDB = globalThis.db;
-    output(1, "databases:");
-    configDB.databases.find().sort({name: 1}).forEach(function(db) {
-        output(2, tojson(db, "", true));
-
-        configDB.collections.find({_id: new RegExp("^" + RegExp.escape(db._id) + "\.")})
-            .sort({_id: 1})
-            .forEach(function(coll) {
-                output(3, coll._id + " chunks:");
-                configDB.chunks.find({"ns": coll._id}).sort({min: 1}).forEach(function(chunk) {
-                    let out = saveDB.adminCommand(
-                        {dataSize: coll._id, keyPattern: coll.key, min: chunk.min, max: chunk.max});
-                    delete out.millis;
-                    delete out.ok;
-
-                    output(4,
-                           tojson(chunk.min) + " -->> " + tojson(chunk.max) +
-                               " on : " + chunk.shard + " " + tojson(out));
-                });
-            });
-    });
-
-    print(raw);
-}
-
 export {
     sh,
     printShardingStatus,

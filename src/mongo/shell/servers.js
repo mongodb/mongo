@@ -9,54 +9,6 @@ let shellVersion = version;
 let serverExitCodeMap = {};
 let grpcToMongoRpcPortMap = {};
 
-let _parsePath = function() {
-    let dbpath = "";
-    for (let i = 0; i < arguments.length; ++i)
-        if (arguments[i] == "--dbpath")
-            dbpath = arguments[i + 1];
-
-    if (dbpath == "")
-        throw Error("No dbpath specified");
-
-    return dbpath;
-};
-
-let createMongoArgs = function(binaryName, args) {
-    if (!Array.isArray(args)) {
-        throw new Error("The second argument to createMongoArgs must be an array");
-    }
-
-    let fullArgs = [binaryName];
-
-    if (args.length == 1 && isObject(args[0])) {
-        let o = args[0];
-        for (let k in o) {
-            if (o.hasOwnProperty(k)) {
-                if (k == "v" && isNumber(o[k])) {
-                    let n = o[k];
-                    if (n > 0) {
-                        if (n > 10)
-                            n = 10;
-                        let temp = "-";
-                        while (n-- > 0)
-                            temp += "v";
-                        fullArgs.push(temp);
-                    }
-                } else {
-                    fullArgs.push("--" + k);
-                    if (o[k] != "")
-                        fullArgs.push("" + o[k]);
-                }
-            }
-        }
-    } else {
-        for (let i = 0; i < args.length; i++)
-            fullArgs.push(args[i]);
-    }
-
-    return fullArgs;
-};
-
 // A path.join-like thing for paths that must work
 // on Windows (\-separated) and *nix (/-separated).
 function pathJoin(...parts) {
@@ -238,23 +190,12 @@ let convertVersionStringToArray = function(versionString) {
  * This function will not work if the minor version is greater than or equal to 10
  */
 let convertVersionStringToInteger = function(versionString) {
-    const [major, minor, point] = _convertVersionToIntegerArray(versionString);
+    const [major, minor] = _convertVersionToIntegerArray(versionString);
     assert(
         minor < 10,
         `Cannot convert a minor version greater than ten to an integer value since the minor version is in the tens position in the integer. Minor version attempting to convert: ${
             minor}`);
     return (major * 100) + (minor * 10);
-};
-
-/**
- * Returns the major version string from a version string.
- *
- * 3.3.4-fade3783 -> 3.3
- * 3.2 -> 3.2
- * 3 -> exception: versions must have at least two components.
- */
-let extractMajorVersionFromVersionString = function(versionString) {
-    return convertVersionStringToArray(versionString).slice(0, 2).join('.');
 };
 
 // These patterns allow substituting the binary versions used for each version string to support
@@ -1236,24 +1177,6 @@ MongoRunner.getAndPrepareDumpDirectory = function(testName) {
     return dir;
 };
 
-// Start a mongod instance and return a 'Mongo' object connected to it.
-// This function's arguments are passed as command line arguments to mongod.
-// The specified 'dbpath' is cleared if it exists, created if not.
-// var conn = _startMongodEmpty("--port", 30000, "--dbpath", "asdf");
-let _startMongodEmpty = function() {
-    let args = createMongoArgs("mongod", Array.from(arguments));
-
-    let dbpath = _parsePath.apply(null, args);
-    resetDbpath(dbpath);
-
-    return startMongoProgram.apply(null, args);
-};
-
-function _startMongod() {
-    print("startMongod WARNING DELETES DATA DIRECTORY THIS IS FOR TESTING ONLY");
-    return _startMongodEmpty.apply(null, arguments);
-};
-
 /**
  * Returns a new argArray with any test-specific arguments added.
  */
@@ -1717,7 +1640,7 @@ function _getMongoProgramArguments(args) {
 
     const separator = _isWindows() ? '\\' : '/';
     progName = progName.split(separator).pop();
-    const [baseProgramName, programVersion] = progName.split("-");
+    const [baseProgramName] = progName.split("-");
     let newArgs = [];
 
     // Non-shell binaries (which are in fact instantiated via `runMongoProgram`) may not support
@@ -1783,25 +1706,8 @@ function startMongoProgramNoConnect() {
     return _startMongoProgram.apply(null, _getMongoProgramArguments(arguments));
 };
 
-function myPort() {
-    const hosts = globalThis.db.getMongo().host.split(',');
-
-    const ip6Numeric = hosts[0].match(/^\[[0-9A-Fa-f:]+\]:(\d+)$/);
-    if (ip6Numeric) {
-        return ip6Numeric[1];
-    }
-
-    const hasPort = hosts[0].match(/:(\d+)/);
-    if (hasPort) {
-        return hasPort[1];
-    }
-
-    return 27017;
-};
-
 export {
     MongoRunner,
-    myPort,
     runMongoProgram,
     startMongoProgram,
     startMongoProgramNoConnect,

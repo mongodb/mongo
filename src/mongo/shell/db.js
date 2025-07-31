@@ -1409,7 +1409,6 @@ DB.prototype._authOrThrow = function() {
 };
 
 DB.prototype.auth = function() {
-    let ex;
     try {
         this._authOrThrow.apply(this, arguments);
     } catch (ex) {

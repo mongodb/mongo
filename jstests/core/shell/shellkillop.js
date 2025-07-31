@@ -1,4 +1,4 @@
-let baseName = "jstests_shellkillop";
+const baseName = "jstests_shellkillop";
 
 // 'retry' should be set to true in contexts where an exception should cause the test to be retried
 // rather than to fail.
@@ -9,14 +9,14 @@ function testShellAutokillop() {
         db[baseName].drop();
 
         print("shellkillop.js insert data");
-        for (let i = 0; i < 100000; ++i) {
+        for (let i = 0; i < 100_000; ++i) {
             db[baseName].insert({i: 1});
         }
-        assert.eq(100000, db[baseName].count());
+        assert.eq(100_000, db[baseName].count());
 
         // mongo --autokillop suppressed the ctrl-c "do you want to kill current operation" message
         // it's just for testing purposes and thus not in the shell help
-        var evalStr = "print('SKO subtask started'); db." + baseName +
+        let evalStr = "print('SKO subtask started'); db." + baseName +
             ".update( {}, {$set:{i:'abcdefghijkl'}}, false, true ); db." + baseName + ".count();";
         print("shellkillop.js evalStr:" + evalStr);
         let spawn = startMongoProgramNoConnect(
@@ -24,7 +24,7 @@ function testShellAutokillop() {
 
         sleep(100);
         retry = true;
-        assert(db[baseName].find({i: 'abcdefghijkl'}).count() < 100000,
+        assert(db[baseName].find({i: 'abcdefghijkl'}).count() < 100_000,
                "update ran too fast, test won't be valid");
         retry = false;
 
@@ -34,20 +34,36 @@ function testShellAutokillop() {
 
         print("count abcdefghijkl:" + db[baseName].find({i: 'abcdefghijkl'}).count());
 
-        var inprog = db.currentOp().inprog;
+        let inprog = db.currentOp().inprog;
         for (let i in inprog) {
             if (inprog[i].ns == "test." + baseName)
                 throw Error("shellkillop.js op is still running: " + tojson(inprog[i]));
         }
 
         retry = true;
-        assert(db[baseName].find({i: 'abcdefghijkl'}).count() < 100000,
+        assert(db[baseName].find({i: 'abcdefghijkl'}).count() < 100_000,
                "update ran too fast, test was not valid");
         retry = false;
     }
 }
 
-for (var nTries = 0; nTries < 10 && retry; ++nTries) {
+function myPort() {
+    const hosts = globalThis.db.getMongo().host.split(',');
+
+    const ip6Numeric = hosts[0].match(/^\[[0-9A-Fa-f:]+\]:(\d+)$/);
+    if (ip6Numeric) {
+        return ip6Numeric[1];
+    }
+
+    const hasPort = hosts[0].match(/:(\d+)/);
+    if (hasPort) {
+        return hasPort[1];
+    }
+
+    return 27017;
+};
+
+for (let nTries = 0; nTries < 10 && retry; ++nTries) {
     try {
         testShellAutokillop();
     } catch (e) {

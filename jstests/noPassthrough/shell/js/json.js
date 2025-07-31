@@ -71,16 +71,17 @@ describe("tojson", function() {
             let json;
 
             json = tojson(obj);
-            assert.eq(tojson(obj), '{ "x" : [ ], "y" : { } }');
+            assert.eq(json, '{ "x" : [ ], "y" : { } }');
 
             json = tojson(obj, "", true);
-            assert.eq(tojson(obj), '{ "x" : [ ], "y" : { } }');
+            jsTest.log.info(json);
+            assert.eq(json, '{ "x" : [ ], "y" : {  } }');
 
             json = toJsonForLog(obj);
-            assert.eq(tojson(obj), '{ "x" : [ ], "y" : { } }');
+            assert.eq(json, '{"x":[],"y":{}}');
 
             json = tojson(obj, "", false);
-            assert.eq(tojson(obj), '{ "x" : [ ], "y" : { } }');
+            assert.eq(json, '{\n\t"x" : [ ],\n\t"y" : {\n\t\t\n\t}\n}');
         });
 
         it("deep", function() {

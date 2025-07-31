@@ -62,8 +62,6 @@ ToolTest.prototype.runTool = function() {
     return runMongoProgram.apply(null, a);
 };
 
-let uncheckedParallelShellPids;
-
 // Defer initializing these variables until the first call, as TestData attributes may be
 // initialized as part of the --eval argument (e.g. by resmoke.py), which will not be evaluated
 // until after this has loaded.
