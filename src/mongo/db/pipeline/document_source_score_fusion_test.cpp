@@ -46,24 +46,7 @@ namespace {
 class DocumentSourceScoreFusionTest : service_context_test::WithSetupTransportLayer,
                                       public AggregationContextFixture {
 public:
-    DocumentSourceScoreFusionTest() {
-        // TODO SERVER-82020: Delete this once the feature flag defaults to true.
-        // $minMaxScaler is gated behind a feature flag and does
-        // not get put into the map as the flag is off by default. Changing the value of the feature
-        // flag with RAIIServerParameterControllerForTest() does not solve the issue because the
-        // registration logic is not re-hit.
-        try {
-            window_function::Expression::registerParser(
-                "$minMaxScaler",
-                window_function::ExpressionMinMaxScaler::parse,
-                nullptr,
-                AllowedWithApiStrict::kNeverInVersion1);
-        } catch (const DBException& e) {
-            // Allow this exception, to allow multiple instances
-            // to be created in this process.
-            ASSERT(e.reason() == "Duplicate parsers ($minMaxScaler) registered.");
-        }
-    }
+    DocumentSourceScoreFusionTest() {}
 
 private:
     RAIIServerParameterControllerForTest scoreFusionFlag{"featureFlagSearchHybridScoringFull",

@@ -2,7 +2,7 @@
 /**
  * Tests that the $sample stage works reasonably within $rankFusion.
  *
- * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_81]
+ * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_82]
  */
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";

@@ -187,8 +187,9 @@ feature_flags:
 
     featureFlagRankFusionFull:
         description:
-            "Feature flag to finish up $rankFusion features as well as introduce $score and
-            $scoreDetails stages. (Second milestone of Vector Search Hybrid Scoring)"
+            "Feature flag to finish up $rankFusion features as well as introduce score and
+            scoreDetails metadata fields. $rankFusion will also begin to produce these metadata fields.
+            (Second milestone of Vector Search Hybrid Scoring)"
         cpp_varname: gFeatureFlagRankFusionFull
         default: true
         version: 8.1
@@ -197,10 +198,11 @@ feature_flags:
 
     featureFlagSearchHybridScoringFull:
         description:
-            "Feature flag to introduce $scoreFusion, the $minMaxScaler helper and finish up
+            "Feature flag to introduce $scoreFusion, $score, and the $minMaxScaler helper and finish up
             hybrid scoring features. (Final milestone of Vector Search Hybrid Scoring)"
         cpp_varname: gFeatureFlagSearchHybridScoringFull
-        default: false
+        default: true
+        version: 8.2
         fcv_gated: true
 
     featureFlagQueryMemoryTracking:

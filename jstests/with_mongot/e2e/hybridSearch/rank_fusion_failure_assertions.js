@@ -8,7 +8,7 @@
  *   featureFlagRankFusionFull,
  *   # Needed for the nested $scoreFusion.
  *   featureFlagSearchHybridScoringFull,
- *   requires_fcv_81
+ *   requires_fcv_82
  * ]
  */
 

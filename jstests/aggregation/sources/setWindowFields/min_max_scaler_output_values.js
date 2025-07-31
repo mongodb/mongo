@@ -1,6 +1,6 @@
 /**
  * Test that $minMaxScaler window function output values are as expected.
- * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_81]
+ * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_82]
  */
 
 const coll = db[jsTestName()];

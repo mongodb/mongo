@@ -3,7 +3,7 @@
  * $scoreFusion and $score exists inside of jstests/with_mongot/e2e/hybridSearch. This test exists
  * in order to get picked up by the fuzzer/query shape hash stability tests (tests must exist inside
  * of the jstests/aggregation directory).
- * @tags: [ featureFlagSearchHybridScoringFull, do_not_wrap_aggregations_in_facets, requires_fcv_81
+ * @tags: [ featureFlagSearchHybridScoringFull, do_not_wrap_aggregations_in_facets, requires_fcv_82
  * ]
  */
 

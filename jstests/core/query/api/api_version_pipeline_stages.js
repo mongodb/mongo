@@ -18,6 +18,8 @@ const coll = testDb[collName];
 coll.drop();
 coll.insert({a: 1});
 
+const kUnrecognizedPipelineStageErrorCode = 40324;
+
 const unstablePipelines = [
     [{$collStats: {count: {}, latencyStats: {}}}],
     [{$currentOp: {}}],
@@ -42,71 +44,47 @@ if (is81orAbove(db)) {
     unstablePipelines.push([{$listClusterCatalog: {}}]);
 }
 
-// TODO SERVER-85426 $rankFusion can always be included when the feature flag is removed.
 // TODO SERVER-98591 Change RankFusionFull to RankFusionBasic.
-if (FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), 'RankFusionFull')) {
-    unstablePipelines.push([{$rankFusion: {input: {pipelines: {field1: [{$sort: {foo: 1}}]}}}}]);
-}
+unstablePipelines.push([{$rankFusion: {input: {pipelines: {field1: [{$sort: {foo: 1}}]}}}}]);
 
-// TODO SERVER-82020: $scoreFusion/$score/$minMaxScaler can always be included when the feature flag
-// is enabled by default.
-if (FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), 'SearchHybridScoringFull')) {
-    let hybridSearchPipelines = [
-        // $score is not included in the strict api.
-        [{$score: {score: 10}}],
-        // $minMaxScaler is not included in the strict api.
-        [{
-            $setWindowFields: {
-                sortBy: {_id: 1},
-                output: {
-                    "relativeXValue": {
-                        $minMaxScaler: {
-                            input: "$x",
-                        },
-                        window: {range: ["unbounded", "unbounded"]}
+let hybridSearchPipelines = [
+    // $score is not included in the strict api.
+    [{$score: {score: 10}}],
+    // $minMaxScaler is not included in the strict api.
+    [{
+        $setWindowFields: {
+            sortBy: {_id: 1},
+            output: {
+                "relativeXValue": {
+                    $minMaxScaler: {
+                        input: "$x",
                     },
-                }
-            }
-        }],
-        // $scoreFusion is not included in the strict api.
-        [{
-            $scoreFusion: {
-                input: {
-                    pipelines: {
-                        score2: [
-                            {
-                                $search: {
-                                    index: "search_index",
-                                    text: {query: "mystery", path: "genres"}
-                                }
-                            },
-                            {$match: {author: "dave"}}
-                        ]
-                    },
-                    normalization: "none"
+                    window: {range: ["unbounded", "unbounded"]}
                 },
-                combination: {weights: {score2: 5}}
             }
-        }]
-    ];
+        }
+    }],
+    // $scoreFusion is not included in the strict api.
+    [{
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    score2: [
+                        {
+                            $search:
+                                {index: "search_index", text: {query: "mystery", path: "genres"}}
+                        },
+                        {$match: {author: "dave"}}
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {weights: {score2: 5}}
+        }
+    }]
+];
 
-    for (var hybridSearchPipeline of hybridSearchPipelines) {
-        // Hybrid search stages require a minimum FCV of 8.1. In some tests, namely
-        // fcv_upgrade_downgrade_replica_sets_jscore_passthrough and its burn-in tests, the FCV is
-        // changed in the background as the test is running. This results in a flaky test, unless we
-        // accept both the strict API error code and the queryFeatureNotAllowed error code for
-        // hybrid search pipelines.
-        assert.commandFailedWithCode(
-            testDb.runCommand({
-                aggregate: collName,
-                pipeline: hybridSearchPipeline,
-                cursor: {},
-                apiStrict: true,
-                apiVersion: "1"
-            }),
-            [ErrorCodes.APIStrictError, ErrorCodes.QueryFeatureNotAllowed]);
-    }
-}
+unstablePipelines.concat(hybridSearchPipelines);
 
 function assertAggregateFailsWithAPIStrict(pipeline) {
     assert.commandFailedWithCode(testDb.runCommand({
@@ -116,7 +94,7 @@ function assertAggregateFailsWithAPIStrict(pipeline) {
         apiStrict: true,
         apiVersion: "1"
     }),
-                                 ErrorCodes.APIStrictError);
+                                 [ErrorCodes.APIStrictError, kUnrecognizedPipelineStageErrorCode]);
 }
 
 for (let pipeline of unstablePipelines) {
@@ -124,6 +102,8 @@ for (let pipeline of unstablePipelines) {
     assertAggregateFailsWithAPIStrict(pipeline);
 
     // Assert error thrown when creating a view on a pipeline with stages not in API Version 1.
+    // The error code may also be an unrecognized pipeline stage, if the test is running in a
+    // multiversioned scenario.
     assert.commandFailedWithCode(testDb.runCommand({
         create: 'api_version_pipeline_stages_should_fail',
         viewOn: collName,
@@ -131,7 +111,7 @@ for (let pipeline of unstablePipelines) {
         apiStrict: true,
         apiVersion: "1"
     }),
-                                 ErrorCodes.APIStrictError);
+                                 [ErrorCodes.APIStrictError, kUnrecognizedPipelineStageErrorCode]);
 }
 
 // Test that $collStats is allowed in APIVersion 1, even with 'apiStrict: true', so long as the only
