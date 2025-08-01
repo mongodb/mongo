@@ -23,9 +23,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:write_stage_common",
         "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/collection_crud",
-        "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query/collation:collator_interface_mock",
-        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
     ],
 )

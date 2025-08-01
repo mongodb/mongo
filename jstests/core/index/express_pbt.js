@@ -18,7 +18,7 @@ import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 if (isSlowBuild(db)) {
-    jsTest.log.info('Exiting early because debug is on, opt is off, or a sanitizer is enabled.');
+    jsTestLog('Exiting early because debug is on, opt is off, or a sanitizer is enabled.');
     quit();
 }
 
@@ -211,16 +211,16 @@ fc.assert(
                         invalidQueryList.push(_buildBsonObj(cfs, {$eq: value}, cfs, 0));
                     });
 
-                    jsTest.log.info("Generated test data", {docs, indexSpec, projectSpec});
+                    jsTestLog(docs);
+                    jsTestLog(indexSpec);
+                    jsTestLog(projectSpec);
+                    jsTestLog(queryList);
 
                     queryList.forEach((query) => {
-                        jsTest.log.info("Verifying read operation", {query});
                         verifyReadOperations(coll, query, projectSpec);
                     });
 
                     // queryList[0] should always produce exactly 1 match.
-                    jsTest.log.info("Verifying write operation",
-                                    {query: queryList[0], update: updateValue});
                     verifyWriteOperations(coll, queryList[0], updateValue);
 
                     invalidQueryList.forEach((query) => {

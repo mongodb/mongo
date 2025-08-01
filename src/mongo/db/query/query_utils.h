@@ -91,13 +91,12 @@ inline bool isEqualityExpressEligibleQuery(const CollectionPtr& collection,
         return false;
     }
 
-    const bool isProjectionEligible = cq.getProj() == nullptr || cq.getProj()->isSimple();
-
     return
         // Properties of the find command.
-        isProjectionEligible && !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
+        !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
         findCommand.getMin().isEmpty() && findCommand.getMax().isEmpty() &&
-        findCommand.getSort().isEmpty() && !findCommand.getSkip() && !findCommand.getTailable() &&
+        findCommand.getProjection().isEmpty() && findCommand.getSort().isEmpty() &&
+        !findCommand.getSkip() && !findCommand.getTailable() &&
         // Properties of the query's match expression.
         me->matchType() == MatchExpression::EQ &&
         Indexability::isExactBoundsGenerating(
