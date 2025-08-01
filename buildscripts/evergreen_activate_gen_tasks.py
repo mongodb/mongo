@@ -7,8 +7,15 @@ import sys
 import click
 import structlog
 from pydantic.main import BaseModel
+from urllib3.util import Retry
 
-from evergreen.api import EvergreenApi, RetryingEvergreenApi
+from evergreen.api import (
+    DEFAULT_HTTP_RETRY_ATTEMPTS,
+    DEFAULT_HTTP_RETRY_BACKOFF_FACTOR,
+    DEFAULT_HTTP_RETRY_CODES,
+    EvergreenApi,
+    RetryingEvergreenApi,
+)
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -137,6 +144,14 @@ def main(expansion_file: str, evergreen_config: str, verbose: bool) -> None:
     enable_logging(verbose)
     expansions = EvgExpansions.from_yaml_file(expansion_file)
     evg_api = RetryingEvergreenApi.get_api(config_file=evergreen_config, log_on_error=True)
+    evg_api._http_retry = Retry(
+        # this is a way to reuse all of Evergreen's logic, but to bump up the number of attempts
+        total=DEFAULT_HTTP_RETRY_ATTEMPTS + 10,
+        backoff_factor=DEFAULT_HTTP_RETRY_BACKOFF_FACTOR,
+        status_forcelist=DEFAULT_HTTP_RETRY_CODES,
+        raise_on_status=False,
+        raise_on_redirect=False,
+    )
 
     activate_task(expansions, evg_api)
 
