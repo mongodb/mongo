@@ -37,6 +37,7 @@ namespace unified_write_executor {
 void WriteBatchScheduler::run(OperationContext* opCtx, const std::set<NamespaceString>& nssSet) {
     while (!_batcher.isDone()) {
 
+        bool shouldAbort = false;
         // Destroy the routing context after retrieving the next batch, as later processing
         // may generate separate routing operations (e.g. implicitly creating collections)
         // but at most one routing context should exist in one thread at any given time.
@@ -62,8 +63,11 @@ void WriteBatchScheduler::run(OperationContext* opCtx, const std::set<NamespaceS
 
 
                 auto batchOfResponses = _executor.execute(opCtx, routingCtx, *batchOfRequests);
-                auto result = _processor.onWriteBatchResponse(routingCtx, batchOfResponses);
-                if (result.unrecoverableError) {
+                auto result = _processor.onWriteBatchResponse(opCtx, routingCtx, batchOfResponses);
+                if (result.errorType == WriteBatchResponseProcessor::ErrorType::kStopProcessing) {
+                    shouldAbort = true;
+                } else if (result.errorType ==
+                           WriteBatchResponseProcessor::ErrorType::kUnrecoverable) {
                     _batcher.markUnrecoverableError();
                 }
                 if (!result.opsToRetry.empty()) {
@@ -71,6 +75,9 @@ void WriteBatchScheduler::run(OperationContext* opCtx, const std::set<NamespaceS
                 }
                 return result.collsToCreate;
             });
+        if (shouldAbort) {
+            break;
+        }
         if (!collsToCreate.empty()) {
             for (auto& [nss, _] : collsToCreate) {
                 cluster::createCollectionWithRouterLoop(opCtx, nss);

@@ -33,6 +33,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
@@ -98,7 +99,8 @@ public:
         boost::optional<bool> expectedErrorsOnly = boost::none,
         boost::optional<mongo::BSONObj> expectedLet = boost::none,
         boost::optional<mongo::IDLAnyTypeOwned> expectedComment = boost::none,
-        boost::optional<std::int64_t> expectedMaxTimeMS = boost::none) {
+        boost::optional<std::int64_t> expectedMaxTimeMS = boost::none,
+        boost::optional<std::vector<StmtId>> expectedStmtIds = boost::none) {
         BSONObjBuilder builder;
         builder.appendElements(cmdObj);
         // The serialized command object does not have '$db' field, which is required for parsing.
@@ -152,6 +154,12 @@ public:
         }
         if (expectedMaxTimeMS) {
             ASSERT_EQ(*expectedMaxTimeMS, cmdObj.getField("maxTimeMS").number());
+        }
+        if (expectedStmtIds) {
+            ASSERT_EQ(expectedStmtIds->size(), bulkWrite.getStmtIds()->size());
+            for (size_t i = 0; i < expectedStmtIds->size(); i++) {
+                ASSERT_EQ(expectedStmtIds->at(i), bulkWrite.getStmtIds()->at(i));
+            }
         }
     }
 };
@@ -392,6 +400,72 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
             lsid,
             txnNumber,
             operationContext()->getWriteConcern());
+        return BSON("ok" << 1);
+    });
+
+    future.default_timed_get();
+}
+
+TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
+    const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
+    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
+
+    // We create a bulkRequest with two insert ops that have stmtIds.
+    BulkWriteInsertOp insertOp = BulkWriteInsertOp(1, BSON("a" << 0));
+    BulkWriteDeleteOp deleteOp = BulkWriteDeleteOp(1, BSON("a" << 2));
+    BulkWriteCommandRequest bulkRequest({insertOp, deleteOp},
+                                        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    std::vector<StmtId> stmtIds{0, 1};
+    bulkRequest.setStmtIds(std::move(stmtIds));
+    WriteOpContext context(bulkRequest);
+
+    auto batch = SimpleWriteBatch{{{shardId1,
+                                    {
+                                        {{nss1, nss1Shard1}},
+                                        {WriteOp(bulkRequest, 0), WriteOp(bulkRequest, 1)},
+                                    }}}};
+    auto lsid = LogicalSessionId(UUID::gen(), SHA256Block());
+    operationContext()->setLogicalSessionId(lsid);
+    auto txnNumber = 0;
+    operationContext()->setTxnNumber(txnNumber);
+
+    auto future = launchAsync([&]() {
+        WriteBatchExecutor executor(context);
+        MockRoutingContext rtx;
+        auto resps = executor.execute(operationContext(), rtx, {batch});
+
+        ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
+
+        auto& responses = get<SimpleWriteBatchResponse>(resps);
+
+        std::set<ShardId> expectedShardIds{shardId1};
+        ASSERT_EQ(1, responses.size());
+        for (auto& [shardId, response] : responses) {
+            ASSERT(expectedShardIds.contains(shardId));
+            ASSERT(response.swResponse.getStatus().isOK());
+            ASSERT_BSONOBJ_EQ(BSON("ok" << 1), response.swResponse.getValue().data);
+        }
+    });
+
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        assertBulkWriteRequest(
+            request.cmdObj,
+            {
+                BSON("insert" << 0 << "document" << BSON("a" << 0)),
+                BSON("delete" << 0 << "filter" << BSON("a" << 2) << "multi" << false),
+            },
+            {
+                getNamespaceInfoEntry(nss1, boost::none, nss1DbVersion),
+            },
+            lsid,
+            txnNumber,
+            operationContext()->getWriteConcern(),
+            boost::none,
+            boost::none,
+            boost::none,
+            boost::none,
+            boost::none,
+            std::vector<StmtId>{0, 1});
         return BSON("ok" << 1);
     });
 

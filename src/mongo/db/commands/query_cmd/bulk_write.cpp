@@ -1033,10 +1033,16 @@ bool handleDeleteOp(OperationContext* opCtx,
     auto idx = op->getNsInfoIdx();
     auto& nsEntry = nsInfo.at(idx);
     try {
+        auto stmtId = opCtx->isRetryableWrite()
+            ? bulk_write_common::getStatementId(req, currentOpIdx)
+            : kUninitializedStmtId;
+        auto stmtIds = std::vector<StmtId>{stmtId};
+
         if (op->getMulti()) {
+            // We don't allow multi=true retryable writes unless we are in a transaction.
             uassert(ErrorCodes::InvalidOptions,
                     "Cannot use retryable writes with multi=true",
-                    !opCtx->isRetryableWrite());
+                    !opCtx->isRetryableWrite() || stmtId == kUninitializedStmtId);
         }
 
         const NamespaceString& nsString = nsEntry.getNs();
@@ -1050,9 +1056,6 @@ bool handleDeleteOp(OperationContext* opCtx,
         // Non-FLE deletes (including timeseries deletes) will be handled by
         // write_ops_exec::performDelete.
 
-        auto stmtId = opCtx->isRetryableWrite()
-            ? bulk_write_common::getStatementId(req, currentOpIdx)
-            : kUninitializedStmtId;
         if (opCtx->isRetryableWrite()) {
             const auto txnParticipant = TransactionParticipant::get(opCtx);
             if (txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
@@ -1591,10 +1594,16 @@ bool handleUpdateOp(OperationContext* opCtx,
     const auto& nsEntry = nsInfo[idx];
 
     try {
+        auto stmtId = opCtx->isRetryableWrite()
+            ? bulk_write_common::getStatementId(req, currentOpIdx)
+            : kUninitializedStmtId;
+        auto stmtIds = std::vector<StmtId>{stmtId};
+
         if (op->getMulti()) {
+            // We don't allow multi=true retryable writes unless we are in a transaction.
             uassert(ErrorCodes::InvalidOptions,
                     "Cannot use retryable writes with multi=true",
-                    !opCtx->isRetryableWrite());
+                    !opCtx->isRetryableWrite() || stmtId == kUninitializedStmtId);
         }
 
         const NamespaceString& nsString = nsEntry.getNs();
@@ -1608,10 +1617,6 @@ bool handleUpdateOp(OperationContext* opCtx,
             // Map to processFLEUpdate.
             return attemptProcessFLEUpdate(opCtx, op, req, currentOpIdx, responses, nsEntry);
         }
-
-        auto stmtId = opCtx->isRetryableWrite()
-            ? bulk_write_common::getStatementId(req, currentOpIdx)
-            : kUninitializedStmtId;
 
         const auto [preConditions, isTimeseriesLogicalRequest] =
             timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(

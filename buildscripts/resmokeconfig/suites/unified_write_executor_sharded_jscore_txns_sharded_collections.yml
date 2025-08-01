@@ -1,0 +1,80 @@
+test_kind: js_test
+selector:
+  roots:
+    - jstests/core/txns/**/*.js
+  exclude_files:
+    # Profile can only be run against the admin database on mongos.
+    - jstests/core/txns/transactions_profiling.js
+    - jstests/core/txns/transactions_profiling_with_drops.js
+
+    # transactionLifetimeLimitSeconds parameter is not available in mongos.
+    - jstests/core/txns/abort_expired_transaction.js
+    - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+    - jstests/core/txns/kill_op_on_txn_expiry.js
+
+    # Uses hangAfterCollectionInserts failpoint not available on mongos.
+    - jstests/core/txns/speculative_snapshot_includes_all_writes.js
+
+    # These workloads explicitly create collections inside multi-document transactions. These are
+    # non-idempotent operations, and the implicit collection sharding logic upon collection access
+    # results in premature collection creation, causing the workloads to fail.
+    - jstests/core/txns/create_collection.js
+    - jstests/core/txns/create_collection_parallel.js
+    - jstests/core/txns/create_indexes.js
+    - jstests/core/txns/create_indexes_parallel.js
+    - jstests/core/txns/commands_in_txns_read_concern.js
+
+    # Exclusions because of unimplemented functionalities in the unified write executor.
+    # TODO: SERVER-104535 support cursor with bulk write.
+    - jstests/core/txns/bulk_write_getMore.js
+    # TODO: SERVER-104139 timeseries support.
+    - jstests/core/txns/timeseries/timeseries_reads_in_txns.js
+    - jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
+
+  exclude_with_any_tags:
+    - assumes_against_mongod_not_mongos
+    # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+    # can't be created on `getCollection` call.
+    - assumes_no_implicit_collection_creation_on_get_collection
+    # Tests tagged with the following will fail because they assume collections are not sharded.
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    # Transactions are not allowed to operate on capped collections.
+    - requires_capped
+    # Prepare is not a command on mongos.
+    - uses_prepare_transaction
+
+executor:
+  archive:
+    hooks:
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
+      global_vars:
+        TestData:
+          internalQueryUnifiedWriteExecutor: true
+  hooks:
+    # We don't execute dbHash or oplog consistency checks since there is only a single replica set
+    # node.
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true
+    num_shards: 2

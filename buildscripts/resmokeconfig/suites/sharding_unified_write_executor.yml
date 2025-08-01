@@ -6,6 +6,10 @@ test_kind: js_test
 
 selector:
   roots:
+    - jstests/sharding/internal_txns/**/*.js
+    - jstests/sharding/txn*.js
+    - jstests/noPassthrough/txns_retryable_writes_sessions/**/*.js
+
     # Sharding tests.
     - jstests/sharding/query/bulk_write_basic.js
     # - jstests/sharding/analyze_shard_key/list_sampled_queries.js
@@ -21,7 +25,10 @@ selector:
     # TODO SERVER-104139: Timeseries collection support
     # - jstests/sharding/mongos_writes_wait_for_write_concern_timeseries.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_unsharded.js
+    # TODO: SERVER-104120 try enabling when writes without shard key are fully supported.
     # - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
+    # TODO: SERVER-103781 try enabling when write without shard key with id supported.
+    # - jstests/sharding/retryable_update_one_by_id_chunk_migration.js
     # - jstests/sharding/query/bulk_write_size_limit.js
     - jstests/sharding/query/let_rand.js
     # - jstests/sharding/query/update/update_shard_key_bulk_write.js
@@ -33,6 +40,14 @@ selector:
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_basic.js
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_sort.js
     # - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
+    - jstests/sharding/retryable_writes.js
+    - jstests/sharding/retryable_writes_nested_shard_key.js
+    - jstests/sharding/retryable_upsert_single_write_shard.js
+    - jstests/sharding/retryable_write_error_labels.js
+
+    # TODO: SERVER-104115 these flakily fail with 'Routing info refresh did not complete'.
+    # - jstests/sharding/internal_txns/retryable_writes_aborted_during_resharding.js
+    # - jstests/sharding/internal_txns/retryable_writes_committed_during_resharding.js
 
     # No passthrough tests.
     # - jstests/noPassthrough/crud/bulk_write_currentop.js
@@ -48,6 +63,10 @@ selector:
     # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_update_shard_key.js
     # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_write_concern_errors_unsharded.js
     # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle_tassert_log_omit.js
+
+  exclude_files:
+    # TODO: SERVER-104535 support cursor with bulk write.
+    - jstests/sharding/internal_txns/transaction_api_distributed_from_shard.js
 
 executor:
   config:

@@ -30,6 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
 #include "mongo/s/grid.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/wc_error.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 
@@ -54,6 +55,12 @@ std::vector<AsyncRequestsSender::Request> WriteBatchExecutor::buildBulkWriteRequ
         std::vector<BulkWriteOpVariant> bulkOps;
         std::vector<NamespaceInfoEntry> nsInfos;
         std::map<NamespaceString, int> nsIndexMap;
+        const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+        const bool isRetryableWrite = opCtx->isRetryableWrite();
+        std::vector<int> stmtIds;
+        if (isRetryableWrite) {
+            stmtIds.reserve(shardRequest.ops.size());
+        }
         for (auto& op : shardRequest.ops) {
             auto& nss = op.getNss();
             auto versionIt = shardRequest.versionByNss.find(nss);
@@ -75,6 +82,10 @@ std::vector<AsyncRequestsSender::Request> WriteBatchExecutor::buildBulkWriteRequ
             auto bulkOp = op.getBulkWriteOp();
             visit([&](auto& value) { return value.setNsInfoIdx(nsIndex); }, bulkOp);
             bulkOps.emplace_back(bulkOp);
+
+            if (isRetryableWrite) {
+                stmtIds.push_back(op.getEffectiveStmtId());
+            }
         }
 
         auto bulkRequest = BulkWriteCommandRequest(std::move(bulkOps), std::move(nsInfos));
@@ -87,11 +98,16 @@ std::vector<AsyncRequestsSender::Request> WriteBatchExecutor::buildBulkWriteRequ
             bulkRequest.setMaxTimeMS(_context.getMaxTimeMS());
         }
 
+        if (isRetryableWrite) {
+            bulkRequest.setStmtIds(stmtIds);
+        }
         BSONObjBuilder builder;
         bulkRequest.serialize(&builder);
         logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
         auto writeConcern = getWriteConcernForShardRequest(opCtx);
-        if (writeConcern) {
+
+        // We don't append write concern in a transaction.
+        if (writeConcern && !inTransaction) {
             builder.append(WriteConcernOptions::kWriteConcernField, writeConcern->toBSON());
         }
         auto bulkRequestObj = builder.obj();
@@ -110,13 +126,16 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 const SimpleWriteBatch& batch) {
     std::vector<AsyncRequestsSender::Request> requestsToSend = buildBulkWriteRequests(opCtx, batch);
 
+    // Note we check this rather than `isRetryableWrite()` because we do not want to retry
+    // commands within retryable internal transactions.
+    bool shouldRetry = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
     auto sender = MultiStatementTransactionRequestsSender(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
         DatabaseName::kAdmin,
         std::move(requestsToSend),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        Shard::RetryPolicy::kNoRetry);
+        shouldRetry ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
 
     // Note that we sent a request for the involved namespaces after the requests get scheduled.
     for (const auto& nss : batch.getInvolvedNamespaces()) {
