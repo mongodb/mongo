@@ -149,8 +149,6 @@ struct ProjectionPositionInfoRecorder {
 };
 
 struct BsonWalkNode {
-    bool isTraverse = false;
-
     FilterPositionInfoRecorder* filterPosInfoRecorder = nullptr;
 
     std::vector<ProjectionPositionInfoRecorder*> childProjRecorders;
@@ -182,7 +180,6 @@ struct BsonWalkNode {
             invariant(pathIdx != 0);
             if (!traverseChild) {
                 traverseChild = std::make_unique<BsonWalkNode>();
-                traverseChild->isTraverse = true;
             }
             if (outProjBlockRecorder) {
                 // Each node must know about all projection recorders below it, not just ones
