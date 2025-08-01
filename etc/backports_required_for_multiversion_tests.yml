@@ -619,6 +619,8 @@ last-continuous:
     ticket: SERVER-92419
   - test_file: jstests/sharding/query/union_with_doubly_nested_lookup.js
     ticket: SERVER-108341
+  - test_file: jstests/core/txns/multi_statement_transaction_abort.js
+    ticket: SERVER-84081
   suites: null
 last-lts:
   all:
@@ -1290,4 +1292,6 @@ last-lts:
     ticket: SERVER-104771
   - test_file: jstests/sharding/query/union_with_doubly_nested_lookup.js
     ticket: SERVER-108341
+  - test_file: jstests/core/txns/multi_statement_transaction_abort.js
+    ticket: SERVER-84081
   suites: null

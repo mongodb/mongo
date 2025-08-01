@@ -266,5 +266,22 @@ assert.commandWorked(sessionDb.adminCommand({
     autocommit: false
 }));
 
+jsTest.log("Aborting transaction attempts to wait for write concern.");
+txnNumber++;
+assert.commandWorked(sessionDb.runCommand({
+    insert: collName,
+    documents: [{a: 1}],
+    txnNumber: NumberLong(txnNumber),
+    startTransaction: true,
+    autocommit: false
+}));
+assert.commandFailedWithCode(sessionDb.adminCommand({
+    abortTransaction: 1,
+    txnNumber: NumberLong(txnNumber),
+    writeConcern: {w: 40},
+    autocommit: false
+}),
+                             ErrorCodes.UnsatisfiableWriteConcern);
+
 session.endSession();
 }());
