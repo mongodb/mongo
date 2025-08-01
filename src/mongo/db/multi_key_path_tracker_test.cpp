@@ -45,9 +45,9 @@ namespace {
 void assertMultikeyPathsAreEqual(const MultikeyPaths& actual, const MultikeyPaths& expected) {
     bool match = (expected == actual);
     if (!match) {
-        FAIL(str::stream() << "Expected: " << MultikeyPathTracker::dumpMultikeyPaths(expected)
-                           << ", "
-                           << "Actual: " << MultikeyPathTracker::dumpMultikeyPaths(actual));
+        FAIL(std::string(str::stream()
+                         << "Expected: " << MultikeyPathTracker::dumpMultikeyPaths(expected) << ", "
+                         << "Actual: " << MultikeyPathTracker::dumpMultikeyPaths(actual)));
     }
     ASSERT(match);
 }

@@ -105,9 +105,9 @@ void _compareOutputOptionField(const DatabaseName& dbName,
                                const T& expected) {
     if (actual == expected)
         return;
-    FAIL(str::stream() << "parseOutputOptions(\"" << dbName.toStringForErrorMsg() << ", "
-                       << cmdObjStr << "): " << fieldName << ": Expected: " << expected
-                       << ". Actual: " << actual);
+    FAIL(std::string(str::stream() << "parseOutputOptions(\"" << dbName.toStringForErrorMsg()
+                                   << ", " << cmdObjStr << "): " << fieldName
+                                   << ": Expected: " << expected << ". Actual: " << actual));
 }
 
 /**

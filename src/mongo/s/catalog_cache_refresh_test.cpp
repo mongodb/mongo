@@ -216,8 +216,8 @@ TEST_F(CatalogCacheRefreshTest, DatabaseNotFound) {
 
     try {
         auto cri = *future.default_timed_get();
-        FAIL(str::stream() << "Returning no database did not fail and returned "
-                           << cri.getChunkManager().toString());
+        FAIL(std::string(str::stream() << "Returning no database did not fail and returned "
+                                       << cri.getChunkManager().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::NamespaceNotFound, ex.code());
     }
@@ -233,8 +233,9 @@ TEST_F(CatalogCacheRefreshTest, DatabaseBSONCorrupted) {
 
     try {
         auto cri = *future.default_timed_get();
-        FAIL(str::stream() << "Returning corrupted database entry did not fail and returned "
-                           << cri.getChunkManager().toString());
+        FAIL(std::string(str::stream()
+                         << "Returning corrupted database entry did not fail and returned "
+                         << cri.getChunkManager().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::IDLFailedToParse, ex.code());
     }
@@ -266,8 +267,9 @@ TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {
 
     try {
         auto cri = *future.default_timed_get();
-        FAIL(str::stream() << "Returning corrupted collection entry did not fail and returned "
-                           << cri.getChunkManager().toString());
+        FAIL(std::string(str::stream()
+                         << "Returning corrupted collection entry did not fail and returned "
+                         << cri.getChunkManager().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::IDLFailedToParse, ex.code());
     }
@@ -300,8 +302,9 @@ TEST_F(CatalogCacheRefreshTest, FullLoadNoChunksFound) {
 
     try {
         auto cri = *future.default_timed_get();
-        FAIL(str::stream() << "Returning no chunks for collection did not fail and returned "
-                           << cri.getChunkManager().toString());
+        FAIL(std::string(str::stream()
+                         << "Returning no chunks for collection did not fail and returned "
+                         << cri.getChunkManager().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.code());
     }
@@ -340,8 +343,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadNoChunksFound) {
 
     try {
         auto cri = *future.default_timed_get();
-        FAIL(str::stream() << "Returning no chunks for collection did not fail and returned "
-                           << cri.getChunkManager().toString());
+        FAIL(std::string(str::stream()
+                         << "Returning no chunks for collection did not fail and returned "
+                         << cri.getChunkManager().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.code());
     }
@@ -374,8 +378,9 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
 
     try {
         auto cri = *future.default_timed_get();
-        FAIL(str::stream() << "Returning no chunks for collection did not fail and returned "
-                           << cri.getChunkManager().toString());
+        FAIL(std::string(str::stream()
+                         << "Returning no chunks for collection did not fail and returned "
+                         << cri.getChunkManager().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::NoSuchKey, ex.code());
     }
@@ -463,9 +468,9 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithHighestVersion) {
 
     try {
         auto cri = *future.default_timed_get();
-        FAIL(
-            str::stream() << "Returning incomplete chunks for collection did not fail and returned "
-                          << cri.getChunkManager().toString());
+        FAIL(std::string(str::stream()
+                         << "Returning incomplete chunks for collection did not fail and returned "
+                         << cri.getChunkManager().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ChunkMetadataInconsistency, ex.code());
     }
@@ -515,9 +520,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithLowestVersion) {
 
     try {
         auto cri = *future.default_timed_get();
-        FAIL(
-            str::stream() << "Returning incomplete chunks for collection did not fail and returned "
-                          << cri.getChunkManager().toString());
+        FAIL(std::string(str::stream()
+                         << "Returning incomplete chunks for collection did not fail and returned "
+                         << cri.getChunkManager().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ChunkMetadataInconsistency, ex.code());
     }
@@ -567,9 +572,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithHighestVersion) {
 
     try {
         auto cri = *future.default_timed_get();
-        FAIL(
-            str::stream() << "Returning incomplete chunks for collection did not fail and returned "
-                          << cri.getChunkManager().toString());
+        FAIL(std::string(str::stream()
+                         << "Returning incomplete chunks for collection did not fail and returned "
+                         << cri.getChunkManager().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ChunkMetadataInconsistency, ex.code());
     }

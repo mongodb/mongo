@@ -538,7 +538,7 @@ void QueryPlannerTest::assertNumSolutions(size_t expectSolutions) const {
        << " instead. Run with --verbose=vv to see reasons for mismatch. Solutions generated: "
        << '\n';
     dumpSolutions(ss);
-    FAIL(ss);
+    FAIL(std::string(ss));
 }
 
 size_t QueryPlannerTest::numSolutionMatches(const std::string& solnJson) const {
@@ -568,7 +568,7 @@ void QueryPlannerTest::assertSolutionExists(const std::string& solnJson, size_t 
        << " instead. Run with --verbose=vv to see reasons for mismatch. All solutions generated: "
        << '\n';
     dumpSolutions(ss);
-    FAIL(ss);
+    FAIL(std::string(ss));
 }
 
 void QueryPlannerTest::assertSolutionDoesntExist(const std::string& solnJson) const {
@@ -592,7 +592,7 @@ void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& so
        << " instead. Run with --verbose=vv to see reasons for mismatch. All solutions generated: "
        << '\n';
     dumpSolutions(ss);
-    FAIL(ss);
+    FAIL(std::string(ss));
 }
 
 void QueryPlannerTest::assertNoSolutions() const {
@@ -613,8 +613,8 @@ std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(
 
     StatusWithMatchExpression status = MatchExpressionParser::parse(obj, expCtx);
     if (!status.isOK()) {
-        FAIL(str::stream() << "failed to parse query: " << obj.toString()
-                           << ". Reason: " << status.getStatus().toString());
+        FAIL(std::string(str::stream() << "failed to parse query: " << obj.toString()
+                                       << ". Reason: " << status.getStatus().toString()));
     }
     return std::move(status.getValue());
 }

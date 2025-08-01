@@ -120,8 +120,8 @@ bool areKeysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& actua
 void assertMultikeyPathsEqual(const MultikeyPaths& expectedMultikeyPaths,
                               const MultikeyPaths& actualMultikeyPaths) {
     if (expectedMultikeyPaths != actualMultikeyPaths) {
-        FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
-                           << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths));
+        FAIL(std::string(str::stream() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
+                                       << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths)));
     }
 }
 

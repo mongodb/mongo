@@ -176,8 +176,8 @@ TEST(RandomTest, NextInt32SanityCheck) {
         }
 
         if (onesCount < 400 || onesCount > 600)
-            FAIL(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
-                               << "% of the time.");
+            FAIL(std::string(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
+                                           << "% of the time."));
     }
 }
 
@@ -200,8 +200,8 @@ TEST(RandomTest, NextInt64SanityCheck) {
         }
 
         if (onesCount < 400 || onesCount > 600)
-            FAIL(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
-                               << "% of the time.");
+            FAIL(std::string(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
+                                           << "% of the time."));
     }
 }
 

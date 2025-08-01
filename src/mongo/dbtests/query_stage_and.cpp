@@ -102,7 +102,7 @@ public:
         coll.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
         if (indexes.empty()) {
-            FAIL(str::stream() << "Unable to find index with key pattern " << obj);
+            FAIL(std::string(str::stream() << "Unable to find index with key pattern " << obj));
         }
         return indexes[0];
     }

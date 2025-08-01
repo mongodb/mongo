@@ -899,9 +899,10 @@ public:
         MultikeyPaths actualMultikeyPaths = indexMetaData.multikeyPaths;
         const bool match = (expectedMultikeyPaths == actualMultikeyPaths);
         if (!match) {
-            FAIL(str::stream() << "TS: " << ts.toString()
-                               << ", Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
-                               << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths));
+            FAIL(std::string(str::stream()
+                             << "TS: " << ts.toString()
+                             << ", Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
+                             << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths)));
         }
         ASSERT_TRUE(match);
     }
@@ -2112,8 +2113,8 @@ public:
             ASSERT_EQ(std::size_t(1), indexMetaData.multikeyPaths.size());
             const bool match = indexMetaData.multikeyPaths[0] == MultikeyComponents({0});
             if (!match) {
-                FAIL(str::stream() << "Expected: [ [ 0 ] ] Actual: "
-                                   << dumpMultikeyPaths(indexMetaData.multikeyPaths));
+                FAIL(std::string(str::stream() << "Expected: [ [ 0 ] ] Actual: "
+                                               << dumpMultikeyPaths(indexMetaData.multikeyPaths)));
             }
         }
     }

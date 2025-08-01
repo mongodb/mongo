@@ -71,7 +71,7 @@ public:
         if (stream.ss.len() > 0) {
             stream << "First expression: " << expr1->debugString()
                    << "\nSecond expression: " << expr2->debugString();
-            FAIL(stream);
+            FAIL(std::string(stream));
         }
     }
 
@@ -103,7 +103,7 @@ public:
         if (stream.ss.len() > 0) {
             stream << "First expression: " << expr1->debugString()
                    << "\nSecond expression: " << expr2->debugString();
-            FAIL(stream);
+            FAIL(std::string(stream));
         }
     }
 

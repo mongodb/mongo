@@ -1231,12 +1231,13 @@ void assertRoundingTestCase(const Decimal128& actual,
     auto const& expectedVal = expected.getValue();
 
     if (actualVal.low64 != expectedVal.low64 || actualVal.high64 != expectedVal.high64) {
-        FAIL(str::stream() << "Rounding test case defined on line " << testCaseLineNumber
-                           << " failed. Rounding mode: " << roundingModeName << ". "
-                           << "Expected: {" << fmt::format("0x{:016X}", expectedVal.low64) << ", "
-                           << fmt::format("0x{:016X}", expectedVal.high64) << "}. Actual: {"
-                           << fmt::format("0x{:016X}", actualVal.low64) << ", "
-                           << fmt::format("0x{:016X}", actualVal.high64) << "}");
+        FAIL(std::string(str::stream()
+                         << "Rounding test case defined on line " << testCaseLineNumber
+                         << " failed. Rounding mode: " << roundingModeName << ". "
+                         << "Expected: {" << fmt::format("0x{:016X}", expectedVal.low64) << ", "
+                         << fmt::format("0x{:016X}", expectedVal.high64) << "}. Actual: {"
+                         << fmt::format("0x{:016X}", actualVal.low64) << ", "
+                         << fmt::format("0x{:016X}", actualVal.high64) << "}"));
     }
 }
 

@@ -911,10 +911,11 @@ protected:
                                    [](const BSONObj& l, const BSONObj& r) {
                                        return l.woCompare(r) == 0;
                                    })) {
-                        FAIL(str::stream()
-                             << "Chunks " << prevChunk.toString() << " and " << currChunk.toString()
-                             << " not merged despite belonging to the same shard and falling "
-                                "into the same zone (or both in no zone)");
+                        FAIL(std::string(
+                            str::stream()
+                            << "Chunks " << prevChunk.toString() << " and " << currChunk.toString()
+                            << " not merged despite belonging to the same shard and falling "
+                               "into the same zone (or both in no zone)"));
                     }
                 }
             }

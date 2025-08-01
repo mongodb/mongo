@@ -167,7 +167,7 @@ void assertEqualsIndexKeys(std::set<std::string>& expectedKeys, const KeyStringS
                  ++k) {
                 ss << "\n    " << *k;
             }
-            FAIL(ss);
+            FAIL(std::string(ss));
         }
     }
 }

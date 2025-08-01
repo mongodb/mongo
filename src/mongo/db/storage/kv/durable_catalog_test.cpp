@@ -230,8 +230,8 @@ public:
     void assertMultikeyPathsAreEqual(const MultikeyPaths& actual, const MultikeyPaths& expected) {
         bool match = (expected == actual);
         if (!match) {
-            FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expected) << ", "
-                               << "Actual: " << dumpMultikeyPaths(actual));
+            FAIL(std::string(str::stream() << "Expected: " << dumpMultikeyPaths(expected) << ", "
+                                           << "Actual: " << dumpMultikeyPaths(actual)));
         }
         ASSERT(match);
     }

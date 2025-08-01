@@ -700,10 +700,10 @@ void checkDocumentAndResult(BSONObj updateModifier,
     if (expectedDocument == actualDocument && !applyResult.noop) {
         // Check succeeded.
     } else {
-        FAIL(str::stream() << "apply() failure for " << updateModifier << ". Expected "
-                           << expectedDocument << " (noop = false) but got "
-                           << actualDocument.toString()
-                           << " (noop = " << (applyResult.noop ? "true" : "false"));
+        FAIL(std::string(str::stream() << "apply() failure for " << updateModifier << ". Expected "
+                                       << expectedDocument << " (noop = false) but got "
+                                       << actualDocument.toString()
+                                       << " (noop = " << (applyResult.noop ? "true" : "false")));
     }
 }
 

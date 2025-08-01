@@ -104,7 +104,7 @@ protected:
         }
         str::stream ss;
         ss << "Canonical query should be cacheable: " << query.toString();
-        FAIL(ss);
+        FAIL(std::string(ss));
     }
 
     void assertShouldNotCacheQuery(const CanonicalQuery& query) {
@@ -113,7 +113,7 @@ protected:
         }
         str::stream ss;
         ss << "Canonical query should not be cacheable: " << query.toString();
-        FAIL(ss);
+        FAIL(std::string(ss));
     }
 
     void assertShouldNotCacheQuery(const BSONObj& query) {
@@ -1145,7 +1145,7 @@ protected:
         ss << "expected " << numMatches << " matches for solution " << solnJson << " but got "
            << matches << " instead. all solutions generated: " << '\n';
         dumpSolutions(ss);
-        FAIL(ss);
+        FAIL(std::string(ss));
     }
 
     /**
@@ -1223,7 +1223,7 @@ protected:
         ss << "Could not find a match for solution " << solnJson
            << " All solutions generated: " << '\n';
         dumpSolutions(ss);
-        FAIL(ss);
+        FAIL(std::string(ss));
 
         return nullptr;
     }
@@ -1242,7 +1242,7 @@ protected:
             ss << "Expected solution " << solnJson
                << " did not match true solution: " << trueSoln->toString()
                << ". Reason: " << matchStatus.reason() << '\n';
-            FAIL(ss);
+            FAIL(std::string(ss));
         }
     }
 

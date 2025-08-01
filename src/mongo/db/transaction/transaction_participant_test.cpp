@@ -5351,7 +5351,8 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
                 return;
             }
         }
-        FAIL(str::stream() << "No prepared transaction with start timestamp (1, " << i << ")");
+        FAIL(std::string(str::stream()
+                         << "No prepared transaction with start timestamp (1, " << i << ")"));
     };
 
     auto oldestActiveTransactionTS = [&]() {

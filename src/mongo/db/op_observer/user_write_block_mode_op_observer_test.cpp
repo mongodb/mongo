@@ -117,7 +117,8 @@ protected:
 
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         if (!autoColl)
-            FAIL(str::stream() << "Collection " << nss.toStringForErrorMsg() << " doesn't exist");
+            FAIL(std::string(str::stream()
+                             << "Collection " << nss.toStringForErrorMsg() << " doesn't exist"));
 
         UserWriteBlockModeOpObserver opObserver;
         std::vector<InsertStatement> inserts;

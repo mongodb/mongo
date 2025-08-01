@@ -266,12 +266,12 @@ static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
                                  &simpleStringDataComparator);
     if (elA.type() != elB.type() || (!elA.isABSONObj() && eltCmp.evaluate(elA != elB))) {
-        FAIL(str::stream() << "element " << elA << " not equal to " << elB);
+        FAIL(std::string(str::stream() << "element " << elA << " not equal to " << elB));
     } else if (elA.type() == BSONType::array) {
         std::vector<BSONElement> elsA = elA.Array();
         std::vector<BSONElement> elsB = elB.Array();
         if (elsA.size() != elsB.size())
-            FAIL(str::stream() << "element " << elA << " not equal to " << elB);
+            FAIL(std::string(str::stream() << "element " << elA << " not equal to " << elB));
 
         std::vector<BSONElement>::iterator arrItA = elsA.begin();
         std::vector<BSONElement>::iterator arrItB = elsB.begin();
@@ -289,7 +289,8 @@ static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
  */
 static void assertSameFields(const BSONObj& docA, const BSONObj& docB) {
     if (docA.nFields() != docB.nFields())
-        FAIL(str::stream() << "document " << docA << " has different fields than " << docB);
+        FAIL(std::string(str::stream()
+                         << "document " << docA << " has different fields than " << docB));
 
     std::map<StringData, BSONElement> docAMap;
     BSONObjIterator itA(docA);
@@ -305,7 +306,7 @@ static void assertSameFields(const BSONObj& docA, const BSONObj& docB) {
         std::map<StringData, BSONElement>::iterator seenIt =
             docAMap.find(elB.fieldNameStringData());
         if (seenIt == docAMap.end())
-            FAIL(str::stream() << "element " << elB << " not found in " << docA);
+            FAIL(std::string(str::stream() << "element " << elB << " not found in " << docA));
 
         BSONElement elA = seenIt->second;
         assertSameElements(elA, elB);

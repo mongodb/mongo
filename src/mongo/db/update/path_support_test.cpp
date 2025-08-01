@@ -642,14 +642,14 @@ static void assertContains(const EqualityMatches& equalities, const BSONObj& wra
 
     EqualityMatches::const_iterator it = equalities.find(path);
     if (it == equalities.end()) {
-        FAIL(stream() << "Equality matches did not contain path \"" << path << "\"");
+        FAIL(std::string(stream() << "Equality matches did not contain path \"" << path << "\""));
     }
 
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
                                  &simpleStringDataComparator);
     if (eltCmp.evaluate(it->second->getData() != value)) {
-        FAIL(stream() << "Equality match at path \"" << path << "\" contains value "
-                      << it->second->getData() << ", not value " << value);
+        FAIL(std::string(stream() << "Equality match at path \"" << path << "\" contains value "
+                                  << it->second->getData() << ", not value " << value));
     }
 }
 
@@ -933,20 +933,22 @@ static void assertParent(const EqualityMatches& equalities,
     BSONElement parentEl = findParentEqualityElement(equalities, path, &parentPathPart);
 
     if (parentEl.eoo()) {
-        FAIL(stream() << "Equality matches did not contain parent for \"" << pathStr << "\"");
+        FAIL(std::string(stream() << "Equality matches did not contain parent for \"" << pathStr
+                                  << "\""));
     }
 
     StringData foundParentPath = path.dottedSubstring(0, parentPathPart);
     if (foundParentPath != parentPath) {
-        FAIL(stream() << "Equality match parent at path \"" << foundParentPath
-                      << "\" does not match \"" << parentPath << "\"");
+        FAIL(std::string(stream() << "Equality match parent at path \"" << foundParentPath
+                                  << "\" does not match \"" << parentPath << "\""));
     }
 
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
                                  &simpleStringDataComparator);
     if (eltCmp.evaluate(parentEl != value)) {
-        FAIL(stream() << "Equality match parent for \"" << pathStr << "\" at path \"" << parentPath
-                      << "\" contains value " << parentEl << ", not value " << value);
+        FAIL(std::string(stream() << "Equality match parent for \"" << pathStr << "\" at path \""
+                                  << parentPath << "\" contains value " << parentEl
+                                  << ", not value " << value));
     }
 }
 
@@ -965,8 +967,8 @@ static void assertNoParent(const EqualityMatches& equalities, StringData pathStr
 
     if (!parentEl.eoo()) {
         StringData foundParentPath = path.dottedSubstring(0, parentPathPart);
-        FAIL(stream() << "Equality matches contained parent for \"" << pathStr << "\" at \""
-                      << foundParentPath << "\"");
+        FAIL(std::string(stream() << "Equality matches contained parent for \"" << pathStr
+                                  << "\" at \"" << foundParentPath << "\""));
     }
 }
 

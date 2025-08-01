@@ -105,7 +105,7 @@ unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
         str::stream ss;
         ss << "failed to parse query: " << obj.toString()
            << ". Reason: " << status.getStatus().toString();
-        FAIL(ss);
+        FAIL(std::string(ss));
     }
 
     return std::move(status.getValue());

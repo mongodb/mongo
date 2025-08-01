@@ -175,7 +175,7 @@ public:
                << ":\n"
                << "Expected: " << expectedObj.toString() << "\n"
                << "Actual:   " << outputObj.toString() << "\n";
-            FAIL(ss);
+            FAIL(std::string(ss));
         }
     }
 

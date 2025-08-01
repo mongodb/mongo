@@ -71,7 +71,7 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
         str::stream ss;
         ss << "failed to parse query: " << obj.toString()
            << ". Reason: " << status.getStatus().toString();
-        FAIL(ss);
+        FAIL(std::string(ss));
     }
 
     return status.getValue().release();
@@ -96,7 +96,7 @@ void assertEquivalent(const char* queryStr,
         stream << "Original query: " << queryStr << "\nExpected: " << expected->debugString()
                << "\nActual: " << actual->debugString();
 
-        FAIL(stream);
+        FAIL(std::string(stream));
     }
 }
 
@@ -119,7 +119,7 @@ void assertNotEquivalent(const char* queryStr,
         stream << "Original query: " << queryStr << "\nExpected: " << expected->debugString()
                << "\nActual: " << actual->debugString();
 
-        FAIL(stream);
+        FAIL(std::string(stream));
     }
 }
 

@@ -136,8 +136,9 @@ public:
         ASSERT_FALSE(actualMultikeyPaths.empty());
         const bool match = (expectedMultikeyPaths == actualMultikeyPaths);
         if (!match) {
-            FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
-                               << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths));
+            FAIL(std::string(str::stream()
+                             << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
+                             << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths)));
         }
         ASSERT_TRUE(match);
     }

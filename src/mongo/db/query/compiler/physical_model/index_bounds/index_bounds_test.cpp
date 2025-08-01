@@ -1053,7 +1053,7 @@ void testFindIntervalForField(int key,
         ss << "Unexpected location from findIntervalForField: key=" << keyElt
            << "; intervals=" << oil.toString(false) << "; direction=" << expectedDirection
            << ". Expected: " << toString(expectedLocation) << ". Actual: " << toString(location);
-        FAIL(ss);
+        FAIL(std::string(ss));
     }
     // Check interval index if location is BEHIND or WITHIN.
     if ((IndexBoundsChecker::BEHIND == expectedLocation ||
@@ -1064,7 +1064,7 @@ void testFindIntervalForField(int key,
            << "; intervals=" << oil.toString(false) << "; direction=" << expectedDirection
            << "; location= " << toString(location) << ". Expected: " << expectedIntervalIndex
            << ". Actual: " << intervalIndex;
-        FAIL(ss);
+        FAIL(std::string(ss));
     }
 }
 

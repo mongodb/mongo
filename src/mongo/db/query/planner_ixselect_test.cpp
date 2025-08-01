@@ -145,7 +145,7 @@ void testGetFields(const char* query,
             str::stream ss;
             ss << "getFields(query=" << query << ", prefix=" << prefix << "): unable to find " << *i
                << " in result: " << toString(fields.begin(), fields.end());
-            FAIL(ss);
+            FAIL(std::string(ss));
         }
     }
 
@@ -156,7 +156,7 @@ void testGetFields(const char* query,
            << "): unexpected fields in result. expected: "
            << toString(expectedFields.begin(), expectedFields.end())
            << ". actual: " << toString(fields.begin(), fields.end());
-        FAIL(ss);
+        FAIL(std::string(ss));
     }
 }
 
@@ -224,7 +224,7 @@ void findRelevantTaggedNodePathsAndIndices(MatchExpression* root,
             str::stream ss;
             ss << "tag is not instance of RelevantTag. tree: " << root->debugString()
                << "; tag: " << buf.str();
-            FAIL(ss);
+            FAIL(std::string(ss));
         }
         paths->push_back(r->path);
         for (auto const& index : r->first) {
@@ -295,7 +295,7 @@ void testRateIndices(const char* query,
            << "): expected indices did not match actual indices. expected: "
            << toString(expectedIndices.begin(), expectedIndices.end())
            << ". actual: " << toString(actualIndices.begin(), actualIndices.end());
-        FAIL(ss);
+        FAIL(std::string(ss));
     }
 
     // Compare with expected list of paths.
@@ -307,7 +307,7 @@ void testRateIndices(const char* query,
            << "): unexpected number of tagged nodes found. expected: "
            << toString(expectedPaths.begin(), expectedPaths.end())
            << ". actual: " << toString(paths.begin(), paths.end());
-        FAIL(ss);
+        FAIL(std::string(ss));
     }
 
     // Next, check that value and order of each element match between the two lists.
@@ -322,7 +322,7 @@ void testRateIndices(const char* query,
            << "): unexpected path found. expected: " << *j << " "
            << toString(expectedPaths.begin(), expectedPaths.end()) << ". actual: " << *i << " "
            << toString(paths.begin(), paths.end());
-        FAIL(ss);
+        FAIL(std::string(ss));
     }
 }
 
