@@ -91,6 +91,12 @@ OplogApplierBatch OplogApplierBatcher::getNextBatch(Seconds maxWaitTime) {
         (void)_cv.wait_for(lk, maxWaitTime.toSystemDuration());
     }
 
+    // Prevent oplog application while there is an active replication state transition.
+    if (rss::consensus::IntentRegistry::get(cc().getServiceContext()).activeStateTransition()) {
+        // Return an empty batch without touching the batch we have queued up.
+        return OplogApplierBatch();
+    }
+
     OplogApplierBatch ops = std::move(_ops);
     _ops = OplogApplierBatch();
     _cv.notify_all();
