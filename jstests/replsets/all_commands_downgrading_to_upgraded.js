@@ -52,6 +52,7 @@ const allCommands = {
     _configsvrCommitMovePrimary: {skip: isAnInternalCommand},
     _configsvrCommitRefineCollectionShardKey: {skip: isAnInternalCommand},
     _configsvrCommitReshardCollection: {skip: isAnInternalCommand},
+    _configsvrCommitShardRemoval: {skip: isAnInternalCommand},
     _configsvrConfigureCollectionBalancing: {skip: isAnInternalCommand},
     _configsvrCreateDatabase: {skip: isAnInternalCommand},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isAnInternalCommand},
@@ -484,6 +485,13 @@ const allCommands = {
     },
     commitReshardCollection: {
         skip: requiresParallelShell,
+    },
+    commitShardRemoval: {
+        // We cannot test commitShardRemoval because we need to be able to run addShard during set
+        // up.
+        // This will be tested in FCV upgrade/downgrade passthroughs in the sharding
+        // directory.
+        skip: "cannot add shard while in downgrading FCV state",
     },
     commitTransaction: {
         doesNotRunOnStandalone: true,

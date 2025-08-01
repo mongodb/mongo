@@ -117,4 +117,32 @@ describe("removeShard interoperability with new removeShard interface", function
         assert.eq(shardDrainingStatus.note, removeShardStatus.note);
         assert.eq(shardDrainingStatus.collectionsToMove, removeShardStatus.collectionsToMove);
     });
+
+    it("commitShardRemoval interoperability with removeShard", () => {
+        // Start shard draining with removeShard
+        assert.commandWorked(this.st.s.adminCommand({removeShard: this.rs1.name}));
+
+        // Move the unsharded collection off st.shard1.shardName
+        assert.commandWorked(
+            this.st.s.adminCommand({movePrimary: "TestDB", to: this.st.shard0.shardName}));
+
+        assert.soon(() => {
+            const drainingStatus_completed =
+                this.st.s.adminCommand({shardDrainingStatus: this.rs1.name});
+            assert.commandWorked(drainingStatus_completed);
+            return 'drainingComplete' == drainingStatus_completed.state;
+        }, "shardDrainingStatus did not return 'drainingCompleted' status within the timeout.");
+
+        assert.commandWorked(this.st.s.adminCommand({commitShardRemoval: this.rs1.name}));
+
+        // Check shard has been removed correctly
+        assert.eq(0, this.st.s.getDB("config").shards.find({_id: this.rs1.name}).toArray().length);
+
+        // Restart the replica set and add it back to the cluster
+        this.rs1.stopSet();
+        this.rs1.startSet({shardsvr: ""});
+        this.rs1.initiate();
+        assert.commandWorked(
+            this.st.s.adminCommand({addShard: this.rs1.getURL(), name: this.rs1.name}));
+    });
 });

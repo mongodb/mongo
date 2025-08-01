@@ -181,6 +181,7 @@ let testCases = {
     collMod: {skip: "primary only"},
     collStats: {skip: "does not return user data"},
     commitReshardCollection: {skip: "primary only"},
+    commitShardRemoval: {skip: "primary only"},
     commitTransaction: {skip: "primary only"},
     compact: {skip: "does not return user data"},
     compactStructuredEncryptionData: {skip: "does not return user data"},

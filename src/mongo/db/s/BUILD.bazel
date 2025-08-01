@@ -1469,6 +1469,7 @@ mongo_cc_library(
         "//src/mongo/db/s/config:configsvr_commit_move_primary_command.cpp",
         "//src/mongo/db/s/config:configsvr_commit_refine_collection_shard_key.cpp",
         "//src/mongo/db/s/config:configsvr_commit_reshard_collection_command.cpp",
+        "//src/mongo/db/s/config:configsvr_commit_shard_removal_command.cpp",
         "//src/mongo/db/s/config:configsvr_configure_collection_balancing.cpp",
         "//src/mongo/db/s/config:configsvr_control_balancer_command.cpp",
         "//src/mongo/db/s/config:configsvr_coordinator.cpp",

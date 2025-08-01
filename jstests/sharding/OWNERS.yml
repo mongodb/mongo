@@ -76,3 +76,6 @@ filters:
   - "remove_shard_interoperability_tests.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "commit_shard_removal_test.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

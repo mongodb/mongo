@@ -45,7 +45,7 @@
 
 namespace mongo {
 
-namespace {
+namespace topology_change_helpers {
 
 RemoveShardProgress runCoordinatorRemoveShard(
     OperationContext* opCtx,
@@ -89,10 +89,6 @@ RemoveShardProgress runCoordinatorRemoveShard(
     }();
     return drainingStatus;
 }
-
-}  // namespace
-
-namespace topology_change_helpers {
 
 RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId) {
     const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);

@@ -103,6 +103,7 @@ const wcCommandsTests = {
     _configsvrCommitMovePrimary: {skip: "internal command"},
     _configsvrCommitRefineCollectionShardKey: {skip: "internal command"},
     _configsvrCommitReshardCollection: {skip: "internal command"},
+    _configsvrCommitShardRemoval: {skip: "internal command"},
     _configsvrConfigureCollectionBalancing: {skip: "internal command"},
     _configsvrCreateDatabase: {skip: "internal command"},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: "internal command"},
@@ -636,6 +637,7 @@ const wcCommandsTests = {
     },
     collStats: {skip: "does not accept write concern"},
     commitReshardCollection: {skip: "does not accept write concern"},
+    commitShardRemoval: {skip: "unrelated"},
     commitTransaction: {
         noop: {
             // The transaction is already committed
@@ -3205,6 +3207,7 @@ const wcTimeseriesViewsCommandsTests = {
     _configsvrCommitMovePrimary: {skip: "internal command"},
     _configsvrCommitRefineCollectionShardKey: {skip: "internal command"},
     _configsvrCommitReshardCollection: {skip: "internal command"},
+    _configsvrCommitShardRemoval: {skip: "internal command"},
     _configsvrConfigureCollectionBalancing: {skip: "internal command"},
     _configsvrCreateDatabase: {skip: "internal command"},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: "internal command"},
@@ -3658,6 +3661,7 @@ const wcTimeseriesViewsCommandsTests = {
     },
     collStats: {skip: "does not accept write concern"},
     commitReshardCollection: {skip: "does not accept write concern"},
+    commitShardRemoval: {skip: "unrelated"},
     commitTransaction: {skip: "not supported on timeseries views"},
     compact: {skip: "does not accept write concern"},
     compactStructuredEncryptionData: {skip: "does not accept write concern"},

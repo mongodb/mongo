@@ -316,6 +316,7 @@ mongo_cc_library(
         "cluster_change_primary_cmd.cpp",
         "cluster_check_metadata_consistency_cmd.cpp",
         "cluster_clear_jumbo_flag_cmd.cpp",
+        "cluster_commit_shard_removal_cmd.cpp",
         "cluster_configure_collection_balancing.cpp",
         "cluster_configure_query_analyzer_cmd.cpp",
         "cluster_control_balancer_cmd.cpp",

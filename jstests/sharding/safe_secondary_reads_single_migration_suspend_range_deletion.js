@@ -174,6 +174,7 @@ let testCases = {
     clusterReleaseMemory: {skip: "already tested by 'releaseMemory' tests on mongos"},
     clusterUpdate: {skip: "already tested by 'update' tests on mongos"},
     commitReshardCollection: {skip: "primary only"},
+    commitShardRemoval: {skip: "primary only"},
     commitTransaction: {skip: "primary only"},
     configureCollectionBalancing: {skip: "does not return user data"},
     collMod: {skip: "primary only"},

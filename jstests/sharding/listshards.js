@@ -69,7 +69,6 @@ describe("listShards correct functionality test", function() {
         assert(this.checkShardName('repl', shardsArray),
                'listShards command didn\'t return replica set shard: ' + tojson(shardsArray));
         // remove 'repl' shard
-        // TODO-SERVER-107017 use commitShardRemoval to remove the shard
         removeShard(this.st, 'repl');
     });
 
@@ -78,7 +77,6 @@ describe("listShards correct functionality test", function() {
         let res = this.st.admin.runCommand({addShard: this.rs1.getURL()});
         assert.commandWorked(res, 'addShard command failed');
         // remove 'repl' shard
-        // TODO-SERVER-107017 use commitShardRemoval to remove the shard
         removeShard(this.st, 'repl');
         res = this.mongos.adminCommand('listShards');
         assert.commandWorked(res, 'listShards command failed');
@@ -106,7 +104,6 @@ describe("listShards correct functionality test", function() {
         assert(this.checkShardName('repl', shardsArray),
                'listShards command didn\'t return the draining shard: ' + tojson(shardsArray));
         // remove 'repl' shard
-        // TODO-SERVER-107017 use commitShardRemoval to remove the shard
         removeShard(this.st, 'repl');
     });
 
@@ -127,7 +124,6 @@ describe("listShards correct functionality test", function() {
         assert(this.checkShardName(this.st.shard0.shardName, shardsArray),
                'listShards command didn\'t return the non-draining shard: ' + tojson(shardsArray));
         // remove 'repl' shard
-        // TODO-SERVER-107017 use commitShardRemoval to remove the shard
         removeShard(this.st, 'repl');
     });
 
@@ -145,7 +141,6 @@ describe("listShards correct functionality test", function() {
             this.st.admin.runCommand({listShards: 1, filter: {draining: 1}}),
             ErrorCodes.TypeMismatch);
         // remove 'repl' shard
-        // TODO-SERVER-107017 use commitShardRemoval to remove the shard
         removeShard(this.st, 'repl');
     });
 
@@ -178,7 +173,6 @@ describe("listShards correct functionality test", function() {
         const shardsArray = res.shards;
         assert.eq(shardsArray.length, 0);
         // remove 'repl' shard
-        // TODO-SERVER-107017 use commitShardRemoval to remove the shard
         removeShard(this.st, 'repl');
     });
 

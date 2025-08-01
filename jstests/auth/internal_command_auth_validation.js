@@ -206,6 +206,10 @@ const internalCommandsMap = {
             to: shard0name
         },
     },
+    _configsvrCommitShardRemoval: {
+        testname: "_configsvrCommitShardRemoval",
+        command: {_configsvrCommitShardRemoval: shard0name, commitShardRemoval: shard0name},
+    },
     _configsvrEnsureChunkVersionIsGreaterThan: {
         testname: "_configsvrEnsureChunkVersionIsGreaterThan",
         command: {

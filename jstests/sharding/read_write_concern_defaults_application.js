@@ -106,6 +106,7 @@ let testCases = {
     _configsvrCommitMovePrimary: {skip: "internal command"},  // Can be removed once 6.0 is last LTS
     _configsvrCommitRefineCollectionShardKey: {skip: "internal command"},
     _configsvrCommitReshardCollection: {skip: "internal command"},
+    _configsvrCommitShardRemoval: {skip: "internal command"},
     _configsvrConfigureCollectionBalancing: {skip: "internal command"},
     _configsvrCreateDatabase: {skip: "internal command"},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: "internal command"},
@@ -340,6 +341,7 @@ let testCases = {
     },
     collStats: {skip: "does not accept read or write concern"},
     commitReshardCollection: {skip: "does not accept read or write concern"},
+    commitShardRemoval: {skip: "does not accept read or write concern"},
     commitTransaction: {
         setUp: function(conn) {
             assert.commandWorked(

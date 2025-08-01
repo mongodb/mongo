@@ -110,6 +110,7 @@ let viewsCommandTests = {
         {skip: isAnInternalCommand},  // Can be removed once 6.0 is last LTS
     _configsvrCommitRefineCollectionShardKey: {skip: isAnInternalCommand},
     _configsvrCommitReshardCollection: {skip: isAnInternalCommand},
+    _configsvrCommitShardRemoval: {skip: isAnInternalCommand},
     _configsvrConfigureCollectionBalancing: {skip: isAnInternalCommand},
     _configsvrCreateDatabase: {skip: isAnInternalCommand},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isAnInternalCommand},
@@ -314,6 +315,7 @@ let viewsCommandTests = {
     collMod: {command: {collMod: "view", viewOn: "other", pipeline: []}},
     collStats: {skip: "Tested in views/views_coll_stats.js"},
     commitReshardCollection: {skip: isUnrelated},
+    commitShardRemoval: {skip: isUnrelated},
     commitTransaction: {skip: isUnrelated},
     compact: {command: {compact: "view", force: true}, expectFailure: true, skipSharded: true},
     compactStructuredEncryptionData: {skip: isUnrelated},

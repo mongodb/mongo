@@ -1,7 +1,7 @@
 /**
  * Test that startShardDraining works correctly.
  * @tags: [
- * requires_fcv_82
+ * requires_fcv_83
  * ]
  */
 
@@ -38,7 +38,7 @@ function checkDrainingCorrectAndIllegalOperations() {
                                  ErrorCodes.ShardNotFound);
 
     // Remove st.shard1.shardName
-    assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({commitShardRemoval: st.shard1.shardName}));
 
     // Can't drain the last shard in the cluster
     assert.commandFailedWithCode(st.s.adminCommand({startShardDraining: st.shard0.shardName}),

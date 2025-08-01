@@ -45,6 +45,7 @@ const allCommands = {
     _configsvrCommitMovePrimary: {skip: isPrimaryOnly},
     _configsvrCommitRefineCollectionShardKey: {skip: isPrimaryOnly},
     _configsvrCommitReshardCollection: {skip: isPrimaryOnly},
+    _configsvrCommitShardRemoval: {skip: isPrimaryOnly},
     _configsvrConfigureCollectionBalancing: {skip: isPrimaryOnly},
     _configsvrCreateDatabase: {skip: isPrimaryOnly},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isPrimaryOnly},

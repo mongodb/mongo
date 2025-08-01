@@ -186,3 +186,6 @@ filters:
   - "cluster_stop_shard_draining_cmd.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "cluster_commit_shard_removal_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing

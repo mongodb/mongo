@@ -49,6 +49,7 @@ const allCommands = {
     _configsvrCommitMovePrimary: {skip: isAnInternalCommand},
     _configsvrCommitRefineCollectionShardKey: {skip: isAnInternalCommand},
     _configsvrCommitReshardCollection: {skip: isAnInternalCommand},
+    _configsvrCommitShardRemoval: {skip: isAnInternalCommand},
     _configsvrConfigureCollectionBalancing: {skip: isAnInternalCommand},
     _configsvrCreateDatabase: {skip: isAnInternalCommand},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isAnInternalCommand},
@@ -395,6 +396,7 @@ const allCommands = {
     commitReshardCollection: {
         skip: requiresParallelShell,
     },
+    commitShardRemoval: {skip: requiresMongoS},
     commitTransaction: {skip: "requires modifications to users of number of shards"},
     compact: {
         setUp: function(mongoS) {

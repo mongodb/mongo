@@ -632,6 +632,8 @@ routing_and_topology:
     - src/mongo/s/request_types/remove_shard*
     - src/mongo/db/s/config/configsvr_shard_draining_status_command.cpp
     - src/mongo/s/commands/cluster_shard_draining_status_cmd.cpp
+    - src/mongo/db/s/config/configsvr_commit_shard_removal_command.cpp
+    - src/mongo/s/commands/cluster_commit_shard_removal_cmd.cpp
 
     - src/mongo/db/s/complete_promotion_to_sharded_cluster_coordinator*
     - src/mongo/db/s/topology_change_helpers*

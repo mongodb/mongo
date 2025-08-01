@@ -5070,6 +5070,21 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "commitShardRemoval",
+          command: {commitShardRemoval: "x"},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_clusterManager,
+                privileges: [{resource: {cluster: true}, actions: ["removeShard"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "insert",
           command: {insert: "foo", documents: [{data: 5}]},
           testcases: [

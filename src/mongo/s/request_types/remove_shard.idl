@@ -165,3 +165,25 @@ commands:
         strict: false
         chained_structs:
             RemoveShardRequestBase: RemoveShardRequestBase
+
+    commitShardRemoval:
+        command_name: commitShardRemoval
+        description: "The public commitShardRemoval command on mongos"
+        cpp_name: CommitShardRemoval
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    _configsvrCommitShardRemoval:
+        command_name: _configsvrCommitShardRemoval
+        description: "The internal commitShardRemoval command on config server"
+        cpp_name: ConfigSvrCommitShardRemoval
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase

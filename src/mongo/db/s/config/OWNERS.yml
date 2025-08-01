@@ -103,3 +103,6 @@ filters:
   - "configsvr_stop_shard_draining_command.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "configsvr_commit_shard_removal_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing

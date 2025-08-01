@@ -56,4 +56,5 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_configsvrShardDrainingStatus",
     "_configsvrStopShardDraining",
     "_shardsvrMergeChunks",
+    "_configsvrCommitShardRemoval",
 ];

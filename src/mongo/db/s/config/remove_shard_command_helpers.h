@@ -29,18 +29,30 @@
 
 #pragma once
 
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/remove_shard_draining_progress_gen.h"
 #include "mongo/db/shard_id.h"
+
 
 namespace mongo {
 
 namespace topology_change_helpers {
 
 /**
+ * Runs the coordinator to remove a shard from the cluster.
+ */
+RemoveShardProgress runCoordinatorRemoveShard(
+    OperationContext* opCtx,
+    boost::optional<DDLLockManager::ScopedCollectionDDLLock>& ddlLock,
+    boost::optional<FixedFCVRegion>& fcvRegion,
+    const ShardId& shardId);
+
+/**
  * Runs the different stages of the remove shard command - checkPreconditionsAndStartDrain,
- * checkDrainingStatus, and commit of the removal. Will retry the entire procedure after receiving
- * a ConflictingOperationOnProgress error.
+ * checkDrainingStatus, and commit of the removal. Will retry the entire procedure after
+ * receiving a ConflictingOperationOnProgress error.
  */
 RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId);
 
@@ -52,5 +64,6 @@ boost::optional<RemoveShardProgress> startShardDraining(OperationContext* opCtx,
 
 
 void stopShardDraining(OperationContext* opCtx, const ShardId& shardId);
+
 }  // namespace topology_change_helpers
 }  // namespace mongo
