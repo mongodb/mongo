@@ -758,7 +758,7 @@ std::vector<BatchedCommandRequest> getOperationsToCreateOrShardCollectionOnShard
     return ret;
 }
 
-std::vector<BatchedCommandRequest> getOperationsToCreateUnsplittableCollectionOnShardingCatalog(
+std::pair<CollectionType, std::vector<ChunkType>> generateMetadataForUnsplittableCollectionCreation(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const UUID& collectionUuid,
@@ -779,8 +779,7 @@ std::vector<BatchedCommandRequest> getOperationsToCreateUnsplittableCollectionOn
     coll.setUnsplittable(true);
     coll.setDefaultCollation(defaultCollation);
 
-    return getOperationsToCreateOrShardCollectionOnShardingCatalog(
-        coll, initialChunks.chunks, placementVersion, {shardId});
+    return std::make_pair(std::move(coll), std::move(initialChunks.chunks));
 }
 
 void runTransactionWithStmtIdsOnShardingCatalog(

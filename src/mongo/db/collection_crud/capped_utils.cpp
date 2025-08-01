@@ -219,7 +219,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                                                                 toCollection.getCollectionPtr(),
                                                                 std::move(insertStmt),
                                                                 nullptr /* OpDebug */,
-                                                                true));
+                                                                true /*fromMigrate*/));
             wunit.commit();
 
             // Go to the next document
@@ -320,6 +320,7 @@ ConvertToCappedAcquisitions acquireLocksForConvertToCapped(
 void convertToCapped(OperationContext* opCtx,
                      const NamespaceString& ns,
                      long long size,
+                     bool fromMigrate,
                      const boost::optional<UUID>& targetUUID) {
     auto [sourceAcq, tmpAcq, leftoverAcq] = acquireLocksForConvertToCapped(opCtx, ns, targetUUID);
 
@@ -371,7 +372,7 @@ void convertToCapped(OperationContext* opCtx,
                                leftoverAcq->nss(),
                                &unused,
                                DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops,
-                               false));
+                               fromMigrate));
         }
     }
 
@@ -380,6 +381,7 @@ void convertToCapped(OperationContext* opCtx,
     RenameCollectionOptions options;
     options.dropTarget = true;
     options.stayTemp = false;
+    options.markFromMigrate = fromMigrate;
     uassertStatusOK(renameCollection(opCtx, tmpAcq.nss(), ns, options));
 }
 

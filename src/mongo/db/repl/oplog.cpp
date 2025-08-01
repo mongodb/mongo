@@ -1139,7 +1139,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& cmd = entry.getObject();
           convertToCapped(opCtx,
                           extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd),
-                          cmd["size"].safeNumberLong());
+                          cmd["size"].safeNumberLong(),
+                          entry.getFromMigrate().value_or(false));
           return Status::OK();
       },
       {ErrorCodes::NamespaceNotFound}}},

@@ -301,10 +301,10 @@ std::vector<BatchedCommandRequest> getOperationsToCreateOrShardCollectionOnShard
     const std::set<ShardId>& shardIds);
 
 /*
- * Same as `getOperationsToCreateOrShardCollectionOnShardingCatalog`, with the difference that it
- * generates the collection and chunk entries for an unsplittable collection.
+ * Compose the needed metadata to request the creation of an unsplittable collection (intended to be
+ * used in combination with getOperationsToCreateOrShardCollectionOnShardingCatalog()).
  */
-std::vector<BatchedCommandRequest> getOperationsToCreateUnsplittableCollectionOnShardingCatalog(
+std::pair<CollectionType, std::vector<ChunkType>> generateMetadataForUnsplittableCollectionCreation(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const UUID& collectionUuid,

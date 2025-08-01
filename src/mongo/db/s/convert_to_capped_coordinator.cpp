@@ -31,6 +31,7 @@
 #include "mongo/db/s/convert_to_capped_coordinator.h"
 
 #include "mongo/db/collection_crud/capped_utils.h"
+#include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/list_collections_gen.h"
@@ -332,7 +333,10 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 // The collection must be updated also on the DBPrimary shard in case the
                 // dataShard is not the DBPrimary shard.
                 if (*_doc.getDataShard() != ShardingState::get(opCtx)->shardId()) {
-                    convertToCapped(opCtx, nss(), _doc.getSize(), *_doc.getTargetUUID());
+                    // If the primary is not a data bearing shard, op entries must not be visible to
+                    // change stream readers.
+                    convertToCapped(
+                        opCtx, nss(), _doc.getSize(), true /*fromMigrate*/, *_doc.getTargetUUID());
                 }
             }))
         .then(_buildPhaseHandler(
@@ -365,9 +369,17 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                             **executor);
                     }
 
-                    auto createCollectionOnShardingCatalogOps = sharding_ddl_util::
-                        getOperationsToCreateUnsplittableCollectionOnShardingCatalog(
+                    const auto [coll, chunkDescriptor] =
+                        sharding_ddl_util::generateMetadataForUnsplittableCollectionCreation(
                             opCtx, nss(), localCollUuid, defaultCollator, *(_doc.getDataShard()));
+
+                    auto createCollectionOnShardingCatalogOps =
+                        sharding_ddl_util::getOperationsToCreateOrShardCollectionOnShardingCatalog(
+                            coll,
+                            chunkDescriptor,
+                            chunkDescriptor.front().getVersion(),
+                            {*(_doc.getDataShard())});
+
                     sharding_ddl_util::runTransactionWithStmtIdsOnShardingCatalog(
                         opCtx,
                         **executor,
@@ -378,6 +390,24 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     // the new primary will start-up from a configTime that is inclusive of the
                     // metadata changes that were committed on the sharding catalog.
                     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+
+                    // When targeting a tracked collection, change stream readers need to receive
+                    // a post-commit notification about the placement change affecting the uncapped
+                    // incarnation.
+                    const auto& commitTime = coll.getTimestamp();
+
+                    NamespacePlacementChanged notification(nss(), commitTime);
+                    auto buildNewSessionFn = [this](OperationContext* opCtx) {
+                        return getNewSession(opCtx);
+                    };
+
+                    sharding_ddl_util::generatePlacementChangeNotificationOnShard(
+                        opCtx,
+                        notification,
+                        *_doc.getDataShard(),
+                        buildNewSessionFn,
+                        executor,
+                        token);
                 }
 
                 logConvertToCappedOnChangelog(

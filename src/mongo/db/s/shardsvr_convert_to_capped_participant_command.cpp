@@ -102,7 +102,10 @@ public:
                     "Capped collection size must be greater than zero",
                     size > 0);
 
-            convertToCapped(opCtx, ns(), size, request().getTargetUUID());
+            // Note: the receiver of this command is expected to be the only data bearing shard for
+            // the collection - change stream readers expect to observe the effects of the DDL from
+            // here.
+            convertToCapped(opCtx, ns(), size, false /*fromMigrate*/, request().getTargetUUID());
 
             // In case no write that generated a retryable write oplog entry with this sessionId
             // and txnNumber has happened, we need to make a dummy write so that the session gets
