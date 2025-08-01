@@ -678,6 +678,9 @@ if args.command == "branch":
 
                 def validate_binaries(sources_text):
                     return "src/mongo/db/modules/enterprise" in sources_text
+                
+            def validate_atlas_binaries(sources_text):
+                    return "src/mongo/db/modules/atlas" not in sources_text
 
             os.makedirs("dist-test", exist_ok=True)
 
@@ -722,6 +725,8 @@ if args.command == "branch":
                 logging.info(output_text)
                 if not validate_binaries(output_text):
                     raise Exception(exception_msg.format(binfile=binfile))
+                if not validate_atlas_binaries(output_text):
+                    raise Exception(f"Found atlas code in release binary {binfile}.")
 
                 if p.returncode != 0:
                     raise Exception("GDB process exited non-zero!")

@@ -1115,6 +1115,7 @@ disagg_storage:
     slack: disaggregated-storage-mongod
     jira: RSSD
   files:
+    - src/mongo/db/modules/atlas
     - src/mongo/db/disagg_storage
 
 storage_engine_api:

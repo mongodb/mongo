@@ -2891,3 +2891,29 @@ string_flag(
     name = "win_min_version",
     build_setting_default = "10",
 )
+
+# --------------------------------------
+# build_atlas
+# --------------------------------------
+
+bool_flag(
+    name = "build_atlas",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "build_atlas_enabled",
+    flag_values = {
+        "//bazel/config:build_atlas": "True",
+    },
+)
+
+selects.config_setting_group(
+    name = "build_atlas_required_settings",
+    match_all = [
+        ":build_grpc_enabled",
+        ":build_otel_enabled",
+        ":build_atlas_enabled",
+        ":build_enterprise_enabled",
+    ],
+)

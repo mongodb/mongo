@@ -39,6 +39,10 @@ def main():
             )
             args += ["--build_enterprise=False", "--config=local"]
 
+        atlas_mod = REPO_ROOT / "src" / "mongo" / "db" / "modules" / "atlas"
+        if not atlas_mod.exists():
+            args += ["--build_atlas=False"]
+
         engflow_auth(args)
 
         write_workstation_bazelrc(args)

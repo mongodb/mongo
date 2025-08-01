@@ -2004,6 +2004,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/memory_tracking/**/memory_usage_tracker* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/memory_tracking/**/operation_memory_usage_tracker* @10gen/query-integration-observability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/modules/atlas/OWNERS.yml
+/src/mongo/db/modules/atlas/**/* @10gen/server-disagg-storage @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/OWNERS.yml
 /src/mongo/db/modules/enterprise/BUILD.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/modules/enterprise/README.md @10gen/server-release @svc-auto-approve-bot

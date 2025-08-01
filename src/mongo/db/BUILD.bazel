@@ -3661,6 +3661,11 @@ mongo_cc_library(
             "//src/mongo/util/tracing_profiler",
         ],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:build_atlas_required_settings": [
+            "//src/mongo/db/modules/atlas:atlas_only",
+        ],
+        "//conditions:default": [],
     }),
 )
 
