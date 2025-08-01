@@ -266,17 +266,17 @@ ObjectIdDistribution::ObjectIdDistribution(MixedDistributionDescriptor distrDesc
  */
 sbe::value::ObjectIdType createObjectId(uint32_t a, uint32_t b, uint32_t c) {
     return {
-        static_cast<uint8_t>((a << 24) & 0xff),
-        static_cast<uint8_t>((a << 16) & 0xff),
-        static_cast<uint8_t>((a << 8) & 0xff),
+        static_cast<uint8_t>((a >> 24) & 0xff),
+        static_cast<uint8_t>((a >> 16) & 0xff),
+        static_cast<uint8_t>((a >> 8) & 0xff),
         static_cast<uint8_t>(a & 0xff),
-        static_cast<uint8_t>((b << 24) & 0xff),
-        static_cast<uint8_t>((b << 16) & 0xff),
-        static_cast<uint8_t>((b << 8) & 0xff),
+        static_cast<uint8_t>((b >> 24) & 0xff),
+        static_cast<uint8_t>((b >> 16) & 0xff),
+        static_cast<uint8_t>((b >> 8) & 0xff),
         static_cast<uint8_t>(b & 0xff),
-        static_cast<uint8_t>((c << 24) & 0xff),
-        static_cast<uint8_t>((c << 16) & 0xff),
-        static_cast<uint8_t>((c << 8) & 0xff),
+        static_cast<uint8_t>((c >> 24) & 0xff),
+        static_cast<uint8_t>((c >> 16) & 0xff),
+        static_cast<uint8_t>((c >> 8) & 0xff),
         static_cast<uint8_t>(c & 0xff),
     };
 }
