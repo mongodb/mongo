@@ -36,6 +36,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <functional>
@@ -43,7 +44,7 @@
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 /**
@@ -110,4 +111,4 @@ private:
     std::vector<InitialSyncCrashRecoveryFunction> _crashRecoveryFunctions;
 };
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

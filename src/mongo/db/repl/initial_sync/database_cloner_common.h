@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace repl {

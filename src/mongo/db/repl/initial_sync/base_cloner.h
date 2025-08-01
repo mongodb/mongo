@@ -43,6 +43,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <string>
@@ -89,7 +90,7 @@ public:
     /**
      * For unit testing, allow stopping after any given stage.
      */
-    void setStopAfterStage_forTest(std::string stage);
+    MONGO_MOD_PRIVATE void setStopAfterStage_forTest(std::string stage);
 
 private:
     // The _clonerName must be initialized before _mutex, as _clonerName is used to generate the

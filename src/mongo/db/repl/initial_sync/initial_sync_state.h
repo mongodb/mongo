@@ -33,6 +33,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/initial_sync/all_database_cloner.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace repl {

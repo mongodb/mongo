@@ -38,6 +38,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <string>
@@ -55,7 +56,7 @@ public:
                           ThreadPool* dbPool);
     ~InitialSyncBaseCloner() override = default;
 
-    int getRetryableOperationCount_forTest();
+    MONGO_MOD_PRIVATE int getRetryableOperationCount_forTest();
 
 protected:
     InitialSyncSharedData* getSharedData() const final {

@@ -35,8 +35,9 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 /**
  * An interface for the Initial Syncer that declares functions that are used by
@@ -129,4 +130,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

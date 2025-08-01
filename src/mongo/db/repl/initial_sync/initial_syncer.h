@@ -63,6 +63,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -78,13 +79,17 @@
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
-namespace repl {
 
+namespace MONGO_MOD_PUB repl {
 // Failpoint which causes the initial sync function to hang before copying databases.
 extern FailPoint initialSyncHangBeforeCopyingDatabases;
 
 // Failpoint which stops the applier.
 extern FailPoint rsSyncApplyStop;
+
+}  // namespace MONGO_MOD_PUB repl
+
+namespace repl {
 
 struct InitialSyncState;
 struct MemberState;
@@ -102,7 +107,7 @@ class StorageInterface;
  * Entry Points:
  *      -- startup: Start initial sync.
  */
-class InitialSyncer : public InitialSyncerInterface {
+class MONGO_MOD_PRIVATE InitialSyncer : public InitialSyncerInterface {
     InitialSyncer(const InitialSyncer&) = delete;
     InitialSyncer& operator=(const InitialSyncer&) = delete;
 

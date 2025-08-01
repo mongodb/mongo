@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -50,7 +51,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 /**
@@ -135,4 +136,4 @@ private:
     ReverseHostOnlyMapping _reverseHostMapping;
 };
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

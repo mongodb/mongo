@@ -47,6 +47,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
@@ -82,8 +83,8 @@ protected:
     ServiceContext::UniqueClient _oldClient;
 
 private:
-    unittest::MinimumLoggedSeverityGuard _verboseGuard{logv2::LogComponent::kReplicationInitialSync,
-                                                       logv2::LogSeverity::Debug(1)};
+    MONGO_MOD_FILE_PRIVATE unittest::MinimumLoggedSeverityGuard _verboseGuard{
+        logv2::LogComponent::kReplicationInitialSync, logv2::LogSeverity::Debug(1)};
 };
 
 }  // namespace repl

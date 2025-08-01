@@ -34,6 +34,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status_with.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <ostream>
@@ -48,7 +49,7 @@ namespace repl {
  * are persisted and/or sent over the network, so their values are reserved forever. Do not change
  * or delete them, except to update RS_MAX when introducing new states.
  */
-struct MemberState {
+struct MONGO_MOD_PUB MemberState {
     enum MS {
         // Server is still starting-up or the replica set is still being initiated
         RS_STARTUP = 0,

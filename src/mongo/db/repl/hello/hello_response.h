@@ -39,6 +39,7 @@
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <string>
@@ -61,7 +62,7 @@ namespace repl {
  * Response structure for the hello command. Only handles responses from nodes
  * that are in replset mode.
  */
-class HelloResponse {
+class MONGO_MOD_PUB HelloResponse {
 public:
     HelloResponse();
 

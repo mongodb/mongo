@@ -33,6 +33,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -114,7 +115,8 @@ public:
         return _allowedOutageDuration;
     }
 
-    void setAllowedOutageDuration_forTest(WithLock, Milliseconds allowedOutageDuration) {
+    MONGO_MOD_PRIVATE void setAllowedOutageDuration_forTest(WithLock,
+                                                            Milliseconds allowedOutageDuration) {
         _allowedOutageDuration = allowedOutageDuration;
     }
 

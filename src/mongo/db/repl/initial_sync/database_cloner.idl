@@ -54,6 +54,7 @@ structs:
                 optional: true
             uuid:
                 type: uuid
+        mod_visibility: pub
 
     ListCollectionResult:
         description: "A struct representing the output of the listCollections command"
@@ -73,3 +74,4 @@ structs:
             info:
                 type: CollectionInfo
             # The idIndex field is not used in initial sync, so we do not define it here.
+        mod_visibility: pub

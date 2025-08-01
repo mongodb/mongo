@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace repl {

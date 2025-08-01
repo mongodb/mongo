@@ -41,6 +41,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <cstddef>
