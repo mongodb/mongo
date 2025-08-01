@@ -157,7 +157,7 @@ rules:
         forbidden_task_tag: "experimental"
         ignored_tasks: [
             # TODO: remove this exception when SERVER-94572 is resolved
-            "streams_kafka",
+            "streams_kafka_gen",
             "streams_kafka_gwproxy",
             "streams_lambda",
             "streams_s3",
