@@ -353,7 +353,6 @@ export function runMemoryStatsTest({
     stageName,
     expectedNumGetMores,
     skipInUseMemBytesCheck = false,
-    // TODO SERVER-105637 Remove this param.
     checkInUseMemBytesResets = true
 }) {
     assert("pipeline" in commandObj, "Command object must include a pipeline field.");
