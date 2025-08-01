@@ -204,7 +204,7 @@ const MetaFields = Object.freeze({
     VECTOR_SEARCH_SCORE: {
         name: "vectorSearchScore",
         shouldBeValidated: true,
-        debugName: "$vectorSearch distance",
+        debugName: "$vectorSearch score",
         validSortKey: true,
         firstStageRequired: [FirstStageOptions.VECTOR_SEARCH]
     },
