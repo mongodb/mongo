@@ -6,7 +6,6 @@
 //   does_not_support_stepdowns,
 //   directly_against_shardsvrs_incompatible,
 //   simulate_atlas_proxy_incompatible,
-//   requires_fcv_80,
 // ]
 //
 

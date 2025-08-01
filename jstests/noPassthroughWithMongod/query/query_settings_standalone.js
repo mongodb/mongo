@@ -1,9 +1,6 @@
 /**
  * Tests that modifying query settings is not allowed on standalone (because of the missing
  * 'VectorClock').
- * @tags: [
- *   requires_fcv_80,
- * ]
  */
 
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";

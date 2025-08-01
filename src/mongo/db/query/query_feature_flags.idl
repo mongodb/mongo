@@ -64,14 +64,6 @@ feature_flags:
         default: true
         fcv_gated: false
 
-    featureFlagQuerySettings:
-        description: "Feature flag for enabling persistent query settings"
-        cpp_varname: gFeatureFlagQuerySettings
-        default: true
-        version: 8.0
-        fcv_gated: true
-        fcv_context_unaware: true
-
     featureFlagVectorSearchPublicPreview:
         description: "Feature flag to enable vector search for public preview."
         cpp_varname: gFeatureFlagVectorSearchPublicPreview

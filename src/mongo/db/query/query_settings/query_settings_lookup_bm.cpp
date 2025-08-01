@@ -362,9 +362,6 @@ class QuerySettingsNotMultitenantLookupBenchmark : public QuerySettingsLookupBen
             setGlobalServiceContext(ServiceContext::make());
             query_settings::QuerySettingsService::initializeForTest(getGlobalServiceContext());
 
-            // Initialize the feature flag.
-            _querySettingsFeatureFlag.emplace("featureFlagQuerySettings", true);
-
             // Query settings are populated only for a single tenant (global scope).
             auto numberOfExistingSettings = state.range(0);
             populateQueryShapeConfigurations(
@@ -391,7 +388,6 @@ class QuerySettingsMultiTenantLookupBenchmark : public QuerySettingsLookupBenchm
             query_settings::QuerySettingsService::initializeForTest(getGlobalServiceContext());
 
             // Initialize the feature flags.
-            _querySettingsFeatureFlag.emplace("featureFlagQuerySettings", true);
             _multitenancyFeatureFlag.emplace("multitenancySupport", true);
         }
 

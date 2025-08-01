@@ -1493,8 +1493,6 @@ const allCommands = {
     },
     setQuerySettings: {
         skip: commandIsDisabledOnLastLTS,
-        // TODO: SERVER-71537 Remove Feature Flag for PM-412.
-        checkFeatureFlag: "QuerySettings",
         isAdminCommand: true,
         doesNotRunOnStandalone: true,
         command: {
@@ -1504,8 +1502,6 @@ const allCommands = {
     },
     removeQuerySettings: {
         skip: commandIsDisabledOnLastLTS,
-        // TODO: SERVER-71537 Remove Feature Flag for PM-412.
-        checkFeatureFlag: "QuerySettings",
         isAdminCommand: true,
         doesNotRunOnStandalone: true,
         command: {

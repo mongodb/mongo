@@ -21,7 +21,6 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getPlanStage,
@@ -255,8 +254,7 @@ if (isShardedColl) {
 
 // We respect query settings such as allowedIndexes when they are specified.
 // TODO SERVER-87016: change this if statement to allow sharded collections.
-if (!isShardedColl && !FixtureHelpers.isStandalone(db) &&
-    FeatureFlagUtil.isEnabled(db, "QuerySettings")) {
+if (!isShardedColl && !FixtureHelpers.isStandalone(db)) {
     jsTestLog("Running query settings test");
 
     const qsutils = new QuerySettingsUtils(db, coll.getName());

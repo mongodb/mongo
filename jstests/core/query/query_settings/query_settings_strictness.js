@@ -8,7 +8,6 @@
  *   directly_against_shardsvrs_incompatible,
  *   requires_non_retryable_commands,
  *   simulate_atlas_proxy_incompatible,
- *   requires_fcv_80,
  *   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer.
  *   assumes_balancer_off,
  * ]

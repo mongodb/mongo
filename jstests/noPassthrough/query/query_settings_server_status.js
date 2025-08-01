@@ -5,7 +5,6 @@
 // * are restored to their previous values on upon restarts
 //
 // @tags: [
-//   requires_fcv_80,
 //   # This test needs persistence to ensure that query settings metrics survive cluster restarts.
 //   requires_persistence,
 // ]

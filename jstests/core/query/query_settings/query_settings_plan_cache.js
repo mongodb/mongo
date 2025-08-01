@@ -18,7 +18,6 @@
 //   directly_against_shardsvrs_incompatible,
 //   # Index filter commands do not accept security token.
 //   not_allowed_with_signed_security_token,
-//   requires_fcv_80,
 //   # Query settings commands can not be handled by atlas proxy.
 //   simulate_atlas_proxy_incompatible,
 //   requires_getmore,

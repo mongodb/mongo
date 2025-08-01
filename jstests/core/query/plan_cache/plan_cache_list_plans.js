@@ -21,8 +21,6 @@
 //   # Query settings are atlas proxy and direct shard execution incompatible.
 //   directly_against_shardsvrs_incompatible,
 //   simulate_atlas_proxy_incompatible,
-//   # Query settings are not supported in upgrade/downgrade scenario
-//   cannot_run_during_upgrade_downgrade,
 //   # The test examines the SBE plan cache, which initial sync may change the contents of.
 //   examines_sbe_cache,
 //   # This test checks a new field "solutionHash" in $planCacheStats, not available in previous
@@ -32,7 +30,6 @@
 //   requires_getmore,
 // ]
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getPlanCacheKeyFromPipeline,
@@ -228,8 +225,7 @@ if (!isUsingSbePlanCache) {
 }
 
 // Ensure query setting entry is present in $planCacheStats output.
-// TODO: SERVER-71537 Remove Feature Flag for PM-412.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings") && !FixtureHelpers.isStandalone(db)) {
+if (!FixtureHelpers.isStandalone(db)) {
     // Set query settings for a query to use 'settings.indexHints.allowedIndexes' indexes.
     const qsutils = new QuerySettingsUtils(db, coll.getName());
 

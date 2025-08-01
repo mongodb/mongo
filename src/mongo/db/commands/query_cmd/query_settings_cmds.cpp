@@ -293,10 +293,6 @@ public:
         using InvocationBase::InvocationBase;
 
         SetQuerySettingsCommandReply typedRun(OperationContext* opCtx) {
-            uassert(7746400,
-                    "setQuerySettings command is unknown",
-                    feature_flags::gFeatureFlagQuerySettings.isEnabled(
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             assertNoStandalone(opCtx, definition()->getName());
 
             // Ensure FCV is not changing throughout the command execution.
@@ -477,10 +473,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(7746700,
-                    "removeQuerySettings command is unknown",
-                    feature_flags::gFeatureFlagQuerySettings.isEnabled(
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             assertNoStandalone(opCtx, definition()->getName());
 
             // Ensure FCV is not changing throughout the command execution.

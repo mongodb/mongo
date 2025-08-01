@@ -7,7 +7,6 @@
  *   does_not_support_transactions,
  *   does_not_support_stepdowns,
  *   no_selinux,
- *   requires_fcv_80,
  *   simulate_atlas_proxy_incompatible,
  * ]
  */

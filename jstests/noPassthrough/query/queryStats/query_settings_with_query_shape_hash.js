@@ -1,7 +1,4 @@
 // Tests that setting PQS works with the 'queryShapeHash' exposed via $queryStats.
-// @tags: [
-//   requires_fcv_80,
-// ]
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";

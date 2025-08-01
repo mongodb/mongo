@@ -12,8 +12,6 @@ selector:
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - featureFlagFLE2CleanupCommand
-    # TODO: SERVER-71537 Remove Feature Flag for PM-412.
-    - featureFlagQuerySettings
     # TODO: SERVER-66393 Remove Feature Flag for PM-2919.
     - featureFlagTimeseriesUpdatesSupport
     - featureFlagTimeseriesUpdatesSupport_incompatible

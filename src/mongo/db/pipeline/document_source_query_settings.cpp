@@ -45,11 +45,10 @@ namespace mongo {
 
 using namespace query_settings;
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(querySettings,
-                                           DocumentSourceQuerySettings::LiteParsed::parse,
-                                           DocumentSourceQuerySettings::createFromBson,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           &feature_flags::gFeatureFlagQuerySettings);
+REGISTER_DOCUMENT_SOURCE(querySettings,
+                         DocumentSourceQuerySettings::LiteParsed::parse,
+                         DocumentSourceQuerySettings::createFromBson,
+                         AllowedWithApiStrict::kNeverInVersion1);
 ALLOCATE_DOCUMENT_SOURCE_ID(querySettings, DocumentSourceQuerySettings::id)
 
 DocumentSourceQuerySettings::DocumentSourceQuerySettings(
