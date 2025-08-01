@@ -2215,7 +2215,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_function* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_hasher* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_test_api_version* @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/pipeline/**/expression_dependencies* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_javascript* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_js* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_visitor* @10gen/query-optimization @svc-auto-approve-bot
@@ -2393,6 +2392,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/query/compiler/ce/OWNERS.yml
 /src/mongo/db/query/compiler/ce/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/compiler/ce/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/query/compiler/dependency_analysis/OWNERS.yml
+/src/mongo/db/query/compiler/dependency_analysis/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/compiler/dependency_analysis/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/compiler/logical_model/projection/OWNERS.yml
 /src/mongo/db/query/compiler/logical_model/projection/**/* @10gen/query-optimization @svc-auto-approve-bot

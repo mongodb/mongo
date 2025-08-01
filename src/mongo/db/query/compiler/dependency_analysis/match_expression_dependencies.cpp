@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/match_expression_dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
@@ -64,7 +64,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
-#include "mongo/db/pipeline/expression_dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/db/query/tree_walker.h"
 
 #include <cstddef>
@@ -73,7 +73,7 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo::match_expression {
+namespace mongo::dependency_analysis {
 
 namespace {
 
@@ -405,4 +405,4 @@ void addVariableRefs(const MatchExpression* expr, std::set<Variables::Id>* refs)
     tree_walker::walk<true, MatchExpression>(expr, &walker);
 }
 
-}  // namespace mongo::match_expression
+}  // namespace mongo::dependency_analysis

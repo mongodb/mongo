@@ -847,7 +847,10 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
     fcr->setProjection(fromjson("{varIs: '$$var'}"));
 
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());
-    expCtx->variables.seedVariablesWithLetParameters(expCtx.get(), *fcr->getLet());
+    expCtx->variables.seedVariablesWithLetParameters(
+        expCtx.get(), *fcr->getLet(), [](const Expression* expr) {
+            return expression::getDependencies(expr).hasNoRequirements();
+        });
     auto hmacApplied = makeQueryStatsKeyFindRequest(*fcr, expCtx, false);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({

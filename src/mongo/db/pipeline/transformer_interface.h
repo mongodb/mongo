@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_options.h"
 
 namespace mongo {

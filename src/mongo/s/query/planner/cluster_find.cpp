@@ -783,7 +783,10 @@ std::unique_ptr<CanonicalQuery> ClusterFind::generateAndValidateCanonicalQuery(
     // Evaluate let params once: not per shard, and not per retry.
     if (auto letParams = findCommand.getLet()) {
         auto* expCtx = query->getExpCtx().get();
-        expCtx->variables.seedVariablesWithLetParameters(expCtx, *letParams);
+        expCtx->variables.seedVariablesWithLetParameters(
+            expCtx, *letParams, [](const Expression* expr) {
+                return expression::getDependencies(expr).hasNoRequirements();
+            });
     }
 
     return query;

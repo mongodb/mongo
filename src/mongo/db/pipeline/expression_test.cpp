@@ -46,8 +46,8 @@
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/name_expression.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep

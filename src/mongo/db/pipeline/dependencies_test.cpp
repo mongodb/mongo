@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"

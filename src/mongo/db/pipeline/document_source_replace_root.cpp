@@ -35,14 +35,14 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_expr.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_replace_root_gen.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -119,7 +119,7 @@ void ReplaceRootTransformation::reportRenames(const MatchExpression* expr,
                                               const std::string& prefixPath,
                                               StringMap<std::string>& renames) {
     DepsTracker deps;
-    match_expression::addDependencies(expr, &deps);
+    dependency_analysis::addDependencies(expr, &deps);
     for (const auto& path : deps.fields) {
         // Only record renames for top level paths.
         const auto oldPathTopLevelField = FieldPath::extractFirstFieldFromDottedPath(path);

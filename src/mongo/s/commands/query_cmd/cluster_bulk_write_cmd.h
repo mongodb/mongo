@@ -382,7 +382,10 @@ public:
             if (auto let = bulkRequest.getLet()) {
                 // Evaluate the let parameters.
                 auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).letParameters(*let).build();
-                expCtx->variables.seedVariablesWithLetParameters(expCtx.get(), *let);
+                expCtx->variables.seedVariablesWithLetParameters(
+                    expCtx.get(), *let, [](const Expression* expr) {
+                        return expression::getDependencies(expr).hasNoRequirements();
+                    });
                 bulkRequest.setLet(expCtx->variables.toBSON(expCtx->variablesParseState, *let));
             }
 

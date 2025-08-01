@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_options.h"
@@ -98,7 +99,10 @@ public:
         _setTimeZoneDatabase();
 
         if (_params.letParameters) {
-            variables.seedVariablesWithLetParameters(this, *_params.letParameters);
+            variables.seedVariablesWithLetParameters(
+                this, *_params.letParameters, [](const Expression* expr) {
+                    return expression::getDependencies(expr).hasNoRequirements();
+                });
         }
     }
 
@@ -187,7 +191,10 @@ public:
         }
 
         if (_params.letParameters) {
-            variables.seedVariablesWithLetParameters(this, *_params.letParameters);
+            variables.seedVariablesWithLetParameters(
+                this, *_params.letParameters, [](const Expression* expr) {
+                    return expression::getDependencies(expr).hasNoRequirements();
+                });
         }
     }
 
@@ -216,7 +223,10 @@ public:
         _setTimeZoneDatabase();
 
         if (_params.letParameters) {
-            variables.seedVariablesWithLetParameters(this, *_params.letParameters);
+            variables.seedVariablesWithLetParameters(
+                this, *_params.letParameters, [](const Expression* expr) {
+                    return expression::getDependencies(expr).hasNoRequirements();
+                });
         }
     }
 

@@ -37,9 +37,9 @@
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/index/btree_key_generator.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor_factory.h"
@@ -88,7 +88,7 @@ bool containsDottedPath(const std::vector<std::string>& topLevelSampleFieldNames
 void checkSampleContainsMatchExpressionFields(
     const std::vector<std::string>& topLevelSampleFieldNames, const MatchExpression* expr) {
     DepsTracker deps;
-    match_expression::addDependencies(expr, &deps);
+    dependency_analysis::addDependencies(expr, &deps);
 
     const auto matchExpressionFields = stage_builder::getTopLevelFields(deps.fields);
     stdx::unordered_set<StringData> topLevelSampleFieldNamesSet(topLevelSampleFieldNames.begin(),

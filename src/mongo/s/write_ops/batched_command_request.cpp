@@ -36,6 +36,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
@@ -72,7 +73,9 @@ BSONObj freezeLet(OperationContext* opCtx,
                       .runtimeConstants(legacyRuntimeConstants)
                       .letParameters(let)
                       .build();
-    expCtx->variables.seedVariablesWithLetParameters(expCtx.get(), let);
+    expCtx->variables.seedVariablesWithLetParameters(expCtx.get(), let, [](const Expression* expr) {
+        return expression::getDependencies(expr).hasNoRequirements();
+    });
     return expCtx->variables.toBSON(expCtx->variablesParseState, let);
 }
 

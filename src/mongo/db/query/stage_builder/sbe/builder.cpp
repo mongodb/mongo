@@ -54,11 +54,9 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -69,6 +67,8 @@
 #include "mongo/db/pipeline/window_function/window_function_shift.h"
 #include "mongo/db/pipeline/window_function/window_function_top_bottom_n.h"
 #include "mongo/db/query/bind_input_params.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
@@ -1261,7 +1261,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
 
     if (fn->filter) {
         DepsTracker deps;
-        match_expression::addDependencies(fn->filter.get(), &deps);
+        dependency_analysis::addDependencies(fn->filter.get(), &deps);
         // If the filter predicate doesn't need the whole document, then we take all the top-level
         // fields referenced by the filter predicate and we add them to 'fields'.
         if (!deps.needWholeDocument) {
@@ -1870,7 +1870,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildMatch(const Query
     std::vector<std::string> fields;
     if (mn->filter) {
         DepsTracker filterDeps;
-        match_expression::addDependencies(mn->filter.get(), &filterDeps);
+        dependency_analysis::addDependencies(mn->filter.get(), &filterDeps);
 
         // If the filter predicate doesn't need the whole document, then we take all the top-level
         // fields referenced by the filter predicate and we add them to 'fields'.
@@ -3104,7 +3104,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOr(const QuerySol
 
     if (orn->filter) {
         DepsTracker deps;
-        match_expression::addDependencies(orn->filter.get(), &deps);
+        dependency_analysis::addDependencies(orn->filter.get(), &deps);
         // If the filter predicate doesn't need the whole document, then we take all the top-level
         // fields referenced by the filter predicate and we add them to 'fields'.
         if (!deps.needWholeDocument) {

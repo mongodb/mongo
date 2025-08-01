@@ -26,20 +26,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "dependencies",
-    srcs = [
-        "dependencies.cpp",
-    ],
-    hdrs = [
-        "dependencies.h",
-    ],
-    deps = [
-        ":field_path",
-        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
     name = "document_path_support",
     srcs = [
         "document_path_support.cpp",
@@ -699,7 +685,6 @@ mongo_cc_library(
         ":accumulator",
         ":change_stream_error_extra_info",
         ":change_stream_helpers",
-        ":dependencies",
         ":document_path_support",
         ":document_sources_idl",
         ":granularity_rounder",
@@ -735,6 +720,7 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:generic_cursor",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/collation:collator_interface",
+        "//src/mongo/db/query/compiler/dependency_analysis:dependencies",
         "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/query/compiler/physical_model/query_solution",

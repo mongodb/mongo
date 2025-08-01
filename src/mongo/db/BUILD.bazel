@@ -2437,7 +2437,6 @@ mongo_cc_library(
         "//src/mongo/db/exec/matcher:matcher_text.cpp",
         "//src/mongo/db/exec/matcher:matcher_where.cpp",
         "//src/mongo/db/matcher:expression.cpp",
-        "//src/mongo/db/matcher:expression_algo.cpp",
         "//src/mongo/db/matcher:expression_array.cpp",
         "//src/mongo/db/matcher:expression_expr.cpp",
         "//src/mongo/db/matcher:expression_geo.cpp",
@@ -2454,7 +2453,6 @@ mongo_cc_library(
         "//src/mongo/db/matcher:extensions_callback.cpp",
         "//src/mongo/db/matcher:extensions_callback_noop.cpp",
         "//src/mongo/db/matcher:in_list_data.cpp",
-        "//src/mongo/db/matcher:match_expression_dependencies.cpp",
         "//src/mongo/db/matcher:match_expression_util.cpp",
         "//src/mongo/db/matcher:matchable.cpp",
         "//src/mongo/db/matcher:matcher_type_set.cpp",
@@ -2474,7 +2472,6 @@ mongo_cc_library(
         "//src/mongo/db/matcher/schema:json_pointer.cpp",
         "//src/mongo/db/pipeline:expression.cpp",
         "//src/mongo/db/pipeline:expression_context.cpp",
-        "//src/mongo/db/pipeline:expression_dependencies.cpp",
         "//src/mongo/db/pipeline:expression_find_internal.cpp",
         "//src/mongo/db/pipeline:expression_function.cpp",
         "//src/mongo/db/pipeline:expression_js_emit.cpp",
@@ -2501,7 +2498,6 @@ mongo_cc_library(
         "//src/mongo/db/exec/matcher:matcher_geo.h",
         "//src/mongo/db/exec/sbe:match_path.h",
         "//src/mongo/db/matcher:expression.h",
-        "//src/mongo/db/matcher:expression_algo.h",
         "//src/mongo/db/matcher:expression_always_boolean.h",
         "//src/mongo/db/matcher:expression_arity.h",
         "//src/mongo/db/matcher:expression_array.h",
@@ -2524,7 +2520,6 @@ mongo_cc_library(
         "//src/mongo/db/matcher:extensions_callback.h",
         "//src/mongo/db/matcher:extensions_callback_noop.h",
         "//src/mongo/db/matcher:in_list_data.h",
-        "//src/mongo/db/matcher:match_expression_dependencies.h",
         "//src/mongo/db/matcher:match_expression_util.h",
         "//src/mongo/db/matcher:match_expression_walker.h",
         "//src/mongo/db/matcher:matchable.h",
@@ -2553,7 +2548,6 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:expression.h",
         "//src/mongo/db/pipeline:expression_context.h",
         "//src/mongo/db/pipeline:expression_context_diagnostic_printer.h",
-        "//src/mongo/db/pipeline:expression_dependencies.h",
         "//src/mongo/db/pipeline:expression_find_internal.h",
         "//src/mongo/db/pipeline:expression_function.h",
         "//src/mongo/db/pipeline:expression_hasher.h",
@@ -2598,13 +2592,13 @@ mongo_cc_library(
         "//src/mongo/db/geo:geoparser",
         "//src/mongo/db/matcher:path",
         "//src/mongo/db/pipeline:aggregation_request_helper",
-        "//src/mongo/db/pipeline:dependencies",
         "//src/mongo/db/pipeline:variable_validation",
         "//src/mongo/db/query:query_knob_configuration",
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:random_utils",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/compiler/dependency_analysis:dependencies",
         "//src/mongo/db/query/datetime:date_time_support",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_settings",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_shape:query_shape_common",  # TODO(SERVER-93876): Remove.
@@ -2644,6 +2638,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:query_expressions",
+        "//src/mongo/db/query/compiler/dependency_analysis",
     ],
 )
 

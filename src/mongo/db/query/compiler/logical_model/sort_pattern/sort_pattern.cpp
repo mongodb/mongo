@@ -37,8 +37,8 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/util/str.h"
 
 #include <string>

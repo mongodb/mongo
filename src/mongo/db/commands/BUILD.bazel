@@ -691,7 +691,6 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:document_source_set_window_fields_gen",
         "//src/mongo/db/pipeline:expression.h",
         "//src/mongo/db/pipeline:expression_context.h",
-        "//src/mongo/db/pipeline:expression_dependencies.h",
         "//src/mongo/db/pipeline:expression_from_accumulator_quantile.h",
         "//src/mongo/db/pipeline:expression_visitor.h",
         "//src/mongo/db/pipeline:expression_walker.h",
@@ -745,6 +744,7 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:cursor_response_gen",
         "//src/mongo/db/query/client_cursor:generic_cursor_gen",
         "//src/mongo/db/query/collation:collator_factory_interface.h",
+        "//src/mongo/db/query/compiler/dependency_analysis:expression_dependencies.h",
         "//src/mongo/db/query/compiler/logical_model/projection:projection.h",
         "//src/mongo/db/query/compiler/logical_model/projection:projection_ast.h",
         "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_visitor.h",
@@ -1051,6 +1051,7 @@ mongo_cc_library(
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/query/compiler/dependency_analysis",
         "//src/mongo/db/query/query_stats",
     ],
 )

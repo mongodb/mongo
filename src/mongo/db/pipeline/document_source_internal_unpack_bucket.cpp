@@ -51,7 +51,6 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
@@ -74,6 +73,7 @@
 #include "mongo/db/pipeline/monotonic_expression.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
@@ -1164,7 +1164,7 @@ void DocumentSourceInternalUnpackBucket::setEventFilter(BSONObj eventFilterBson,
         std::min(originalSbeCompatibility, _isEventFilterSbeCompatible.get()));
 
     _eventFilterDeps = DepsTracker();
-    match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
+    dependency_analysis::addDependencies(_eventFilter.get(), &_eventFilterDeps);
 }
 
 void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& project,
@@ -1732,17 +1732,17 @@ DepsTracker DocumentSourceInternalUnpackBucket::getRestPipelineDependencies(
         DocumentSourceContainer{std::next(itr), container->end()},
         DepsTracker::NoMetadataValidation());
     if (_eventFilter && includeEventFilter) {
-        match_expression::addDependencies(_eventFilter.get(), &deps);
+        dependency_analysis::addDependencies(_eventFilter.get(), &deps);
     }
     return deps;
 }
 
 void DocumentSourceInternalUnpackBucket::addVariableRefs(std::set<Variables::Id>* refs) const {
     if (_eventFilter) {
-        match_expression::addVariableRefs(eventFilter(), refs);
+        dependency_analysis::addVariableRefs(eventFilter(), refs);
     }
     if (_wholeBucketFilter) {
-        match_expression::addVariableRefs(wholeBucketFilter(), refs);
+        dependency_analysis::addVariableRefs(wholeBucketFilter(), refs);
     }
 }
 

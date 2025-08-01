@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 
 namespace mongo {
 

@@ -30,8 +30,8 @@
 #include "mongo/db/exec/inclusion_projection_executor.h"
 
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/expression_walker.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 

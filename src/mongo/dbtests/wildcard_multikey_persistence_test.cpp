@@ -50,7 +50,7 @@
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"

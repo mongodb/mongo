@@ -30,7 +30,7 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/abt_defs.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -79,7 +79,7 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
     if (unpackNode->eventFilter) {
         DepsTracker eventFilterDeps;
         ;
-        match_expression::addDependencies(unpackNode->eventFilter.get(), &eventFilterDeps);
+        dependency_analysis::addDependencies(unpackNode->eventFilter.get(), &eventFilterDeps);
         for (const auto& path : eventFilterDeps.fields) {
             auto rootField = std::string{FieldPath::extractFirstFieldFromDottedPath(path)};
             // Check that the collected path doesn't start from a metadata field, and that it's one
@@ -367,7 +367,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnpackTsBucket(
     // non-produced fields with the 'Nothing' slot.
     {
         DepsTracker eventFilterDeps;
-        match_expression::addDependencies(eventFilter, &eventFilterDeps);
+        dependency_analysis::addDependencies(eventFilter, &eventFilterDeps);
         for (const std::string& eventFilterPath : eventFilterDeps.fields) {
             if (eventFilterPath.empty()) {
                 continue;

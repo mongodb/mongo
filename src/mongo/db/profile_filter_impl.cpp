@@ -33,12 +33,12 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -63,7 +63,7 @@ ProfileFilterImpl::ProfileFilterImpl(BSONObj expr,
     : _matcher(expr.getOwned(), parserExpCtx) {
 
     DepsTracker deps;
-    match_expression::addDependencies(_matcher.getMatchExpression(), &deps);
+    dependency_analysis::addDependencies(_matcher.getMatchExpression(), &deps);
     uassert(4910201,
             "Profile filter is not allowed to depend on metadata",
             !deps.getNeedsAnyMetadata());

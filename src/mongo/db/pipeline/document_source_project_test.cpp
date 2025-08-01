@@ -43,10 +43,10 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 

@@ -41,11 +41,10 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/variable_validation.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/transport/session.h"
@@ -299,8 +298,10 @@ boost::optional<std::function<void(const Value&)>> validateVariable(OperationCon
 
 }  // namespace
 
-void Variables::seedVariablesWithLetParameters(ExpressionContext* const expCtx,
-                                               const BSONObj letParams) {
+void Variables::seedVariablesWithLetParameters(
+    ExpressionContext* const expCtx,
+    const BSONObj letParams,
+    std::function<bool(const Expression* expr)> exprRequirementsValidator) {
     for (auto&& elem : letParams) {
         const auto fieldName = elem.fieldNameStringData();
         auto maybeSystemVarValidator = validateVariable(expCtx->getOperationContext(), fieldName);
@@ -309,7 +310,7 @@ void Variables::seedVariablesWithLetParameters(ExpressionContext* const expCtx,
         uassert(4890500,
                 "Command let Expression tried to access a field, but this is not allowed because"
                 "Command let Expressions run before the query examines any documents.",
-                expression::getDependencies(expr.get()).hasNoRequirements());
+                exprRequirementsValidator(expr.get()));
         Value value = expr->evaluate(Document{}, &expCtx->variables);
 
         if (maybeSystemVarValidator) {

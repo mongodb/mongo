@@ -38,11 +38,11 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/util/assert_util.h"
@@ -592,7 +592,7 @@ DepsTracker::State DocumentSourceMatch::getDependencies(DepsTracker* deps) const
 DepsTracker::State DocumentSourceMatch::getDependencies(const MatchExpression* expr,
                                                         DepsTracker* deps) const {
     // Get all field or variable dependencies.
-    match_expression::addDependencies(expr, deps);
+    dependency_analysis::addDependencies(expr, deps);
 
     if (isTextQuery()) {
         // A $text aggregation field should return EXHAUSTIVE_FIELDS, since we don't necessarily
@@ -613,7 +613,7 @@ DepsTracker::State DocumentSourceMatch::getDependencies(const MatchExpression* e
 }
 
 void DocumentSourceMatch::addVariableRefs(std::set<Variables::Id>* refs) const {
-    match_expression::addVariableRefs(_matchProcessor->getExpression().get(), refs);
+    dependency_analysis::addVariableRefs(_matchProcessor->getExpression().get(), refs);
 }
 
 Value DocumentSourceInternalChangeStreamMatch::serialize(const SerializationOptions& opts) const {

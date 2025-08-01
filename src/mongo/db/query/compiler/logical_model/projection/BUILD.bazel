@@ -29,6 +29,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/query/compiler/dependency_analysis",
         "//src/mongo/db/query/compiler/parsers/matcher:matcher_parser",
         "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
     ],

@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/split_pipeline.h"
 
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
@@ -38,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

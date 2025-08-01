@@ -197,9 +197,14 @@ public:
     void setDefaultRuntimeConstants(OperationContext* opCtx);
 
     /**
-     * Seed let parameters with the given BSONObj.
+     * Seed let parameters with the given BSONObj. The 'exprRequirementsValidator' is a callback
+     * function to validate that the 'let' parameter expressions don't have any dependencies on
+     * the input documents or metadata.
      */
-    void seedVariablesWithLetParameters(ExpressionContext* expCtx, BSONObj letParameters);
+    void seedVariablesWithLetParameters(
+        ExpressionContext* expCtx,
+        BSONObj letParameters,
+        std::function<bool(const Expression* expr)> exprRequirementsValidator);
 
     /**
      * Serializes this Variables object to a BSONObj, according to the top level field names of

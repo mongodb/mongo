@@ -31,9 +31,9 @@
 
 #include "mongo/base/exact_cast.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
-#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_path_tracking_visitor.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_visitor.h"
 #include "mongo/db/query/tree_walker.h"
@@ -150,8 +150,8 @@ public:
     }
 
     void visit(const MatchExpressionASTNode* node) final {
-        match_expression::addDependencies(&(*node->matchExpression()),
-                                          &_context->data().fieldDependencyTracker);
+        dependency_analysis::addDependencies(&(*node->matchExpression()),
+                                             &_context->data().fieldDependencyTracker);
     }
 
     void visit(const ProjectionPositionalASTNode* node) final {

@@ -41,16 +41,13 @@
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
@@ -59,6 +56,9 @@
 #include "mongo/db/pipeline/spilling/spillable_map.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -189,7 +189,7 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {
         expression::addVariableRefs(_startWith.get(), refs);
         if (_additionalFilter) {
-            match_expression::addVariableRefs(
+            dependency_analysis::addVariableRefs(
                 uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, _fromExpCtx))
                     .get(),
                 refs);

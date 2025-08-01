@@ -484,8 +484,10 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContextBuilder::build() {
     auto expCtx = boost::intrusive_ptr<ExpressionContext>(new ExpressionContext{std::move(params)});
 
     if (expCtx->_params.letParameters) {
-        expCtx->variables.seedVariablesWithLetParameters(expCtx.get(),
-                                                         *expCtx->_params.letParameters);
+        expCtx->variables.seedVariablesWithLetParameters(
+            expCtx.get(), *expCtx->_params.letParameters, [](const Expression* expr) {
+                return expression::getDependencies(expr).hasNoRequirements();
+            });
     }
 
     return expCtx;

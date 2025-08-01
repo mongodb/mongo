@@ -41,9 +41,9 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/algebra/polyvalue.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
@@ -700,7 +700,7 @@ PlanStageReqs computeReqsForIndexScan(const PlanStageReqs& reqs,
         // and add these fields to 'ixScanReqs'.
         if (filter) {
             DepsTracker deps;
-            match_expression::addDependencies(filter, &deps);
+            dependency_analysis::addDependencies(filter, &deps);
             for (auto&& elt : keyPattern) {
                 if (deps.fields.count(elt.fieldName())) {
                     StringData name = elt.fieldNameStringData();

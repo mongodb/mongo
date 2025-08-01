@@ -402,7 +402,11 @@ Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
                     cleanLetSpecBuilder.append(letVar.name, BSONObj{});
                 }
                 expCtxWithLetVariables->variables.seedVariablesWithLetParameters(
-                    expCtxWithLetVariables.get(), cleanLetSpecBuilder.obj());
+                    expCtxWithLetVariables.get(),
+                    cleanLetSpecBuilder.obj(),
+                    [](const Expression* expr) {
+                        return expression::getDependencies(expr).hasNoRequirements();
+                    });
             }
             return withErrorContext(
                 [&]() {

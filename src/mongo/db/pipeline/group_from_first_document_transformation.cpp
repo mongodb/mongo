@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/expression_dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>

@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/expression_dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
 #include "mongo/db/pipeline/expression_from_accumulator_quantile.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 
 #include <map>
 #include <string>
@@ -296,11 +296,11 @@ public:
     }
 
     void visit(const ExpressionInternalFindPositional* expr) final {
-        match_expression::addVariableRefs(&(*expr->getMatchExpr()), _refs);
+        dependency_analysis::addVariableRefs(&(*expr->getMatchExpr()), _refs);
     }
 
     void visit(const ExpressionInternalFindElemMatch* expr) final {
-        match_expression::addVariableRefs(&(*expr->getMatchExpr()), _refs);
+        dependency_analysis::addVariableRefs(&(*expr->getMatchExpr()), _refs);
     }
 
     //

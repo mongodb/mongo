@@ -37,10 +37,10 @@
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
@@ -382,7 +382,7 @@ std::pair<SbStage, PlanStageSlots> generateGenericCollScan(StageBuilderState& st
 
     if (csn->filter) {
         DepsTracker deps;
-        match_expression::addDependencies(csn->filter.get(), &deps);
+        dependency_analysis::addDependencies(csn->filter.get(), &deps);
         // If the filter predicate doesn't need the whole document, then we take all the top-level
         // fields referenced by the filter predicate and we add them to 'fields'.
         if (!deps.needWholeDocument) {

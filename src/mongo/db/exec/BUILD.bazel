@@ -120,6 +120,8 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:query_expressions",
+        "//src/mongo/db/matcher:expression_algo",
+        "//src/mongo/db/query/compiler/dependency_analysis",
     ],
 )
 

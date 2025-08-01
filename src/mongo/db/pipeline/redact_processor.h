@@ -31,7 +31,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>

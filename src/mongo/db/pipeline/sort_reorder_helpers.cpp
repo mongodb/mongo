@@ -31,11 +31,11 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 

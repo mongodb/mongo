@@ -816,7 +816,10 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         // times (which can only happen when executing against a sharded cluster).
         if (letParams) {
             // Serialize variables before moving 'cmdObjForShard' to avoid invalid access.
-            expCtx->variables.seedVariablesWithLetParameters(expCtx.get(), *letParams);
+            expCtx->variables.seedVariablesWithLetParameters(
+                expCtx.get(), *letParams, [](const Expression* expr) {
+                    return expression::getDependencies(expr).hasNoRequirements();
+                });
             auto letVars = Value(expCtx->variables.toBSON(expCtx->variablesParseState, *letParams));
 
             MutableDocument cmdDoc(Document(std::move(cmdObjForShard)));

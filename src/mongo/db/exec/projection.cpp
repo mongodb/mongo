@@ -35,7 +35,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/projection_executor_builder.h"
-#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/util/assert_util.h"
