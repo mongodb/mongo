@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -139,8 +140,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSample::create(
 
     intrusive_ptr<DocumentSourceSample> sample(new DocumentSourceSample(expCtx));
     sample->_size = size;
-    sample->_sortStage = DocumentSourceSort::create(
-        expCtx, {randSortSpec, expCtx}, {.limit = static_cast<uint64_t>(sample->_size)});
+    sample->_sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(
+        exec::agg::buildStage(DocumentSourceSort::create(
+            expCtx, {randSortSpec, expCtx}, {.limit = static_cast<uint64_t>(sample->_size)})));
     return sample;
 }
 

@@ -54,6 +54,7 @@
 
 #include <iterator>
 #include <list>
+#include <memory>
 #include <tuple>
 
 #include <boost/cstdint.hpp>
@@ -119,10 +120,6 @@ struct CompDesc {
     }
 };
 
-[[noreturn]] void throwCannotHandleControlEvent() {
-    tasserted(10358905, "Sort does not support control events");
-}
-
 using TimeSorterAscMin =
     BoundedSorter<DocumentSourceSort::SortableDate, Document, CompAsc, BoundMakerMin>;
 using TimeSorterAscMax =
@@ -139,21 +136,18 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
                                        const SortPattern& sortOrder,
                                        DocumentSourceSort::SortStageOptions options)
     : DocumentSource(kStageName, pExpCtx),
-      exec::agg::Stage(kStageName, pExpCtx),
-      _sortExecutor({sortOrder,
-                     options.limit,
-                     options.maxMemoryUsageBytes.value_or(
-                         internalQueryMaxBlockingSortMemoryUsageBytes.load()),
-                     pExpCtx->getTempDir(),
-                     pExpCtx->getAllowDiskUse()}),
-      // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort
-      // by a metadata field.
-      _sortKeyGen({sortOrder, pExpCtx->getCollator()}),
-      _outputSortKeyMetadata(options.outputSortKeyMetadata),
-      _memoryTracker{OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-          *pExpCtx,
-          options.maxMemoryUsageBytes.value_or(
-              internalQueryMaxBlockingSortMemoryUsageBytes.load()))} {
+      _sortExecutor(std::make_shared<SortExecutor<Document>>(
+          sortOrder,
+          options.limit,
+          options.maxMemoryUsageBytes.value_or(internalQueryMaxBlockingSortMemoryUsageBytes.load()),
+          pExpCtx->getTempDir(),
+          pExpCtx->getAllowDiskUse())),
+      _memoryTracker(std::make_shared<SimpleMemoryUsageTracker>(
+          OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
+              *pExpCtx,
+              options.maxMemoryUsageBytes.value_or(
+                  internalQueryMaxBlockingSortMemoryUsageBytes.load())))),
+      _outputSortKeyMetadata(options.outputSortKeyMetadata) {
     uassert(15976,
             "$sort stage must have at least one sort key",
             !_sortExecutor->sortPattern().empty());
@@ -177,159 +171,6 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(_internalBoundedSort,
                                            : AllowedWithClientType::kInternal,
                                        nullptr,  // featureFlag
                                        true);
-
-DocumentSource::GetNextResult::ReturnStatus DocumentSourceSort::timeSorterPeek() {
-    if (_timeSorterNextDoc) {
-        return GetNextResult::ReturnStatus::kAdvanced;
-    }
-    if (_timeSorterInputEOF) {
-        return GetNextResult::ReturnStatus::kEOF;
-    }
-
-    auto next = pSource->getNext();
-    auto status = next.getStatus();
-    switch (status) {
-        case GetNextResult::ReturnStatus::kAdvanced: {
-            _timeSorterNextDoc = next.getDocument();
-            return status;
-        }
-        case GetNextResult::ReturnStatus::kAdvancedControlDocument: {
-            throwCannotHandleControlEvent();
-        }
-        case GetNextResult::ReturnStatus::kEOF:
-            _timeSorterInputEOF = true;
-            return status;
-        case GetNextResult::ReturnStatus::kPauseExecution:
-            return status;
-    }
-    MONGO_UNREACHABLE_TASSERT(6434800);
-}
-
-Document DocumentSourceSort::timeSorterGetNext() {
-    tassert(6434801,
-            "timeSorterGetNext() is only valid after timeSorterPeek() returns isAdvanced()",
-            _timeSorterNextDoc);
-    auto result = std::move(*_timeSorterNextDoc);
-    _timeSorterNextDoc.reset();
-    return result;
-}
-
-DocumentSource::GetNextResult::ReturnStatus DocumentSourceSort::timeSorterPeekSamePartition() {
-    auto status = timeSorterPeek();
-    switch (status) {
-        case GetNextResult::ReturnStatus::kEOF:
-        case GetNextResult::ReturnStatus::kPauseExecution:
-            return status;
-        case GetNextResult::ReturnStatus::kAdvanced:
-            break;
-        case GetNextResult::ReturnStatus::kAdvancedControlDocument: {
-            throwCannotHandleControlEvent();
-        }
-    }
-
-    if (!_timeSorterPartitionKeyGen) {
-        // No partition key means everything is in the same partition.
-        return GetNextResult::ReturnStatus::kAdvanced;
-    } else {
-        auto prevPartition = std::move(_timeSorterCurrentPartition);
-        _timeSorterCurrentPartition =
-            _timeSorterPartitionKeyGen->computeSortKeyFromDocument(*_timeSorterNextDoc);
-
-        if (!prevPartition) {
-            // No previous partition means there is no constraint.
-            return GetNextResult::ReturnStatus::kAdvanced;
-        } else if (pExpCtx->getValueComparator().evaluate(*_timeSorterCurrentPartition ==
-                                                          *prevPartition)) {
-            // Next is in the same partition.
-            return GetNextResult::ReturnStatus::kAdvanced;
-        } else {
-            // Next is in a new partition: pretend we don't have a next document.
-            return GetNextResult::ReturnStatus::kEOF;
-        }
-    }
-}
-
-DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
-    if (_timeSorter) {
-        // If the _timeSorter is exhausted but we have more input, it must be because we just
-        // finished a partition. Restart the _timeSorter to make it ready for the next partition.
-        if (_timeSorter->getState() == TimeSorterInterface::State::kDone &&
-            timeSorterPeek() == GetNextResult::ReturnStatus::kAdvanced) {
-            updateTimeSorterStats();
-            _timeSorter->restart();
-            _timeSorterCurrentPartition.reset();
-        }
-
-        auto prevMemUsage = _timeSorter->stats().memUsage();
-
-        // Only pull input as necessary to get _timeSorter to have a result.
-        while (_timeSorter->getState() == TimeSorterInterface::State::kWait) {
-            auto status = timeSorterPeekSamePartition();
-            switch (status) {
-                case GetNextResult::ReturnStatus::kPauseExecution: {
-                    return GetNextResult::makePauseExecution();
-                }
-                case GetNextResult::ReturnStatus::kEOF: {
-                    // We've reached the end of the current partition. Tell _timeSorter there will
-                    // be no more input. In response, its state will never be kWait again unless we
-                    // restart it, so we can proceed to drain all the documents currently held by
-                    // the sorter.
-                    _timeSorter->done();
-                    tassert(
-                        6434802,
-                        "DocumentSourceSort::_timeSorter waiting for input that will not arrive",
-                        _timeSorter->getState() != TimeSorterInterface::State::kWait);
-                    continue;
-                }
-                case GetNextResult::ReturnStatus::kAdvanced: {
-                    auto [time, doc] = extractTime(timeSorterGetNext());
-                    _timeSorter->add({time}, doc);
-                    auto currMemUsage = _timeSorter->stats().memUsage();
-                    _memoryTracker.add(currMemUsage - prevMemUsage);
-                    prevMemUsage = currMemUsage;
-                    continue;
-                }
-                case GetNextResult::ReturnStatus::kAdvancedControlDocument: {
-                    throwCannotHandleControlEvent();
-                }
-            }
-        }
-
-        if (_timeSorter->getState() == TimeSorterInterface::State::kDone) {
-            updateTimeSorterStats();
-            return GetNextResult::makeEOF();
-        }
-
-        // In the bounded sort case, memory is released incrementally as documents are returned via
-        // next(). The memory tracker is updated to reflect these changes.
-        prevMemUsage = _timeSorter->stats().memUsage();
-        Document nextDocument = _timeSorter->next().second;
-        auto currMemUsage = _timeSorter->stats().memUsage();
-        _memoryTracker.add(currMemUsage - prevMemUsage);
-        return nextDocument;
-    }
-
-    if (!_populated) {
-        auto populationResult = populate();
-        if (MONGO_unlikely(populationResult.isAdvancedControlDocument())) {
-            throwCannotHandleControlEvent();
-        }
-        if (populationResult.isPaused()) {
-            return populationResult;
-        }
-        invariant(populationResult.isEOF());
-    }
-
-    if (!_sortExecutor->hasNext()) {
-        _memoryTracker.set(0);
-        return GetNextResult::makeEOF();
-    }
-
-    // In the general case (without _timeSorter), memory is not released incrementally while
-    // returning sorted results. Memory is ultimately cleared in bulk once EOF is reached via
-    // _sortExecutor's call to clearSortTable() during hasNext().
-    return GetNextResult{_sortExecutor->getNext().second};
-}
 
 void DocumentSourceSort::serializeForBoundedSort(std::vector<Value>& array,
                                                  const SerializationOptions& opts) const {
@@ -359,7 +200,7 @@ void DocumentSourceSort::serializeForBoundedSort(std::vector<Value>& array,
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
             mutDoc["maxUsedMemBytes"] =
-                opts.serializeLiteral(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
+                opts.serializeLiteral(static_cast<long long>(_memoryTracker->maxMemoryBytes()));
         }
     }
 
@@ -410,7 +251,7 @@ void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
             mutDoc["maxUsedMemBytes"] =
-                opts.serializeLiteral(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
+                opts.serializeLiteral(static_cast<long long>(_memoryTracker->maxMemoryBytes()));
         }
     }
     array.push_back(Value(mutDoc.freeze()));
@@ -433,7 +274,7 @@ void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
         }
         array.push_back(Value(DOC(kStageName << mutDoc.freeze())));
         if (_sortExecutor->hasLimit()) {
-            auto limitSrc = DocumentSourceLimit::create(pExpCtx, _sortExecutor->getLimit());
+            auto limitSrc = DocumentSourceLimit::create(getExpCtx(), _sortExecutor->getLimit());
             limitSrc->serializeToArray(array, opts);
         }
     }
@@ -551,7 +392,7 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     if (expCtx->getAllowDiskUse()) {
         opts.extSortAllowed = true;
         opts.tempDir = expCtx->getTempDir();
-        opts.sorterFileStats = ds->getSorterFileStats();
+        opts.sorterFileStats = ds->_sortExecutor->getSorterFileStats();
     }
 
     if (limit) {
@@ -560,20 +401,20 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
 
     if (boundBase == kMin) {
         if (pat.back().isAscending) {
-            ds->_timeSorter.reset(
-                new TimeSorterAscMin{opts, CompAsc{}, BoundMakerMin{boundOffset}});
+            ds->_timeSorter =
+                std::make_shared<TimeSorterAscMin>(opts, CompAsc{}, BoundMakerMin{boundOffset});
         } else {
-            ds->_timeSorter.reset(
-                new TimeSorterDescMin{opts, CompDesc{}, BoundMakerMin{boundOffset}});
+            ds->_timeSorter =
+                std::make_shared<TimeSorterDescMin>(opts, CompDesc{}, BoundMakerMin{boundOffset});
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime);
     } else if (boundBase == kMax) {
         if (pat.back().isAscending) {
-            ds->_timeSorter.reset(
-                new TimeSorterAscMax{opts, CompAsc{}, BoundMakerMax{boundOffset}});
+            ds->_timeSorter =
+                std::make_shared<TimeSorterAscMax>(opts, CompAsc{}, BoundMakerMax{boundOffset});
         } else {
-            ds->_timeSorter.reset(
-                new TimeSorterDescMax{opts, CompDesc{}, BoundMakerMax{boundOffset}});
+            ds->_timeSorter =
+                std::make_shared<TimeSorterDescMax>(opts, CompDesc{}, BoundMakerMax{boundOffset});
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMaxTime);
     } else {
@@ -586,7 +427,7 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
         SortPattern partitionKey =
             std::vector<SortPattern::SortPatternPart>(pat.begin(), pat.end() - 1);
         ds->_timeSorterPartitionKeyGen =
-            SortKeyGenerator{std::move(partitionKey), expCtx->getCollator()};
+            std::make_shared<SortKeyGenerator>(std::move(partitionKey), expCtx->getCollator());
     }
 
     ds->_timeSorterStats = ds->_sortExecutor->stats();
@@ -652,7 +493,7 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     if (expCtx->getAllowDiskUse()) {
         opts.ExtSortAllowed(true);
         opts.TempDir(expCtx->getTempDir());
-        opts.FileStats(ds->getSorterFileStats());
+        opts.FileStats(ds->_sortExecutor->getSorterFileStats());
     }
     if (BSONElement limitElem = args["limit"]) {
         uassert(6588100,
@@ -663,20 +504,20 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
 
     if (boundBase == kMin) {
         if (pat.back().isAscending) {
-            ds->_timeSorter.reset(
-                new TimeSorterAscMin{opts, CompAsc{}, BoundMakerMin{boundOffset}});
+            ds->_timeSorter =
+                std::make_shared<TimeSorterAscMin>(opts, CompAsc{}, BoundMakerMin{boundOffset});
         } else {
-            ds->_timeSorter.reset(
-                new TimeSorterDescMin{opts, CompDesc{}, BoundMakerMin{boundOffset}});
+            ds->_timeSorter =
+                std::make_shared<TimeSorterDescMin>(opts, CompDesc{}, BoundMakerMin{boundOffset});
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime);
     } else if (boundBase == kMax) {
         if (pat.back().isAscending) {
-            ds->_timeSorter.reset(
-                new TimeSorterAscMax{opts, CompAsc{}, BoundMakerMax{boundOffset}});
+            ds->_timeSorter =
+                std::make_shared<TimeSorterAscMax>(opts, CompAsc{}, BoundMakerMax{boundOffset});
         } else {
-            ds->_timeSorter.reset(
-                new TimeSorterDescMax{opts, CompDesc{}, BoundMakerMax{boundOffset}});
+            ds->_timeSorter =
+                std::make_shared<TimeSorterDescMax>(opts, CompDesc{}, BoundMakerMax{boundOffset});
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMaxTime);
     } else {
@@ -687,83 +528,10 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
         SortPattern partitionKey =
             std::vector<SortPattern::SortPatternPart>(pat.begin(), pat.end() - 1);
         ds->_timeSorterPartitionKeyGen =
-            SortKeyGenerator{std::move(partitionKey), expCtx->getCollator()};
+            std::make_shared<SortKeyGenerator>(std::move(partitionKey), expCtx->getCollator());
     }
 
     return ds;
-}
-
-DocumentSource::GetNextResult DocumentSourceSort::populate() {
-    auto nextInput = pSource->getNext();
-    auto prevMemUsage = _sortExecutor->stats().memoryUsageBytes;
-    for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-        loadDocument(nextInput.releaseDocument());
-        auto currMemUsage = _sortExecutor->stats().memoryUsageBytes;
-        _memoryTracker.add(currMemUsage - prevMemUsage);
-        prevMemUsage = currMemUsage;
-    }
-    if (nextInput.isEOF()) {
-        loadingDone();
-    }
-    return nextInput;
-}
-
-void DocumentSourceSort::loadDocument(Document&& doc) {
-    invariant(!_populated);
-
-    Value sortKey;
-    Document docForSorter;
-    // We always need to extract the sort key if we've reached this point. If the query system had
-    // already computed the sort key we'd have split the pipeline there, would be merging presorted
-    // documents, and wouldn't use this method.
-    std::tie(sortKey, docForSorter) = extractSortKey(std::move(doc));
-    _sortExecutor->add(sortKey, docForSorter);
-}
-
-void DocumentSourceSort::loadingDone() {
-    _sortExecutor->loadingDone();
-    _populated = true;
-}
-
-bool DocumentSourceSort::usedDisk() const {
-    return isBoundedSortStage() ? _timeSorter->stats().spilledRanges() > 0
-                                : _sortExecutor->wasDiskUsed();
-}
-
-std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) const {
-    Value sortKey = _sortKeyGen->computeSortKeyFromDocument(doc);
-
-    if (shouldSetSortKeyMetadata()) {
-        // If this sort stage is part of a merged pipeline, make sure that each Document's sort key
-        // gets saved with its metadata.
-        MutableDocument toBeSorted(std::move(doc));
-        toBeSorted.metadata().setSortKey(sortKey, _sortKeyGen->isSingleElementKey());
-
-        return std::make_pair(std::move(sortKey), toBeSorted.freeze());
-    } else {
-        return std::make_pair(std::move(sortKey), std::move(doc));
-    }
-}
-
-std::pair<Date_t, Document> DocumentSourceSort::extractTime(Document&& doc) const {
-    const auto& fullPath = _sortExecutor->sortPattern().back().fieldPath->fullPath();
-    auto time = doc.getField(StringData{fullPath});
-    uassert(6369909,
-            "$_internalBoundedSort only handles BSONType::date values",
-            time.getType() == BSONType::date);
-    auto date = time.getDate();
-
-    if (shouldSetSortKeyMetadata()) {
-        // If this sort stage is part of a merged pipeline, make sure that each Document's sort key
-        // gets saved with its metadata.
-        Value sortKey = _sortKeyGen->computeSortKeyFromDocument(doc);
-        MutableDocument toBeSorted(std::move(doc));
-        toBeSorted.metadata().setSortKey(sortKey, _sortKeyGen->isSingleElementKey());
-
-        return std::make_pair(date, toBeSorted.freeze());
-    }
-
-    return std::make_pair(date, std::move(doc));
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distributedPlanLogic() {
@@ -778,7 +546,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distri
                                  .serialize(SortPattern::SortKeySerialization::kForSortKeyMerging)
                                  .toBson();
     if (auto limit = getLimit()) {
-        split.mergingStages = {DocumentSourceLimit::create(pExpCtx, *limit)};
+        split.mergingStages = {DocumentSourceLimit::create(getExpCtx(), *limit)};
     }
     return split;
 }
@@ -792,39 +560,6 @@ bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
     // extend our analysis to detect if an exchange is appropriate in a general pipeline, a $sort
     // would generally require merging the streams before producing output.
     return false;
-}
-
-void DocumentSourceSort::doForceSpill() {
-    if (_sortExecutor) {
-        auto prevSorterSize = _sortExecutor->stats().memoryUsageBytes;
-        _sortExecutor->forceSpill();
-        auto currSorterSize = _sortExecutor->stats().memoryUsageBytes;
-        _memoryTracker.add(currSorterSize - prevSorterSize);
-    }
-    if (_timeSorter) {
-        auto prevSorterSize = _timeSorter->stats().memUsage();
-        _timeSorter->forceSpill();
-        auto currSorterSize = _timeSorter->stats().memUsage();
-        _memoryTracker.add(currSorterSize - prevSorterSize);
-    }
-}
-
-void DocumentSourceSort::updateTimeSorterStats() {
-    tassert(10321900,
-            "Called updateTimeSorterStats() on a non-bounded sort stage",
-            isBoundedSortStage());
-    _timeSorterStats.totalDataSizeBytes = _timeSorter->stats().bytesSorted();
-    _timeSorterStats.memoryUsageBytes = _timeSorter->stats().memUsage();
-    _timeSorterStats.keysSorted = _timeSorter->stats().numSorted();
-    auto sorterFileStats = getSorterFileStats();
-    if (sorterFileStats) {
-        _timeSorterStats.spillingStats.setSpills(_timeSorter->stats().spilledRanges());
-        _timeSorterStats.spillingStats.setSpilledRecords(
-            _timeSorter->stats().spilledKeyValuePairs());
-        _timeSorterStats.spillingStats.setSpilledBytes(sorterFileStats->bytesSpilledUncompressed());
-        _timeSorterStats.spillingStats.updateSpilledDataStorageSize(
-            sorterFileStats->bytesSpilled());
-    }
 }
 
 }  // namespace mongo

@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/agg/sort_stage.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -105,7 +106,7 @@ private:
     long long _size;
 
     // Uses a $sort stage to randomly sort the documents.
-    boost::intrusive_ptr<DocumentSourceSort> _sortStage;
+    boost::intrusive_ptr<exec::agg::SortStage> _sortStage;
 };
 
 }  // namespace mongo

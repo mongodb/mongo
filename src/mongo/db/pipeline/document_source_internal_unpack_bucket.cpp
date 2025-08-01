@@ -159,7 +159,7 @@ boost::intrusive_ptr<DocumentSourceSort> createNewSortWithMemoryUsage(
         maxMemoryUsageBytes = sortStatsPtr->maxMemoryUsageBytes;
     }
     return DocumentSourceSort::create(
-        sort.getContext(), pattern, {.limit = limit, .maxMemoryUsageBytes = maxMemoryUsageBytes});
+        sort.getExpCtx(), pattern, {.limit = limit, .maxMemoryUsageBytes = maxMemoryUsageBytes});
 }
 
 /**
@@ -213,7 +213,7 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
                   sort.getSortKeyPattern()
                       .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
                       .toBson()),
-              sort.getContext())
+              sort.getExpCtx())
         : sort.getSortKeyPattern();
     std::vector<SortPattern::SortPatternPart> updatedPattern;
 

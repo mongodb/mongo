@@ -163,7 +163,7 @@ DocumentSourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
         if (nextSort->hasLimit()) {
             container->insert(
                 std::next(next),
-                DocumentSourceLimit::create(nextSort->getContext(), nextSort->getLimit().value()));
+                DocumentSourceLimit::create(nextSort->getExpCtx(), nextSort->getLimit().value()));
         }
         std::swap(*itr, *next);
         return itr == container->begin() ? itr : std::prev(itr);

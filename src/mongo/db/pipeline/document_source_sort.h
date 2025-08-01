@@ -75,7 +75,7 @@
 
 namespace mongo {
 
-class DocumentSourceSort final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceSort final : public DocumentSource {
 public:
     static constexpr StringData kMin = "min"_sd;
     static constexpr StringData kMax = "max"_sd;
@@ -108,6 +108,8 @@ public:
             return date.toString();
         }
     };
+
+    using TimeSorterInterface = BoundedSorterInterface<SortableDate, Document>;
 
     static constexpr StringData kStageName = "$sort"_sd;
 
@@ -194,7 +196,7 @@ public:
         // sending a $sort to another node in the cluster (as of the time of this writing). This is
         // OK today because the callers who set this option during construction first must check the
         // FCV (and/or a feature flag), which guards against mixed-version scenarios.
-        return _outputSortKeyMetadata || pExpCtx->getNeedsMerge();
+        return _outputSortKeyMetadata || getExpCtx()->getNeedsMerge();
     }
 
     StageConstraints constraints(PipelineSplitState) const final {
@@ -219,15 +221,12 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
+
     bool canRunInParallelBeforeWriteStage(
         const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const final;
 
-    SortExecutor<Document>* getSortExecutor() {
-        return _sortExecutor.get_ptr();
-    }
-
-    SortKeyGenerator* getSortKeyGenerator() {
-        return _sortKeyGen.get_ptr();
+    const std::shared_ptr<SortExecutor<Document>>& getSortExecutor() const {
+        return _sortExecutor;
     }
 
     /**
@@ -243,55 +242,29 @@ public:
      */
     boost::optional<long long> getLimit() const;
 
-    /**
-     * Loads a document to be sorted. This can be used to sort a stream of documents that are not
-     * coming from another DocumentSource. Once all documents have been added, the caller must call
-     * loadingDone() before using getNext() to receive the documents in sorted order.
-     */
-    void loadDocument(Document&& doc);
-
-    /**
-     * Signals to the sort stage that there will be no more input documents. It is an error to call
-     * loadDocument() once this method returns.
-     */
-    void loadingDone();
-
-    /**
-     * Returns true if the sorter used disk while satisfying the query and false otherwise.
-     */
-    bool usedDisk() const final;
-
-    bool isPopulated() {
-        return _populated;
-    };
-
     bool isBoundedSortStage() const {
-        return (_timeSorter) ? true : false;
+        return _timeSorter ? true : false;
     }
 
     bool hasLimit() const {
         return _sortExecutor->hasLimit();
     }
 
-    const SpecificStats* getSpecificStats() const final {
+    const SpecificStats* getSpecificStats() const {
         return isBoundedSortStage() ? &_timeSorterStats : &_sortExecutor->stats();
     }
 
-    const SimpleMemoryUsageTracker* getMemoryTracker_forTest() const {
-        return &_memoryTracker;
-    }
-
 protected:
-    GetNextResult doGetNext() final;
     /**
      * Attempts to absorb a subsequent $limit stage so that it can perform a top-k sort.
      */
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
                                                    DocumentSourceContainer* container) final;
 
-    void doForceSpill() final;
-
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceSortToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     Value serialize(const SerializationOptions& opts) const final {
         MONGO_UNREACHABLE_TASSERT(7484302);  // Should call serializeToArray instead.
     }
@@ -303,90 +276,19 @@ private:
     void serializeWithVerbosity(std::vector<Value>& array, const SerializationOptions& opts) const;
     void serializeForCloning(std::vector<Value>& array, const SerializationOptions& opts) const;
 
-    SorterFileStats* getSorterFileStats() const {
-        return _sortExecutor->getSorterFileStats();
-    }
+    QueryMetadataBitSet _requiredMetadata;
 
-    /**
-     * Before returning anything, we have to consume all input and sort it. This method consumes all
-     * input and prepares the sorted stream '_output'.
-     *
-     * This method may not be able to finish populating the sorter in a single call if 'pSource'
-     * returns a DocumentSource::GetNextResult::kPauseExecution, so it returns the last
-     * GetNextResult encountered, which may be either kEOF or kPauseExecution.
-     */
-    GetNextResult populate();
+    std::shared_ptr<SortExecutor<Document>> _sortExecutor;
+    std::shared_ptr<TimeSorterInterface> _timeSorter;
+    std::shared_ptr<SimpleMemoryUsageTracker> _memoryTracker;
+    // TODO: SERVER-105521 This member can be moved instead of shared.
+    std::shared_ptr<SortKeyGenerator> _timeSorterPartitionKeyGen;
 
-    /**
-     * Returns the sort key for 'doc', as well as the document that should be entered into the
-     * sorter to eventually be returned. If we will need to later merge the sorted results with
-     * other results, this method adds the sort key as metadata onto 'doc' to speed up the merge
-     * later.
-     */
-    std::pair<Value, Document> extractSortKey(Document&& doc) const;
-
-    /**
-     * Returns the time value used to sort 'doc', as well as the document that should be entered
-     * into the sorter to eventually be returned. If we will need to later merge the sorted results
-     * with other results, this method adds the full sort key as metadata onto 'doc' to speed up the
-     * merge later.
-     */
-    std::pair<Date_t, Document> extractTime(Document&& doc) const;
-
-    /**
-     * Peeks at the next document in the input. The next document is cached in _timeSorterNextDoc
-     * to support peeking without advancing.
-     */
-    GetNextResult::ReturnStatus timeSorterPeek();
-
-    /**
-     * Peeks at the next document in the input, but ignores documents whose partition key differs
-     * from the current partition key (if there is one).
-     */
-    GetNextResult::ReturnStatus timeSorterPeekSamePartition();
-
-    /**
-     * Gets the next document from the input. Caller must call timeSorterPeek() first, and it's
-     * only valid to call timeSorterGetNext() if peek returned kAdvanced.
-     */
-    Document timeSorterGetNext();
-
-    /**
-     * Populates this stage specific stats using data from _timeSorter. Should be called atleast
-     * once after _timeSorter is exhausted. Can be called before to provide "online" stats during
-     * cursor lifetime.
-     */
-    void updateTimeSorterStats();
-
-    bool _populated = false;
-
-    boost::optional<SortExecutor<Document>> _sortExecutor;
-
-    boost::optional<SortKeyGenerator> _sortKeyGen;
-
-    // Whether to include metadata including the sort key in the output documents from this stage.
-    bool _outputSortKeyMetadata = false;
-
-    using TimeSorterInterface = BoundedSorterInterface<SortableDate, Document>;
-    std::unique_ptr<TimeSorterInterface> _timeSorter;
-    boost::optional<SortKeyGenerator> _timeSorterPartitionKeyGen;
-    // The next document that will be returned by timeSorterGetNext().
-    // timeSorterPeek() fills it in, and timeSorterGetNext() empties it.
-    boost::optional<Document> _timeSorterNextDoc;
-    // The current partition key.
-    // If _timeSorterNextDoc has a document then this represents the partition key of
-    // that document.
-    // If _timeSorterNextDoc is empty then this represents the partition key of
-    // the document last returned by timeSorterGetNext().
-    boost::optional<Value> _timeSorterCurrentPartition;
-    // Used in timeSorterPeek() to avoid calling getNext() on an exhausted pSource.
-    bool _timeSorterInputEOF = false;
     // Used only if _timeSorter is present.
     SortStats _timeSorterStats;
 
-    QueryMetadataBitSet _requiredMetadata;
-
-    SimpleMemoryUsageTracker _memoryTracker;
+    // Whether to include metadata including the sort key in the output documents from this stage.
+    bool _outputSortKeyMetadata = false;
 };
 
 }  // namespace mongo
