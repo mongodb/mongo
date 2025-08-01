@@ -274,13 +274,15 @@ server_parameters:
 
     # From oplog_applier.cpp
     replWriterThreadCount:
-        description: The number of threads in the thread pool used to apply the oplog
+        description: >-
+            The number of threads in the thread pool used to apply the oplog, 
+            default '0' means number of threads is set to double number of cores
         set_at: startup
         cpp_vartype: int
         cpp_varname: replWriterThreadCount
-        default: 16
+        default: 0
         validator:
-            gte: 1
+            gte: 0
             lte: 256
         redact: false
 

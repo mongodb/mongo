@@ -161,15 +161,17 @@ void OplogApplier::setMinValid(const OpTime& minValid) {
 std::unique_ptr<ThreadPool> makeReplWorkerPool() {
     // Reduce content pinned in cache by single oplog batch on small machines by reducing the number
     // of threads of ReplWriter to reduce the number of concurrent open WT transactions.
-    if (replWriterThreadCount < replWriterMinThreadCount) {
+    if (replWriterThreadCount && replWriterThreadCount < replWriterMinThreadCount) {
         LOGV2_FATAL_NOTRACE(
             5605400,
             "replWriterMinThreadCount must be less than or equal to replWriterThreadCount",
             "replWriterMinThreadCount"_attr = replWriterMinThreadCount,
             "replWriterThreadCount"_attr = replWriterThreadCount);
     }
-    auto numberOfThreads =
-        std::min(replWriterThreadCount, 2 * static_cast<int>(ProcessInfo::getNumAvailableCores()));
+    auto numberOfThreads = 2 * static_cast<int>(ProcessInfo::getNumAvailableCores());
+    if (replWriterThreadCount) {
+        numberOfThreads = std::min(numberOfThreads, replWriterThreadCount);
+    }
     return makeReplWorkerPool(numberOfThreads);
 }
 

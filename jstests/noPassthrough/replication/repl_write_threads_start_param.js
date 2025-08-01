@@ -1,15 +1,8 @@
-// This test ensures that the replWriterThreadCount server parameter:
-//       1) cannot be less than 1
-//       2) cannot be greater than 256
-//       3) is actually set to the passed in value
-//       4) cannot be altered at run time
-
-// too low a count
-clearRawMongoProgramOutput();
-assert.throws(() => MongoRunner.runMongod({setParameter: 'replWriterThreadCount=0'}));
-assert(rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount: ")
-           .match("0 is not greater than or equal to 1"),
-       "mongod started with too low a value for replWriterThreadCount");
+// This test ensures that the replWriterThreadCount server parameter://
+//       1) cannot be greater than 256 (0 - special case, meaning the value is ignored and thread
+//          count is set to twice number of cores)
+//       2) is actually set to the passed in value
+//       3) cannot be altered at run time
 
 // too high a count
 clearRawMongoProgramOutput();
