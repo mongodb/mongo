@@ -40,7 +40,31 @@
 #include <bitset>
 #include <compare>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
+namespace {
+
+// Ticks for "searchScore" and "vectorSearchScore" invalid usage warning log messages.
+Rarely _searchScoreValidator, _vectorSearchScoreValidator;
+
+// Gently validated metadata fields will log a warning instead of throwing a uassert. Each one
+// has its own ticker to avoid flooding the logs with warnings.
+static const std::map<DocumentMetadataFields::MetaType, Rarely&>
+    kMetadataFieldsToBeGentlyValidatedWithTicker = {
+        {DocumentMetadataFields::MetaType::kSearchScore, _searchScoreValidator},
+        {DocumentMetadataFields::MetaType::kVectorSearchScore, _vectorSearchScoreValidator},
+};
+// Strictly validated metadata fields will throw a uassert if they are not available.
+static const std::set<DocumentMetadataFields::MetaType> kMetadataFieldsToBeStrictlyValidated = {
+    DocumentMetadataFields::MetaType::kTextScore,
+    DocumentMetadataFields::MetaType::kGeoNearDist,
+    DocumentMetadataFields::MetaType::kGeoNearPoint,
+    DocumentMetadataFields::MetaType::kScore,
+    DocumentMetadataFields::MetaType::kScoreDetails,
+    DocumentMetadataFields::MetaType::kSearchRootDocumentId,
+};
+}  // namespace
 
 OrderedPathSet DepsTracker::simplifyDependencies(const OrderedPathSet& dependencies,
                                                  TruncateToRootLevel truncateToRootLevel) {
@@ -105,25 +129,35 @@ BSONObj DepsTracker::toProjectionWithoutMetadata(
 }
 
 void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type) {
-    static const std::set<DocumentMetadataFields::MetaType> kMetadataFieldsToBeValidated = {
-        DocumentMetadataFields::MetaType::kTextScore,
-        DocumentMetadataFields::MetaType::kGeoNearDist,
-        DocumentMetadataFields::MetaType::kGeoNearPoint,
-        DocumentMetadataFields::MetaType::kScore,
-        DocumentMetadataFields::MetaType::kScoreDetails,
-        DocumentMetadataFields::MetaType::kSearchScore,
-        DocumentMetadataFields::MetaType::kVectorSearchScore,
-        DocumentMetadataFields::MetaType::kSearchRootDocumentId,
-    };
-
     // Perform validation if necessary.
-    if (!std::holds_alternative<NoMetadataValidation>(_availableMetadata) &&
-        kMetadataFieldsToBeValidated.contains(type)) {
+    const bool shouldBeValidated =
+        !std::holds_alternative<NoMetadataValidation>(_availableMetadata) &&
+        (kMetadataFieldsToBeGentlyValidatedWithTicker.contains(type) ||
+         kMetadataFieldsToBeStrictlyValidated.contains(type));
+
+    if (shouldBeValidated) {
         auto& availableMetadataBitSet = std::get<QueryMetadataBitSet>(_availableMetadata);
-        uassert(40218,
-                str::stream() << "query requires " << type << " metadata, but it is not available",
-                availableMetadataBitSet[type]);
+
+        // Occasionally log a message in the logs when this error is hit for gently validated
+        // fields.
+        if (kMetadataFieldsToBeGentlyValidatedWithTicker.contains(type) &&
+            kMetadataFieldsToBeGentlyValidatedWithTicker.at(type).tick()) {
+            LOGV2_WARNING(10846800,
+                          "The query attempts to retrieve metadata at a place in the pipeline "
+                          "where that metadata type is not available",
+                          "metadataType"_attr =
+                              DocumentMetadataFields::typeNameToDebugString(type));
+        }
+
+        // uassert for stages that should be strictly validated.
+        if (kMetadataFieldsToBeStrictlyValidated.contains(type)) {
+            uassert(40218,
+                    str::stream() << "query requires " << type
+                                  << " metadata, but it is not available",
+                    availableMetadataBitSet[type]);
+        }
     }
+
     _metadataDeps[type] = true;
 }
 

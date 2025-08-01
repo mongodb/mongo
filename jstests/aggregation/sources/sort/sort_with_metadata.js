@@ -12,29 +12,25 @@ assert.commandWorked(coll.insert({_id: 4, text: "cantaloupe", words: 1}));
 
 assert.commandWorked(coll.createIndex({text: "text"}));
 
-assert.throwsWithCode(() => coll.aggregate([
+assert.doesNotThrow(() => coll.aggregate([
     {$match: {$text: {$search: 'apple banana'}}},
     {$sort: {textScore: {$meta: 'searchScore'}}}
-]),
-                      kUnavailableMetadataErrCode);
+]));
 
-assert.throwsWithCode(() => coll.aggregate([
+assert.doesNotThrow(() => coll.aggregate([
     {$match: {$text: {$search: 'apple banana'}}},
     {$set: {textScore: {$meta: 'searchScore'}}}
-]),
-                      kUnavailableMetadataErrCode);
+]));
 
-assert.throwsWithCode(() => coll.aggregate([
+assert.doesNotThrow(() => coll.aggregate([
     {$match: {$text: {$search: 'apple banana'}}},
     {$sort: {textScore: {$meta: 'vectorSearchScore'}}}
-]),
-                      kUnavailableMetadataErrCode);
+]));
 
-assert.throwsWithCode(() => coll.aggregate([
+assert.doesNotThrow(() => coll.aggregate([
     {$match: {$text: {$search: 'apple banana'}}},
     {$set: {textScore: {$meta: 'vectorSearchScore'}}}
-]),
-                      kUnavailableMetadataErrCode);
+]));
 
 assert.throwsWithCode(() => coll.aggregate([
     {$match: {$text: {$search: 'apple banana'}}},

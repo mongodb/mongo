@@ -133,7 +133,9 @@ const MetaFields = Object.freeze({
         {name: "randVal", shouldBeValidated: false, debugName: "rand val", validSortKey: true},
     SEARCH_SCORE: {
         name: "searchScore",
-        shouldBeValidated: true,
+        // For 8.2, "searchScore" is not strictly validated but instead logs a warning message (see
+        // search_score_meta_validation_warning_logs.js).
+        shouldBeValidated: false,
         debugName: "$search score",
         validSortKey: true,
         firstStageRequired: [
@@ -203,8 +205,10 @@ const MetaFields = Object.freeze({
     },
     VECTOR_SEARCH_SCORE: {
         name: "vectorSearchScore",
-        shouldBeValidated: true,
-        debugName: "$vectorSearch distance",
+        // For 8.2, "vectorSearchScore" is not strictly validated but instead logs a warning message
+        // (see search_score_meta_validation_warning_logs.js).
+        shouldBeValidated: false,
+        debugName: "$vectorSearch score",
         validSortKey: true,
         firstStageRequired: [FirstStageOptions.VECTOR_SEARCH]
     },

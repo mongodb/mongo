@@ -642,7 +642,7 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
         case DocumentMetadataFields::kSearchSequenceToken:
             return "$search sequence token";
         case DocumentMetadataFields::kVectorSearchScore:
-            return "$vectorSearch distance";
+            return "$vectorSearch score";
         case DocumentMetadataFields::kScore:
             return "score";
         case DocumentMetadataFields::kScoreDetails:

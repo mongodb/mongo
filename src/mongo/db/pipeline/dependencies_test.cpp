@@ -123,8 +123,6 @@ TEST(DependenciesNeedsMetadataTest, OnlyChosenMetadataFieldsShouldThrowIfUnavail
         DocumentMetadataFields::MetaType::kGeoNearDist,
         DocumentMetadataFields::MetaType::kGeoNearPoint,
         DocumentMetadataFields::MetaType::kScore,
-        DocumentMetadataFields::MetaType::kSearchScore,
-        DocumentMetadataFields::MetaType::kVectorSearchScore,
         DocumentMetadataFields::MetaType::kScoreDetails,
         DocumentMetadataFields::MetaType::kSearchRootDocumentId,
     };
