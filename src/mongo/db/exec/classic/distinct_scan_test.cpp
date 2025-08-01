@@ -31,8 +31,8 @@
 
 #include "mongo/client/index_spec.h"
 #include "mongo/db/exec/classic/distinct_scan.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/query_shard_server_test_fixture.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/query_shard_server_test_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/s/catalog/type_chunk.h"

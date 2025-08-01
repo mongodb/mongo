@@ -424,7 +424,7 @@ inserted into new bucket documents. If all measurements match the query predicat
 document will be deleted.
 
 To avoid the [Halloween Problem](https://en.wikipedia.org/wiki/Halloween_Problem) for `{multi: true}`
-updates, a [Spool Stage](https://github.com/mongodb/mongo/blob/cd7f99721a32a14bc76d20e207ebefd26134ff40/src/mongo/db/exec/spool.h)
+updates, a [Spool Stage](../exec/classic/spool.h)
 is used to record all record ids of the bucket documents returned from the scan stage. This, along
 with inserting updated measurements to new buckets, helps avoid seeing measurements already updated
 by the current update command. If the query is non-selective and there are too many matching bucket

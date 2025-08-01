@@ -52,10 +52,10 @@ mongo_cc_library(
 mongo_cc_library(
     name = "working_set",
     srcs = [
-        "working_set.cpp",
+        "//src/mongo/db/exec/classic:working_set.cpp",
     ],
     hdrs = [
-        "working_set.h",
+        "//src/mongo/db/exec/classic:working_set.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -126,21 +126,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "query_shard_server_test_fixture",
-    srcs = [
-        "query_shard_server_test_fixture.cpp",
-    ],
-    hdrs = [
-        "query_shard_server_test_fixture.h",
-    ],
-    deps = [
-        "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/db/query:query_test_service_context",
-        "//src/mongo/db/s:shard_server_test_fixture",
-    ],
-)
-
-mongo_cc_library(
     name = "str_trim_utils",
     srcs = [
         "str_trim_utils.cpp",
@@ -173,23 +158,23 @@ mongo_cc_unit_test(
         "exclusion_projection_executor_test.cpp",
         "find_projection_executor_test.cpp",
         "inclusion_projection_executor_test.cpp",
-        "or_test.cpp",
-        "orphan_chunk_skipper_test.cpp",
         "projection_executor_builder_test.cpp",
         "projection_executor_redaction_test.cpp",
         "projection_executor_test.cpp",
         "projection_executor_utils_test.cpp",
         "projection_executor_wildcard_access_test.cpp",
-        "queued_data_stage_test.cpp",
-        "recordid_deduplicator_test.cpp",
-        "sort_test.cpp",
-        "spool_test.cpp",
-        "working_set_test.cpp",
         "//src/mongo/db/exec/agg:exec_pipeline_test.cpp",
         "//src/mongo/db/exec/agg:pipeline_builder_test.cpp",
         "//src/mongo/db/exec/classic:distinct_scan_test.cpp",
         "//src/mongo/db/exec/classic:index_scan_test.cpp",
+        "//src/mongo/db/exec/classic:or_test.cpp",
+        "//src/mongo/db/exec/classic:orphan_chunk_skipper_test.cpp",
+        "//src/mongo/db/exec/classic:queued_data_stage_test.cpp",
+        "//src/mongo/db/exec/classic:recordid_deduplicator_test.cpp",
+        "//src/mongo/db/exec/classic:sort_test.cpp",
+        "//src/mongo/db/exec/classic:spool_test.cpp",
         "//src/mongo/db/exec/classic:text_or_test.cpp",
+        "//src/mongo/db/exec/classic:working_set_test.cpp",
         "//src/mongo/db/exec/document_value:document_comparator_test.cpp",
         "//src/mongo/db/exec/document_value:document_metadata_fields_test.cpp",
         "//src/mongo/db/exec/document_value:document_value_test.cpp",
@@ -231,7 +216,6 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":projection_executor",
-        ":query_shard_server_test_fixture",
         ":working_set",
         "//src/mongo:base",
         "//src/mongo/bson/column",
@@ -239,6 +223,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/exec/classic:query_shard_server_test_fixture",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/pipeline:aggregation_context_fixture",

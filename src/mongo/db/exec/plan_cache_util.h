@@ -31,7 +31,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/operation_context.h"

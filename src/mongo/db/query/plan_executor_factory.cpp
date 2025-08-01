@@ -30,7 +30,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 
 #include "mongo/base/status.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/plan_executor_impl.h"

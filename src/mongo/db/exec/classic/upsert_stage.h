@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/update_stage.h"
+#include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/mutable_bson/document.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/working_set.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/shard_role.h"

@@ -29,7 +29,7 @@
 
 #include "mongo/db/exec/classic/distinct_scan.h"
 
-#include "mongo/db/exec/orphan_chunk_skipper.h"
+#include "mongo/db/exec/classic/orphan_chunk_skipper.h"
 
 #include <memory>
 #include <vector>
@@ -37,10 +37,10 @@
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/classic/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/plan_executor_impl.h"

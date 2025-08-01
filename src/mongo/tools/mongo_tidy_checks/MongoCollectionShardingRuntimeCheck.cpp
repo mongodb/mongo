@@ -43,9 +43,8 @@ MongoCollectionShardingRuntimeCheck::MongoCollectionShardingRuntimeCheck(
     : ClangTidyCheck(Name, Context),
       exceptionDirs(clang::tidy::utils::options::parseStringList(
           Options.get("exceptionDirs", "src/mongo/db/s"))),
-      exceptionFiles(clang::tidy::utils::options::parseStringList(
-          Options.get("exceptionFiles", "src/mongo/db/exec/query_shard_server_test_fixture.cpp"))) {
-}
+      exceptionFiles(clang::tidy::utils::options::parseStringList(Options.get(
+          "exceptionFiles", "src/mongo/db/exec/classic/query_shard_server_test_fixture.cpp"))) {}
 
 void MongoCollectionShardingRuntimeCheck::registerMatchers(MatchFinder* Finder) {
     // Match instances of the CollectionShardingRuntime class

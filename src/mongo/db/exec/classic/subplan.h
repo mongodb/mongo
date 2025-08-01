@@ -31,11 +31,11 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/exec/classic/multi_plan.h"
+#include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_all_indices_stage.h"
+#include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_cache_util.h"
-#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"

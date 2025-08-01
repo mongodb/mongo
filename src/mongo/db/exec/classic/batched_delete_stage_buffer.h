@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/classic/working_set.h"
 
 #include <cstddef>
 #include <set>

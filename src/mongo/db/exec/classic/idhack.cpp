@@ -31,9 +31,9 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/classic/working_set_common.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor_impl.h"

@@ -31,7 +31,7 @@
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/db/exec/classic/index_scan.h"
 
-#include "mongo/db/exec/filter.h"
+#include "mongo/db/exec/classic/filter.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -17,15 +17,30 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "query_shard_server_test_fixture",
+    srcs = [
+        "query_shard_server_test_fixture.cpp",
+    ],
+    hdrs = [
+        "query_shard_server_test_fixture.h",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/s:shard_server_test_fixture",
+    ],
+)
+
 mongo_cc_benchmark(
     name = "distinct_scan_bm",
     srcs = [
         "distinct_scan_bm.cpp",
     ],
     deps = [
+        ":query_shard_server_test_fixture",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:service_context_d_test_fixture",
-        "//src/mongo/db/exec:query_shard_server_test_fixture",
         "//src/mongo/unittest:benchmark_util",
     ],
 )

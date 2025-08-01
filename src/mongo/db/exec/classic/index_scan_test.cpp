@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/classic/collection_scan.h"
-#include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"

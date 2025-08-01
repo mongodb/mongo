@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/exec/classic/requires_index_stage.h"
+#include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/working_set.h"
 #include "mongo/db/record_id.h"
 #include "mongo/stdx/unordered_map.h"
 

@@ -31,7 +31,7 @@
 
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/classic/requires_collection_stage.h"
-#include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/expression_context.h"

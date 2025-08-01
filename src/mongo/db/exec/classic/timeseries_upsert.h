@@ -31,10 +31,10 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/timeseries_modify.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
-#include "mongo/db/exec/working_set.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/write_ops/update_request.h"

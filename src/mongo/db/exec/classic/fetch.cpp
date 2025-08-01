@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/exec/classic/filter.h"
+#include "mongo/db/exec/classic/working_set_common.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/util/assert_util.h"
 
