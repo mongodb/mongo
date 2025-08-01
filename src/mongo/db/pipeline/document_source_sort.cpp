@@ -191,11 +191,16 @@ void DocumentSourceSort::serializeForBoundedSort(std::vector<Value>& array,
     }}};
 
     if (opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        auto& stats = _timeSorter->stats();
+
         mutDoc["totalDataSizeSortedBytesEstimate"] =
-            opts.serializeLiteral(static_cast<long long>(_timeSorter->stats().bytesSorted()));
-        mutDoc["usedDisk"] = opts.serializeLiteral(_timeSorter->stats().spilledRanges() > 0);
-        mutDoc["spills"] =
-            opts.serializeLiteral(static_cast<long long>(_timeSorter->stats().spilledRanges()));
+            opts.serializeLiteral(static_cast<long long>(stats.bytesSorted()));
+        mutDoc["usedDisk"] = opts.serializeLiteral(stats.spilledRanges() > 0);
+        mutDoc["spills"] = opts.serializeLiteral(static_cast<long long>(stats.spilledRanges()));
+        mutDoc["spilledBytes"] =
+            opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledBytes()));
+        mutDoc["spilledRecords"] =
+            opts.serializeLiteral(static_cast<long long>(stats.spilledKeyValuePairs()));
         mutDoc["spilledDataStorageSize"] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
@@ -247,6 +252,10 @@ void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
         mutDoc["usedDisk"] = opts.serializeLiteral(stats.spillingStats.getSpills() > 0);
         mutDoc["spills"] =
             opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpills()));
+        mutDoc["spilledBytes"] =
+            opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledBytes()));
+        mutDoc["spilledRecords"] =
+            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledRecords()));
         mutDoc["spilledDataStorageSize"] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {

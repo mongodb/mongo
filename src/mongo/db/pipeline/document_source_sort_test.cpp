@@ -1017,6 +1017,8 @@ TEST_F(DocumentSourceSortTest, RedactionWithoutMemoryTracking) {
             "totalDataSizeSortedBytesEstimate": "?number",
             "usedDisk": "?bool",
             "spills": "?number",
+            "spilledBytes": "?number",
+            "spilledRecords": "?number",
             "spilledDataStorageSize": "?number"
         })",
         redact(*sort(), true, ExplainOptions::Verbosity::kExecStats));
@@ -1036,6 +1038,8 @@ TEST_F(DocumentSourceSortTest, RedactionWithoutMemoryTracking) {
             "totalDataSizeSortedBytesEstimate": "?number",
             "usedDisk": "?bool",
             "spills": "?number",
+            "spilledBytes": "?number",
+            "spilledRecords": "?number",
             "spilledDataStorageSize": "?number"
         })",
         redact(*boundedSort, true, ExplainOptions::Verbosity::kExecStats));
@@ -1093,6 +1097,8 @@ TEST_F(DocumentSourceSortTest, RedactionWithSortKeyMetadata) {
             "totalDataSizeSortedBytesEstimate": "?number",
             "usedDisk": "?bool",
             "spills": "?number",
+            "spilledBytes": "?number",
+            "spilledRecords": "?number",
             "spilledDataStorageSize": "?number"
         })",
         redact(*sort(), true, ExplainOptions::Verbosity::kExecStats));
@@ -1112,6 +1118,8 @@ TEST_F(DocumentSourceSortTest, RedactionWithSortKeyMetadata) {
             "totalDataSizeSortedBytesEstimate": "?number",
             "usedDisk": "?bool",
             "spills": "?number",
+            "spilledBytes": "?number",
+            "spilledRecords": "?number",
             "spilledDataStorageSize": "?number"
         })",
         redact(*boundedSort, true, ExplainOptions::Verbosity::kExecStats));
@@ -1171,6 +1179,8 @@ TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
             "totalDataSizeSortedBytesEstimate": "?number",
             "usedDisk": "?bool",
             "spills": "?number",
+            "spilledBytes": "?number",
+            "spilledRecords": "?number",
             "spilledDataStorageSize": "?number",
             "maxUsedMemBytes": "?number"
         })",
@@ -1191,6 +1201,8 @@ TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
             "totalDataSizeSortedBytesEstimate": "?number",
             "usedDisk": "?bool",
             "spills": "?number",
+            "spilledBytes": "?number",
+            "spilledRecords": "?number",
             "spilledDataStorageSize": "?number",
             "maxUsedMemBytes": "?number"
         })",
