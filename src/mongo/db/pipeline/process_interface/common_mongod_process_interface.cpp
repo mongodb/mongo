@@ -184,7 +184,7 @@ BSONObjBuilder createCommonNsFields(const VersionContext& vCtx,
                                     StringData shardName,
                                     const NamespaceString& ns,
                                     const BSONObj& extraElements,
-                                    StringData type = "collection") {
+                                    StringData type) {
     BSONObjBuilder builder;
     builder.append("db",
                    DatabaseNameUtil::serialize(ns.dbName(), SerializationContext::stateDefault()));
@@ -199,6 +199,25 @@ BSONObjBuilder createCommonNsFields(const VersionContext& vCtx,
     }
     builder.appendElements(extraElements);
     return builder;
+}
+
+BSONObj createListCatalogEntryForCollection(const VersionContext& vCtx,
+                                            StringData shardName,
+                                            const NamespaceString& ns,
+                                            const BSONObj& catalogEntry) {
+    auto type = [&]() {
+        // TODO SERVER-101594 remove `isTimeseriesBucketsCollection()` after 9.0 becomes lastLTS
+        // By then we will not have system buckets timeseries anymore,
+        // thus we can always return "timeseries" if the collection has timeseries options
+        if (catalogEntry["md"]["options"]["timeseries"].ok() &&
+            !ns.isTimeseriesBucketsCollection()) {
+            return "timeseries"_sd;
+        }
+
+        return "collection"_sd;
+    }();
+
+    return createCommonNsFields(vCtx, shardName, ns, catalogEntry, type).obj();
 }
 
 /**
@@ -229,18 +248,8 @@ void listDurableCatalog(OperationContext* opCtx,
             systemViewsNamespaces->push_back(ns);
         }
 
-        auto type = [&] {
-            // TODO SERVER-101594 remove `isTimeseriesBucketsCollection()` after 9.0 becomes lastLTS
-            // By then we will not have system buckets timeseries anymore,
-            // thus we can always return "timeseries" if the collection has timeseries options
-            if (obj["md"]["options"]["timeseries"].ok() && !ns.isTimeseriesBucketsCollection()) {
-                return "timeseries"_sd;
-            }
-            return "collection"_sd;
-        }();
-        docs->push_back(
-            createCommonNsFields(VersionContext::getDecoration(opCtx), shardName, ns, obj, type)
-                .obj());
+        docs->push_back(createListCatalogEntryForCollection(
+            VersionContext::getDecoration(opCtx), shardName, ns, obj));
     }
 }
 
@@ -439,8 +448,8 @@ boost::optional<BSONObj> CommonMongodProcessInterface::getCatalogEntry(
     const auto& collPtr = acquisition.getCollectionPtr();
     auto obj = MDBCatalog::get(opCtx)->getRawCatalogEntry(opCtx, collPtr->getCatalogId());
 
-    return createCommonNsFields(VersionContext::getDecoration(opCtx), getShardName(opCtx), ns, obj)
-        .obj();
+    return createListCatalogEntryForCollection(
+        VersionContext::getDecoration(opCtx), getShardName(opCtx), ns, obj);
 }
 
 void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,

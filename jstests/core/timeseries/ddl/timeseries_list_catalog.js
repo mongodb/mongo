@@ -29,8 +29,7 @@ function validateCollectionMetadata(coll, metadata, onAdminDB) {
         onAdminDB}`);
     jsTest.log(`Collection metadata: ${tojson(metadata)}`);
     const viewlessTimeseriesEnabled = areViewlessTimeseriesEnabled(db);
-    // TODO SERVER-103776 remove `onAdminDB` from the following condition once the bug is fixed.
-    if (viewlessTimeseriesEnabled && onAdminDB) {
+    if (viewlessTimeseriesEnabled) {
         assert.eq('timeseries', metadata.type);
     } else {
         assert.eq('collection', metadata.type);

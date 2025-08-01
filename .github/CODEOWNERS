@@ -854,6 +854,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/**/pause_after_populate.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/libs/**/check_shard_filtering_metadata_helpers.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/libs/**/check_metadata_consistency_helpers.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/libs/**/catalog_list_operations_consistency_validator.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/libs/**/raw_operation_utils.js @10gen/server-collection-write-path @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/clustered_collections/OWNERS.yml

@@ -26,6 +26,7 @@ import {
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 
 function assertNoUnrecognizedFields(restParameters, sourceName, targetName, sourceObject) {
     assert(
@@ -360,6 +361,21 @@ function validateListCatalogToListCollectionsConsistency(
     return equals;
 }
 
+/**
+ * Returns whether the listCollections/$listCatalog entry corresponds to a view.
+ * This includes legacy timeseries views, which are shown as 'type: `timeseries` in
+ * listCollections/$listCatalog, so they do not persist indexes or chunks on their own.
+ *
+ * TODO(SERVER-101594): Simplify to `entry.type === 'view'`
+ */
+function isViewListCollectionsEntry(listCollectionsEntry) {
+    return !listCollectionsEntry.info.uuid;
+}
+
+function isViewListCatalogEntry(listCatalogEntry) {
+    return !listCatalogEntry.md?.options.uuid;
+}
+
 function validateListCatalogToListIndexesConsistency(listCatalog, listIndexes, shouldAssert) {
     // Sorting function to ignore irrelevant ordering differences while comparing.
     function sortCollectionIndexesInPlace(indexList) {
@@ -370,7 +386,7 @@ function validateListCatalogToListIndexesConsistency(listCatalog, listIndexes, s
     }
 
     const listIndexesFromListCatalog = removeDuplicateDocuments(sortCollectionIndexesInPlace(
-        listCatalog.filter(lc => lc.type === 'collection').map(mapListCatalogToListIndexesEntry)));
+        listCatalog.filter(e => !isViewListCatalogEntry(e)).map(mapListCatalogToListIndexesEntry)));
     const sortedListIndexes = sortCollectionIndexesInPlace(
         // Shallow-copy to avoid modifying the list given by the caller.
         listIndexes.map(ci => ({
@@ -413,10 +429,10 @@ function filterListCatalogEntriesFromShardsWithoutChunks(db, listCatalog) {
     // Protocol, and therefore only returns non-stale entries from shards that own chunks.
     // We re-run a 'collectionful' $listCatalog on each collection to clean up stale entries.
     const collectionsFromListCatalog =
-        [...new Set(listCatalog.filter(e => e.type === 'collection').map(e => e.name))];
+        [...new Set(listCatalog.filter(e => !isViewListCatalogEntry(e)).map(e => e.name))];
     const refetchedListCatalog = collectionsFromListCatalog.flatMap(
         collName => db.getCollection(collName).aggregate([{$listCatalog: {}}]).toArray());
-    return listCatalog.filter(e => e.type !== 'collection').concat(refetchedListCatalog);
+    return listCatalog.filter(e => isViewListCatalogEntry(e)).concat(refetchedListCatalog);
 }
 
 /**
@@ -437,12 +453,11 @@ export function assertCatalogListOperationsConsistencyForCollection(collection) 
 
     const listCollections = db.getCollectionInfos({name: {$in: collectionNames}});
     const listIndexes =
-        listCollections
-            // TODO SERVER-103776 Handle the viewless timeseries case by filtering by type !==
-            // 'view' and call getIndexes({rawData: true}) once listCatalog returns a consistent
-            // output for viewless timeseries.
-            .filter(c => c.type === 'collection')
-            .map(coll => ({name: coll.name, indexes: db.getCollection(coll.name).getIndexes()}));
+        listCollections.filter(e => !isViewListCollectionsEntry(e))
+            .map(coll => ({
+                     name: coll.name,
+                     indexes: db.getCollection(coll.name).getIndexes(getRawOperationSpec(db))
+                 }));
 
     let listCatalog =
         db.getSiblingDB("admin")
@@ -551,10 +566,12 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
             }
             // TODO SERVER-75675: do not skip index consistency check on sharded clusters.
             collIndexes = !isMongos
-                ? collInfo.filter(coll => coll.type === "collection")
-                      .map(
-                          coll => (
-                              {name: coll.name, indexes: db.getCollection(coll.name).getIndexes()}))
+                ? collInfo.filter(e => !isViewListCollectionsEntry(e))
+                      .map(coll => ({
+                               name: coll.name,
+                               indexes:
+                                   db.getCollection(coll.name).getIndexes(getRawOperationSpec(db))
+                           }))
                 : null;
         } catch (ex) {
             // In a sharded cluster with in-progress validate command for the config database

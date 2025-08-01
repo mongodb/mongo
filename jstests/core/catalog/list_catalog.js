@@ -108,8 +108,7 @@ checkEntries(collClustered.getName(), result, 'collection', {numSecondaryIndexes
 if (areViewlessTimeseriesEnabled(testDB)) {
     result = collTimeseries.aggregate([{$listCatalog: {}}]).toArray();
     jsTestLog(collTimeseries.getFullName() + ' $listCatalog: ' + tojson(result));
-    // TODO SERVER-103776: listCatalog should return type 'timeseries' instead of 'collection'
-    checkEntries(collTimeseries.getName(), result, 'collection', {numSecondaryIndexes: 0});
+    checkEntries(collTimeseries.getName(), result, 'timeseries', {numSecondaryIndexes: 0});
 } else {
     assert.commandFailedWithCode(
         testDB.runCommand(
