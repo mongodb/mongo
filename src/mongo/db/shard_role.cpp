@@ -1553,6 +1553,10 @@ PreparedForYieldToken prepareForYieldingTransactionResources(OperationContext* o
 
 YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx) {
     auto token = prepareForYieldingTransactionResources(opCtx);
+    tassert(10778400,
+            "Cannot yield inside a write unit of work",
+            !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     return yieldTransactionResourcesFromOperationContext(opCtx, token);
 }
 

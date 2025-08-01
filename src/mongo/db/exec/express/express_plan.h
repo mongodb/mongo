@@ -329,12 +329,6 @@ template <class Callable>
 void temporarilyYieldCollection(OperationContext* opCtx,
                                 const CollectionAcquisition& acquisition,
                                 Callable whileYieldedCallback) {
-
-    tassert(8375911,
-            "Cannot yield inside a write unit of work",
-            !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-
     opCtx->checkForInterrupt();
 
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);

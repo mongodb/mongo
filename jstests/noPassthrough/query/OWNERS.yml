@@ -72,3 +72,6 @@ filters:
   - "parse_zone_info.js":
     approvers:
       - 10gen/query-execution
+  - "filemd5_kill_during_yield.js":
+    approvers:
+      - 10gen/query-execution

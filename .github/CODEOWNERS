@@ -1182,6 +1182,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/query/**/kill_pinned_cursor.js @10gen/query-execution-router @svc-auto-approve-bot
 /jstests/noPassthrough/query/**/missing_shard_key.js @10gen/query-execution-router @svc-auto-approve-bot
 /jstests/noPassthrough/query/**/parse_zone_info.js @10gen/query-execution @svc-auto-approve-bot
+/jstests/noPassthrough/query/**/filemd5_kill_during_yield.js @10gen/query-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/query/change_streams/OWNERS.yml
 /jstests/noPassthrough/query/change_streams/**/* @10gen/query-execution-change-streams @svc-auto-approve-bot
