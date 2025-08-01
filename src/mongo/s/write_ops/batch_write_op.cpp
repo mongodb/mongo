@@ -540,8 +540,14 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             };
 
             if (!isMultiWrite && isNonTargetedWriteWithoutShardKeyWithExactId) {
-                writeType = WriteType::WithoutShardKeyWithId;
-                writeOp.setWriteType(writeType);
+                // Do not group WithoutShardKeyWithId together with Ordinary writes
+                if (writeType == WriteType::Ordinary && !batchMap.empty()) {
+                    writeOp.resetWriteToReady();
+                    break;
+                } else {
+                    writeType = WriteType::WithoutShardKeyWithId;
+                    writeOp.setWriteType(writeType);
+                }
             }
 
             if (writeOp.getWriteType() == WriteType::Ordinary &&

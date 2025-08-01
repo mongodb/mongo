@@ -2633,6 +2633,40 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneUnorderedBatchingWithTargeted
     ASSERT_FALSE(batchOp.isFinished());
 }
 
+// Test that a WriteWithoutShardKeyWithId write is not batched with Ordinary write
+TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneUnorderedBatchingWithWOSKWIDAfterOrdinary) {
+    BatchedCommandRequest updateRequest([&] {
+        write_ops::UpdateCommandRequest updateOp(kNss);
+        // Op style update.
+        updateOp.setUpdates({
+            buildUpdate(BSON("x" << 1), BSON("$inc" << BSON("a" << 1)), false),
+            buildUpdate(BSON("_id" << 1), BSON("$inc" << BSON("a" << 1)), false),
+        });
+        updateOp.setOrdered(false);
+        return updateOp;
+    }());
+
+    makeCollectionRoutingInfo(kNss, _shardKeyPattern, nullptr, false, {BSON("x" << 0)}, {});
+    _criTargeter = CollectionRoutingInfoTargeter(getOpCtx(), kNss);
+
+    const TxnNumber kTxnNumber = 0;
+    getOpCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    getOpCtx()->setTxnNumber(kTxnNumber);
+
+    BatchWriteOp batchOp(getOpCtx(), updateRequest);
+
+    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+    auto status = batchOp.targetBatch(getCollectionRoutingInfoTargeter(), false, &targeted);
+    ASSERT_OK(status);
+    ASSERT_EQ(status.getValue(), WriteType::Ordinary);
+
+    // The second WWSKWID write will not be batched together with the first ordinary write.
+    ASSERT_EQUALS(targeted.size(), 1);
+    ASSERT_EQUALS(targeted.begin()->second->getNumOps(), 1);
+
+    ASSERT_FALSE(batchOp.isFinished());
+}
+
 // Test that a single shard targeted write is not WriteWithoutShardKeyWithId
 TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneUnorderedBatchingWithSingleShard) {
     BatchedCommandRequest updateRequest([&] {
