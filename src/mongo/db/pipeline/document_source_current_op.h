@@ -31,7 +31,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -64,7 +63,7 @@
 
 namespace mongo {
 
-class DocumentSourceCurrentOp final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceCurrentOp final : public DocumentSource {
 public:
     using TruncationMode = MongoProcessInterface::CurrentOpTruncateMode;
     using ConnMode = MongoProcessInterface::CurrentOpConnectionsMode;
@@ -198,6 +197,9 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceCurrentOpToStageFn(
+        const boost::intrusive_ptr<const DocumentSource>& documentSource);
+
     DocumentSourceCurrentOp(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                             boost::optional<ConnMode> includeIdleConnections,
                             boost::optional<SessionMode> includeIdleSessions,
@@ -207,29 +209,23 @@ private:
                             boost::optional<CursorMode> idleCursors,
                             boost::optional<bool> targetAllNodes)
         : DocumentSource(kStageName, pExpCtx),
-          exec::agg::Stage(kStageName, pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeIdleSessions(includeIdleSessions),
           _includeOpsFromAllUsers(includeOpsFromAllUsers),
-          _showLocalOpsOnMongoS(showLocalOpsOnMongoS),
           _truncateOps(truncateOps),
           _idleCursors(idleCursors),
+          _showLocalOpsOnMongoS(showLocalOpsOnMongoS),
           _targetAllNodes(targetAllNodes) {}
 
-    GetNextResult doGetNext() final;
-
+    // shared with exec::agg::CurrentOpStage
     boost::optional<ConnMode> _includeIdleConnections;
     boost::optional<SessionMode> _includeIdleSessions;
     boost::optional<UserMode> _includeOpsFromAllUsers;
-    boost::optional<LocalOpsMode> _showLocalOpsOnMongoS;
     boost::optional<TruncationMode> _truncateOps;
     boost::optional<CursorMode> _idleCursors;
 
+    boost::optional<LocalOpsMode> _showLocalOpsOnMongoS;
     boost::optional<bool> _targetAllNodes;
-    std::string _shardName;
-
-    std::vector<BSONObj> _ops;
-    std::vector<BSONObj>::iterator _opsIter;
 };
 
 }  // namespace mongo

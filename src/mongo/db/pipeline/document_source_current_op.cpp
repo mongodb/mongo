@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
@@ -121,74 +120,6 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
 
 const char* DocumentSourceCurrentOp::getSourceName() const {
     return kStageName.data();
-}
-
-DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
-    if (_ops.empty()) {
-        _ops = pExpCtx->getMongoProcessInterface()->getCurrentOps(
-            pExpCtx,
-            _includeIdleConnections.value_or(kDefaultConnMode),
-            _includeIdleSessions.value_or(kDefaultSessionMode),
-            _includeOpsFromAllUsers.value_or(kDefaultUserMode),
-            _truncateOps.value_or(kDefaultTruncationMode),
-            _idleCursors.value_or(kDefaultCursorMode));
-
-        _opsIter = _ops.begin();
-
-        if (pExpCtx->getFromRouter()) {
-            _shardName =
-                pExpCtx->getMongoProcessInterface()->getShardName(pExpCtx->getOperationContext());
-
-            uassert(40465,
-                    "Aggregation request specified 'fromRouter' but unable to retrieve shard name "
-                    "for $currentOp pipeline stage.",
-                    !_shardName.empty());
-        }
-    }
-
-    if (_opsIter != _ops.end()) {
-        if (!pExpCtx->getFromRouter()) {
-            return Document(*_opsIter++);
-        }
-
-        // This $currentOp is running in a sharded context.
-        invariant(!_shardName.empty());
-
-        const BSONObj& op = *_opsIter++;
-        MutableDocument doc;
-
-        // Add the shard name to the output document.
-        doc.addField(kShardFieldName, Value(_shardName));
-
-        if (mongo::lockedForWriting()) {
-            doc.addField(StringData("fsyncLock"), Value(true));
-        }
-
-        // For operations on a shard, we change the opid from the raw numeric form to
-        // 'shardname:opid'. We also change the fieldname 'client' to 'client_s' to indicate
-        // that the IP is that of the mongos which initiated this request.
-        for (auto&& elt : op) {
-            StringData fieldName = elt.fieldNameStringData();
-
-            if (fieldName == kOpIdFieldName) {
-                uassert(ErrorCodes::TypeMismatch,
-                        str::stream() << "expected numeric opid for $currentOp response from '"
-                                      << _shardName << "' but got: " << typeName(elt.type()),
-                        elt.isNumber());
-
-                std::string shardOpID = (str::stream() << _shardName << ":" << elt.numberInt());
-                doc.addField(kOpIdFieldName, Value(shardOpID));
-            } else if (fieldName == kClientFieldName) {
-                doc.addField(kMongosClientFieldName, Value(elt.str()));
-            } else {
-                doc.addField(fieldName, Value(elt));
-            }
-        }
-
-        return doc.freeze();
-    }
-
-    return GetNextResult::makeEOF();
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
