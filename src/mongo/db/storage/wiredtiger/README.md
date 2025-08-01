@@ -335,6 +335,100 @@ oplog.
 
 [copy-on-write]: https://en.wikipedia.org/wiki/Copy-on-write
 
+# Cache-Pressure Monitor
+
+## Eviction and Application-threads
+
+Wiredtiger tries to keep cache utilization within acceptable ranges. The
+process of removing data from the cache (sometimes by writing it to disk) is
+called "eviction". Eviction occurs depending on whether the cache's size
+exceeds certain "trigger" and "target" limits set by the user:
+
+- `cache < target` : no eviction occurs
+- `target <= cache < trigger` : only internal threads will perform eviction.
+- `cache >= trigger` : wiredtiger will block application threads from performing
+  their work until cache returns to acceptable ranges. This is often called
+  "recruitment" because, rather than leave the threads idle, they too are used
+  to perform eviction.
+
+## Cache-Pressure and Stalls
+
+Recruiting application threads is associated with periods of unavailability in
+the presence of large, long-running transactions.
+
+- Until a transaction finishes, its state is held in-memory and it can not be
+  evicted. If enough of these transactions fill the cache, none will be
+  evicted and none will make progress (wiredtiger will have recruited them).
+- When transactions are committed or aborted, wiredtiger uses that time to
+  perform some eviction. This causes unexpected latency increases for many
+  operations, and is particularly problematic during shutdown/stepdown as they
+  can't complete in a timely fashion.
+
+## Monitoring
+
+To alleviate these problems, the server has mechanisms to detect cache-pressure
+and remediate it.
+
+Wiredtiger's implememntation is the `WiredTigerCachePressureMonitor`. This
+monitor queries internal wiredtiger stats to determine:
+
+- if the triggers have been reached or exceeded
+- how long since we have made any commits/progress
+- how much time is being spent by application threads in eviction
+
+If all of the above metrics exceed an allowed limit, a cache-pressure situation
+is flagged.
+
+Outside of the storage engine, mongo maintains a thread to perdiodically check
+for cache-pressure and act on it, called the
+`PeriodicThreadToRollbackUnderCachePressure`. This thread queries wiredtiger
+for cache-pressure and, if detected, aborts the oldest transactions until the
+cache-pressure goes away.
+
+## Interrupting Eviction
+
+Operations in wiredtiger normally can't be controlled by the mongod process
+once it calls a wiredtiger API. This would usually mean we are unable to abort
+operations recruited for eviction, in spite of the above monitor.
+
+To solve this, wiredtiger has functionality to periodically query whether a
+given application thread should stop evicting, if the
+`WT_EVENT_HANDLER.handle_general` returns nonzero for a `WT_EVENT_EVICTION`
+event, then wiredtiger will pull that application thread out of eviction early,
+either returning normally (for optional kinds of eviction) or erroring (if the
+eviction was a mandatory prerequisite for that thread's operation).
+
+This functionality is needed to allow both cache-pressure aborts and
+idle-session aborts to roll-back active transactions.
+
+## Detection and Tuning
+
+Cache-pressure detection is not a "one-size-fits-all" solution for end users.
+Depending on their workload, how spiky it is, and how many large/long transactions
+they use, they may require different configuration to detect/remediate
+cache-pressure as it appears for them.
+
+Mongod provides several mechanisms for configuring the cache-pressure
+mechanism:
+
+- CachePressureEvictionStallThresholdProportion controls how much our
+  application threads' time is allowed to count towards eviction before we
+  decide to call it "cache-pressure". Lower values make the monitor more likely
+  to decide that we are in cache-pressure.
+- CachePressureExponentiallyDecayingMovingAverageAlphaValue controls how
+  susceptible the monitor is to mis-detecting cache-pressure when the number of
+  read/write tickets varies a lot. Lower values smooth-out the monitor's view
+  of tickets.
+- CachePressureEvictionStallDetectionWindowSeconds controls how much time the
+  monitor will wait while under cache-pressure before allowing rollbacks to
+  take place. Lower values make the monitor more responsive.
+- CachePressureQueryPeriodMilliseconds controls the frequency that we check for
+  cache-pressure. Lower values increase the frequency of checking.
+- CachePressureAbortSessionKillLimitPerBatch controls how many transactions
+  per-second can be aborted when under cache-pressure. Lower values limit the
+  number (i.e. they cause cache-pressure events to either involve fewer aborts
+  or take longer to remediate).
+
 # Table of MongoDB <-> WiredTiger <-> Log version numbers
 
 | MongoDB                | WiredTiger | Log |
