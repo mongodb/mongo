@@ -944,6 +944,10 @@ Status DatabaseImpl::userCreateNS(
                       "options is not allowed");
     }
 
+    tassert(10619100,
+            "Timeseries collections must have a clustered index",
+            !collectionOptions.timeseries || collectionOptions.clusteredIndex);
+
     if (!collectionOptions.validator.isEmpty()) {
         auto expCtx = ExpressionContextBuilder{}
                           .opCtx(opCtx)

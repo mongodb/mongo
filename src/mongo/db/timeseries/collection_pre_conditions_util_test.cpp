@@ -127,14 +127,16 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, CollectionCreatedAfterPreCondi
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, DetectWhenCollectionIsDroppedAndReacquired) {
     RAIIServerParameterControllerForTest queryKnobController{
         "featureFlagCreateViewlessTimeseriesCollections", true};
-    repl::UnreplicatedWritesBlock uwb(_opCtx);
     CreateCommand cmd = CreateCommand(viewlessTsNss);
     uassertStatusOK(createCollection(_opCtx, cmd));
 
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
         _opCtx, viewlessTsNss, /*isRawDataRequest=*/false);
 
-    ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, viewlessTsNss));
+    {
+        repl::UnreplicatedWritesBlock uwb(_opCtx);  // Do not use oplog.
+        ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, viewlessTsNss));
+    }
 
     CreateCommand secondCmd = CreateCommand(viewlessTsNss);
     auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
