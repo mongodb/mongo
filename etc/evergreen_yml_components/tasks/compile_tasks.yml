@@ -821,7 +821,7 @@ tasks:
       source_dir: "src"
       include:
       - "repo/**"
-      - "./**.msi"
+      - "bazel-bin/src/mongo/installer/**.msi"
   - command: s3.put
     params:
       optional: true
