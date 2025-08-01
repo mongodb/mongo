@@ -321,6 +321,16 @@ functions:
         - "https://mciuploads.s3.amazonaws.com/${mongo_jstestshell}"
         - "mongodb-jstestshell.tgz"
 
+  "fetch extensions":
+    command: s3.get
+    display_name: "fetch extensions"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${mongo_extensions}
+      bucket: mciuploads
+      local_file: src/mongo-extensions.tgz
+
   "write mongo binary URL to downstream_expansions.yml": &echo_mongo_binary_url
     command: subprocess.exec
     params:
@@ -373,6 +383,19 @@ functions:
         - "--extraction-command=${decompress}"
         - "--change-dir=${extraction_change_dir}"
         - "--move-output=dist-test/:bazel-bin/install"
+
+  "extract extensions":
+    command: subprocess.exec
+    display_name: "extract extensions"
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "evergreen/functions/binaries_extract.py"
+        - "--tarball=mongo-extensions.tgz"
+        - "--extraction-command=${decompress}"
+        - "--change-dir=${extraction_change_dir}"
+        - "${move_outputs}"
 
   "get version expansions": &get_version_expansions
     command: s3.get
@@ -3191,3 +3214,16 @@ functions:
           [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN]
         args:
           - "./src/evergreen/container_registry_login.sh"
+
+  "find all extensions":
+    - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "find all extensions"
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/functions/find_extensions.sh"
+    - command: expansions.update
+      params:
+        file: src/extension_paths.yml
+    - *f_expansions_write
