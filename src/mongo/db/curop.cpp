@@ -39,6 +39,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
+#include "mongo/db/admission/ticketholder_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -107,6 +108,13 @@ BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
     return newCmdObj;
 }
 
+void incrementQueueStats(TicketHolder* ticketHolder,
+                         const ExecutionAdmissionContext::DelinquencyStats& stats) {
+    ticketHolder->incrementDelinquencyStats(
+        stats.delinquentAcquisitions.loadRelaxed(),
+        Milliseconds(stats.totalAcquisitionDelinquencyMillis.loadRelaxed()),
+        Milliseconds(stats.maxAcquisitionDelinquencyMillis.loadRelaxed()));
+}
 }  // namespace
 
 /**
@@ -410,7 +418,12 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
         metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + _debug.cpuTime;
 
         if (const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
-            admCtx.getDelinquentAcquisitions() > 0) {
+            admCtx.getDelinquentAcquisitions() > 0 && !opCtx()->inMultiDocumentTransaction()) {
+            // Note that we don't record delinquency stats around ticketing when in a
+            // multi-document transaction, since operations within multi-document transactions hold
+            // tickets for a long time by design and reporting them as delinquent will just create
+            // noise in the data.
+
             metrics.delinquentAcquisitions = metrics.delinquentAcquisitions.value_or(0) +
                 static_cast<uint64_t>(admCtx.getDelinquentAcquisitions());
             metrics.totalAcquisitionDelinquencyMillis =
@@ -631,6 +644,19 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
     const auto executionTimeMillis =
         durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime);
+
+    if (!opCtx->inMultiDocumentTransaction()) {
+        // If we're not in a txn, we record information about delinquent ticket acquisitions to the
+        // Queue's stats.
+        auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+
+        if (auto manager = admission::TicketHolderManager::get(opCtx->getServiceContext())) {
+            incrementQueueStats(manager->getTicketHolder(LockMode::MODE_IS),
+                                admCtx.readDelinquencyStats());
+            incrementQueueStats(manager->getTicketHolder(LockMode::MODE_IX),
+                                admCtx.writeDelinquencyStats());
+        }
+    }
 
     // Do not log the slow query information if asked to omit it
     if (shouldCurOpStackOmitDiagnosticInformation(this)) {

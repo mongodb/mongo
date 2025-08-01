@@ -152,13 +152,13 @@ public:
         return bool(_startQueueingTime.waitFor(kNotQueueing, timeout));
     }
 
-    void recordDelinquentAcquisition(int64_t delay) {
+    void recordDelinquentAcquisition(Milliseconds delay) {
         ++delinquentAcquisitions;
-        totalAcquisitionDelinquencyMillis += delay;
-        maxAcquisitionDelinquencyMillis = std::max(maxAcquisitionDelinquencyMillis, delay);
+        totalAcquisitionDelinquencyMillis += delay.count();
+        maxAcquisitionDelinquencyMillis = std::max(maxAcquisitionDelinquencyMillis, delay.count());
     }
 
-    int32_t delinquentAcquisitions{0};
+    int64_t delinquentAcquisitions{0};
     int64_t totalAcquisitionDelinquencyMillis{0};
     int64_t maxAcquisitionDelinquencyMillis{0};
 };

@@ -58,10 +58,8 @@ class TicketHolder {
     friend class Ticket;
 
 public:
-    struct QueueStats;
+    using DelinquentCallback = std::function<void(AdmissionContext*, Milliseconds)>;
 
-    using DelinquentCallback =
-        std::function<void(AdmissionContext*, int64_t, TicketHolder::QueueStats&)>;
     /**
      * Describes the algorithm used to update the TicketHolder when the size of the ticket pool
      * changes.
@@ -186,6 +184,21 @@ public:
     void setPeakUsed_forTest(int32_t used);
 
     /**
+     * Append TicketHolder statistics to the provided builder.
+     */
+    void appendStats(BSONObjBuilder& b) const;
+
+    /**
+     * Bumps the delinquency counters associated with this queue. This intended to be called when
+     * an operation completes, with the value of each of the delinquency counters accumulated
+     * during its execution.
+     */
+    void incrementDelinquencyStats(int64_t delinquentAcquisitions,
+                                   Milliseconds totalAcquisitionDelinquency,
+                                   Milliseconds maxAcquisitionDelinquency);
+
+private:
+    /**
      * Statistics for queueing mechanisms in the TicketHolder implementations. The term "Queue" is a
      * loose abstraction for the way in which operations are queued when there are no available
      * tickets.
@@ -199,17 +212,18 @@ public:
         AtomicWord<std::int64_t> totalStartedProcessing{0};
         AtomicWord<std::int64_t> totalCanceled{0};
         AtomicWord<std::int64_t> totalTimeQueuedMicros{0};
-        AtomicWord<std::int32_t> totalDelinquentAcquisitions{0};
+    };
+
+    /**
+     * Tracks stats around normal-priority operations that were delinquent in returning their
+     * ticket.
+     */
+    struct DelinquencyStats {
+        AtomicWord<std::int64_t> totalDelinquentAcquisitions{0};
         AtomicWord<std::int64_t> totalAcquisitionDelinquencyMillis{0};
         AtomicWord<std::int64_t> maxAcquisitionDelinquencyMillis{0};
     };
 
-    /**
-     * Append TicketHolder statistics to the provided builder.
-     */
-    void appendStats(BSONObjBuilder& b) const;
-
-private:
     /**
      * Releases a ticket back into the ticket pool and updates queueing statistics. Tickets
      * issued for exempt operations do not get deposited back to the pool.
@@ -270,6 +284,7 @@ private:
     bool _enabledDelinquent{false};
     Milliseconds _delinquentMs{0};
     DelinquentCallback _reportDelinquentOpCallback{nullptr};
+    DelinquencyStats _delinquencyStats;
 };
 
 /**

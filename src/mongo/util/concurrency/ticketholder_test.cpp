@@ -259,13 +259,8 @@ TEST_F(TicketHolderTest, DelinquentAcquisitionStats) {
         1 /* numTickets */,
         false /* trackPeakUsed */,
         TicketHolder::kDefaultMaxQueueDepth,
-        [](AdmissionContext* admCtx, int64_t delta, TicketHolder::QueueStats& queueStats) {
+        [](AdmissionContext* admCtx, Milliseconds delta) {
             static_cast<MockAdmissionContext*>(admCtx)->recordDelinquentAcquisition(delta);
-            // Update aggregated metrics in QueueStats.
-            queueStats.totalDelinquentAcquisitions.fetchAndAddRelaxed(1);
-            queueStats.totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(delta);
-            queueStats.maxAcquisitionDelinquencyMillis.store(
-                std::max(queueStats.maxAcquisitionDelinquencyMillis.loadRelaxed(), delta));
         });
     OperationContext* opCtx = _opCtx.get();
     auto tickSource = getTickSource();
@@ -283,12 +278,12 @@ TEST_F(TicketHolderTest, DelinquentAcquisitionStats) {
         ASSERT_EQ(admCtx.maxAcquisitionDelinquencyMillis, 0);
 
         auto currentStats = stats.getNonTicketStats();
-        ASSERT_EQ(currentStats["normalPriority"]["totalDelinquentAcquisitions"].Int(), 0);
+        ASSERT_EQ(currentStats["normalPriority"]["totalDelinquentAcquisitions"].Long(), 0);
         ASSERT_EQ(currentStats["normalPriority"]["totalAcquisitionDelinquencyMillis"].Long(), 0);
         ASSERT_EQ(currentStats["normalPriority"]["maxAcquisitionDelinquencyMillis"].Long(), 0);
     }
     {
-        // Ticket releases within the threshold, delinquent metric should be collected.
+        // Ticket releases after the threshold, delinquent metric should be collected.
         boost::optional<Ticket> ticket = holder->waitForTicket(opCtx, &admCtx);
         tickSource->advance(Milliseconds{threshold * 2});
         ticket.reset();
@@ -297,15 +292,20 @@ TEST_F(TicketHolderTest, DelinquentAcquisitionStats) {
         ASSERT_EQ(admCtx.totalAcquisitionDelinquencyMillis, threshold * 2);
         ASSERT_EQ(admCtx.maxAcquisitionDelinquencyMillis, threshold * 2);
 
+        // Normally an operation will call this as it completes.
+        holder->incrementDelinquencyStats(admCtx.delinquentAcquisitions,
+                                          Milliseconds(admCtx.totalAcquisitionDelinquencyMillis),
+                                          Milliseconds(admCtx.maxAcquisitionDelinquencyMillis));
+
         auto currentStats = stats.getNonTicketStats();
-        ASSERT_EQ(currentStats["normalPriority"]["totalDelinquentAcquisitions"].Int(), 1);
+        ASSERT_EQ(currentStats["normalPriority"]["totalDelinquentAcquisitions"].Long(), 1);
         ASSERT_EQ(currentStats["normalPriority"]["totalAcquisitionDelinquencyMillis"].Long(),
                   threshold * 2);
         ASSERT_EQ(currentStats["normalPriority"]["maxAcquisitionDelinquencyMillis"].Long(),
                   threshold * 2);
     }
     {
-        // Ticket with a different AdmissionContext releases within the threshold, aggregated
+        // Ticket with a different AdmissionContext releases beyond the threshold, aggregated
         // delinquent metric should be updated.
         MockAdmissionContext admCtx2{};
         boost::optional<Ticket> ticket = holder->waitForTicket(opCtx, &admCtx2);
@@ -316,8 +316,12 @@ TEST_F(TicketHolderTest, DelinquentAcquisitionStats) {
         ASSERT_EQ(admCtx2.totalAcquisitionDelinquencyMillis, threshold * 5);
         ASSERT_EQ(admCtx2.maxAcquisitionDelinquencyMillis, threshold * 5);
 
+        holder->incrementDelinquencyStats(admCtx2.delinquentAcquisitions,
+                                          Milliseconds(admCtx2.totalAcquisitionDelinquencyMillis),
+                                          Milliseconds(admCtx2.maxAcquisitionDelinquencyMillis));
+
         auto currentStats = stats.getNonTicketStats();
-        ASSERT_EQ(currentStats["normalPriority"]["totalDelinquentAcquisitions"].Int(), 2);
+        ASSERT_EQ(currentStats["normalPriority"]["totalDelinquentAcquisitions"].Long(), 2);
         ASSERT_EQ(currentStats["normalPriority"]["totalAcquisitionDelinquencyMillis"].Long(),
                   threshold * 7);
         ASSERT_EQ(currentStats["normalPriority"]["maxAcquisitionDelinquencyMillis"].Long(),

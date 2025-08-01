@@ -585,13 +585,15 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
 
     // If the delinquent stats are not zero, they *are* included in the state.
     {
-        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(20);
-        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(10);
+        ExecutionAdmissionContext::get(opCtx.get())
+            .recordDelinquentReadAcquisition(Milliseconds(20));
+        ExecutionAdmissionContext::get(opCtx.get())
+            .recordDelinquentReadAcquisition(Milliseconds(10));
         BSONObjBuilder bob;
         curOp->reportState(&bob, SerializationContext{});
         BSONObj state = bob.obj();
         ASSERT_TRUE(state.hasField("delinquencyInfo"));
-        ASSERT_EQ(state["delinquencyInfo"]["totalDelinquentAcquisitions"].Int(), 2);
+        ASSERT_EQ(state["delinquencyInfo"]["totalDelinquentAcquisitions"].Long(), 2);
         ASSERT_EQ(state["delinquencyInfo"]["totalAcquisitionDelinquencyMillis"].Long(), 30);
         ASSERT_EQ(state["delinquencyInfo"]["maxAcquisitionDelinquencyMillis"].Long(), 20);
     }

@@ -39,27 +39,53 @@ class OperationContext;
  */
 class ExecutionAdmissionContext : public AdmissionContext {
 public:
+    struct DelinquencyStats {
+        DelinquencyStats() = default;
+        DelinquencyStats(const DelinquencyStats& other);
+        DelinquencyStats& operator=(const DelinquencyStats& other);
+
+        AtomicWord<int64_t> delinquentAcquisitions{0};
+        AtomicWord<int64_t> totalAcquisitionDelinquencyMillis{0};
+        AtomicWord<int64_t> maxAcquisitionDelinquencyMillis{0};
+    };
+
     ExecutionAdmissionContext() = default;
     ExecutionAdmissionContext(const ExecutionAdmissionContext& other);
     ExecutionAdmissionContext& operator=(const ExecutionAdmissionContext& other);
 
-    int32_t getDelinquentAcquisitions() const {
-        return _delinquentAcquisitions.loadRelaxed();
+    int64_t getDelinquentAcquisitions() const {
+        return _readDelinquencyStats.delinquentAcquisitions.loadRelaxed() +
+            _writeDelinquencyStats.delinquentAcquisitions.loadRelaxed();
     }
 
     int64_t getTotalAcquisitionDelinquencyMillis() const {
-        return _totalAcquisitionDelinquencyMillis.loadRelaxed();
+        return _readDelinquencyStats.totalAcquisitionDelinquencyMillis.loadRelaxed() +
+            _writeDelinquencyStats.totalAcquisitionDelinquencyMillis.loadRelaxed();
     }
 
     int64_t getMaxAcquisitionDelinquencyMillis() const {
-        return _maxAcquisitionDelinquencyMillis.loadRelaxed();
+        return std::max(_readDelinquencyStats.maxAcquisitionDelinquencyMillis.loadRelaxed(),
+                        _writeDelinquencyStats.maxAcquisitionDelinquencyMillis.loadRelaxed());
     }
 
-    void recordDelinquentAcquisition(int64_t delay) {
-        _delinquentAcquisitions.fetchAndAddRelaxed(1);
-        _totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(delay);
-        _maxAcquisitionDelinquencyMillis.storeRelaxed(
-            std::max(_maxAcquisitionDelinquencyMillis.loadRelaxed(), delay));
+    /**
+     * Indicates that a read or write ticket was held for 'delay' milliseconds past due.
+     */
+    void recordDelinquentReadAcquisition(Milliseconds delay) {
+        recordDelinquentAcquisition(delay, _readDelinquencyStats);
+    }
+    void recordDelinquentWriteAcquisition(Milliseconds delay) {
+        recordDelinquentAcquisition(delay, _writeDelinquencyStats);
+    }
+
+    /**
+     * Getters for stats related to delinquency in acquiring read and write tickets.
+     */
+    const DelinquencyStats& readDelinquencyStats() const {
+        return _readDelinquencyStats;
+    }
+    const DelinquencyStats& writeDelinquencyStats() const {
+        return _writeDelinquencyStats;
     }
 
     /**
@@ -68,9 +94,16 @@ public:
     static ExecutionAdmissionContext& get(OperationContext* opCtx);
 
 private:
-    AtomicWord<int32_t> _delinquentAcquisitions{0};
-    AtomicWord<int64_t> _totalAcquisitionDelinquencyMillis{0};
-    AtomicWord<int64_t> _maxAcquisitionDelinquencyMillis{0};
+    void recordDelinquentAcquisition(Milliseconds delay, DelinquencyStats& stats) {
+        const int64_t delayMs = delay.count();
+        stats.delinquentAcquisitions.fetchAndAddRelaxed(1);
+        stats.totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(delayMs);
+        stats.maxAcquisitionDelinquencyMillis.storeRelaxed(
+            std::max(stats.maxAcquisitionDelinquencyMillis.loadRelaxed(), delayMs));
+    }
+
+    DelinquencyStats _readDelinquencyStats;
+    DelinquencyStats _writeDelinquencyStats;
 };
 
 }  // namespace mongo

@@ -451,7 +451,7 @@ void OpDebug::report(OperationContext* opCtx,
     }
 
     const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
-    if (admCtx.getDelinquentAcquisitions() > 0) {
+    if (admCtx.getDelinquentAcquisitions() > 0 && !opCtx->inMultiDocumentTransaction()) {
         BSONObjBuilder sub;
         appendDelinquentInfo(opCtx, sub);
         pAttrs->add("delinquencyInfo", sub.obj());

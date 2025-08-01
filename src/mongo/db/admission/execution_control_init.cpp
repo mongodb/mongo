@@ -79,21 +79,22 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
         }
     };
 
-    auto delinquentCb =
-        [](AdmissionContext* admCtx, int64_t delta, TicketHolder::QueueStats& queueStats) {
-            static_cast<ExecutionAdmissionContext*>(admCtx)->recordDelinquentAcquisition(delta);
-            // Update aggregated metrics in QueueStats.
-            queueStats.totalDelinquentAcquisitions.fetchAndAddRelaxed(1);
-            queueStats.totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(delta);
-            queueStats.maxAcquisitionDelinquencyMillis.storeRelaxed(
-                std::max(queueStats.maxAcquisitionDelinquencyMillis.loadRelaxed(), delta));
-        };
+    auto delinquentReadCb = [](AdmissionContext* admCtx, Milliseconds delta) {
+        static_cast<ExecutionAdmissionContext*>(admCtx)->recordDelinquentReadAcquisition(delta);
+    };
+
+    auto delinquentWriteCb = [](AdmissionContext* admCtx, Milliseconds delta) {
+        static_cast<ExecutionAdmissionContext*>(admCtx)->recordDelinquentWriteAcquisition(delta);
+    };
 
     std::unique_ptr<TicketHolderManager> ticketHolderManager = makeTicketHolderManager(
         std::make_unique<TicketHolder>(
-            svcCtx, readTransactions, usingThroughputProbing, readMaxQueueDepth, delinquentCb),
-        std::make_unique<TicketHolder>(
-            svcCtx, writeTransactions, usingThroughputProbing, writeMaxQueueDepth, delinquentCb));
+            svcCtx, readTransactions, usingThroughputProbing, readMaxQueueDepth, delinquentReadCb),
+        std::make_unique<TicketHolder>(svcCtx,
+                                       writeTransactions,
+                                       usingThroughputProbing,
+                                       writeMaxQueueDepth,
+                                       delinquentWriteCb));
 
     TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
 

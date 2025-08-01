@@ -18,6 +18,7 @@ import {findMatchingLogLine, getMatchingLoglinesCount} from "jstests/libs/log.js
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // The failpoint will wait for this long before yielding for every iteration.
@@ -208,6 +209,59 @@ function testDelinquencyOnShard(routerDb, shardDb) {
     }
 
     failPoint.off();
+
+    // Run a multi-doc transaction with a long running operation. Assert that it does not get
+    // marked delinquent or bump the delinquency serverStatus counters.
+    {
+        const session = routerDb.getMongo().startSession();
+        const sessionDb = session.getDatabase(jsTestName());
+        assert.commandWorked(sessionDb.txn_coll.insert({a: 1}));
+
+        const findTxnComment = "find_in_txn";
+        const sleepMillis = 10 * 1000;
+
+        {
+            session.startTransaction();
+            assert.eq(sessionDb.txn_coll.find({$where: `sleep(${sleepMillis}); return true;`})
+                          .comment(findTxnComment)
+                          .itcount(),
+                      1);
+            assert.commandWorked(sessionDb.txn_coll.insert({a: 2}));
+            session.commitTransaction();
+        }
+
+        const globalLog = assert.commandWorked(shardDb.adminCommand({getLog: "global"}));
+        const line = findMatchingLogLine(
+            globalLog.log, {msg: "Slow query", comment: findTxnComment, "command": "find"});
+        const parsedLine = JSON.parse(line);
+        assert(!('delinquencyInfo' in parsedLine.attr), parsedLine);
+
+        // Check that the server status counters were not bumped. Here we can only do a loose check.
+        {
+            const serverStatus = shardDb.serverStatus();
+            const queues = serverStatus.queues.execution;
+
+            // Ensure that the slow find() did not bump the queue-level counters. To do this, we
+            // assert that the max delinquent value for each queue is less than the time this
+            // operation slept. This assumes that no other background operation that the test
+            // didn't trigger directly was delinquent for more than 'sleepMillis'.
+            assert.lt(
+                queues.write.normalPriority.maxAcquisitionDelinquencyMillis, sleepMillis, queues);
+            assert.lt(
+                queues.read.normalPriority.maxAcquisitionDelinquencyMillis, sleepMillis, queues);
+        }
+
+        // Ensure that the query stats for this operation do not indicate that it's delinquent.
+        {
+            const queryStats = getQueryStats(routerDb.getMongo(), {collName: "txn_coll"});
+            assert(queryStats.length === 1,
+                   "Expected to find exactly one query stats entry for 'testColl' " +
+                       tojson(queryStats));
+            assert.eq(queryStats[0].metrics.delinquentAcquisitions.sum, 0, queryStats);
+            assert.eq(queryStats[0].metrics.totalAcquisitionDelinquencyMillis.sum, 0, queryStats);
+            assert.eq(queryStats[0].metrics.maxAcquisitionDelinquencyMillis.max, 0, queryStats);
+        }
+    }
 }
 
 // routerDb is the database on the router (mongos) when the cluster is sharded, otherwise it is the
@@ -263,20 +317,23 @@ const startupParameters = {
 };
 
 {
-    let conn = MongoRunner.runMongod({setParameter: startupParameters});
+    const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: startupParameters}});
+    rst.startSet();
+    rst.initiate();
+    const conn = rst.getPrimary();
     const db = conn.getDB(jsTestName());
 
     // Don't run this test on slow builds, as it can be racey.
     if (isSlowBuild(db)) {
         jsTestLog("Aborting test since it's running on a slow build");
-        MongoRunner.stopMongod(conn);
+        rst.stopSet();
         quit();
     }
 
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
 
     runTest(db, db);
-    MongoRunner.stopMongod(conn);
+    rst.stopSet();
 }
 
 {

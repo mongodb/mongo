@@ -288,6 +288,14 @@ void TicketHolder::appendStats(BSONObjBuilder& b) const {
     {
         BSONObjBuilder bb(b.subobjStart("normalPriority"));
         _appendQueueStats(bb, _normalPriorityQueueStats);
+
+        b.append("totalDelinquentAcquisitions",
+                 _delinquencyStats.totalDelinquentAcquisitions.loadRelaxed());
+        b.append("totalAcquisitionDelinquencyMillis",
+                 _delinquencyStats.totalAcquisitionDelinquencyMillis.loadRelaxed());
+        b.append("maxAcquisitionDelinquencyMillis",
+                 _delinquencyStats.maxAcquisitionDelinquencyMillis.loadRelaxed());
+
         bb.done();
     }
 }
@@ -309,11 +317,6 @@ void TicketHolder::_appendQueueStats(BSONObjBuilder& b, const QueueStats& stats)
     b.append("canceled", stats.totalCanceled.loadRelaxed());
     b.append("newAdmissions", stats.totalNewAdmissions.loadRelaxed());
     b.append("totalTimeQueuedMicros", stats.totalTimeQueuedMicros.loadRelaxed());
-    b.append("totalDelinquentAcquisitions", stats.totalDelinquentAcquisitions.loadRelaxed());
-    b.append("totalAcquisitionDelinquencyMillis",
-             stats.totalAcquisitionDelinquencyMillis.loadRelaxed());
-    b.append("maxAcquisitionDelinquencyMillis",
-             stats.maxAcquisitionDelinquencyMillis.loadRelaxed());
 }
 
 void TicketHolder::_updateQueueStatsOnRelease(TicketHolder::QueueStats& queueStats,
@@ -325,8 +328,8 @@ void TicketHolder::_updateQueueStatsOnRelease(TicketHolder::QueueStats& queueSta
     queueStats.totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
 
     if (_enabledDelinquent && _reportDelinquentOpCallback && delta > _delinquentMs) {
-        auto deltaCount = duration_cast<Milliseconds>(delta).count();
-        _reportDelinquentOpCallback(ticket.getAdmissionContext(), deltaCount, queueStats);
+        _reportDelinquentOpCallback(ticket.getAdmissionContext(),
+                                    duration_cast<Milliseconds>(delta));
     }
 }
 
@@ -380,4 +383,17 @@ void TicketHolder::setPeakUsed_forTest(int32_t used) {
 int32_t TicketHolder::waiting_forTest() const {
     return _waiterCount.load();
 }
+
+void TicketHolder::incrementDelinquencyStats(int64_t delinquentAcquisitions,
+                                             Milliseconds totalAcquisitionDelinquency,
+                                             Milliseconds maxAcquisitionDelinquency) {
+    auto& stats = _delinquencyStats;
+    stats.totalDelinquentAcquisitions.fetchAndAddRelaxed(delinquentAcquisitions);
+
+    stats.totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(totalAcquisitionDelinquency.count());
+
+    stats.maxAcquisitionDelinquencyMillis.storeRelaxed(std::max(
+        stats.maxAcquisitionDelinquencyMillis.loadRelaxed(), maxAcquisitionDelinquency.count()));
+}
+
 }  // namespace mongo
