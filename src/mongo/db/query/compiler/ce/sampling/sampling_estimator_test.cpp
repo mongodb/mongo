@@ -56,31 +56,6 @@ const size_t kSampleSize = 5;
 const int numChunks = 10;
 const std::vector<std::string> includedSampleFields = {"_id", "a", "b", "obj"};
 
-TEST_F(SamplingEstimatorTest, SamplingCanonicalQueryTest) {
-    const int64_t sampleSize = 500;
-    // The samplingCQ is a different CQ than the one for the query being optimized. 'samplingCQ'
-    // should contain information about the sample size and the same nss as the CQ for the query
-    // being optimized.
-    auto samplingCQ = SamplingEstimatorForTesting::makeEmptyCanonicalQuery(
-        kTestNss, operationContext(), sampleSize);
-    ASSERT_EQUALS(samplingCQ->getFindCommandRequest().getLimit(), sampleSize);
-    ASSERT_EQUALS(kTestNss, samplingCQ->nss());
-}
-
-TEST_F(SamplingEstimatorTest, SamplingCanonicalQueryWithProjectionTest) {
-    const int64_t sampleSize = 500;
-    // The samplingCQ is a different CQ than the one for the query being optimized. 'samplingCQ'
-    // should contain information about the sample size and the same nss as the CQ for the query
-    // being optimized.
-    auto samplingCQ = SamplingEstimatorForTesting::makeEmptyCanonicalQuery(
-        kTestNss, operationContext(), sampleSize, includedSampleFields);
-    auto expectedProjection = fromjson("{_id: 1, a: 1, b: 1, obj: 1}");
-    ASSERT_EQUALS(samplingCQ->getFindCommandRequest().getLimit(), sampleSize);
-    ASSERT_EQUALS(kTestNss, samplingCQ->nss());
-    ASSERT_EQUALS(samplingCQ->getFindCommandRequest().getProjection().woCompare(expectedProjection),
-                  0);
-}
-
 TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
     insertDocuments(kTestNss, createDocuments(10));
 

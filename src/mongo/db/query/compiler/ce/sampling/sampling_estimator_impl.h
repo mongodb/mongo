@@ -148,11 +148,8 @@ protected:
      * preparing the sampling plan for execution in SBE. That function uses the CanonicalQuery to
      * bind input parameters, but this is a no-op for sampling CE.
      */
-    static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(
-        const NamespaceString& nss,
-        OperationContext* opCtx,
-        boost::optional<size_t> sampleSize,
-        const std::vector<std::string>& topLevelSampleFieldNames = {});
+    static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(const NamespaceString& nss,
+                                                                   OperationContext* opCtx);
 
     double getCollCard() const {
         return _collectionCard.cardinality().v();

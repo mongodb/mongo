@@ -58,24 +58,9 @@ using CardinalityType = mongo::cost_based_ranker::CardinalityType;
 using EstimationSource = mongo::cost_based_ranker::EstimationSource;
 
 std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeEmptyCanonicalQuery(
-    const NamespaceString& nss,
-    OperationContext* opCtx,
-    boost::optional<size_t> sampleSize,
-    const std::vector<std::string>& topLevelSampleFieldNames) {
+    const NamespaceString& nss, OperationContext* opCtx) {
     auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
-    if (sampleSize) {
-        findCommand->setLimit(*sampleSize);
-    }
-    if (!topLevelSampleFieldNames.empty()) {
-        BSONObjBuilder bob;
-        for (const auto& fieldName : topLevelSampleFieldNames) {
-            bob.append(fieldName, 1);
-        }
-        findCommand->setProjection(bob.obj());
-    }
-
     auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build();
-
     auto statusWithCQ = CanonicalQuery::make(
         {.expCtx = expCtx,
          .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)}});
@@ -489,9 +474,9 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
 
 void SamplingEstimatorImpl::generateFullCollScanSample() {
     // Create a CanonicalQuery for the CollScan plan.
-    auto cq = makeEmptyCanonicalQuery(
-        _collections.getMainCollection()->ns(), _opCtx, boost::none, _topLevelSampleFieldNames);
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
+    const auto& ns = _collections.getMainCollection()->ns();
+    auto cq = makeEmptyCanonicalQuery(ns, _opCtx);
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, ns);
 
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
@@ -525,10 +510,10 @@ void SamplingEstimatorImpl::generateFullCollScanSample() {
 
 void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
     // Create a CanonicalQuery for the sampling plan.
-    auto cq = makeEmptyCanonicalQuery(
-        _collections.getMainCollection()->ns(), _opCtx, sampleSize, _topLevelSampleFieldNames);
+    const auto& ns = _collections.getMainCollection()->ns();
+    auto cq = makeEmptyCanonicalQuery(ns, _opCtx);
     _sampleSize = sampleSize;
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, ns);
 
     auto plan = generateRandomSamplingPlan(sbeYieldPolicy.get());
     executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
@@ -543,10 +528,10 @@ void SamplingEstimatorImpl::generateRandomSample() {
 
 void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
     // Create a CanonicalQuery for the sampling plan.
-    auto cq = makeEmptyCanonicalQuery(
-        _collections.getMainCollection()->ns(), _opCtx, sampleSize, _topLevelSampleFieldNames);
+    const auto& ns = _collections.getMainCollection()->ns();
+    auto cq = makeEmptyCanonicalQuery(ns, _opCtx);
     _sampleSize = sampleSize;
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, ns);
 
     auto plan = generateChunkSamplingPlan(sbeYieldPolicy.get());
     executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
@@ -561,9 +546,9 @@ void SamplingEstimatorImpl::generateChunkSample() {
 
 void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
     // Create a CanonicalQuery for the sampling plan.
-    auto cq = makeEmptyCanonicalQuery(
-        _collections.getMainCollection()->ns(), _opCtx, _sampleSize, _topLevelSampleFieldNames);
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
+    const auto& ns = _collections.getMainCollection()->ns();
+    auto cq = makeEmptyCanonicalQuery(ns, _opCtx);
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, ns);
 
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
