@@ -349,7 +349,7 @@ class AllVersionsJSTestCase(JSTestCase):
     """
     Alias for JSTestCase for multiversion passthrough suites.
 
-    It run with all combinations of versions of replica sets and sharded clusters.
+    It runs with all combinations of versions of replica sets and sharded clusters.
     The distinct name is picked up by task generation.
     """
 
