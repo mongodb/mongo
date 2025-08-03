@@ -4,7 +4,7 @@ Fixtures define a specific topology that tests run against.
 
 ## Supported Fixtures
 
-Specify any of the following as the `fixture` in your [Suite](../../../../buildscripts/resmokeconfig/suites/README.md) config:
+Specify any these in your [Suite](../../../../buildscripts/resmokeconfig/suites/README.md) config.
 
 - [`BulkWriteFixture`](./bulk_write.py) - Fixture which provides JSTests with a set of clusters to run tests against.
 - [`ExternalFixture`](./external.py) - Fixture which provides JSTests capability to connect to external (non-resmoke) cluster.

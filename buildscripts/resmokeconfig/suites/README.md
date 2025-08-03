@@ -64,7 +64,29 @@ Example:
 test_kind: js_test
 ```
 
-See all supported kinds in [`buildscripts/resmokelib/testing/testcases`](../../../buildscripts/resmokelib/testing/testcases/README.md).
+The following kinds are supported (see [`_SELECTOR_REGISTRY`](../../../buildscripts/resmokelib/selector.py)):
+
+- `all_versions_js_test`
+- `benchmark_test`
+- `bulk_write_cluster_js_test`
+- `cpp_integration_test`
+- `cpp_libfuzzer_test`
+- `cpp_unit_test`
+- `db_test`
+- `fsm_workload_test`
+- `js_test`
+- `json_schema_test`
+- `multi_stmt_txn_passthrough`
+- `magic_restore_js_test`
+- `parallel_fsm_workload_test`
+- `pretty_printer_test`
+- `py_test`
+- `query_tester_self_test`
+- `query_tester_server_test`
+- `sdam_json_test`
+- `server_selection_json_test`
+- `sleep_test`
+- `tla_plus_test`
 
 ## `selector`
 

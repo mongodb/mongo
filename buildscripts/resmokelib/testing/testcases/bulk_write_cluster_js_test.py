@@ -7,7 +7,7 @@ from buildscripts.resmokelib.testing.testcases import jsrunnerfile
 
 
 class BulkWriteClusterTestCase(jsrunnerfile.JSRunnerFileTestCase):
-    """A test to execute with connection data for multiple clusters passed through TestData."""
+    """An test to execute with connection data for multiple clusters passed through TestData."""
 
     REGISTERED_NAME = "bulk_write_cluster_js_test"
 
