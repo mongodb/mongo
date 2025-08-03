@@ -1251,6 +1251,23 @@ void BulkWriteOp::noteErrorForRemainingWrites(const Status& status) {
     dassert(isFinished());
 }
 
+/**
+ * Checks if an error reply has the TransientTransactionError label. We use this in cases where we
+ * want to defer to whether a shard attached the label to an error it gave us.
+ */
+bool hasTransientTransactionErrorLabel(const ErrorReply& reply) {
+    auto errorLabels = reply.getErrorLabels();
+    if (!errorLabels) {
+        return false;
+    }
+    for (auto& label : errorLabels.value()) {
+        if (label == ErrorLabel::kTransientTransaction) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::vector<BulkWriteReplyItem> exhaustCursorForReplyItems(
     OperationContext* opCtx,
     const TargetedWriteBatch& targetedBatch,

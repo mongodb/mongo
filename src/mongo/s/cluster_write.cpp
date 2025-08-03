@@ -88,8 +88,9 @@ void write(OperationContext* opCtx,
     LOGV2_DEBUG_OPTIONS(
         4817400, 2, {logv2::LogComponent::kShardMigrationPerf}, "Starting batch write");
 
+    // TODO SERVER-104131: Enable insert/update/delete commands in transactions.
     // TODO SERVER-104145: Enable insert/update/delete commands from internal clients.
-    if (internalQueryUnifiedWriteExecutor.load()) {
+    if (internalQueryUnifiedWriteExecutor.load() && !opCtx->inMultiDocumentTransaction()) {
         *response = unified_write_executor::write(opCtx, request);
     } else {
         BatchWriteExec::executeBatch(opCtx, targeter, request, response, stats);

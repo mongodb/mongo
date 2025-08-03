@@ -462,14 +462,6 @@ buildvariants:
     tasks:
       - name: unified_write_executor
       - name: sharding_unified_write_executor
-      - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_gen
-      - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard_gen
-      - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_gen
-      - name: unified_write_executor_sharded_jscore_txns
-      - name: unified_write_executor_sharded_jscore_txns_sharded_collections
-      - name: unified_write_executor_sharded_jscore_txns_without_snapshot
-      - name: unified_write_executor_multi_shard_multi_stmt_txn_jscore_passthrough_gen
-      - name: unified_write_executor_multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
       - name: burn_in_tests_gen
         depends_on:
           - name: version_burn_in_gen

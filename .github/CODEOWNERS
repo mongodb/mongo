@@ -179,7 +179,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/rollback* @10gen/server-recovery @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/*txn* @10gen/server-transactions @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/unified_write_executor* @10gen/query-execution-router @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/unified_write_executor.yml @10gen/query-execution-router @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/sharding_unified_write_executor.yml @10gen/query-execution-router @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/sharded_collections_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot

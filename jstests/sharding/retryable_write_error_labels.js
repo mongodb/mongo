@@ -29,10 +29,6 @@ const st = new ShardingTest({
     shards: 1
 });
 
-const isUnifiedWriteExecutor =
-    st.s.adminCommand({getParameter: 1, internalQueryUnifiedWriteExecutor: 1})
-        .internalQueryUnifiedWriteExecutor;
-
 function checkErrorCode(res, expectedErrorCodes, isWCError) {
     // Rewrite each element of the `expectedErrorCodes` array.
     // If it's not an array, just rewrite the scalar.
@@ -83,10 +79,6 @@ function testMongodError(errorCode, isWCError) {
     const sessionColl = sessionDb.getCollection(collName);
 
     let insertFailPoint = enableFailCommand(shard0Primary, isWCError, errorCode, ["insert"]);
-    if (isUnifiedWriteExecutor) {
-        // In the unified write executor batched writes are converted to bulkWrites.
-        insertFailPoint = enableFailCommand(shard0Primary, isWCError, errorCode, ["bulkWrite"]);
-    }
 
     jsTestLog(`Testing with errorCode: ${errorCode}, isWCError: ${isWCError}`);
 

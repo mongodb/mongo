@@ -76,19 +76,6 @@ bool ErrorLabelBuilder::isTransientTransactionError() const {
                _code.value(), _wcCode != boost::none, _isCommitOrAbort());
 }
 
-bool hasTransientTransactionErrorLabel(const ErrorReply& reply) {
-    auto errorLabels = reply.getErrorLabels();
-    if (!errorLabels) {
-        return false;
-    }
-    for (auto& label : errorLabels.value()) {
-        if (label == ErrorLabel::kTransientTransaction) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool ErrorLabelBuilder::isRetryableWriteError() const {
     // Do not return RetryableWriteError labels to internal clients (e.g. mongos).
     if (_isInternalClient) {
