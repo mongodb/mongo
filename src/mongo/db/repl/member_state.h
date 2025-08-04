@@ -199,7 +199,7 @@ inline std::string MemberState::toString() const {
  * Insertion operator for MemberState. Formats member state for output stream.
  * For testing only.
  */
-inline std::ostream& operator<<(std::ostream& os, const MemberState& state) {
+MONGO_MOD_PUB inline std::ostream& operator<<(std::ostream& os, const MemberState& state) {
     return os << state.toString();
 }
 
