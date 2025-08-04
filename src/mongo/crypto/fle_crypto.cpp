@@ -2515,8 +2515,11 @@ EmuBinaryResult ESCCollection::emuBinaryV2(HmacContext* context,
                                            const ESCTwiceDerivedValueToken& valueToken) {
     auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
 
+    context->setReuseKey(true);
     auto x = anchorBinaryHops(context, reader, tagToken, valueToken, tracker);
+    context->resetCount();
     auto i = binaryHops(context, reader, tagToken, valueToken, x, tracker);
+    context->setReuseKey(false);
     return EmuBinaryResult{i, x};
 }
 

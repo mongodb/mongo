@@ -36,6 +36,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
+#include "mongo/crypto/symmetric_crypto.h"
+#include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
 
 #include <ostream>
@@ -183,6 +185,44 @@ TEST(CryptoVectors, HMACSHA512_ContextReuse) {
         ASSERT(hmacSha512Tests[i].hash == result) << "Failed HMAC-SHA512 iteration " << i;
     }
 }
+
+/**
+ * This test runs 256 times.
+ *
+ * Each time, the test randomly generates a key and then generates a random string 256
+ * times. It attempts to hmac this same string using the randomly generated key using three
+ * different mechanisms - computeHmac, computeHmacWithCtx, and computeHmacWithCtx with key
+ * reuse. It asserts that the result is the same every time.
+ */
+TEST(CryptoVectors, HMACSHA1_KeyReuse) {
+    PseudoRandom random(12345);
+    for (size_t i = 0; i < 256; i++) {
+        const auto key =
+            crypto::aesGenerate(crypto::sym256KeySize, "randomKey" + std::to_string(i));
+        HmacContext nonKeyReuseContext;
+        HmacContext keyReuseContext;
+
+        SHA512Block noReuseResult;
+        SHA512Block noKeyReuseResult;
+        SHA512Block keyReuseResult;
+
+        keyReuseContext.setReuseKey(true);
+        for (size_t j = 0; j < 256; j++) {
+            unsigned char data[maxDataSize];
+            random.fill(&data, maxDataSize);
+            ConstDataRange cdr(data);
+            noReuseResult =
+                SHA512Block::computeHmac(key.getKey(), key.getKeySize(), data, maxDataSize);
+            SHA512Block::computeHmacWithCtx(
+                &nonKeyReuseContext, key.getKey(), key.getKeySize(), {cdr}, &noKeyReuseResult);
+            SHA512Block::computeHmacWithCtx(
+                &keyReuseContext, key.getKey(), key.getKeySize(), {cdr}, &keyReuseResult);
+            ASSERT_EQ(noReuseResult, noKeyReuseResult);
+            ASSERT_EQ(noKeyReuseResult, keyReuseResult);
+        }
+    }
+}
+
 
 TEST(SHA512Block, BinDataRoundTrip) {
     SHA512Block::HashType rawHash;

@@ -36,6 +36,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
+#include "mongo/crypto/symmetric_crypto.h"
+#include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
 
 #include <ostream>
@@ -165,6 +167,43 @@ TEST(CryptoVectors, HMACSHA256_ContextReuse) {
             {ConstDataRange(&hmacSha256Tests[i].data[0], hmacSha256Tests[i].dataLen)},
             &result);
         ASSERT(hmacSha256Tests[i].hash == result) << "Failed HMAC-SHA256 iteration " << i;
+    }
+}
+
+/**
+ * This test runs 256 times.
+ *
+ * Each time, the test randomly generates a key and then generates a random string 256
+ * times. It attempts to hmac this same string using the randomly generated key using three
+ * different mechanisms - computeHmac, computeHmacWithCtx, and computeHmacWithCtx with key
+ * reuse. It asserts that the result is the same every time.
+ */
+TEST(CryptoVectors, HMACSHA256_KeyReuse) {
+    PseudoRandom random(12345);
+    for (size_t i = 0; i < 256; i++) {
+        const auto key =
+            crypto::aesGenerate(crypto::sym256KeySize, "randomKey" + std::to_string(i));
+        HmacContext nonKeyReuseContext;
+        HmacContext keyReuseContext;
+
+        SHA256Block noReuseResult;
+        SHA256Block noKeyReuseResult;
+        SHA256Block keyReuseResult;
+
+        keyReuseContext.setReuseKey(true);
+        for (size_t j = 0; j < 256; j++) {
+            unsigned char data[maxDataSize];
+            random.fill(&data, maxDataSize);
+            ConstDataRange cdr(data);
+            noReuseResult =
+                SHA256Block::computeHmac(key.getKey(), key.getKeySize(), data, maxDataSize);
+            SHA256Block::computeHmacWithCtx(
+                &nonKeyReuseContext, key.getKey(), key.getKeySize(), {cdr}, &noKeyReuseResult);
+            SHA256Block::computeHmacWithCtx(
+                &keyReuseContext, key.getKey(), key.getKeySize(), {cdr}, &keyReuseResult);
+            ASSERT_EQ(noReuseResult, noKeyReuseResult);
+            ASSERT_EQ(noKeyReuseResult, keyReuseResult);
+        }
     }
 }
 

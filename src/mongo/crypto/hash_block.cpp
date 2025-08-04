@@ -49,6 +49,18 @@ void HMAC_CTX_free(HMAC_CTX* ctx) {
 }  // namespace
 #endif
 #if defined(MONGO_CONFIG_SSL) && (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL)
+int HmacContext::hmacCtxInitFn(const EVP_MD* md, const uint8_t* key, size_t keyLen) {
+    int ret;
+    if (getReuseKey() && useCount() >= 1) {
+        ret = HMAC_Init_ex(get(), nullptr, 0, md, nullptr);
+    }
+    ret = HMAC_Init_ex(get(), key, keyLen, md, nullptr);
+    if (getReuseKey()) {
+        use++;
+    }
+    return ret;
+}
+
 HmacContext::HmacContext() {
     hmac_ctx = HMAC_CTX_new();
 };
@@ -61,4 +73,24 @@ HMAC_CTX* HmacContext::get() {
     return hmac_ctx;
 }
 #endif
+
+void HmacContext::resetCount() {
+    use = 0;
+}
+
+int HmacContext::useCount() {
+    return use;
+}
+
+void HmacContext::setReuseKey(bool val) {
+    _reuseKey = val;
+    if (val == false) {
+        resetCount();
+    }
+}
+
+bool HmacContext::getReuseKey() {
+    return _reuseKey;
+}
+
 }  // namespace mongo

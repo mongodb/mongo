@@ -63,8 +63,19 @@ class BSONObjBuilder;
  * the other two platforms.
  */
 class HmacContext {
-#if defined(MONGO_CONFIG_SSL) && (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL)
 public:
+    /**
+     * When we reuse a key with the same hmac context, we can get a performance benefit by
+     * not setting the key during the HMAC_Init_ex function. To use this API, the user should
+     * identify the location where we will reuse a key. Before using the key for the first time,
+     * they should call setReuseKey(true). Before they change to a new key with the same
+     * HmacContext object, they must call setReuseKey(false), OR if they intend to reuse the
+     * next key, they may call resetCount().
+     */
+    void setReuseKey(bool val);
+    void resetCount();
+#if defined(MONGO_CONFIG_SSL) && (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL)
+    int hmacCtxInitFn(const EVP_MD* md, const uint8_t* key, size_t keyLen);
     HmacContext();
     ~HmacContext();
     HMAC_CTX* get();
@@ -75,6 +86,11 @@ private:
     // have to manage the lifetime of the ctx object manually.
     HMAC_CTX* hmac_ctx;
 #endif
+private:
+    bool getReuseKey();
+    int useCount();
+    bool _reuseKey = false;
+    int use = 0;
 };
 
 /**
