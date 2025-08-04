@@ -6,3 +6,9 @@ filters:
   - "ssl*":
     approvers:
       - 10gen/server-security
+  - "*ssl_test*":
+    approvers:
+      - 10gen/server-security
+  - "*openssl*":
+    approvers:
+      - 10gen/server-security
