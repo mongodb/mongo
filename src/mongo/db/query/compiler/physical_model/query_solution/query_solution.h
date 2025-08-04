@@ -64,7 +64,6 @@
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/platform/atomic_word.h"
@@ -1238,13 +1237,15 @@ struct SortNode : public QuerySolutionNodeWithSortSet {
     // The maximum number of bytes of memory we're willing to use during execution of the sort. If
     // this limit is exceeded and we're not allowed to spill to disk, the query will fail at
     // execution time. Otherwise, the data will be spilled to disk.
-    uint64_t maxMemoryUsageBytes = internalQueryMaxBlockingSortMemoryUsageBytes.load();
+    uint64_t maxMemoryUsageBytes = _loadMaxMemoryUsageBytes();
 
 protected:
     void cloneSortData(SortNode* copy) const;
 
 private:
     virtual StringData sortImplementationTypeToString() const = 0;
+
+    static uint64_t _loadMaxMemoryUsageBytes();
 };
 
 /**

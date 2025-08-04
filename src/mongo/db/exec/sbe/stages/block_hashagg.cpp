@@ -34,12 +34,12 @@
 #include "mongo/db/exec/sbe/stages/hashagg_base.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-
 
 namespace mongo {
 namespace sbe {

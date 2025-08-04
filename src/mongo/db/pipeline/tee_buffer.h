@@ -32,7 +32,7 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/intrusive_counter.h"
 

@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"

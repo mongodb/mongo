@@ -738,6 +738,7 @@ mongo_cc_library(
         "//src/mongo/db/query:query_knob_configuration.h",
         "//src/mongo/db/query:query_knobs_gen",
         "//src/mongo/db/query:query_request_helper.h",
+        "//src/mongo/db/query:query_stage_memory_limit_knobs_gen",
         "//src/mongo/db/query:restore_context.h",
         "//src/mongo/db/query:tailable_mode.h",
         "//src/mongo/db/query:tailable_mode_gen",

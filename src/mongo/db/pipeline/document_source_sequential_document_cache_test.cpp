@@ -34,7 +34,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 

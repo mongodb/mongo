@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
 
 #include <cstddef>
 #include <cstdint>

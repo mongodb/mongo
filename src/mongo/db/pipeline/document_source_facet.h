@@ -50,6 +50,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/intrusive_counter.h"

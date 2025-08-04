@@ -505,21 +505,6 @@ server_parameters:
     #
     # Query execution
     #
-    internalQueryMaxBlockingSortMemoryUsageBytes:
-        description: >-
-            The maximum amount of memory a query (e.g. a find or aggregate command) is willing
-            to use to execute a blocking sort, measured in bytes. If disk use is allowed, then it may be
-            possible to sort more data, but this limit will still constrain the memory consumption.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQueryMaxBlockingSortMemoryUsageBytes"
-        cpp_vartype: AtomicWord<int>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gte: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
-        redact: false
-
     internalQueryExecYieldIterations:
         description: 'Yield after this many "should yield?" checks.'
         set_at: [startup, runtime]
@@ -554,17 +539,6 @@ server_parameters:
         default: 1000
         validator:
             gte: 0
-        redact: false
-
-    internalQueryFacetBufferSizeBytes:
-        description: "The number of bytes to buffer at once during a $facet stage."
-        set_at: [startup, runtime]
-        cpp_varname: "internalQueryFacetBufferSizeBytes"
-        cpp_vartype: AtomicWord<int>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
         redact: false
 
     internalQueryFacetMaxOutputDocSizeBytes:
@@ -604,58 +578,6 @@ server_parameters:
             gte: {expr: BSONObjMaxInternalSize}
         redact: false
 
-    internalDocumentSourceGraphLookupMaxMemoryBytes:
-        description: >-
-            Maximum size of the data that the $graphLookup aggregation stage will cache
-            in-memory before spilling.
-        set_at: [startup, runtime]
-        cpp_varname: "internalDocumentSourceGraphLookupMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
-        redact: false
-
-    internalDocumentSourceGroupMaxMemoryBytes:
-        description: >-
-            Maximum size of the data that the $group aggregation stage will cache in-memory
-            before spilling to disk.
-        set_at: [startup, runtime]
-        cpp_varname: "internalDocumentSourceGroupMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
-        redact: false
-
-    internalDocumentSourceSetWindowFieldsMaxMemoryBytes:
-        description: >-
-            Maximum size of the data that the $setWindowFields aggregation stage will cache
-            in-memory before throwing an error.
-        set_at: [startup, runtime]
-        cpp_varname: "internalDocumentSourceSetWindowFieldsMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
-        redact: false
-
-    internalDocumentSourceBucketAutoMaxMemoryBytes:
-        description: >-
-            Maximum size of the data that the $bucketAuto aggregation stage will cache in-memory
-            before spilling to disk.
-        set_at: [startup, runtime]
-        cpp_varname: "internalDocumentSourceBucketAutoMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
-        redact: false
-
     internalDocumentSourceCursorBatchSizeBytes:
         description: >-
             Maximum amount of data that DocumentSourceCursor will cache from the underlying
@@ -678,19 +600,6 @@ server_parameters:
         cpp_varname: "internalDocumentSourceCursorInitialBatchSize"
         cpp_vartype: AtomicWord<int>
         default: 32
-        validator:
-            gte: 0
-        redact: false
-
-    internalDocumentSourceLookupCacheSizeBytes:
-        description: >-
-            Maximum amount of non-correlated foreign-collection data that the $lookup stage
-            will cache before abandoning the cache and executing the full pipeline on each iteration."
-        set_at: [startup, runtime]
-        cpp_varname: "internalDocumentSourceLookupCacheSizeBytes"
-        cpp_vartype: AtomicWord<int>
-        default:
-            expr: 100 * 1024 * 1024
         validator:
             gte: 0
         redact: false
@@ -948,19 +857,6 @@ server_parameters:
             gt: 0
         redact: false
 
-    internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
-        description: >-
-            The max size in bytes that the hash table in a HashAgg stage can be estimated to
-            be before we spill to disk.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill"
-        cpp_vartype: AtomicWord<long long>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
-        redact: false
-
     internalQuerySlotBasedExecutionHashAggIncreasedSpilling:
         description: >-
             Define whether the HashAgg stage will perform increased spilling It supports 3 values: kAlways, kNever, kInDebug.
@@ -972,19 +868,6 @@ server_parameters:
             data: synchronized_value<SbeHashAggIncreasedSpillingModeEnum>
         default:
             expr: SbeHashAggIncreasedSpillingModeEnum::kInDebug
-        redact: false
-
-    internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
-        description: >-
-            The max size in bytes that the hash table in a HashLookup stage can be estimated to
-            be before we spill to disk.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill"
-        cpp_vartype: AtomicWord<long long>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
         redact: false
 
     internalQuerySlotBasedExecutionDisableLookupPushdown:
@@ -1079,17 +962,6 @@ server_parameters:
         cpp_varname: "internalQueryMaxAllowedDensifyDocs"
         cpp_vartype: AtomicWord<int>
         default: 500000
-        validator:
-            gt: 0
-        redact: false
-
-    internalDocumentSourceDensifyMaxMemoryBytes:
-        description: "Limits the number of bytes densification can use to store partition information."
-        set_at: [startup, runtime]
-        cpp_varname: "internalDocumentSourceDensifyMaxMemoryBytes"
-        cpp_vartype: AtomicWord<int>
-        default:
-            expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
@@ -1463,20 +1335,6 @@ server_parameters:
         default: true
         redact: false
 
-    internalQueryMaxSpoolMemoryUsageBytes:
-        description: >-
-            The maximum amount of memory a query or command is willing to use to execute a
-            spool, measured in bytes. If disk use is allowed, then it may be possible to spool more data,
-            but this limit will still constrain the memory consumption.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQueryMaxSpoolMemoryUsageBytes"
-        cpp_vartype: AtomicWord<long long>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
-        redact: false
-
     internalQueryMaxSpoolDiskUsageBytes:
         description: >-
             The maximum amount of disk a query or command is willing to use to execute a
@@ -1583,20 +1441,6 @@ server_parameters:
         cpp_varname: "internalQueryEnableAggressiveSpillsInGroup"
         cpp_vartype: AtomicWord<bool>
         default: false
-        redact: false
-
-    internalTextOrStageMaxMemoryBytes:
-        description: >-
-            Maximum size of the data that the TextOrStage stage will cache in-memory before
-            spilling to disk.
-        set_at: [startup, runtime]
-        cpp_varname: "internalTextOrStageMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
-        # TODO SERVER-99279 Enable automatic spilling by setting a reasonable default value.
-        default:
-            expr: std::numeric_limits<long long>::max()
-        validator:
-            gt: 0
         redact: false
 
     planRankerMode:
@@ -1720,7 +1564,7 @@ server_parameters:
 
     internalQuerySettingsBackfillMemoryLimitBytes:
         description: >-
-            Controlls the maximum amount of memory that the backfill operation can use while buffering. 
+            Controlls the maximum amount of memory that the backfill operation can use while buffering.
             Surpasing this limit will cause subsequent queries to be skipped for the current period.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>

@@ -244,6 +244,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/query:plan_yield_policy",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query:spill_util",
         "//src/mongo/db/query/compiler/metadata:query_metadata",
         "//src/mongo/db/query/compiler/physical_model/index_bounds",

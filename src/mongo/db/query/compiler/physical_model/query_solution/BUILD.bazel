@@ -25,6 +25,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/pipeline:accumulator",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query/compiler/metadata:query_metadata",
         "//src/mongo/db/query/compiler/optimizer/index_bounds_builder",
         "//src/mongo/db/query/compiler/physical_model/index_bounds",
