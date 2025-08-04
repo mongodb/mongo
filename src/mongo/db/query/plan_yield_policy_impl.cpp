@@ -61,10 +61,8 @@ void PlanYieldPolicyImpl::saveState(OperationContext* opCtx) {
 void PlanYieldPolicyImpl::restoreState(OperationContext* opCtx,
                                        const Yieldable* yieldable,
                                        RestoreContext::RestoreType restoreType) {
-    // We expect 'yieldable' to either be null or a CollectionPtr. TODO (SERVER-98914), consider
-    // refactoring this code to avoid the need for a runtime cast here.
     auto collectionPtr = checked_cast<const CollectionPtr*>(yieldable);
-    _planYielding->restoreStateWithoutRetrying({restoreType, collectionPtr}, yieldable);
+    _planYielding->restoreStateWithoutRetrying({restoreType, collectionPtr});
 }
 
 

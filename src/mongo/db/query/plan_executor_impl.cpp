@@ -221,7 +221,7 @@ void PlanExecutorImpl::saveState() {
 
 void PlanExecutorImpl::restoreState(const RestoreContext& context) {
     try {
-        restoreStateWithoutRetrying(context, context.collection());
+        restoreStateWithoutRetrying(context);
     } catch (const StorageUnavailableException&) {
         if (!_yieldPolicy->canAutoYield()) {
             throw;
@@ -233,12 +233,11 @@ void PlanExecutorImpl::restoreState(const RestoreContext& context) {
     }
 }
 
-void PlanExecutorImpl::restoreStateWithoutRetrying(const RestoreContext& context,
-                                                   const Yieldable* yieldable) {
+void PlanExecutorImpl::restoreStateWithoutRetrying(const RestoreContext& context) {
     invariant(_currentState == kSaved);
 
     if (!_yieldPolicy->usesCollectionAcquisitions()) {
-        _yieldPolicy->setYieldable(yieldable);
+        _yieldPolicy->setYieldable(context.collection());
     }
     if (!isMarkedAsKilled()) {
         _root->restoreState(context);

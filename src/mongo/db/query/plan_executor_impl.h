@@ -205,7 +205,7 @@ public:
      *
      * This is only public for PlanYieldPolicy. DO NOT CALL ANYWHERE ELSE.
      */
-    void restoreStateWithoutRetrying(const RestoreContext& context, const Yieldable* yieldable);
+    void restoreStateWithoutRetrying(const RestoreContext& context);
 
     /**
      * Return a pointer to this executor's MultiPlanStage, or nullptr if it does not have one.
