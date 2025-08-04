@@ -264,6 +264,17 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "rand_utils_new_test",
+    srcs = [
+        "rand_utils_new_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":stats_test_utils",
+    ],
+)
+
 mongo_cc_benchmark(
     name = "value_utils_bm",
     srcs = [
