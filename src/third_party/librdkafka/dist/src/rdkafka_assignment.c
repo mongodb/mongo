@@ -1,7 +1,8 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2020 Magnus Edenhill
+ * Copyright (c) 2020-2022, Magnus Edenhill
+ *               2023 Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -135,7 +136,9 @@ rd_kafka_assignment_apply_offsets(rd_kafka_t *rk,
         rd_kafka_topic_partition_t *rktpar;
 
         RD_KAFKA_TPLIST_FOREACH(rktpar, offsets) {
-                rd_kafka_toppar_t *rktp = rktpar->_private; /* May be NULL */
+                /* May be NULL, borrow ref. */
+                rd_kafka_toppar_t *rktp =
+                    rd_kafka_topic_partition_toppar(rk, rktpar);
 
                 if (!rd_kafka_topic_partition_list_del(
                         rk->rk_consumer.assignment.queried, rktpar->topic,
@@ -150,8 +153,30 @@ rd_kafka_assignment_apply_offsets(rd_kafka_t *rk,
                         continue;
                 }
 
-                if (err == RD_KAFKA_RESP_ERR_UNSTABLE_OFFSET_COMMIT ||
-                    rktpar->err == RD_KAFKA_RESP_ERR_UNSTABLE_OFFSET_COMMIT) {
+                if (err == RD_KAFKA_RESP_ERR_STALE_MEMBER_EPOCH ||
+                    rktpar->err == RD_KAFKA_RESP_ERR_STALE_MEMBER_EPOCH) {
+                        rd_kafka_topic_partition_t *rktpar_copy;
+
+                        rd_kafka_dbg(rk, CGRP, "OFFSETFETCH",
+                                     "Adding %s [%" PRId32
+                                     "] back to pending "
+                                     "list because of stale member epoch",
+                                     rktpar->topic, rktpar->partition);
+
+                        rktpar_copy = rd_kafka_topic_partition_list_add_copy(
+                            rk->rk_consumer.assignment.pending, rktpar);
+                        /* Need to reset offset to STORED to query for
+                         * the committed offset again. If the offset is
+                         * kept INVALID then auto.offset.reset will be
+                         * triggered.
+                         *
+                         * Not necessary if err is UNSTABLE_OFFSET_COMMIT
+                         * because the buffer is retried there. */
+                        rktpar_copy->offset = RD_KAFKA_OFFSET_STORED;
+
+                } else if (err == RD_KAFKA_RESP_ERR_UNSTABLE_OFFSET_COMMIT ||
+                           rktpar->err ==
+                               RD_KAFKA_RESP_ERR_UNSTABLE_OFFSET_COMMIT) {
                         /* Ongoing transactions are blocking offset retrieval.
                          * This is typically retried from the OffsetFetch
                          * handler but we can come here if the assignment
@@ -207,7 +232,9 @@ rd_kafka_assignment_apply_offsets(rd_kafka_t *rk,
                 /* Do nothing for request-level errors (err is set). */
         }
 
-        if (offsets->cnt > 0)
+        /* In case of stale member epoch we retry to serve the
+         * assignment only after a successful ConsumerGroupHeartbeat. */
+        if (offsets->cnt > 0 && err != RD_KAFKA_RESP_ERR_STALE_MEMBER_EPOCH)
                 rd_kafka_assignment_serve(rk);
 }
 
@@ -271,18 +298,32 @@ static void rd_kafka_assignment_handle_OffsetFetch(rd_kafka_t *rk,
                 return;
         }
 
-
-
         if (err) {
-                rd_kafka_dbg(rk, CGRP, "OFFSET",
-                             "Offset fetch error for %d partition(s): %s",
-                             offsets->cnt, rd_kafka_err2str(err));
-                rd_kafka_consumer_err(
-                    rk->rk_consumer.q, rd_kafka_broker_id(rkb), err, 0, NULL,
-                    NULL, RD_KAFKA_OFFSET_INVALID,
-                    "Failed to fetch committed offsets for "
-                    "%d partition(s) in group \"%s\": %s",
-                    offsets->cnt, rk->rk_group_id->str, rd_kafka_err2str(err));
+                switch (err) {
+                case RD_KAFKA_RESP_ERR_STALE_MEMBER_EPOCH:
+                        rk->rk_cgrp->rkcg_consumer_flags |=
+                            RD_KAFKA_CGRP_CONSUMER_F_SERVE_PENDING;
+                        rd_kafka_cgrp_consumer_expedite_next_heartbeat(
+                            rk->rk_cgrp,
+                            "OffsetFetch error: Stale member epoch");
+                        break;
+                case RD_KAFKA_RESP_ERR_UNKNOWN_MEMBER_ID:
+                        rd_kafka_cgrp_consumer_expedite_next_heartbeat(
+                            rk->rk_cgrp, "OffsetFetch error: Unknown member");
+                        break;
+                default:
+                        rd_kafka_dbg(
+                            rk, CGRP, "OFFSET",
+                            "Offset fetch error for %d partition(s): %s",
+                            offsets->cnt, rd_kafka_err2str(err));
+                        rd_kafka_consumer_err(
+                            rk->rk_consumer.q, rd_kafka_broker_id(rkb), err, 0,
+                            NULL, NULL, RD_KAFKA_OFFSET_INVALID,
+                            "Failed to fetch committed offsets for "
+                            "%d partition(s) in group \"%s\": %s",
+                            offsets->cnt, rk->rk_group_id->str,
+                            rd_kafka_err2str(err));
+                }
         }
 
         /* Apply the fetched offsets to the assignment */
@@ -302,7 +343,9 @@ static int rd_kafka_assignment_serve_removals(rd_kafka_t *rk) {
         int valid_offsets = 0;
 
         RD_KAFKA_TPLIST_FOREACH(rktpar, rk->rk_consumer.assignment.removed) {
-                rd_kafka_toppar_t *rktp = rktpar->_private; /* Borrow ref */
+                rd_kafka_toppar_t *rktp =
+                    rd_kafka_topic_partition_ensure_toppar(
+                        rk, rktpar, rd_true); /* Borrow ref */
                 int was_pending, was_queried;
 
                 /* Remove partition from pending and querying lists,
@@ -333,17 +376,21 @@ static int rd_kafka_assignment_serve_removals(rd_kafka_t *rk) {
 
                 rd_kafka_toppar_lock(rktp);
 
-                /* Save the currently stored offset on .removed
+                /* Save the currently stored offset and epoch on .removed
                  * so it will be committed below. */
-                rktpar->offset = rktp->rktp_stored_offset;
+                rd_kafka_topic_partition_set_from_fetch_pos(
+                    rktpar, rktp->rktp_stored_pos);
+                rd_kafka_topic_partition_set_metadata_from_rktp_stored(rktpar,
+                                                                       rktp);
                 valid_offsets += !RD_KAFKA_OFFSET_IS_LOGICAL(rktpar->offset);
 
                 /* Reset the stored offset to invalid so that
                  * a manual offset-less commit() or the auto-committer
                  * will not commit a stored offset from a previous
                  * assignment (issue #2782). */
-                rd_kafka_offset_store0(rktp, RD_KAFKA_OFFSET_INVALID, rd_true,
-                                       RD_DONT_LOCK);
+                rd_kafka_offset_store0(
+                    rktp, RD_KAFKA_FETCH_POS(RD_KAFKA_OFFSET_INVALID, -1), NULL,
+                    0, rd_true, RD_DONT_LOCK);
 
                 /* Partition is no longer desired */
                 rd_kafka_toppar_desired_del(rktp);
@@ -422,7 +469,9 @@ static int rd_kafka_assignment_serve_pending(rd_kafka_t *rk) {
         for (i = rk->rk_consumer.assignment.pending->cnt - 1; i >= 0; i--) {
                 rd_kafka_topic_partition_t *rktpar =
                     &rk->rk_consumer.assignment.pending->elems[i];
-                rd_kafka_toppar_t *rktp = rktpar->_private; /* Borrow ref */
+                /* Borrow ref */
+                rd_kafka_toppar_t *rktp =
+                    rd_kafka_topic_partition_ensure_toppar(rk, rktpar, rd_true);
 
                 rd_assert(!rktp->rktp_started);
 
@@ -443,9 +492,11 @@ static int rd_kafka_assignment_serve_pending(rd_kafka_t *rk) {
 
                         rd_kafka_dbg(rk, CGRP, "SRVPEND",
                                      "Starting pending assigned partition "
-                                     "%s [%" PRId32 "] at offset %s",
+                                     "%s [%" PRId32 "] at %s",
                                      rktpar->topic, rktpar->partition,
-                                     rd_kafka_offset2str(rktpar->offset));
+                                     rd_kafka_fetch_pos2str(
+                                         rd_kafka_topic_partition_get_fetch_pos(
+                                             rktpar)));
 
                         /* Reset the (lib) pause flag which may have been set by
                          * the cgrp when scheduling the rebalance callback. */
@@ -457,9 +508,10 @@ static int rd_kafka_assignment_serve_pending(rd_kafka_t *rk) {
                         rktp->rktp_started = rd_true;
                         rk->rk_consumer.assignment.started_cnt++;
 
-                        rd_kafka_toppar_op_fetch_start(rktp, rktpar->offset,
-                                                       rk->rk_consumer.q,
-                                                       RD_KAFKA_NO_REPLYQ);
+                        rd_kafka_toppar_op_fetch_start(
+                            rktp,
+                            rd_kafka_topic_partition_get_fetch_pos(rktpar),
+                            rk->rk_consumer.q, RD_KAFKA_NO_REPLYQ);
 
 
                 } else if (can_query_offsets) {
@@ -529,7 +581,8 @@ static int rd_kafka_assignment_serve_pending(rd_kafka_t *rk) {
                              partitions_to_query->cnt);
 
                 rd_kafka_OffsetFetchRequest(
-                    coord, rk->rk_group_id->str, partitions_to_query,
+                    coord, rk->rk_group_id->str, partitions_to_query, rd_false,
+                    -1, NULL,
                     rk->rk_conf.isolation_level ==
                         RD_KAFKA_READ_COMMITTED /*require_stable_offsets*/,
                     0, /* Timeout */
@@ -733,8 +786,9 @@ rd_kafka_assignment_add(rd_kafka_t *rk,
 
                 /* Reset the stored offset to INVALID to avoid the race
                  * condition described in rdkafka_offset.h */
-                rd_kafka_offset_store0(rktp, RD_KAFKA_OFFSET_INVALID,
-                                       rd_true /* force */, RD_DONT_LOCK);
+                rd_kafka_offset_store0(
+                    rktp, RD_KAFKA_FETCH_POS(RD_KAFKA_OFFSET_INVALID, -1), NULL,
+                    0, rd_true /* force */, RD_DONT_LOCK);
 
                 rd_kafka_toppar_unlock(rktp);
         }

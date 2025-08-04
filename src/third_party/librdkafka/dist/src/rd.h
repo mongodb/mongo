@@ -1,7 +1,8 @@
 /*
  * librd - Rapid Development C library
  *
- * Copyright (c) 2012, Magnus Edenhill
+ * Copyright (c) 2012-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -423,6 +424,10 @@ static RD_INLINE RD_UNUSED int rd_refcnt_get(rd_refcnt_t *R) {
                         FUNC(PTR);                                             \
         } while (0)
 
+
+#define RD_INTERFACE_CALL(i, name, ...) (i->name(i->opaque, __VA_ARGS__))
+
+#define RD_CEIL_INTEGER_DIVISION(X, DEN) (((X) + ((DEN)-1)) / (DEN))
 
 /**
  * @brief Utility types to hold memory,size tuple.

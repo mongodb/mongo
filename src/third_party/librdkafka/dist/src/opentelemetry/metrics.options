@@ -1,0 +1,2 @@
+# Needed to generate callback for data types within Metrics which isn't generated for oneof types by default
+opentelemetry.proto.metrics.v1.Metric submsg_callback:true;

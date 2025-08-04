@@ -1,7 +1,8 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2019 Magnus Edenhill
+ * Copyright (c) 2019-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -475,7 +476,8 @@ static int rd_kafka_transport_ssl_set_endpoint_id(rd_kafka_transport_t *rktrans,
 
                 param = SSL_get0_param(rktrans->rktrans_ssl);
 
-                if (!X509_VERIFY_PARAM_set1_host(param, name, 0))
+                if (!X509_VERIFY_PARAM_set1_host(param, name,
+                                                 strnlen(name, sizeof(name))))
                         goto fail;
         }
 #else
@@ -1722,6 +1724,14 @@ int rd_kafka_ssl_ctx_init(rd_kafka_t *rk, char *errstr, size_t errstr_size) {
                 goto fail;
 
 
+#ifdef SSL_OP_IGNORE_UNEXPECTED_EOF
+        /* Ignore unexpected EOF error in OpenSSL 3.x, treating
+         * it like a normal connection close even if
+         * close_notify wasn't received.
+         * see issue #4293 */
+        SSL_CTX_set_options(ctx, SSL_OP_IGNORE_UNEXPECTED_EOF);
+#endif
+
         SSL_CTX_set_mode(ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
 
         rk->rk_conf.ssl.ctx = ctx;
@@ -1838,4 +1848,57 @@ void rd_kafka_ssl_init(void) {
         ERR_load_crypto_strings();
         OpenSSL_add_all_algorithms();
 #endif
+}
+
+int rd_kafka_ssl_hmac(rd_kafka_broker_t *rkb,
+                      const EVP_MD *evp,
+                      const rd_chariov_t *in,
+                      const rd_chariov_t *salt,
+                      int itcnt,
+                      rd_chariov_t *out) {
+        unsigned int ressize = 0;
+        unsigned char tempres[EVP_MAX_MD_SIZE];
+        unsigned char *saltplus;
+        int i;
+
+        /* U1   := HMAC(str, salt + INT(1)) */
+        saltplus = rd_alloca(salt->size + 4);
+        memcpy(saltplus, salt->ptr, salt->size);
+        saltplus[salt->size]     = 0;
+        saltplus[salt->size + 1] = 0;
+        saltplus[salt->size + 2] = 0;
+        saltplus[salt->size + 3] = 1;
+
+        /* U1   := HMAC(str, salt + INT(1)) */
+        if (!HMAC(evp, (const unsigned char *)in->ptr, (int)in->size, saltplus,
+                  salt->size + 4, tempres, &ressize)) {
+                rd_rkb_dbg(rkb, SECURITY, "SSLHMAC", "HMAC priming failed");
+                return -1;
+        }
+
+        memcpy(out->ptr, tempres, ressize);
+
+        /* Ui-1 := HMAC(str, Ui-2) ..  */
+        for (i = 1; i < itcnt; i++) {
+                unsigned char tempdest[EVP_MAX_MD_SIZE];
+                int j;
+
+                if (unlikely(!HMAC(evp, (const unsigned char *)in->ptr,
+                                   (int)in->size, tempres, ressize, tempdest,
+                                   NULL))) {
+                        rd_rkb_dbg(rkb, SECURITY, "SSLHMAC",
+                                   "Hi() HMAC #%d/%d failed", i, itcnt);
+                        return -1;
+                }
+
+                /* U1 XOR U2 .. */
+                for (j = 0; j < (int)ressize; j++) {
+                        out->ptr[j] ^= tempdest[j];
+                        tempres[j] = tempdest[j];
+                }
+        }
+
+        out->size = ressize;
+
+        return 0;
 }

@@ -1,7 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2017 Magnus Edenhill
+ * Copyright (c) 2017-2022, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -660,13 +660,16 @@ size_t rd_buf_erase(rd_buf_t *rbuf, size_t absof, size_t size) {
                                 segremains);
 
                 seg->seg_of -= toerase;
+                seg->seg_erased += toerase;
                 rbuf->rbuf_len -= toerase;
 
                 of += toerase;
 
                 /* If segment is now empty, remove it */
-                if (seg->seg_of == 0)
+                if (seg->seg_of == 0) {
+                        rbuf->rbuf_erased -= seg->seg_erased;
                         rd_buf_destroy_segment(rbuf, seg);
+                }
         }
 
         /* Update absolute offset of remaining segments */
@@ -709,6 +712,7 @@ int rd_buf_write_seek(rd_buf_t *rbuf, size_t absof) {
              next != seg;) {
                 rd_segment_t *this = next;
                 next = TAILQ_PREV(this, rd_segment_head, seg_link);
+                rbuf->rbuf_erased -= this->seg_erased;
                 rd_buf_destroy_segment(rbuf, this);
         }
 

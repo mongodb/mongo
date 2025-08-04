@@ -1,7 +1,8 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2015 Magnus Edenhill
+ * Copyright (c) 2015-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -489,6 +490,7 @@ static void rd_kafka_sasl_cyrus_close(struct rd_kafka_transport_s *rktrans) {
                 mtx_unlock(&rktrans->rktrans_rkb->rkb_rk->rk_conf.sasl.lock);
         }
         rd_free(state);
+        rktrans->rktrans_sasl.state = NULL;
 }
 
 

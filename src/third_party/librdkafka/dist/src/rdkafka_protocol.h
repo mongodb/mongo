@@ -1,7 +1,8 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2020 Magnus Edenhill
+ * Copyright (c) 2020-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -105,7 +106,22 @@
 #define RD_KAFKAP_AlterIsr                     56
 #define RD_KAFKAP_UpdateFeatures               57
 #define RD_KAFKAP_Envelope                     58
-#define RD_KAFKAP__NUM                         59
+#define RD_KAFKAP_FetchSnapshot                59
+#define RD_KAFKAP_DescribeCluster              60
+#define RD_KAFKAP_DescribeProducers            61
+#define RD_KAFKAP_BrokerHeartbeat              63
+#define RD_KAFKAP_UnregisterBroker             64
+#define RD_KAFKAP_DescribeTransactions         65
+#define RD_KAFKAP_ListTransactions             66
+#define RD_KAFKAP_AllocateProducerIds          67
+#define RD_KAFKAP_ConsumerGroupHeartbeat       68
+#define RD_KAFKAP_ConsumerGroupDescribe        69
+#define RD_KAFKAP_ControllerRegistration       70
+#define RD_KAFKAP_GetTelemetrySubscriptions    71
+#define RD_KAFKAP_PushTelemetry                72
+#define RD_KAFKAP_AssignReplicasToDirs         73
+
+#define RD_KAFKAP__NUM 74
 
 
 #endif /* _RDKAFKA_PROTOCOL_H_ */
