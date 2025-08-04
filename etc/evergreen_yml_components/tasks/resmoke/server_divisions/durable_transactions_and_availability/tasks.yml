@@ -225,6 +225,8 @@ tasks:
 
   - <<: *gen_task_template
     name: magic_restore_replica_sets_jscore_passthrough_gen
+    # TODO SERVER-108600: Re-enable magic restore passthroughs once mochalite incompatibility issue has been fixed.
+    disable: true
     tags:
       [
         "assigned_to_jira_team_server_repl",
@@ -240,6 +242,8 @@ tasks:
 
   - <<: *gen_task_template
     name: magic_restore_sharding_jscore_passthrough_gen
+    # TODO SERVER-108600: Re-enable magic restore passthroughs once mochalite incompatibility issue has been fixed.
+    disable: true
     tags:
       [
         "assigned_to_jira_team_server_repl",
@@ -255,6 +259,8 @@ tasks:
 
   - <<: *gen_task_template
     name: magic_restore_sharded_collections_jscore_passthrough_gen
+    # TODO SERVER-108600: Re-enable magic restore passthroughs once mochalite incompatibility issue has been fixed.
+    disable: true
     tags:
       [
         "assigned_to_jira_team_server_repl",
