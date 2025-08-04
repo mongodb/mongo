@@ -58,6 +58,8 @@
 #define WITH_LIBDL 1
 // WITH_PLUGINS
 #define WITH_PLUGINS 1
+// zlib
+#define WITH_ZLIB 1
 // libssl
 #define WITH_SSL 1
 // libcrypto
