@@ -190,6 +190,10 @@ bool Interval::isFullyOpen() const {
     return isMinToMax() || isMaxToMin();
 }
 
+bool Interval::isUndefined() const {
+    return (start.type() == BSONType::undefined || end.type() == BSONType::undefined);
+}
+
 Interval::IntervalComparison Interval::compare(const Interval& other) const {
     //
     // Intersect cases

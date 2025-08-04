@@ -31,6 +31,7 @@
 
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/query/compiler/ce/histogram/histogram_estimator.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_rewrites.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/heuristic_estimator.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
@@ -44,14 +45,16 @@ namespace mongo::cost_based_ranker {
 CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
                                            const ce::SamplingEstimator* samplingEstimator,
                                            EstimateMap& qsnEstimates,
-                                           QueryPlanRankerModeEnum rankerMode)
+                                           QueryPlanRankerModeEnum rankerMode,
+                                           bool useIndexBounds)
     : _collCard{CardinalityEstimate{CardinalityType{collInfo.collStats->getCardinality()},
                                     EstimationSource::Metadata}},
       _inputCard{_collCard},
       _collInfo(collInfo),
       _samplingEstimator(samplingEstimator),
       _qsnEstimates{qsnEstimates},
-      _rankerMode(rankerMode) {
+      _rankerMode(rankerMode),
+      _useIndexBounds(useIndexBounds) {
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
         _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
         tassert(9746501,
@@ -451,7 +454,18 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     // dedupication and applying the filter. This approach does not combine selectivity computed
     // from the index scan.
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
-        auto ridsEst = _samplingEstimator->estimateRIDs(node->bounds, node->filter.get());
+        auto ridsEst = [&]() -> CardinalityEstimate {
+            // TODO: remove the flag _useIndexBounds when SPM-4214 finishes.
+            if (!_useIndexBounds) {
+                // Try to estimate using transformation to match expression.
+                auto matchExpr = getMatchExpressionFromBounds(node->bounds, node->filter.get());
+                if (matchExpr) {
+                    return _samplingEstimator->estimateCardinality(matchExpr.get());
+                }
+            }
+            return _samplingEstimator->estimateRIDs(node->bounds, node->filter.get());
+        }();
+
         _conjSels.emplace_back(ridsEst / _inputCard);
         est.outCE = ridsEst;
         CardinalityEstimate outCE{est.outCE};
@@ -503,8 +517,20 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         static_cast<const IndexScanNode*>(node->children[0].get())->filter ==
             nullptr &&  // TODO SERVER-98577: Remove this restriction
         _rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
-        auto ce = _samplingEstimator->estimateRIDs(
-            static_cast<const IndexScanNode*>(node->children[0].get())->bounds, node->filter.get());
+
+        auto& bounds = static_cast<const IndexScanNode*>(node->children[0].get())->bounds;
+        auto ce = [&]() -> CardinalityEstimate {
+            // TODO: remove the flag _useIndexBounds when SPM-4214 finishes.
+            if (!_useIndexBounds) {
+                // Try to estimate using transformation to match expression.
+                auto matchExpr = getMatchExpressionFromBounds(bounds, node->filter.get());
+                if (matchExpr) {
+                    return _samplingEstimator->estimateCardinality(matchExpr.get());
+                }
+            }
+            return _samplingEstimator->estimateRIDs(bounds, node->filter.get());
+        }();
+
         popSelectivities();
         _conjSels.emplace_back(ce / _inputCard);
         est.outCE = ce;
@@ -1202,5 +1228,4 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
     resultCard = std::min(resultCard, _inputCard);
     return resultCard;
 }
-
 }  // namespace mongo::cost_based_ranker

@@ -66,10 +66,12 @@ concept UnionType = std::same_as<T, OrNode> || std::same_as<T, MergeSortNode>;
  */
 class CardinalityEstimator {
 public:
+    // TODO: remove the useIndexBounds flag when SPM-4214 finishes.
     CardinalityEstimator(const CollectionInfo& collInfo,
                          const ce::SamplingEstimator* samplingEstimator,
                          EstimateMap& qsnEstimates,
-                         QueryPlanRankerModeEnum rankerMode);
+                         QueryPlanRankerModeEnum rankerMode,
+                         bool useIndexBounds = false);
 
     // Delete the copy and move constructors and assignment operator
     CardinalityEstimator(const CardinalityEstimator&) = delete;
@@ -248,6 +250,13 @@ private:
     // ElemMatchValueMatchExpression may have a child which looks like GTMatchExpression with an
     // empty path.
     std::stack<StringData> _elemMatchPathStack;
-};
 
+    // Temporary boolean flag to switch between two implementations of sampling cardinality
+    // estimation for index scan nodes. When '_useIndexBounds' is false (default) compute the
+    // estimation by transforming index bounds back to equivalent match expression and use the
+    // 'estimateCardinality' function. When the flag is true, use estimateRIDs() function, that
+    // matches index keys from the sample documents to the index bounds in the index scan node.
+    // TODO: remove the flag and use one implementation of the estimate when SPM-4214 finishes.
+    bool _useIndexBounds;
+};
 }  // namespace mongo::cost_based_ranker

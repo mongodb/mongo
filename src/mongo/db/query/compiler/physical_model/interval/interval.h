@@ -178,6 +178,11 @@ struct Interval {
      */
     bool isFullyOpen() const;
 
+    /**
+     * Returns true if the interval has undefined start and/or end bounds.
+     */
+    bool isUndefined() const;
+
     /** Returns how 'this' compares to 'other' */
     enum IntervalComparison {
         //
