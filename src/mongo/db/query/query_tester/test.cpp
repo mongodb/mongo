@@ -35,9 +35,9 @@
 #include "mongo/db/query/util/jparse_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/util/pcre.h"
 
 #include <fstream>
-#include <regex>
 #include <thread>
 
 #include "command_helpers.h"
@@ -364,26 +364,13 @@ void Test::parseTestQueryLine() {
     // If we are running with no optimizations we need to block lowering to find from agg.
     if (_optimizationsOff) {
         const auto containsTextOrGeo =
-            std::regex("\\$(text|geoIntersects|geoWithin|near|nearSphere|geoNear|documents)");
-        auto match = std::smatch{};
+            pcre::Regex("\\$(text|geoIntersects|geoWithin|near|nearSphere|geoNear|documents)");
 
         // Some operators require indexes and can't be run with inhibit optimizations.
-        if (!std::regex_search(queryline, match, containsTextOrGeo)) {
-            const auto pipelineStart = std::regex("pipeline\"?[ \t]*:[ \t]*\\[");
+        if (!containsTextOrGeo.match(queryline)) {
+            const auto pipelineStart = pcre::Regex("pipeline\"?[ \t]*:[ \t]*\\[");
             const auto stopOptimization = "{\"$_internalInhibitOptimization\": {}},";
-            auto last = size_t{0};
-            auto ss = std::stringstream{};
-
-            for (auto itr = std::sregex_iterator(queryline.begin(), queryline.end(), pipelineStart);
-                 itr != std::sregex_iterator();
-                 ++itr) {
-                ss << queryline.substr(last, itr->position() + itr->length() - last)
-                   << stopOptimization;
-                last = itr->position() + itr->length();
-            }
-
-            ss << queryline.substr(last, queryline.length() - last);
-            queryline = ss.str();
+            pipelineStart.substitute(stopOptimization, &queryline, pcre::SUBSTITUTE_GLOBAL);
         }
     }
 

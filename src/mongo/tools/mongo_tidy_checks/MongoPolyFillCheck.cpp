@@ -73,6 +73,7 @@ constexpr std::initializer_list<llvm::StringRef> basePolyfillFuncNames = {
     "async",
     "get_terminate",
     "notify_all_at_thread_exit",
+    "regex_search",
     "set_terminate",
 };
 

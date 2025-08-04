@@ -33,12 +33,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/shell_exec.h"
 #include "mongo/util/str.h"
 
 #include <fstream>
 #include <ostream>
-#include <regex>
 #include <string>
 #include <vector>
 
@@ -60,7 +60,7 @@ constexpr auto kColorYellow = "\033[1;33m"_sd;
  * The test number will be captured as part of the summary of failing queries.
  */
 static const auto kTestNumRegex =
-    std::regex{R"(@@(?:\x1B\[[0-9;]*m)*[[:space:]]+(?:\x1B\[[0-9;]*m)*([0-9]+))"};
+    pcre::Regex{R"(@@(?:\x1B\[[0-9;]*m)*[[:space:]]+(?:\x1B\[[0-9;]*m)*([0-9]+))"};
 
 /**
  * Vector of relevant feature types to extract and display from a set of pipelines. These feature
@@ -159,8 +159,8 @@ std::set<size_t> getFailedTestNums(const std::string& diffOutput) {
     auto diffStream = std::istringstream{diffOutput};
 
     while (std::getline(diffStream, line)) {
-        if (auto match = std::smatch{}; std::regex_search(line, match, kTestNumRegex)) {
-            failedTestNums.insert(std::stoull(match[1]));
+        if (auto match = kTestNumRegex.match(line)) {
+            failedTestNums.insert(std::stoull(std::string(match[1])));
         }
     }
     return failedTestNums;

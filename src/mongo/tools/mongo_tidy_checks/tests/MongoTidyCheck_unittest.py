@@ -256,6 +256,7 @@ class MongoTidyTests(unittest.TestCase):
             "std::condition_variable cv",
             "std::unordered_map<int, int> myMap",
             "boost::unordered_map<int, int> boostMap",
+            "std::regex_search(std::string(\"\"), std::regex(\"\"))",
         ]
 
         self.expected_output = [

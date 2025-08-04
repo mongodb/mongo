@@ -1,6 +1,7 @@
 #include <condition_variable>
 #include <future>
 #include <mutex>
+#include <regex>
 #include <thread>
 #include <unordered_map>
 
@@ -19,6 +20,7 @@ void mongoPolyFillCheckTest() {
     std::condition_variable cv;
     std::unordered_map<int, int> myMap;
     boost::unordered_map<int, int> boostMap;
+    std::regex_search(std::string(""), std::regex(""));
 }
 
 }  // namespace mongo

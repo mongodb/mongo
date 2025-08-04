@@ -24,6 +24,7 @@ mongo_cc_library(
         "//src/mongo/rpc:message",
         "//src/mongo/shell:shell_utils",
         "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:pcre_wrapper",
     ],
 )
 

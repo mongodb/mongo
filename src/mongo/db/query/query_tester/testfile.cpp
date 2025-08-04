@@ -31,11 +31,11 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/query/util/jparse_util.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/shell_exec.h"
 
 #include <algorithm>
 #include <ostream>
-#include <regex>
 #include <vector>
 
 #include "command_helpers.h"
@@ -45,7 +45,7 @@ namespace {
 
 // This regex matches geospatial and text indices.
 static const auto kAlwaysIncludedIndex =
-    std::regex{R"-([{,]\s*("?)[^":,]+\1\s*:\s*"(2d|2dsphere|text)"\s*[},])-"};
+    pcre::Regex{R"-([{,]\s*("?)[^":,]+\1\s*:\s*"(2d|2dsphere|text)"\s*[},])-"};
 
 void dropCollections(DBClientConnection* const conn,
                      const std::string& dbName,
@@ -117,7 +117,7 @@ void readAndBuildOrSkipIndexes(DBClientConnection* const conn,
     readLine(fs, lineFromFile);
     for (auto indexNum = 0; !lineFromFile.empty(); readLine(fs, lineFromFile), ++indexNum) {
         // Do index inclusion checks here.
-        if (createAllIndices || std::regex_search(lineFromFile, kAlwaysIncludedIndex)) {
+        if (createAllIndices || kAlwaysIncludedIndex.match(lineFromFile)) {
             hasIndicesToCreate = true;
 
             const auto& indexObj = fromFuzzerJson(lineFromFile);

@@ -1903,6 +1903,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:optime",
         "//src/mongo/db/session:logical_session_id",
         "//src/mongo/idl:idl_parser",
+        "//src/mongo/util:pcre_wrapper",
         "//src/mongo/util/net:hostandport_impl",
     ],
 )
