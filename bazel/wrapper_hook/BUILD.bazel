@@ -10,7 +10,7 @@ py_library(
         "install_modules.py",
         "lint.py",
         "plus_interface.py",
-        "set_mongo_version.py",
+        "set_mongo_variables.py",
         "wrapper_debug.py",
         "wrapper_hook.py",
     ],

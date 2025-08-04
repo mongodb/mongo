@@ -22,7 +22,7 @@ def main():
     from bazel.wrapper_hook.engflow_check import engflow_auth
     from bazel.wrapper_hook.generate_common_bes_bazelrc import write_workstation_bazelrc
     from bazel.wrapper_hook.plus_interface import check_bazel_command_type, test_runner_interface
-    from bazel.wrapper_hook.set_mongo_version import write_mongo_version_bazelrc
+    from bazel.wrapper_hook.set_mongo_variables import write_mongo_variables_bazelrc
 
     # This is used to autogenerate a BUILD.bazel that creates
     # Filegroups for select tags - used to group targets for installing
@@ -47,7 +47,7 @@ def main():
 
         write_workstation_bazelrc(args)
 
-        write_mongo_version_bazelrc(args)
+        write_mongo_variables_bazelrc(args)
 
         args = test_runner_interface(
             sys.argv[1:],
