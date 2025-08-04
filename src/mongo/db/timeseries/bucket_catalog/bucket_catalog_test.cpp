@@ -4017,6 +4017,23 @@ TEST_F(BucketCatalogTest, StageInsertBatchHandlesRolloverReasonTimeForwardWithou
 }
 
 TEST_F(BucketCatalogTest, StageInsertBatchHandlesRolloverReasonSchemaChangeWithMetaField) {
+    // Testing fix of mixed schema detection when using large measurements
+    auto batchOfMeasurementsWithSchemaChangeAtEnd = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kSchemaChange,
+         .numMeasurements = 3,      // staying below bucket mincount to keep bucket open
+         .extraPayload = 130000});  // exceeding bucket size to exercise large path
+
+    // The last measurement in batchOfMeasurementsWithSchemaChangeAtEnd will have a int rather than
+    // a string for field "deathGrips", which means this measurement will be in a different
+    // bucket.
+    std::vector<size_t> numWriteBatches{2};
+
+    // Inserting a batch of measurements with meta field values into a collection with a meta field.
+    _testStageInsertBatchWithMetaField(
+        _ns1, _uuid1, batchOfMeasurementsWithSchemaChangeAtEnd, numWriteBatches);
+}
+
+TEST_F(BucketCatalogTest, StageInsertBatchChecksSchemaChangeWithLargeMeasurements) {
     // Max bucket size with only the last measurement having kSchemaChange.
     auto batchOfMeasurementsWithSchemaChangeAtEnd = _generateMeasurementsWithRolloverReason(
         {.reason = bucket_catalog::RolloverReason::kSchemaChange});
