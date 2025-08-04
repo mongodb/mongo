@@ -30,6 +30,7 @@
 #include "mongo/db/exec/classic/merge_sort.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/util/assert_util.h"
 
@@ -56,7 +57,10 @@ MergeSortStage::MergeSortStage(ExpressionContext* expCtx,
       _pattern(params.pattern),
       _dedup(params.dedup),
       _recordIdDeduplicator(expCtx),
-      _merging(StageWithValueComparison(ws, params.pattern, params.collator)) {}
+      // TODO SERVER-99279 Add internalMergeSortMaxMemoryBytes when it exists.
+      _merging(StageWithValueComparison(ws, params.pattern, params.collator)),
+      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)) {
+}
 
 void MergeSortStage::addChild(std::unique_ptr<PlanStage> child) {
     _children.emplace_back(std::move(child));
@@ -94,6 +98,7 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
                     _noResultToMerge.pop();
                 } else {
                     ++_specificStats.dupsTested;
+                    uint64_t dedupBytesPrev = _recordIdDeduplicator.getApproximateSize();
                     // ...and there's a RecordId and and we've seen the RecordId before
                     if (!_recordIdDeduplicator.insert(member->recordId)) {
                         // ...drop it.
@@ -104,6 +109,9 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
                         // Otherwise, we're going to use the result from the child, so we remove it
                         // from the queue of children without a result.
                         _noResultToMerge.pop();
+                        uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
+                        _memoryTracker.add(dedupBytes - dedupBytesPrev);
+                        _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
                     }
                 }
             } else {
@@ -118,6 +126,8 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
             value.stage = child;
             // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
             member->makeObjOwnedIfNeeded();
+            _memoryTracker.add(member->getMemUsage());
+            _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
             _mergingData.push_front(value);
 
             // Insert the result (indirectly) into our priority queue.
@@ -150,8 +160,10 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
 
     // Save the ID that we're returning and remove the returned result from our data.
     WorkingSetID idToTest = top->id;
+    WorkingSetMember* member = _ws->get(idToTest);
     _mergingData.erase(top);
-
+    _memoryTracker.add(-1 * member->getMemUsage());
+    _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
     // Return the min.
     *out = idToTest;
 

@@ -157,6 +157,18 @@ public:
         return NamespaceString::createNamespaceString_forTest(ns());
     }
 
+    uint64_t checkMemoryTracking(const SimpleMemoryUsageTracker& tracker,
+                                 uint64_t oldPeakMemBytes) {
+        uint64_t currentMemoryBytes = tracker.currentMemoryBytes();
+
+        ASSERT_GT(currentMemoryBytes, 0);
+
+        uint64_t actualPeakMemBytes = tracker.maxMemoryBytes();
+        ASSERT_GTE(actualPeakMemBytes, currentMemoryBytes);
+        ASSERT_GTE(actualPeakMemBytes, oldPeakMemBytes);
+        return actualPeakMemBytes;
+    }
+
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
@@ -270,6 +282,9 @@ public:
         msparams.pattern = BSON("c" << 1);
         auto ms = std::make_unique<MergeSortStage>(_expCtx.get(), msparams, ws.get());
 
+        const SimpleMemoryUsageTracker& memoryTracker = ms->getMemoryTracker_forTest();
+        auto* stats = static_cast<const MergeSortStats*>(ms->getSpecificStats());
+
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
@@ -290,11 +305,15 @@ public:
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
+        uint64_t peakMemoryBytes = 0;
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, nullptr));
             first = first.getOwned();
+            peakMemoryBytes = checkMemoryTracking(memoryTracker, peakMemoryBytes);
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, nullptr));
+            peakMemoryBytes = checkMemoryTracking(memoryTracker, peakMemoryBytes);
+
             ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
             ASSERT_EQUALS(i, first["c"].numberInt());
             ASSERT((first.hasField("a") && second.hasField("b")) ||
@@ -304,6 +323,8 @@ public:
         // Should be done now.
         BSONObj foo;
         ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, nullptr));
+        ASSERT_EQUALS(memoryTracker.maxMemoryBytes(), peakMemoryBytes);
+        ASSERT_EQUALS(stats->maxUsedMemBytes, peakMemoryBytes);
     }
 };
 
@@ -774,7 +795,7 @@ public:
         member = getNextResult(&ws, ms.get());
         ASSERT_EQ(member->getState(), WorkingSetMember::RID_AND_OBJ);
         ASSERT(member->hasObj());
-        // ASSERT(member->obj.value().isOwned());
+        ASSERT(member->doc.value().isOwned());
         ASSERT_BSONOBJ_EQ(member->doc.value().toBson(), BSON("_id" << 5 << "a" << 5));
         ++it;
 

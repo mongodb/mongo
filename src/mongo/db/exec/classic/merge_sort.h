@@ -58,6 +58,9 @@ class MergeSortStageParams;
  * AKA the SERVER-1205 stage.  Allows very efficient handling of the following query:
  * find($or[{a:1}, {b:1}]).sort({c:1}) with indices {a:1, c:1} and {b:1, c:1}.
  *
+ * This stage is part of the "find" subsystem, which only handles local execution and is not related
+ * to merging results from shards.
+ *
  * Preconditions: For each field in 'pattern' all inputs in the child must handle a
  * getFieldDotted for that field.
  */
@@ -77,6 +80,10 @@ public:
     std::unique_ptr<PlanStageStats> getStats() override;
 
     const SpecificStats* getSpecificStats() const final;
+
+    const SimpleMemoryUsageTracker& getMemoryTracker_forTest() const {
+        return _memoryTracker;
+    }
 
     static const char* kStageType;
 
@@ -135,6 +142,8 @@ private:
 
     // Stats
     MergeSortStats _specificStats;
+
+    SimpleMemoryUsageTracker _memoryTracker;
 };
 
 // Parameters that must be provided to a MergeSortStage

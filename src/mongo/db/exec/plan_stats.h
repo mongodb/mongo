@@ -872,6 +872,8 @@ struct MergeSortStats : public SpecificStats {
 
     // The pattern according to which we are sorting.
     BSONObj sortPattern;
+
+    uint64_t maxUsedMemBytes = 0u;
 };
 
 struct ShardingFilterStats : public SpecificStats {
