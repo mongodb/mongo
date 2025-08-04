@@ -257,10 +257,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::isMemberImpl(value::Typ
     }
 
     if (arrTag == value::TypeTags::inList) {
-        if (exprTag == value::TypeTags::Nothing) {
-            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
-        }
-
         // For InLists, we intentionally ignore the 'collator' parmeter and we use the
         // InList's collator instead.
         InList* inList = value::getInListView(arrVal);
