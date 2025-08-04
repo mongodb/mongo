@@ -69,6 +69,9 @@ selector:
     # Fails upsert operations with duplicate key errors due to drops being no-oped.
     # The test performs these upserts in retryable writes that cause the test to timeout.
     - jstests/core/query/update/upsert_fields.js
+
+    # TODO SERVER-108224 Re-enable mochalite tests once the issue is resolved.
+    - jstests/core/index/express_projection.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     # After SERVER-80339, the server runs a "listIndexes" command on the background, which could show
