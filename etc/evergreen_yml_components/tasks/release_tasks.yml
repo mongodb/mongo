@@ -1,7 +1,5 @@
 tasks:
   - name: publish-sast-report
-    # uses "Admin Only" variables, so patch runs will only work for admins
-    allowed_requesters: ["commit", "github_tag", "patch"]
     tags: ["auxiliary", "assigned_to_jira_team_devprod_release_infrastructure"]
     depends_on:
       - name: version_expansions_gen
