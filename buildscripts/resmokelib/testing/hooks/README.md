@@ -4,7 +4,7 @@ Hooks are a mechanism to run routines _around_ the tests, at the test content bo
 
 ## Supported hooks
 
-Specify any these in your [Suite](../../../../buildscripts/resmokeconfig/suites/README.md) config.
+Specify any of the following as the `hooks` in your [Suite](../../../../buildscripts/resmokeconfig/suites/README.md) config:
 
 - [`AnalyzeShardKeysInBackground`](./analyze_shard_key.py) - A hook for running `analyzeShardKey` commands while a test is running.
 - [`AntithesisLogging`](./antithesis_logging.py) - Prints antithesis commands before & after test run.

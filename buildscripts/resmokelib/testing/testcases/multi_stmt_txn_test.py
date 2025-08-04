@@ -7,7 +7,7 @@ from buildscripts.resmokelib.testing.testcases import jsrunnerfile
 
 
 class MultiStmtTxnTestCase(jsrunnerfile.JSRunnerFileTestCase):
-    """Test case for mutli statement transactions."""
+    """Test case for multi statement transactions."""
 
     REGISTERED_NAME = "multi_stmt_txn_passthrough"
 
