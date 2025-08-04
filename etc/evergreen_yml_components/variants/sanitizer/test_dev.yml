@@ -710,6 +710,7 @@ buildvariants:
       - rhel8.8-large
     stepback: false
     expansions:
+      core_analyzer_gdb_index_cache: off
       toolchain_version: stable
       additional_package_targets: >-
         archive-mongocryptd-stripped

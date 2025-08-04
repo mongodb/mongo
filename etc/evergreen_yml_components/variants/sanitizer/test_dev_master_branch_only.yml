@@ -396,6 +396,7 @@ buildvariants:
       - rhel8.8-large
     stepback: false
     expansions:
+      core_analyzer_gdb_index_cache: off
       toolchain_version: stable
       additional_package_targets: >-
         archive-mongocryptd-stripped
@@ -448,6 +449,7 @@ buildvariants:
       multiversion_edition: enterprise
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under UBSAN build.
       large_distro_name: rhel8.8-large
+      core_analyzer_gdb_index_cache: off
     depends_on:
       - name: archive_dist_test
         variant: *rhel8-debug-ubsan-all-feature-flags
