@@ -150,10 +150,6 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
                     int64_t numKills = 0;
                     int64_t numSkips = 0;
                     int64_t numTimeOuts = 0;
-                    // TODO(SERVER-102762): This is a linear scan of the session catalog for every
-                    // session we try to kill. If we find that "larger than a small constant" is a
-                    // reasonable default then we should re-visit this strategy, and find more than
-                    // one oldest transaction per scan.
                     killOldestTransaction(
                         opCtx,
                         Milliseconds(gCachePressureAbortCheckoutTimeoutMilliseconds),
