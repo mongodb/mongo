@@ -66,6 +66,7 @@ SUPPORTED_TEST_KINDS = (
     "multi_stmt_txn_passthrough",
     "parallel_fsm_workload_test",
     "all_versions_js_test",
+    "magic_restore_js_test",
 )
 RUN_ALL_FEATURE_FLAG_TESTS = "--runAllFeatureFlagTests"
 
