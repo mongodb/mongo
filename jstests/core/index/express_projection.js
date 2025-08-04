@@ -61,7 +61,7 @@ describe("Express path supports simple projections", () => {
             limit: 1,
             result: [{b: 0}],
             usesExpress: !isSharded,
-            expectedFetchCount: expectedNonZeroFetchCountWhenCovered,
+            expectedNonZeroFetchCountWhenCovered,
         });
     });
     it("can cover inclusion projection without limit 1 if there is a matching unique index present",
@@ -73,7 +73,7 @@ describe("Express path supports simple projections", () => {
                project: {b: 1, _id: 0},
                result: [{b: 0}],
                usesExpress: false,  // no unique index
-               expectedFetchCount: expectedNonZeroFetchCountWhenCovered,
+               expectedNonZeroFetchCountWhenCovered,
            });
            if (!isSharded) {
                assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
@@ -83,7 +83,7 @@ describe("Express path supports simple projections", () => {
                    project: {b: 1, _id: 0},
                    result: [{b: 0}],
                    usesExpress: true,  // index
-                   expectedFetchCount: expectedNonZeroFetchCountWhenCovered,
+                   expectedNonZeroFetchCountWhenCovered,
                });
            }
        });
@@ -108,7 +108,7 @@ describe("Express path correctly handles multi-key indexes when covering project
             limit: 1,
             result: [{a: "string", b: "string"}],
             usesExpress: !isSharded,
-            expectedFetchCount: expectedNonZeroFetchCountWhenCovered,
+            expectedNonZeroFetchCountWhenCovered,
         });
         runExpressTest({
             coll,
@@ -116,7 +116,7 @@ describe("Express path correctly handles multi-key indexes when covering project
             project: {a: 1, b: 1, _id: 0},
             result: [{a: "string", b: "string"}],
             usesExpress: false,
-            expectedFetchCount: expectedNonZeroFetchCountWhenCovered,
+            expectedNonZeroFetchCountWhenCovered,
         });
         if (!isSharded) {
             assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
@@ -126,7 +126,7 @@ describe("Express path correctly handles multi-key indexes when covering project
                 project: {a: 1, b: 1, _id: 0},
                 result: [{a: "string", b: "string"}],
                 usesExpress: true,
-                expectedFetchCount: expectedNonZeroFetchCountWhenCovered,
+                expectedNonZeroFetchCountWhenCovered,
             });
         }
     });
@@ -140,7 +140,7 @@ describe("Express path correctly handles multi-key indexes when covering project
             limit: 1,
             result: [{b: 3, c: 4}],
             usesExpress: !isSharded,
-            expectedFetchCount: expectedNonZeroFetchCountWhenCovered,
+            expectedNonZeroFetchCountWhenCovered,
         });
     });
     it("does not cover projections with multi-key index if multi-key path is involved", () => {
@@ -152,7 +152,7 @@ describe("Express path correctly handles multi-key indexes when covering project
             limit: 1,
             result: [{a: "string", b: "string", c: [3, 4]}],
             usesExpress: !isSharded,
-            expectedFetchCount: 1,
+            expectedNonZeroFetchCountWhenCovered: true,
         });
     });
     it("does not use express if complete multi-key field is required for filter", () => {
@@ -166,7 +166,7 @@ describe("Express path correctly handles multi-key indexes when covering project
             limit: 1,
             result: [{b: 3}],
             usesExpress: false,
-            expectedFetchCount: 1,
+            expectedNonZeroFetchCountWhenCovered: true,
         });
     });
 
@@ -206,7 +206,7 @@ describe("Express path handles collation when covering projections", () => {
             collation: caseInsensitive,
             result: [{a: 0}],
             usesExpress: !isSharded,
-            expectedFetchCount: expectedNonZeroFetchCountWhenCovered,
+            expectedNonZeroFetchCountWhenCovered,
         });
     });
 
@@ -219,7 +219,7 @@ describe("Express path handles collation when covering projections", () => {
             collation: caseInsensitive,
             result: [{a: "12"}],
             usesExpress: !isSharded,
-            expectedFetchCount: 1,
+            expectedNonZeroFetchCountWhenCovered: true,
         });
     });
 
@@ -232,7 +232,7 @@ describe("Express path handles collation when covering projections", () => {
             collation: caseInsensitive,
             result: [{a: 9, b: "10"}],
             usesExpress: !isSharded,
-            expectedFetchCount: 1,
+            expectedNonZeroFetchCountWhenCovered: true,
         });
     });
 
