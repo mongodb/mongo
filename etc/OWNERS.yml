@@ -15,6 +15,9 @@ filters:
   - "coverity.yml":
     approvers:
       - 10gen/server-programmability
+  - "evergreen_yml_components/variants/coverity.yml":
+    approvers:
+      - 10gen/server-programmability
   - "evergreen_yml_components/tasks/compile_tasks*.yml":
     approvers:
       - 10gen/devprod-build
