@@ -27,3 +27,6 @@ filters:
   - "generated_suites/sharding_auth_audit.yml":
     approvers:
       - 10gen/server-security
+  - "generated_suites/fcv_upgrade_downgrade_primary_step_down_passthrough.yml":
+    approvers:
+      - 10gen/server-replication

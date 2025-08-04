@@ -65,3 +65,6 @@ filters:
   - "*ingress_request_rate_limiter*":
     approvers:
       - 10gen/server-workload-scheduling
+  - "fcv_upgrade_downgrade_primary_step_down_passthrough.yml":
+    approvers:
+      - 10gen/server-replication

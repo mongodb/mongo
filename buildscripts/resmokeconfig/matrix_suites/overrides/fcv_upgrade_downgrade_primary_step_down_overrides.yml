@@ -1,0 +1,65 @@
+- name: stepdown_and_fcv_hooks
+  value:
+    executor:
+      hooks:
+        - class: FCVUpgradeDowngradeInBackground
+          shell_options:
+            # Setting globalThis.db manually allows us to use the retry behavior
+            # defined on network_error_and_txn_override.js. Omitting this causes
+            # the shell to fail prematurely if the primary is killed during initial
+            # connection setup.
+            eval: >-
+              globalThis.testingReplication = true;
+              await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+              globalThis.db = connect(TestData.connectionString);
+            global_vars:
+              TestData:
+                logRetryAttempts: true
+                networkErrorAndTxnOverrideConfig:
+                  retryOnNetworkErrors: true
+                overrideRetryAttempts: 6
+            # Setting nodb makes the hook provide connectionString as a field
+            # on TestData rather than as a direct CLI argument.
+            nodb: ""
+        - class: ContinuousStepdown
+          kill: true
+        - class: CheckReplOplogs
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+          shell_options:
+            global_vars:
+              TestData:
+                skipEnforceFastCountOnValidate: true
+        - class: CleanEveryN
+          n: 20
+
+- name: exclude_fcv_tags
+  value:
+    exclude_with_any_tags:
+      - assumes_standalone_mongod
+      - featureFlagFLE2CleanupCommand
+      # TODO: SERVER-66393 Remove Feature Flag for PM-2919.
+      - featureFlagTimeseriesUpdatesSupport
+      - featureFlagTimeseriesUpdatesSupport_incompatible
+      # TODO: SERVER-78068 Remove Feature Flag for PM-2983
+      - featureFlagRecordIdsReplicated
+      # TODO: SERVER-85426 Remove Feature Flag for SPM-3541
+      - featureFlagRankFusionBasic
+      - featureFlagRankFusionFull
+      - featureFlagSearchHybridScoringFull
+      - featureFlagRankFusion
+      # TODO: SERVER-86544 remove feature flag for SPM-3672
+      - featureFlagMongotIndexedViews
+      # Transactions are aborted upon fcv upgrade or downgrade.
+      - uses_transactions
+      # Exclude tests that require a specific fcv.
+      # Once SERVER-81054 is complete this is no longer needed.
+      - requires_fcv_71
+      - requires_fcv_72
+      - requires_fcv_73
+      - requires_fcv_80
+      - requires_fcv_81
+      - requires_fcv_82
+      - requires_fcv_83
+      # Exclude tests that are not compatible with upgrade/downgrade.
+      - cannot_run_during_upgrade_downgrade
