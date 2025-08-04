@@ -50,3 +50,13 @@ echo ""
 echo "fetching artifact from $fetch_address"
 
 curl --fail-with-body -L $fetch_address --output "mongo-binaries.$promote_extension"
+
+attach_body=$(printf '[
+    {
+        "name": "Custom Build URL",
+        "link": "%s",
+        "visibility": "public"
+    }
+]' "$artifact_address")
+
+echo "$attach_body" >./attach-address.json

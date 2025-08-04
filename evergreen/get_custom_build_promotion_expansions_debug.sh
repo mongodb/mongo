@@ -51,3 +51,13 @@ echo ""
 echo "fetching debug symbols from $fetch_address"
 
 curl --fail-with-body -L $fetch_address --output "mongo-debugsymbols.$promote_extension"
+
+attach_body=$(printf '[
+    {
+        "name": "Custom Build Debug Symbols URL",
+        "link": "%s",
+        "visibility": "public"
+    }
+]' "$artifact_address")
+
+echo "$attach_body" >./attach-address-debug.json

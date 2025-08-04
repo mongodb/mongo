@@ -918,6 +918,10 @@ tasks:
           local_file: mongo-binaries.${promote_extension}
           content_type: application/gzip
           skip_existing: true
+      - command: attach.artifacts
+        params:
+          files:
+            - attach-address.json
       - command: s3.put
         params:
           role_arn: "arn:aws:iam::119629040606:role/s3-access.cdn-origin-server-custom-builds"
@@ -927,6 +931,10 @@ tasks:
           local_file: mongo-debugsymbols.${promote_extension}
           content_type: application/gzip
           skip_existing: true
+      - command: attach.artifacts
+        params:
+          files:
+            - attach-address-debug.json
       - command: subprocess.exec
         params:
           binary: bash
@@ -987,6 +995,10 @@ tasks:
           local_file: mongo-binaries.${promote_extension}
           content_type: application/gzip
           skip_existing: true
+      - command: attach.artifacts
+        params:
+          files:
+            - attach-address.json
       - command: subprocess.exec
         params:
           binary: bash

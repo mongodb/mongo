@@ -5,29 +5,38 @@ if [ "$PROMOTE_TO_CLOUD_DEV" = '' ]; then
     exit 0
 fi
 
-case "$PROMOTE_BUILD_VARIANT" in
-"enterprise-amazon2" | "amazon2-x86-compile")
-    promote_arch="amd64"
-    promote_flavor="amazon2"
-    promote_min_os_version="2"
-    ;;
-"enterprise-amazon2-arm64" | "amazon2-arm64-compile")
+case $PROMOTE_BUILD_VARIANT in
+*"arm64"* | *"aarch64"*)
     promote_arch="aarch64"
-    promote_flavor="amazon2"
-    promote_min_os_version="2"
     ;;
-"enterprise-amazon2023" | "amazon2023-x86-compile")
+*"x86"* | *"amd64"*)
     promote_arch="amd64"
-    promote_flavor="amazon2023"
-    promote_min_os_version=""
-    ;;
-"enterprise-amazon2023-arm64" | "amazon2023-arm64-compile")
-    promote_arch="aarch64"
-    promote_flavor="amazon2023"
-    promote_min_os_version=""
     ;;
 *)
-    echo "Build variant ${PROMOTE_BUILD_VARIANT} cannot be used in cloud-dev, skipping"
+    echo "Could not parse architecture for build variant ${PROMOTE_BUILD_VARIANT} skipping promotion to cloud-dev"
+    exit 0
+    ;;
+esac
+
+case $PROMOTE_BUILD_VARIANT in
+*"amazon"*) ;;
+*)
+    echo "buildvariant ${PROMOTE_BUILD_VARIANT} doesn't appear to be an amazon buildvariant, skipping promotion to cloud-dev"
+    exit 0
+    ;;
+esac
+
+case $PROMOTE_BUILD_VARIANT in
+*"2023"*)
+    promote_flavor="amazon2023"
+    promote_min_os_version=""
+    ;;
+*"2"*)
+    promote_flavor="amazon2"
+    promote_min_os_version="2"
+    ;;
+*)
+    echo "Could not parse flavor for build variant ${PROMOTE_BUILD_VARIANT} skipping promotion to cloud-dev"
     exit 0
     ;;
 esac
