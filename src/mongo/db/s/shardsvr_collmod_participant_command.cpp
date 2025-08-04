@@ -147,7 +147,7 @@ public:
 
                 // TODO SERVER-105548 remove bucketNs and always use namespace from request `ns()`
                 // once 9.0 becomes lastLTS
-                const auto bucketNs = [&] {
+                const auto bucketNs = [&]() -> NamespaceString {
                     auto [collAcq, _] = timeseries::acquireCollectionWithBucketsLookup(
                         opCtx,
                         CollectionAcquisitionRequest::fromOpCtx(
