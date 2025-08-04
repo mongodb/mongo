@@ -6,6 +6,7 @@ selector:
     - buildscripts/idl/tests/**/test_*.py
     - buildscripts/bazel_rules_mongo/tests/test_*.py
   exclude_files:
+    - buildscripts/tests/burn_in_tests_end2end/test_burn_in_tests_end2end.py # Disabled since this test has behavior dependent on currently modified jstests. Re-enable with SERVER-108783.
     # These tests are also @unittest.skip'ed. SERVER-48969 tracks re-enabling them.
     - buildscripts/tests/resmokelib/test_selector.py # Test assumes POSIX path.
     - buildscripts/tests/resmokelib/utils/test_archival.py # Requires boto3.

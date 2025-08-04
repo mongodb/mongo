@@ -9,6 +9,9 @@ import buildscripts.burn_in_tests as under_test
 
 
 class TestBurnInTestsEnd2End(unittest.TestCase):
+    @unittest.skip(
+        "Disabled since this test has behavior dependent on currently modified jstests. Re-enable with SERVER-108783."
+    )
     @classmethod
     def setUpClass(cls):
         subprocess.run(
