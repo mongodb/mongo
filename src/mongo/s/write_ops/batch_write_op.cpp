@@ -715,9 +715,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
         write_ops::WriteError error(0, response.getTopLevelStatus());
 
         // Treat command errors exactly like other failures of the batch.
-        //
-        // Note that no errors will be tracked from these failures - as-designed.
-        noteBatchError(targetedBatch, error);
+        noteBatchError(targetedBatch, error, nullptr /* WriteConcern error */, trackedErrors);
         return;
     }
 
@@ -862,7 +860,8 @@ WriteOp& BatchWriteOp::getWriteOp(int index) {
 
 void BatchWriteOp::noteBatchError(const TargetedWriteBatch& targetedBatch,
                                   const write_ops::WriteError& error,
-                                  const WriteConcernErrorDetail* wce) {
+                                  const WriteConcernErrorDetail* wce,
+                                  TrackedErrors* trackedErrors) {
     // Treat errors to get a batch response as failures of the contained writes
     BatchedCommandResponse emulatedResponse;
     emulatedResponse.setStatus(Status::OK());
@@ -882,7 +881,7 @@ void BatchWriteOp::noteBatchError(const TargetedWriteBatch& targetedBatch,
         emulatedResponse.addToErrDetails(std::move(errorClone));
     }
 
-    noteBatchResponse(targetedBatch, emulatedResponse, nullptr);
+    noteBatchResponse(targetedBatch, emulatedResponse, trackedErrors);
 }
 
 void BatchWriteOp::abortBatch(const write_ops::WriteError& error) {
