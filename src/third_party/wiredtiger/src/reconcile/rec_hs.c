@@ -409,7 +409,7 @@ __rec_hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *bt
     WT_ASSERT(session, !WT_IS_HS(btree));
 
     /*
-     * Only deltas or full updates should be written to the history store. More specifically, we
+     * Only modifies or full updates should be written to the history store. More specifically, we
      * should NOT be writing tombstone records in the history store table.
      */
     WT_ASSERT(session, type == WT_UPDATE_STANDARD || type == WT_UPDATE_MODIFY);
@@ -653,7 +653,8 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
     WT_MODIFY entries[MAX_REVERSE_MODIFY_NUM];
     WT_UPDATE_VECTOR updates;
     WT_SAVE_UPD *list;
-    WT_UPDATE *newest_hs, *no_ts_upd, *oldest_upd, *prev_upd, *ref_upd, *tombstone, *upd;
+    WT_UPDATE *newest_hs, *newest_hs_tombstone, *no_ts_upd, *oldest_upd, *prev_upd, *ref_upd,
+      *tombstone, *upd;
     WT_TIME_WINDOW tw;
     wt_off_t hs_size;
     uint64_t insert_cnt, max_hs_size, modify_cnt;
@@ -709,16 +710,18 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
         /* History store table key component: source key. */
         WT_ERR(__rec_hs_pack_key(session, btree, r, list->ins, list->rip, key));
 
-        no_ts_upd = newest_hs = NULL;
+        no_ts_upd = newest_hs = newest_hs_tombstone = NULL;
         ref_upd = list->onpage_upd;
 
         __wt_update_vector_clear(&updates);
 
         /*
-         * Reverse deltas are only supported on 'S' and 'u' value formats.
+         * Reverse modifies are only supported on 'S' and 'u' value formats. Disable reverse
+         * modifies if we write a prepared update to disk.
          */
         enable_reverse_modify =
-          (WT_STREQ(btree->value_format, "S") || WT_STREQ(btree->value_format, "u"));
+          ((WT_STREQ(btree->value_format, "S") || WT_STREQ(btree->value_format, "u"))) &&
+          !WT_TIME_WINDOW_HAS_START_PREPARE(&list->tw);
 
         /*
          * If there exists an on page tombstone without a timestamp, consider it as a no timestamp
@@ -790,13 +793,6 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
 
             WT_ERR(__wt_update_vector_push(&updates, upd));
 
-            /*
-             * Always insert full update to the history store if we write a prepared update to the
-             * data store.
-             */
-            if (upd->prepare_state == WT_PREPARE_INPROGRESS)
-                enable_reverse_modify = false;
-
             /* Always insert full update to the history store if we need to squash the updates. */
             if (prev_upd != NULL && prev_upd->txnid == upd->txnid &&
               prev_upd->upd_start_ts == upd->upd_start_ts)
@@ -810,8 +806,11 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
                 if (upd->txnid != ref_upd->txnid || upd->upd_start_ts != ref_upd->upd_start_ts) {
                     if (upd->type == WT_UPDATE_TOMBSTONE)
                         ref_upd = upd;
-                    else
+                    else {
                         newest_hs = upd;
+                        if (ref_upd->type == WT_UPDATE_TOMBSTONE)
+                            newest_hs_tombstone = ref_upd;
+                    }
                     if (squashed) {
                         ++cache_hs_write_squash;
                         squashed = false;
@@ -831,7 +830,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
 
             /*
              * If we've reached a full update and it's in the history store we don't need to
-             * continue as anything beyond this point won't help with calculating deltas.
+             * continue as anything beyond this point won't help with calculating reverse modifies.
              *
              * No need to insert any data that is older than the update restored from delta. They
              * are already in the history store.
@@ -931,11 +930,13 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
             tw.start_txn = upd->txnid;
 
             /*
-             * For any uncommitted prepared updates written to disk, the stop timestamp of the last
-             * update moved into the history store should be with max visibility to protect its
-             * removal by checkpoint garbage collection until the data store update is committed.
+             * For any prepared updates written to disk, the stop timestamp of the last update moved
+             * into the history store without a pairing tombstone should be with max visibility to
+             * protect its removal by checkpoint garbage collection until the data store update is
+             * committed.
              */
-            if (prev_upd->prepare_state == WT_PREPARE_INPROGRESS) {
+            if (upd == newest_hs && newest_hs_tombstone == NULL &&
+              WT_TIME_WINDOW_HAS_START_PREPARE(&list->tw)) {
                 WT_ASSERT(session,
                   list->onpage_upd->txnid == prev_upd->txnid &&
                     list->onpage_upd->upd_start_ts == prev_upd->upd_start_ts);

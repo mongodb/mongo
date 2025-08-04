@@ -61,7 +61,7 @@ __rec_child_deleted(
             visible = page_del->txnid <= r->last_running;
 
             if (visible) {
-                WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, page_del->prepare_state);
+                WT_ACQUIRE_READ(prepare_state, page_del->prepare_state);
                 if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
                     visible = false;
             }
@@ -145,7 +145,7 @@ __rec_child_deleted(
      * evict prepared truncates, the page apparently being clean might lead to truncations being
      * lost in hard-to-debug ways.
      */
-    WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, page_del->prepare_state);
+    WT_ACQUIRE_READ(prepare_state, page_del->prepare_state);
     if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
         WT_ASSERT_ALWAYS(session, !F_ISSET(r, WT_REC_EVICT),
           "In progress prepares should never be seen in eviction");

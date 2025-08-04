@@ -449,6 +449,7 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
   WT_TIME_WINDOW *select_tw, WT_CELL_UNPACK_KV *vpack)
 {
     WT_UPDATE *prev_upd, *upd;
+    uint8_t prepare_state;
 
     /*
      * There is no selected update to go to disk as such we don't need to check the updates
@@ -508,12 +509,13 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
         if (upd->txnid == WT_TXN_ABORTED)
             continue;
 
+        WT_ACQUIRE_READ(prepare_state, prev_upd->prepare_state);
         char ts_string[4][WT_TS_INT_STRING_SIZE];
         WT_ASSERT_ALWAYS(session,
-          prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
+          prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED ||
             prev_upd->upd_start_ts == prev_upd->upd_durable_ts ||
             prev_upd->upd_durable_ts >= upd->upd_durable_ts,
-          "Durable timestamps cannot be out of order for prepared updates: "
+          "Durable timestamps cannot be out of order for updates: "
           "prev_upd->upd_start_ts=%s, prev_upd->prepare_ts_ts=%s, "
           "prev_upd->upd_durable_ts=%s, prev_upd->flags=%" PRIu16
           ", upd->upd_durable_ts=%s, upd->flags=%" PRIu16,
@@ -558,24 +560,25 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
      */
     if (vpack != NULL && !WT_TIME_WINDOW_HAS_PREPARE(&(vpack->tw))) {
         char ts_string[4][WT_TS_INT_STRING_SIZE];
-        if (WT_TIME_WINDOW_HAS_STOP(&vpack->tw))
+        WT_ACQUIRE_READ(prepare_state, prev_upd->prepare_state);
+        if (WT_TIME_WINDOW_HAS_STOP(&vpack->tw)) {
             WT_ASSERT_ALWAYS(session,
-              prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
+              prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED ||
                 prev_upd->upd_start_ts == prev_upd->upd_durable_ts ||
                 prev_upd->upd_durable_ts >= vpack->tw.durable_stop_ts,
-              "Stop: Durable timestamps cannot be out of order for prepared updates: "
+              "Stop: Durable timestamps cannot be out of order for updates: "
               "prev_upd->upd_start_ts=%s, prev_upd->prepare_ts=%s, prev_upd->upd_durable_ts=%s, "
               "prev_upd->flags=%" PRIu16 ", vpack->tw.durable_stop_ts=%s",
               __wt_timestamp_to_string(prev_upd->upd_start_ts, ts_string[0]),
               __wt_timestamp_to_string(prev_upd->prepare_ts, ts_string[1]),
               __wt_timestamp_to_string(prev_upd->upd_durable_ts, ts_string[2]), prev_upd->flags,
               __wt_timestamp_to_string(vpack->tw.durable_stop_ts, ts_string[3]));
-        else
+        } else
             WT_ASSERT_ALWAYS(session,
-              prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
+              prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED ||
                 prev_upd->upd_start_ts == prev_upd->upd_durable_ts ||
                 prev_upd->upd_durable_ts >= vpack->tw.durable_start_ts,
-              "Start: Durable timestamps cannot be out of order for prepared updates: "
+              "Start: Durable timestamps cannot be out of order for updates: "
               "prev_upd->upd_start_ts=%s, prev_upd->prepare_ts=%s, prev_upd->upd_durable_ts=%s, "
               "prev_upd->flags=%" PRIu16 ", vpack->tw.durable_start_ts=%s",
               __wt_timestamp_to_string(prev_upd->upd_start_ts, ts_string[0]),
@@ -718,17 +721,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
          * Only checkpoint should ever encounter resolving prepared transactions. If it does, then
          * it needs to wait to see whether they should be included or not.
          */
-        WT_READ_ONCE(prepare_state, upd->prepare_state);
-        while (prepare_state == WT_PREPARE_LOCKED) {
-            WT_ASSERT_ALWAYS(session, F_ISSET(r, WT_REC_CHECKPOINT),
-              "Eviction should never occur on a page that has resolving prepared records.");
-            /*
-             * FIXME: WT-14897. This while loop can be removed if we start to use the new prepared
-             * timestamp field.
-             */
-            __wt_sleep(0, 100);
-            WT_READ_ONCE(prepare_state, upd->prepare_state);
-        }
+        WT_ACQUIRE_READ(prepare_state, upd->prepare_state);
 
         /*
          * An interesting case this code will need to deal with is the case where a prepare (start)
@@ -741,9 +734,10 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
          * a new flag like WT_UPDATE_DS, but indicating that it's partially in the datastore).
          * Question: does this become tricky if a prepare makes multiple changes to the same key?
          */
-        if (prepare_state == WT_PREPARE_INPROGRESS) {
+        if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
             WT_ASSERT_ALWAYS(session,
-              upd_select->upd == NULL || upd_select->upd->txnid == upd->txnid,
+              upd_select->upd == NULL || F_ISSET(r, WT_REC_CHECKPOINT) ||
+                upd_select->upd->txnid == upd->txnid,
               "Cannot have two different prepared transactions active on the same key");
             /*
              * Don't save the record if it's prepare time is greater than the checkpoint timestamp

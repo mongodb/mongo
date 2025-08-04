@@ -51,7 +51,7 @@ if __name__ == '__main__':
         tfile.write("#pragma once\n\n")
         generate_string_conversion('Convert a prepare state to its string representation.',
                                    'prepare_state',
-                                   r'^#define\s+(WT_PREPARE_[A-Z0-9_]+)\s+[0-9]+',
+                                   r'^#define\s+(WT_PREPARE_[A-Z0-9_]+).*?[0-9]+',
                                    'src/include/btmem.h',
                                    tfile)
         tfile.write('\n')

@@ -302,7 +302,6 @@ class DisaggHookCreator(wthooks.WiredTigerHookCreator):
             ("test_salvage",         "Salvage tests directly name files ending in '.wt'"),
             ("test_config_json",     "Disagg hook's create function can't handle a json config string"),
             ("test_cursor_big",      "Cursor caching verified with stats"),
-            ("test_verify",          "Verify not supported on disagg tables (yet)"),
             ("tiered",               "Tiered tests do not apply to disagg"),
             ("disagg",               "Disagg tests already turn on the proper stuff"),
             ("layered",               "Layered tests already turn on the proper stuff"),

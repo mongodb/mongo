@@ -1009,10 +1009,10 @@ typedef uint8_t WT_REF_STATE;
  */
 
 /* Must be 0, as structures will be default initialized with 0. */
-#define WT_PREPARE_INIT 0
-#define WT_PREPARE_INPROGRESS 1
-#define WT_PREPARE_LOCKED 2
-#define WT_PREPARE_RESOLVED 3
+#define WT_PREPARE_INIT (uint8_t)0
+#define WT_PREPARE_INPROGRESS (uint8_t)1
+#define WT_PREPARE_LOCKED (uint8_t)2
+#define WT_PREPARE_RESOLVED (uint8_t)3
 
 /*
  * Page state.

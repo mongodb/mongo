@@ -126,8 +126,7 @@ __wti_rts_visibility_page_needs_abort(
       ref->page_del != NULL) {
         tag = "page_del info";
         durable_ts = ref->page_del->pg_del_durable_ts;
-        prepared = ref->page_del->prepare_state == WT_PREPARE_INPROGRESS ||
-          ref->page_del->prepare_state == WT_PREPARE_LOCKED;
+        prepared = ref->page_del->prepare_state == WT_PREPARE_INPROGRESS;
         newest_txn = ref->page_del->txnid;
         result = (durable_ts > rollback_timestamp) || prepared ||
           WT_CHECK_RECOVERY_FLAG_TXNID(session, newest_txn);

@@ -1139,20 +1139,14 @@ __txn_resolve_prepared_update_chain(WT_SESSION_IMPL *session, WT_UPDATE *upd, bo
     __txn_resolve_prepared_update_chain(session, upd->next, commit);
 
     if (!commit) {
-        if (F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK)) {
-            /*
-             * As updating timestamp might not be an atomic operation, we will manage using state.
-             *
-             * TODO: we can remove the prepare locked state once we separate the prepared timestamp
-             * and commit timestamp.
-             */
-            upd->prepare_state = WT_PREPARE_LOCKED;
-            WT_RELEASE_BARRIER();
+        /* As updating timestamp might not be an atomic operation, we will manage using state. */
+        upd->prepare_state = WT_PREPARE_LOCKED;
+        WT_RELEASE_BARRIER();
+        if (F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK))
             upd->upd_rollback_ts = txn->rollback_timestamp;
-            upd->upd_saved_txnid = upd->txnid;
-            WT_RELEASE_WRITE_WITH_BARRIER(upd->txnid, WT_TXN_ABORTED);
-        } else
-            upd->txnid = WT_TXN_ABORTED;
+        upd->upd_saved_txnid = upd->txnid;
+        WT_RELEASE_WRITE(upd->txnid, WT_TXN_ABORTED);
+        WT_RELEASE_WRITE(upd->prepare_state, WT_PREPARE_INPROGRESS);
         WT_STAT_CONN_INCR(session, txn_prepared_updates_rolledback);
         return;
     }
