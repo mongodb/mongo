@@ -1783,7 +1783,7 @@ void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* 
     translatedRequestParams.setTimeseries(optExtendedTimeseriesFields);
     _doc.setTranslatedRequestParams(std::move(translatedRequestParams));
 
-    const auto& originalDataShard = [&] {
+    const auto originalDataShard = [&]() -> ShardId {
         auto cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
         if (!cm.hasRoutingTable()) {
