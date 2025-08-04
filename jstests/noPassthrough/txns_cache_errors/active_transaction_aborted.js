@@ -5,7 +5,8 @@
  * This test overloads the wiredtiger cache and then waits for the idle expiry thread and
  * cache-pressure thread to abort the blocked sessions, some of which will be active.
  *
- * @tags: [requires_persistence, requires_wiredtiger, featureFlagStorageEngineInterruptibility]
+ * @tags: [requires_persistence, requires_wiredtiger, featureFlagStorageEngineInterruptibility,
+ * requires_fcv_83]
  */
 
 import {Thread} from "jstests/libs/parallelTester.js";
