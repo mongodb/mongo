@@ -293,8 +293,10 @@ void handleWouldChangeOwningShardErrorTransaction(OperationContext* opCtx,
                                                   bool fleCrudProcessed) {
 
     BSONObjBuilder extraInfoBuilder;
-    responseStatus.extraInfo()->serialize(&extraInfoBuilder);
-    auto extraInfo = extraInfoBuilder.obj();
+    if (auto extraInfo = responseStatus.extraInfo()) {
+        extraInfo->serialize(&extraInfoBuilder);
+    }
+    auto commandErrorInfo = extraInfoBuilder.obj();
 
     // Shared state for the transaction API use below.
     struct SharedBlock {
@@ -306,7 +308,7 @@ void handleWouldChangeOwningShardErrorTransaction(OperationContext* opCtx,
         bool matchedDocOrUpserted{false};
     };
     auto sharedBlock = std::make_shared<SharedBlock>(
-        WouldChangeOwningShardInfo::parseFromCommandError(extraInfo), nss);
+        WouldChangeOwningShardInfo::parseFromCommandError(commandErrorInfo), nss);
 
     try {
         auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
@@ -357,10 +359,12 @@ void handleWouldChangeOwningShardErrorTransactionLegacy(OperationContext* opCtx,
                                                         bool isTimeseriesViewRequest,
                                                         bool fleCrudProcessed) {
     BSONObjBuilder extraInfoBuilder;
-    responseStatus.extraInfo()->serialize(&extraInfoBuilder);
-    auto extraInfo = extraInfoBuilder.obj();
+    if (auto extraInfo = responseStatus.extraInfo()) {
+        extraInfo->serialize(&extraInfoBuilder);
+    }
+    auto commandErrorInfo = extraInfoBuilder.obj();
     auto wouldChangeOwningShardExtraInfo =
-        WouldChangeOwningShardInfo::parseFromCommandError(extraInfo);
+        WouldChangeOwningShardInfo::parseFromCommandError(commandErrorInfo);
 
     try {
         auto matchedDocOrUpserted = documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
