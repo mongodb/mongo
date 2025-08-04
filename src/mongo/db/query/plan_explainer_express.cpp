@@ -61,6 +61,12 @@ PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
         bob.append("stage"_sd, _writeOperationStats->stageName());
     }
     _iteratorStats->appendDataAccessStats(bob);
+
+    if (!_projection.isEmpty()) {
+        bob.append("projection"_sd, _projection);
+        bob.append("projectionCovered"_sd, _iteratorStats->projectionCovered());
+    }
+
     PlanSummaryStats stats;
     getSummaryStats(&stats);
 

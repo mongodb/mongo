@@ -58,6 +58,10 @@ public:
         return _indexKeyPattern;
     }
 
+    bool projectionCovered() const {
+        return _projectionCovered;
+    }
+
     void setStageName(StringData stageName) {
         _stageName = std::string{stageName};
     }
@@ -76,6 +80,10 @@ public:
 
     void setIndexKeyPattern(StringData indexKeyPattern) {
         _indexKeyPattern = std::string{indexKeyPattern};
+    }
+
+    void setProjectionCovered(bool projectionCovered) {
+        _projectionCovered = projectionCovered;
     }
 
     void populateSummaryStats(PlanSummaryStats* statsOut) const {
@@ -101,6 +109,7 @@ private:
     size_t _numDocumentsFetched{0};
     std::string _indexName;
     std::string _indexKeyPattern;
+    bool _projectionCovered{false};
 };
 
 class PlanStats {
@@ -194,10 +203,12 @@ class PlanExplainerExpress final : public PlanExplainer {
 public:
     PlanExplainerExpress(const express::PlanStats* planStats,
                          const express::IteratorStats* iteratorStats,
-                         const express::WriteOperationStats* writeOperationStats)
+                         const express::WriteOperationStats* writeOperationStats,
+                         BSONObj projection)
         : _planStats(planStats),
           _iteratorStats(iteratorStats),
-          _writeOperationStats(writeOperationStats) {}
+          _writeOperationStats(writeOperationStats),
+          _projection(std::move(projection)) {}
 
     const ExplainVersion& getVersion() const override {
         static const ExplainVersion kExplainVersion = "1";
@@ -227,5 +238,6 @@ private:
     const express::PlanStats* _planStats;
     const express::IteratorStats* _iteratorStats;
     const express::WriteOperationStats* _writeOperationStats;
+    BSONObj _projection;
 };
 }  // namespace mongo

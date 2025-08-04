@@ -621,7 +621,7 @@ private:
 };
 
 template <typename CollectonType>
-struct FetchFromIndexKey {
+struct CreateDocumentFromIndexKey {
     bool operator()(OperationContext* opCtx,
                     const CollectonType& _,
                     const IndexCatalogEntry* indexCatalogEntry,
@@ -725,6 +725,9 @@ public:
         _stats->setIndexName(_indexName);
         _stats->setIndexKeyPattern(
             KeyPattern::toString(_indexCatalogEntry->descriptor()->keyPattern()));
+        if constexpr (std::is_same_v<FetchCallback, CreateDocumentFromIndexKey<CollectionType>>) {
+            _stats->setProjectionCovered(true);
+        }
     }
 
     template <class Continuation>

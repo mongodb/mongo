@@ -13,6 +13,7 @@
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {runExpressTest} from "jstests/libs/query/express_utils.js";
 
 const coll = db.getCollection('express_coll_projection');
@@ -233,6 +234,47 @@ describe("Express path handles collation when covering projections", () => {
             usesExpress: !isSharded,
             expectedFetchCount: 1,
         });
+    });
+
+    after(() => coll.drop());
+});
+
+describe("Express path includes projection into explain", () => {
+    const docs = [{_id: 0, a: 1, b: 2}, {_id: 3, a: 4, b: 5}];
+
+    before(() => {
+        recreateCollWith(docs);
+    });
+
+    it("includes projection in explain output when using user index", () => {
+        if (isSharded) {
+            return;
+        }
+
+        assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
+        assert.commandWorked(coll.createIndex({a: 1, b: 1}));
+
+        const explainCovered =
+            getWinningPlanFromExplain(coll.find({a: 1}, {b: 1, _id: 0}).explain());
+
+        assert.eq(explainCovered.stage, "EXPRESS_IXSCAN", explainCovered);
+        assert.eq(explainCovered.projection, {b: 1, _id: 0}, explainCovered);
+        assert.eq(explainCovered.projectionCovered,
+                  !expectedNonZeroFetchCountWhenCovered,
+                  explainCovered);
+
+        const explainNotCovered = getWinningPlanFromExplain(coll.find({a: 1}, {_id: 0}).explain());
+
+        assert.eq(explainNotCovered.stage, "EXPRESS_IXSCAN", explainNotCovered);
+        assert.eq(explainNotCovered.projection, {_id: 0}, explainNotCovered);
+        assert.eq(explainNotCovered.projectionCovered, false, explainNotCovered);
+    });
+    it("includes projection in explain output when using _id index", () => {
+        const explain = getWinningPlanFromExplain(coll.find({_id: 0}, {b: 1, _id: 0}).explain());
+
+        assert.eq(explain.stage, "EXPRESS_IXSCAN", explain);
+        assert.eq(explain.projection, {b: 1, _id: 0}, explain);
+        assert.eq(explain.projectionCovered, false, explain);
     });
 
     after(() => coll.drop());

@@ -365,7 +365,10 @@ PlanExecutorExpress<Plan>::PlanExecutorExpress(
       _cq(std::move(cq)),
       _nss(express::accessCollection(collection).ns()),
       _commonStats("EXPRESS"),
-      _planExplainer(&_planStats, &_iteratorStats, &_writeOperationStats),
+      _planExplainer(&_planStats,
+                     &_iteratorStats,
+                     &_writeOperationStats,
+                     _cq ? _cq->getFindCommandRequest().getProjection() : BSONObj{}),
       _plan(std::move(plan)),
       _mustReturnOwnedBson(returnOwnedBson) {
     _plan.open(
@@ -672,7 +675,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
 
             if (coversProjection) {
                 return expressExecutorFactor
-                    .template operator()<express::FetchFromIndexKey<CollectionType>>();
+                    .template operator()<express::CreateDocumentFromIndexKey<CollectionType>>();
             } else {
                 return expressExecutorFactor
                     .template operator()<express::FetchFromCollectionCallback<CollectionType>>();

@@ -427,12 +427,12 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
 
     auto projection = parseProjection(operationContext(), fromjson("{_id: 0, a: 1, c: 1}"));
 
-    LookupViaUserIndex<const CollectionPtr*, FetchFromIndexKey<const CollectionPtr*>> iterator(
-        filter.firstElement(),
-        indexDescriptor->getEntry()->getIdent(),
-        std::string{indexName},
-        collator,
-        &projection);
+    LookupViaUserIndex<const CollectionPtr*, CreateDocumentFromIndexKey<const CollectionPtr*>>
+        iterator(filter.firstElement(),
+                 indexDescriptor->getEntry()->getIdent(),
+                 std::string{indexName},
+                 collator,
+                 &projection);
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
@@ -450,6 +450,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT_EQ(iteratorStats.indexName(), "a_1_b_1_c_1");
     ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1, b: 1, c: 1 }");
+    ASSERT_EQ(iteratorStats.projectionCovered(), true);
 }
 
 TEST_F(ExpressPlanTest, TestLookupClusteredIdIndexNullCollectionOnRestoreThrows) {
