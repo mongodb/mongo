@@ -42,6 +42,13 @@ feature_flags:
         default: false
         fcv_gated: true
 
+    featureFlagSbeAccumulators:
+        description: "Feature flag to enable single-purpose SBE $group accumulators."
+        cpp_varname: gFeatureFlagSbeAccumulators
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development
+
     featureFlagSbeFull:
         description:
             "Feature flag for SBE behaviors, features, or extensions that are not yet enabled

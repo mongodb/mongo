@@ -3873,14 +3873,14 @@ public:
         if (!documentBoundSlot) {
             documentBoundSlot = SbSlot{state.slotId()};
 
-            SbAggExprVector sbAggExprs;
-            sbAggExprs.emplace_back(
-                SbAggExpr{SbExpr{} /*init*/,
-                          SbExpr{} /*blockAgg*/,
-                          b.makeFunction("sum", b.makeInt32Constant(1)) /*agg*/},
+            SbBlockAggExprVector sbBlockAggExprs;
+            sbBlockAggExprs.emplace_back(
+                SbBlockAggExpr{SbExpr{} /*init*/,
+                               SbExpr{} /*blockAgg*/,
+                               b.makeFunction("sum", b.makeInt32Constant(1)) /*agg*/},
                 *documentBoundSlot);
 
-            auto [outStage, _] = b.makeAggProject(std::move(stage), std::move(sbAggExprs));
+            auto [outStage, _] = b.makeAggProject(std::move(stage), std::move(sbBlockAggExprs));
             stage = std::move(outStage);
         }
         auto documentBoundSlotIdx = ensureSlotInBuffer(*documentBoundSlot);

@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include <concepts>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -41,9 +42,11 @@
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
@@ -76,6 +79,11 @@ inline auto makeBoolConstant(bool boolVal) {
     return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, val);
 }
 
+inline auto makeStringConstant(StringData value) {
+    auto [tag, val] = value::makeNewString(value);
+    return sbe::makeE<sbe::EConstant>(tag, val);
+}
+
 inline auto makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
     return sbe::makeE<sbe::EConstant>(tag, val);
 }
@@ -104,6 +112,15 @@ using MakeStageFn = std::function<std::pair<T, std::unique_ptr<PlanStage>>(
     T scanSlots, std::unique_ptr<PlanStage> scanStage)>;
 
 using AssertStageStatsFn = std::function<void(const SpecificStats*)>;
+
+template <class... ACCUMULATOR>
+requires(std::convertible_to<std::decay_t<ACCUMULATOR>, std::unique_ptr<HashAggAccumulator>> && ...)
+inline std::vector<std::unique_ptr<HashAggAccumulator>> makeHashAggAccumulatorList(
+    ACCUMULATOR&&... contents) {
+    std::vector<std::unique_ptr<HashAggAccumulator>> result;
+    (result.emplace_back(std::move(contents)), ...);
+    return result;
+}
 
 /**
  * PlanStageTestFixture is a unittest framework for testing sbe::PlanStages.

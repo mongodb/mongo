@@ -46,8 +46,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/block_hashagg.h"
-#include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/stages/window.h"
@@ -114,7 +112,7 @@ inline size_t estimate(const AggExprPair& expr) {
     return size;
 }
 
-inline size_t estimate(const AggExprTuple& tuple) {
+inline size_t estimate(const BlockAggExprTuple& tuple) {
     size_t size = 0;
 
     if (tuple.init) {

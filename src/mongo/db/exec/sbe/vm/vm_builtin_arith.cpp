@@ -379,12 +379,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum(
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConvertSimpleSumToDoubleDoubleSum(
     ArityType arity) {
     invariant(arity == 1);
+    auto [_, simpleSumTag, simpleSumVal] = getFromStack(0);
+    return builtinConvertSimpleSumToDoubleDoubleSumImpl(simpleSumTag, simpleSumVal);
+}
 
+FastTuple<bool, value::TypeTags, value::Value>
+ByteCode::builtinConvertSimpleSumToDoubleDoubleSumImpl(value::TypeTags simpleSumTag,
+                                                       value::Value simpleSumVal) {
     auto [accTag, accVal] = genericInitializeDoubleDoubleSumState();
     value::ValueGuard accGuard{accTag, accVal};
     value::Array* accumulator = value::getArrayView(accVal);
-
-    auto [_, simpleSumTag, simpleSumVal] = getFromStack(0);
 
     aggDoubleDoubleSumImpl(accumulator, simpleSumTag, simpleSumVal);
 

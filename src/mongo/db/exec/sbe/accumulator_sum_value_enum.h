@@ -46,9 +46,9 @@ namespace mongo {
  * if any such values are encountered.
  */
 enum AggSumValueElems {
-    kNonDecimalTotalTag,
-    kNonDecimalTotalSum,
-    kNonDecimalTotalAddend,
+    kNonDecimalTotalTag,     // starts life as NumberInt32, the smallest numeric type
+    kNonDecimalTotalSum,     // must be NumberDouble per tassert 5755312
+    kNonDecimalTotalAddend,  // must be NumberDouble per tassert 5755312
     kDecimalTotal,
     // This is actually not an index but represents the maximum number of elements.
     kMaxSizeOfArray

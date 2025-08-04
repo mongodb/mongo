@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
+#include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/stages/hash_join.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup_unwind.h"
@@ -53,6 +54,11 @@
 #include "mongo/db/query/stage_builder/sbe/abt_defs.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
+#include "mongo/db/query/stage_builder/sbe/sbexpr.h"
+#include "mongo/util/overloaded_visitor.h"
+
+#include <memory>
+#include <variant>
 
 namespace mongo::stage_builder {
 namespace {
@@ -688,9 +694,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
     const VariableTypes& varTypes,
     SbStage stage,
     const SbSlotVector& gbs,
-    SbAggExprVector sbAggExprs,
-    boost::optional<sbe::value::SlotId> collatorSlot,
-    SbExprSlotVector mergingExprs) {
+    const SbHashAggAccumulatorVector& accumulatorList,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     // In debug builds or when we explicitly set the query knob, we artificially force frequent
     // spilling. This makes sure that our tests exercise the spilling algorithm and the associated
     // logic for merging partial aggregates which otherwise would require large data sizes to
@@ -717,28 +722,43 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
         }
     }
 
-    sbe::AggExprVector aggExprsVec;
+    std::vector<std::unique_ptr<sbe::HashAggAccumulator>> loweredAccumulatorList;
     SbSlotVector aggOutSlots;
-    for (auto& [sbAggExpr, optSbSlot] : sbAggExprs) {
-        auto sbSlot = optSbSlot ? *optSbSlot : SbSlot{_state.slotId()};
-        aggOutSlots.emplace_back(sbSlot);
+    for (auto& sbAccumulator : accumulatorList) {
+        auto outSlot = sbAccumulator.outSlot ? *sbAccumulator.outSlot : SbSlot{_state.slotId()};
+        aggOutSlots.emplace_back(outSlot);
 
-        auto exprPair = sbe::AggExprPair{sbAggExpr.init.lower(_state, &varTypes),
-                                         sbAggExpr.agg.lower(_state, &varTypes)};
+        auto loweredAccumlator = std::visit(
+            OverloadedVisitor{
+                [&](const SbHashAggCompiledAccumulator& implementation)
+                    -> std::unique_ptr<sbe::HashAggAccumulator> {
+                    return std::make_unique<sbe::CompiledHashAggAccumulator>(
+                        outSlot.getId(),
+                        sbAccumulator.spillSlot.getId(),
+                        implementation.agg.clone().lower(_state, &varTypes),
+                        implementation.merge.clone().lower(_state, &varTypes),
+                        implementation.init.clone().lower(_state, &varTypes));
+                },
+                [&]<class Implementation>(
+                    const SbHashAggSinglePurposeScalarAccumulator<Implementation>& implementation)
+                    -> std::unique_ptr<sbe::HashAggAccumulator> {
+                    return std::make_unique<Implementation>(
+                        outSlot.getId(),
+                        sbAccumulator.spillSlot.getId(),
+                        implementation.transform.clone().lower(_state, &varTypes));
+                }},
+            sbAccumulator.implementation);
 
-        aggExprsVec.emplace_back(std::pair(sbSlot.getId(), std::move(exprPair)));
+        loweredAccumulatorList.emplace_back(std::move(loweredAccumlator));
     }
-
-    sbe::SlotExprPairVector mergingExprsVec = lower(mergingExprs);
 
     stage = sbe::makeS<sbe::HashAggStage>(std::move(stage),
                                           std::move(groupBySlots),
-                                          std::move(aggExprsVec),
+                                          std::move(loweredAccumulatorList),
                                           sbe::value::SlotVector{},
                                           true /* optimized close */,
                                           collatorSlot,
                                           _state.allowDiskUse,
-                                          std::move(mergingExprsVec),
                                           _state.yieldPolicy,
                                           _nodeId,
                                           true /* participateInTrialRunTracking */,
@@ -751,7 +771,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
     const VariableTypes& varTypes,
     SbStage stage,
     const SbSlotVector& gbs,
-    SbAggExprVector sbAggExprs,
+    SbBlockAggExprVector SbBlockAggExprs,
     SbSlot selectivityBitmapSlot,
     const SbSlotVector& blockAccArgSbSlots,
     SbSlot bitmapInternalSlot,
@@ -761,26 +781,27 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
 
     const auto selectivityBitmapSlotId = selectivityBitmapSlot.getId();
 
-    sbe::AggExprTupleVector aggs;
+    sbe::BlockAggExprTupleVector aggs;
     SbSlotVector aggOutSlots;
 
-    for (auto& [sbAggExpr, optSbSlot] : sbAggExprs) {
+    for (auto& [sbBlockAggExpr, optSbSlot] : SbBlockAggExprs) {
         auto sbSlot = optSbSlot ? *optSbSlot : SbSlot{_state.slotId()};
         sbSlot.setTypeSignature(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType));
 
         aggOutSlots.emplace_back(sbSlot);
 
         std::unique_ptr<sbe::EExpression> init, blockAgg, agg;
-        if (sbAggExpr.init) {
-            init = sbAggExpr.init.lower(_state, &varTypes);
+        if (sbBlockAggExpr.init) {
+            init = sbBlockAggExpr.init.lower(_state, &varTypes);
         }
-        if (sbAggExpr.blockAgg) {
-            blockAgg = sbAggExpr.blockAgg.lower(_state, &varTypes);
+        if (sbBlockAggExpr.blockAgg) {
+            blockAgg = sbBlockAggExpr.blockAgg.lower(_state, &varTypes);
         }
-        agg = sbAggExpr.agg.lower(_state, &varTypes);
+        agg = sbBlockAggExpr.agg.lower(_state, &varTypes);
 
-        aggs.emplace_back(sbSlot.getId(),
-                          sbe::AggExprTuple{std::move(init), std::move(blockAgg), std::move(agg)});
+        aggs.emplace_back(
+            sbSlot.getId(),
+            sbe::BlockAggExprTuple{std::move(init), std::move(blockAgg), std::move(agg)});
     }
 
     // Copy unique slot IDs from 'gbs' to 'groupBySlots'.
@@ -834,16 +855,16 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
 
 std::tuple<SbStage, SbSlotVector> SbBuilder::makeAggProject(const VariableTypes& varTypes,
                                                             SbStage stage,
-                                                            SbAggExprVector sbAggExprs) {
+                                                            SbBlockAggExprVector sbBlockAggExprs) {
     sbe::AggExprVector aggExprsVec;
     SbSlotVector aggOutSlots;
 
-    for (auto& [sbAggExpr, optSbSlot] : sbAggExprs) {
+    for (auto& [sbBlockAggExpr, optSbSlot] : sbBlockAggExprs) {
         auto sbSlot = optSbSlot ? *optSbSlot : SbSlot{_state.slotId()};
         aggOutSlots.emplace_back(sbSlot);
 
-        auto exprPair = sbe::AggExprPair{sbAggExpr.init.lower(_state, &varTypes),
-                                         sbAggExpr.agg.lower(_state, &varTypes)};
+        auto exprPair = sbe::AggExprPair{sbBlockAggExpr.init.lower(_state, &varTypes),
+                                         sbBlockAggExpr.agg.lower(_state, &varTypes)};
 
         aggExprsVec.emplace_back(std::pair(sbSlot.getId(), std::move(exprPair)));
     }
@@ -1066,12 +1087,12 @@ std::pair<SbStage, SbSlot> SbBuilder::makeHashLookup(
     SbSlot localKeySlot,
     SbSlot foreignKeySlot,
     SbSlot foreignRecordSlot,
-    SbAggExpr sbAggExpr,
+    SbBlockAggExpr sbBlockAggExpr,
     boost::optional<SbSlot> optOutputSlot,
     boost::optional<sbe::value::SlotId> collatorSlot) {
     auto outputSlot = optOutputSlot ? *optOutputSlot : SbSlot{_state.slotId()};
 
-    sbe::SlotExprPair agg{outputSlot.getId(), sbAggExpr.agg.lower(_state, &varTypes)};
+    sbe::SlotExprPair agg{outputSlot.getId(), sbBlockAggExpr.agg.lower(_state, &varTypes)};
 
     SbStage stage = sbe::makeS<sbe::HashLookupStage>(std::move(localStage),
                                                      std::move(foreignStage),

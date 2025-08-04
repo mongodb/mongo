@@ -32,12 +32,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/bson_scan.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/exchange.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
+#include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/stages/hash_join.h"
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
@@ -149,16 +151,19 @@ TEST_F(PlanSizeTest, Filter) {
 }
 
 TEST_F(PlanSizeTest, HashAgg) {
-    auto stage = makeS<HashAggStage>(mockS(),
-                                     mockSV(),
-                                     makeAggExprVector(generateSlotId(), mockE(), mockE()),
-                                     makeSV(),
-                                     true,
-                                     generateSlotId(),
-                                     false,
-                                     makeSlotExprPairVec(),
-                                     nullptr /* yieldPolicy */,
-                                     kEmptyPlanNodeId);
+    auto stage = makeS<HashAggStage>(
+        mockS(),
+        mockSV(),
+        makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
+                                       generateSlotId(), generateSlotId(), mockE(), mockE()),
+                                   std::make_unique<ArithmeticAverageHashAggAccumulatorTerminal>(
+                                       generateSlotId(), generateSlotId(), mockE())),
+        makeSV(),
+        true,
+        generateSlotId(),
+        false,
+        nullptr /* yieldPolicy */,
+        kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
 

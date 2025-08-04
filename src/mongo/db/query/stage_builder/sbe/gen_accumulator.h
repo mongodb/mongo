@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 
 #include <memory>
 #include <vector>
@@ -111,6 +112,37 @@ public:
      * return boost::none.
      */
     bool hasBuildAddBlockAggs() const;
+
+    /**
+     * This method returns true this AccumOp supports buildSinglePurposeAccumulator(), otherwise
+     * returns false.
+     */
+    bool canBuildSinglePurposeAccumulator() const;
+
+    /**
+     * This method generates an expression for a single-purpose accumulator that has native
+     * implementations of accumulator operations instead of "add," "initialize," and "combine" ABT
+     * expressions. Used when the desired output is the final result of accumulation.
+     *
+     * Only call this method after ensuring that canBuildSinglePrposeAccumulator() returns true.
+     */
+    SbHashAggAccumulator buildSinglePurposeAccumulator(StageBuilderState& state,
+                                                       SbExpr inputExpression,
+                                                       std::string fieldName,
+                                                       SbSlot outSlot,
+                                                       SbSlot spillSlot) const;
+
+    /**
+     * Same as buildSinglePurposeAccumulator() but used when the desired result is a partial
+     * aggregate, such as should be produced by shard pipelines whose results are to be merged.
+     *
+     * Only call this method after ensuring that canBuildSinglePrposeAccumulator() returns true.
+     */
+    SbHashAggAccumulator buildSinglePurposeAccumulatorForMerge(StageBuilderState& state,
+                                                               SbExpr inputExpression,
+                                                               std::string fieldName,
+                                                               SbSlot outSlot,
+                                                               SbSlot spillSlot) const;
 
     /**
      * Given one or more input expressions ('input' / 'inputs'), these methods generate the

@@ -56,6 +56,7 @@
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/gen_projection.h"
+#include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -455,21 +456,24 @@ std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySetForForeign(
         ? b.makeFunction("aggCollSetUnion"_sd, SbSlot{*collatorSlot}, spillSlot)
         : b.makeFunction("aggSetUnion"_sd, spillSlot);
 
-    SbAggExprVector sbAggExprs;
-    sbAggExprs.emplace_back(
-        SbAggExpr{SbExpr{} /* init */, SbExpr{} /* blockAgg */, std::move(addToSetExpr)},
-        boost::none);
+    SbHashAggAccumulatorVector accumulatorList;
+    accumulatorList.emplace_back(SbHashAggAccumulator{
+        .outSlot = boost::none,  // A slot will be assigned when creating the final HashAgg stage.
+        .spillSlot = spillSlot,
+        .implementation =
+            SbHashAggCompiledAccumulator{
+                .init = SbExpr{},
+                .agg = std::move(addToSetExpr),
+                .merge = std::move(aggSetUnionExpr),
+            },
+    });
 
-    SbExprSlotVector mergingExprs;
-    mergingExprs.emplace_back(std::move(aggSetUnionExpr), spillSlot);
-
-    auto [packedKeyValuesStage, _, aggOutSlots] =
-        b.makeHashAgg(VariableTypes{},
-                      std::move(keyValuesStage),
-                      {}, /* groupBy slots - an empty vector means creating a single group */
-                      std::move(sbAggExprs),
-                      {}, /* We group _all_ key values to a single set so we can ignore collation */
-                      std::move(mergingExprs));
+    auto [packedKeyValuesStage, _, aggOutSlots] = b.makeHashAgg(
+        VariableTypes{},
+        std::move(keyValuesStage),
+        {}, /* groupBy slots - an empty vector means creating a single group */
+        accumulatorList,
+        {} /* We group _all_ key values to a single set so we can ignore collation */);
 
     SbSlot keyValuesSetSlot = aggOutSlots[0];
 
@@ -500,22 +504,27 @@ std::pair<SbSlot /* resultSlot */, SbStage> buildForeignMatchedArray(SbStage inn
 
     auto addToArrayExpr =
         b.makeFunction("addToArrayCapped"_sd, foreignRecordSlot, b.makeInt32Constant(sizeCap));
-    SbAggExprVector sbAggExprs;
-    sbAggExprs.emplace_back(
-        SbAggExpr{SbExpr{} /* init */, SbExpr{} /* blockAgg */, std::move(addToArrayExpr)},
-        boost::none);
 
-    SbExprSlotVector mergingExprs;
-    mergingExprs.emplace_back(
-        b.makeFunction("aggConcatArraysCapped", spillSlot, b.makeInt32Constant(sizeCap)),
-        spillSlot);
+    auto concatArraysExpr =
+        b.makeFunction("aggConcatArraysCapped", spillSlot, b.makeInt32Constant(sizeCap));
+
+    SbHashAggAccumulatorVector accumulatorList;
+    accumulatorList.emplace_back(SbHashAggAccumulator{
+        .outSlot = boost::none,  // A slot will be assigned when creating the final HashAgg stage.
+        .spillSlot = spillSlot,
+        .implementation =
+            SbHashAggCompiledAccumulator{
+                .init = SbExpr{},
+                .agg = std::move(addToArrayExpr),
+                .merge = std::move(concatArraysExpr),
+            },
+    });
 
     auto [hashAggStage, _, aggOutSlots] = b.makeHashAgg(VariableTypes{},
                                                         std::move(innerBranch),
                                                         {}, /* groupBy slots */
-                                                        std::move(sbAggExprs),
-                                                        {}, /* collatorSlot */
-                                                        std::move(mergingExprs));
+                                                        accumulatorList,
+                                                        {});
     innerBranch = std::move(hashAggStage);
     SbSlot accumulatorSlot = aggOutSlots[0];
 
@@ -1206,9 +1215,9 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
     } else {
         // Plain $lookup without $unwind: use HashLookupStage.
         // Aggregator to assemble the matched foreign documents into an array.
-        SbAggExpr agg{SbExpr{} /*init*/,
-                      SbExpr{} /*blockAgg*/,
-                      b.makeFunction("addToArray", foreignRecordSlot) /*agg*/};
+        SbBlockAggExpr agg{SbExpr{} /*init*/,
+                           SbExpr{} /*blockAgg*/,
+                           b.makeFunction("addToArray", foreignRecordSlot) /*agg*/};
 
         auto [hl, lookupStageOutputSlot] = b.makeHashLookup(std::move(localKeysSetStage),
                                                             std::move(foreignKeyStage),

@@ -144,14 +144,14 @@ struct AggExprPair {
     std::unique_ptr<EExpression> agg;
 };
 
-struct AggExprTuple {
+struct BlockAggExprTuple {
     std::unique_ptr<EExpression> init;
     std::unique_ptr<EExpression> blockAgg;
     std::unique_ptr<EExpression> agg;
 };
 
 using AggExprVector = std::vector<std::pair<value::SlotId, AggExprPair>>;
-using AggExprTupleVector = std::vector<std::pair<value::SlotId, AggExprTuple>>;
+using BlockAggExprTupleVector = std::vector<std::pair<value::SlotId, BlockAggExprTuple>>;
 
 template <typename T, typename... Args>
 inline std::unique_ptr<EExpression> makeE(Args&&... args) {
@@ -246,6 +246,9 @@ auto makeSlotExprPairVec(Ts&&... pack) {
     return v;
 }
 
+/**
+ * Used only by unit tests. Expects input arguments in threes: (slotId, initExpr, accExpr).
+ */
 template <typename... Ts>
 auto makeAggExprVector(Ts&&... pack) {
     AggExprVector v;

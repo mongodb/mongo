@@ -30,13 +30,18 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_defs.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
 
+#include <variant>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::stage_builder {
 
@@ -354,7 +359,9 @@ using SbExprPair = std::pair<SbExpr, SbExpr>;
 
 /**
  * The SbExpr class is used to represent expressions in the SBE stage builder. "SbExpr" is short
- * for "stage builder expression".
+ * for "stage builder expression". This will only get converted to an EExpression when an
+ * sbe::PlanStage is created, by calling SbExpr::lower(). It can also be null, i.e. representing no
+ * expression, which can be checked using the isNull() method.
  */
 class SbExpr : public SbBase {
 public:
@@ -370,7 +377,7 @@ public:
 
     /**
      * At any given time, an SbExpr object can be in one of 5 states:
-     *  1) Null - The SbExpr doesn't hold anything.
+     *  1) Null - The SbExpr doesn't hold anything (see the isNull() method).
      *  2) Slot - The SbExpr holds a slot variable (slot ID).
      *  3) LocalVar - The SbExpr holds a local variable (frame ID and slot ID).
      *  4) Abt - The SbExpr holds an ABT expression.
@@ -620,7 +627,20 @@ private:
                                                 : get<OptimizedAbt>(_storage).ptr;
     }
 
+    /**
+     * Holds the definition of the expression, which can be of various forms documented in the
+     * comment header for VariantType above.
+     */
     VariantType _storage;
+
+    /**
+     * Holds a bitmap set of possible sbe::value::TypeTags types this expression can produce. If no
+     * type inference has been done, all the bits will be set, but if type inference has been done,
+     * some bits may have been cleared. In the best case all but one bit has been cleared, so the
+     * remaining 1 bit indicates the single type this expression will always produce. This info is
+     * used by block processing mode (e.g. to avoid vectorizing a constant into a block of copies)
+     * and to perform some expression tree simplifying rewrites such as constant folding.
+     */
     OptTypeSignature _typeSig;
 };
 
@@ -634,8 +654,8 @@ using SbStage = std::unique_ptr<sbe::PlanStage>;
  * of these structures. Here is a list:
  *    EExpression::Vector -> SbExpr::Vector
  *    SlotExprPairVector  -> SbExprSlotVector or SbExprOptSlotVector
- *    AggExprPair         -> SbAggExpr
- *    AggExprVector       -> SbAggExprVector
+ *    AggExprPair         -> SbBlockAggExpr
+ *    AggExprVector       -> SbBlockAggExprVector
  */
 using SbExprSlotPair = std::pair<SbExpr, SbSlot>;
 using SbExprSlotVector = std::vector<SbExprSlotPair>;
@@ -643,13 +663,48 @@ using SbExprSlotVector = std::vector<SbExprSlotPair>;
 using SbExprOptSlotPair = std::pair<SbExpr, boost::optional<SbSlot>>;
 using SbExprOptSlotVector = std::vector<SbExprOptSlotPair>;
 
-struct SbAggExpr {
+struct SbBlockAggExpr {
     SbExpr init;
     SbExpr blockAgg;
     SbExpr agg;
 };
 
-using SbAggExprVector = std::vector<std::pair<SbAggExpr, boost::optional<SbSlot>>>;
+using SbBlockAggExprPair = std::pair<SbBlockAggExpr, boost::optional<SbSlot>>;
+using SbBlockAggExprVector = std::vector<SbBlockAggExprPair>;
+
+struct SbHashAggCompiledAccumulator {
+    SbExpr init;
+    SbExpr agg;
+    SbExpr merge;
+};
+
+template <class Implementation>
+struct SbHashAggSinglePurposeScalarAccumulator {
+    SbExpr transform;
+};
+
+/**
+ * An object that can be lowered into the execute HashAggAccumulator object used by an SBE
+ * HashAggStage.
+ */
+struct SbHashAggAccumulator {
+    std::string fieldName;
+    boost::optional<SbSlot> outSlot;
+    SbSlot spillSlot;
+    SbExpr resultExpr;
+
+    /**
+     * Each HashAggStage accumulator can compute the accumulated value on the VM (as a compiled
+     * EExpression program) or using one of several fixed-definition accumulators that are natively
+     * implemented.
+     */
+    std::variant<
+        SbHashAggCompiledAccumulator,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::ArithmeticAverageHashAggAccumulatorTerminal>,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::ArithmeticAverageHashAggAccumulatorPartial>>
+        implementation;
+};
+using SbHashAggAccumulatorVector = std::vector<SbHashAggAccumulator>;
 
 struct SbWindow {
     SbSlotVector windowExprSlots;

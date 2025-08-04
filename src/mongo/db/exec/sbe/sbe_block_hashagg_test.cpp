@@ -220,7 +220,7 @@ public:
 
             auto accumulatorBitset = generateSlotId();
 
-            AggExprTupleVector aggs;
+            BlockAggExprTupleVector aggs;
 
             size_t scanSlotIdx = keySize + 1;
             for (const auto& [blockAcc, rowAcc, mergeAcc] : accNames) {
@@ -246,7 +246,7 @@ public:
 
                 aggs.emplace_back(
                     outputSlot,
-                    AggExprTuple{nullptr, std::move(blockAccFunc), std::move(rowAccFunc)});
+                    BlockAggExprTuple{nullptr, std::move(blockAccFunc), std::move(rowAccFunc)});
 
                 outputSlots.push_back(outputSlot);
 

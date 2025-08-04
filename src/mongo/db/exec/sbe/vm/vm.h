@@ -366,6 +366,24 @@ public:
     class TopBottomArgsFromStack;
     class TopBottomArgsFromBlocks;
 
+    static void aggDoubleDoubleSumImpl(value::Array* accumulator,
+                                       value::TypeTags rhsTag,
+                                       value::Value rhsValue);
+    static FastTuple<bool, value::TypeTags, value::Value> aggDoubleDoubleSumFinalizeImpl(
+        value::Array* accmulator);
+    static void aggMergeDoubleDoubleSumsImpl(value::Array* accumulator,
+                                             value::TypeTags rhsTag,
+                                             value::Value rhsValue);
+    static FastTuple<bool, value::TypeTags, value::Value>
+    builtinConvertSimpleSumToDoubleDoubleSumImpl(value::TypeTags simpleSumTag,
+                                                 value::Value simpleSumVal);
+    static FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoublePartialSumFinalizeImpl(
+        value::TypeTags fieldTag, value::Value fieldValue);
+    static FastTuple<bool, value::TypeTags, value::Value> genericDiv(value::TypeTags lhsTag,
+                                                                     value::Value lhsValue,
+                                                                     value::TypeTags rhsTag,
+                                                                     value::Value rhsValue);
+
     ByteCode() {
         _argStack = static_cast<uint8_t*>(::operator new(sizeOfElement * 4));
         _argStackEnd = _argStack + sizeOfElement * 4;
@@ -420,10 +438,6 @@ private:
     void runTagCheck(const uint8_t*& pcPointer, T&& predicate);
     void runTagCheck(const uint8_t*& pcPointer, value::TypeTags tagRhs);
 
-    FastTuple<bool, value::TypeTags, value::Value> genericDiv(value::TypeTags lhsTag,
-                                                              value::Value lhsValue,
-                                                              value::TypeTags rhsTag,
-                                                              value::Value rhsValue);
     FastTuple<bool, value::TypeTags, value::Value> genericIDiv(value::TypeTags lhsTag,
                                                                value::Value lhsValue,
                                                                value::TypeTags rhsTag,
@@ -510,15 +524,6 @@ private:
 
     FastTuple<bool, value::TypeTags, value::Value> aggCount(value::TypeTags accTag,
                                                             value::Value accValue);
-
-    void aggDoubleDoubleSumImpl(value::Array* accumulator,
-                                value::TypeTags rhsTag,
-                                value::Value rhsValue);
-    void aggMergeDoubleDoubleSumsImpl(value::Array* accumulator,
-                                      value::TypeTags rhsTag,
-                                      value::Value rhsValue);
-    FastTuple<bool, value::TypeTags, value::Value> aggDoubleDoubleSumFinalizeImpl(
-        value::Array* accmulator);
 
     // This is an implementation of the following algorithm:
     // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm

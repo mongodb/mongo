@@ -94,7 +94,7 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
                                      value::SlotVector blockDataInSlotIds,
                                      value::SlotVector accumulatorDataSlotIds,
                                      value::SlotId accumulatorBitsetSlotId,
-                                     AggExprTupleVector aggs,
+                                     BlockAggExprTupleVector aggs,
                                      bool allowDiskUse,
                                      SlotExprPairVector mergingExprs,
                                      PlanYieldPolicy* yieldPolicy,
@@ -132,14 +132,15 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
     _tokenInfos.reserve(_groupSlots.size());
 
     if (_allowDiskUse) {
-        tassert(8780601,
-                "Disk use enabled for HashAggStage but incorrect number of merging expresssions",
-                _aggs.size() == _mergingExprs.size());
+        tassert(
+            8780601,
+            "Disk use enabled for BlockHashAggStage but incorrect number of merging expressions",
+            _aggs.size() == _mergingExprs.size());
     }
 }
 
 std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
-    AggExprTupleVector blockRowAggs;
+    BlockAggExprTupleVector blockRowAggs;
     for (const auto& [slot, aggTuple] : _aggs) {
         std::unique_ptr<sbe::EExpression> init;
         std::unique_ptr<sbe::EExpression> blockAgg;
@@ -152,7 +153,8 @@ std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
             blockAgg = aggTuple.blockAgg->clone();
         }
 
-        auto clonedAggTuple = AggExprTuple{std::move(init), std::move(blockAgg), std::move(agg)};
+        auto clonedAggTuple =
+            BlockAggExprTuple{std::move(init), std::move(blockAgg), std::move(agg)};
 
         blockRowAggs.emplace_back(slot, std::move(clonedAggTuple));
     }

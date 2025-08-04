@@ -46,6 +46,19 @@
 namespace mongo {
 namespace sbe {
 
+/**
+ * The hash table '_ht' contains a map from $group keys to the current accumulator states for
+ * all accumulators of that $group stage. The first MaterializedRow in SpilledRow and TableType
+ * contains a key and the second contains the state values.
+ */
+using TableType = stdx::unordered_map<value::MaterializedRow,
+                                      value::MaterializedRow,
+                                      value::MaterializedRowHasher,
+                                      value::MaterializedRowEq>;
+
+using HashKeyAccessor = value::MaterializedRowKeyAccessor<TableType::iterator>;
+using HashAggAccessor = value::MaterializedRowValueAccessor<TableType::iterator>;
+
 template <class Derived>
 class HashAggBaseStage : public PlanStage {
 protected:
@@ -65,19 +78,7 @@ protected:
         return;
     }
 
-    /**
-     * The hash table '_ht' contains a map from $group keys to the current accumulator states for
-     * all accumulators of that $group stage. The first MaterializedRow in SpilledRow and TableType
-     * contains a key and the second contains the state values.
-     */
     using SpilledRow = std::pair<value::MaterializedRow, value::MaterializedRow>;
-    using TableType = stdx::unordered_map<value::MaterializedRow,
-                                          value::MaterializedRow,
-                                          value::MaterializedRowHasher,
-                                          value::MaterializedRowEq>;
-
-    using HashKeyAccessor = value::MaterializedRowKeyAccessor<TableType::iterator>;
-    using HashAggAccessor = value::MaterializedRowValueAccessor<TableType::iterator>;
 
     /**
      * We check amount of used memory every T processed incoming records, where T is calculated

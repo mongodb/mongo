@@ -45,7 +45,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSumF
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePartialSumFinalize(
     ArityType arity) {
     auto [_, fieldTag, fieldValue] = getFromStack(0);
+    return builtinDoubleDoublePartialSumFinalizeImpl(fieldTag, fieldValue);
+}
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(
+    value::TypeTags fieldTag, value::Value fieldValue) {
     // For {$sum: 1}, we use aggSum instruction. In this case, the result type is guaranteed to be
     // either 'NumberInt32', 'NumberInt64', or 'NumberDouble'. We should transform the scalar result
     // into an array which is the over-the-wire data format from a shard to a merging side.

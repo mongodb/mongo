@@ -451,7 +451,7 @@ void ByteCode::aggDoubleDoubleSumImpl(value::Array* accumulator,
 
         setDecimalTotal(nonDecimalTotalTag, nonDecimalTotal, decimalTotal, accumulator);
     }
-}  // aggDoubleDoubleSumImpl
+}  // ByteCode::aggDoubleDoubleSumImpl
 
 void ByteCode::aggMergeDoubleDoubleSumsImpl(value::Array* accumulator,
                                             value::TypeTags rhsTag,
@@ -459,7 +459,7 @@ void ByteCode::aggMergeDoubleDoubleSumsImpl(value::Array* accumulator,
     auto [accumWidestType, _1] = accumulator->getAt(AggSumValueElems::kNonDecimalTotalTag);
 
     tassert(7039532, "value must be of type 'Array'", rhsTag == value::TypeTags::Array);
-    auto nextDoubleDoubleArr = value::getArrayView(rhsValue);
+    value::Array* nextDoubleDoubleArr = value::getArrayView(rhsValue);
 
     tassert(7039533,
             "array does not have enough elements",

@@ -62,7 +62,7 @@ public:
                       value::SlotVector blockDataInSlotIds,
                       value::SlotVector accumulatorDataSlotIds,
                       value::SlotId accumulatorBitsetSlotId,
-                      AggExprTupleVector aggs,
+                      BlockAggExprTupleVector aggs,
                       bool allowDiskUse,
                       SlotExprPairVector mergingExprs,
                       PlanYieldPolicy* yieldPolicy,
@@ -224,7 +224,7 @@ private:
      * input the block accumulator reads from, and is also the output that the row accumulator
      * writes to.
      */
-    AggExprTupleVector _aggs;
+    BlockAggExprTupleVector _aggs;
 
     SlotExprPairVector _mergingExprs;
 

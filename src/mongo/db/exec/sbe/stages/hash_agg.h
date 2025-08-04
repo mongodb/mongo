@@ -32,6 +32,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/stages/hashagg_base.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -56,6 +57,7 @@
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -109,12 +111,11 @@ class HashAggStage final : public HashAggBaseStage<HashAggStage> {
 public:
     HashAggStage(std::unique_ptr<PlanStage> input,
                  value::SlotVector gbs,
-                 AggExprVector aggs,
+                 std::vector<std::unique_ptr<HashAggAccumulator>> accumulatorList,
                  value::SlotVector seekKeysSlots,
                  bool optimizedClose,
                  boost::optional<value::SlotId> collatorSlot,
                  bool allowDiskUse,
-                 SlotExprPairVector mergingExprs,
                  PlanYieldPolicy* yieldPolicy,
                  PlanNodeId planNodeId,
                  bool participateInTrialRunTracking = true,
@@ -135,7 +136,12 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    // Set the in memory data iterator to the next record that should be returned.
+    // After all inputs are processed (which happens in 'open()'), this method iterates over the
+    // resulting aggregated groups in memory. Each call updates the '_htIt' iterator, which has the
+    // effect of redirecting the '_outRecordStoreKeyAccessors' and '_outRecordStoreAggAccessors' to
+    // reference the aggregated from their entry in the '_ht' hash table.
+    //
+    // Does not read any data that was spilled to disk.
     void setIteratorToNextRecord() {
         if (_htIt == _ht->end()) {
             // First invocation of getNext() after open().
@@ -184,20 +190,21 @@ private:
     PlanState getNextSpilled();
 
     const value::SlotVector _gbs;
-    const AggExprVector _aggs;
+
+    /**
+     * Each entry of this list has an "out slot," which binds the accumulator state during
+     * accumulation and the accumulated result after finalization; a "spill slot," which binds the
+     * recovered state of a spilled accumulator when merging partial aggregates from disk; and an
+     * executable implementation of the accumulator's initialize, accumulate, merge, and finalize
+     * steps.
+     */
+    std::vector<std::unique_ptr<HashAggAccumulator>> _accumulatorList;
+
     const boost::optional<value::SlotId> _collatorSlot;
     const value::SlotVector _seekKeysSlots;
     // When this operator does not expect to be reopened (almost always) then it can close the child
     // early.
     const bool _optimizedClose{true};
-
-    // Expressions used to merge partial aggregates that have been spilled to disk and their
-    // corresponding input slots. For example, imagine that this list contains a pair (s12,
-    // sum(s12)). This means that the partial aggregate values will be read into slot s12 after
-    // being recovered from the spill table and can be merged using the 'sum()' agg function.
-    //
-    // When disk use is allowed, this vector must have the same length as '_aggs'.
-    const SlotExprPairVector _mergingExprs;
 
     value::SlotAccessorMap _outAccessors;
 
@@ -208,18 +215,31 @@ private:
     // This buffer stores values for '_outKeyRowRecordStore'; values in the '_outKeyRowRecordStore'
     // can be pointers that point to data in this buffer.
     BufBuilder _outKeyRowRSBuffer;
-    // Accessors for the key slots provided as output by this stage. The keys can either come from
-    // the hash table or recovered from a temporary record store. We use a 'SwitchAccessor' to
-    // switch between these two cases.
+
+    // Each accessor in '_outHashKeyAccessors' references one of the keys for a hash agg result
+    // produced by a 'getNext()' call and is bound by this stage to the corresponding slot in the
+    // '_gbs' array. These accessors are "switch" accessors that reference different sources
+    // depending on whether results were spilled to disk.
+    //
+    // If no spilling was necessary, the '_outKeyAccessors' are switched to
+    // '_outRecordStoreKeyAccesors' that in turn reference the keys from the current entry in the
+    // '_ht' hash table accroding to the '_htIt' iterator.
+    //
+    // If results were spilled to disk, the '_outKeyAccessors' are switched to
+    // '_outRecordStoreKeyAccessors' that hold the result of recovering partial aggregates from disk
+    // and merging them.
     std::vector<std::unique_ptr<HashKeyAccessor>> _outHashKeyAccessors;
     // Row of key values to output used when recovering spilled data from the record store.
     value::MaterializedRow _outKeyRowRecordStore{0};
     std::vector<std::unique_ptr<value::MaterializedSingleRowAccessor>> _outRecordStoreKeyAccessors;
     std::vector<std::unique_ptr<value::SwitchAccessor>> _outKeyAccessors;
 
-    // Accessors for the accumulator states. These can either come from the values in the hash table
-    // '_ht' or can be computed after merging partial aggregates spilled to a record store. We use a
-    // 'SwitchAccessor' to switch between these two cases.
+
+    // Each accessor in 'outHashAggAccessors' references one of the accumulated values for a hash
+    // agg result produced by a 'getNext()' call and is bound by this stage to the "out stage" from
+    // the corresponding '_accumulatorList' entry. These accessors are "switch" accessors that read
+    // either '_ht' table entries or merged-from-disk results using the same mechanism as the above
+    // '_outHashKeyAccessors' list.
     std::vector<std::unique_ptr<HashAggAccessor>> _outHashAggAccessors;
     // Row of agg values to output used when recovering spilled data from the record store.
     value::MaterializedRow _outAggRowRecordStore{0};
@@ -228,15 +248,6 @@ private:
 
     std::vector<value::SlotAccessor*> _seekKeysAccessors;
     value::MaterializedRow _seekKeys;
-
-    // Vector of VM programs for the accumulators. The first code fragment is the accumulator
-    // initializer and may be nullptr. The second code fragment accumulates incoming rows into the
-    // "value" (accumulator state) row of '_ht' for the current $group key.
-    std::vector<std::pair<std::unique_ptr<vm::CodeFragment>, std::unique_ptr<vm::CodeFragment>>>
-        _aggCodes;
-    // Bytecode for the merging expressions, executed if partial aggregates are spilled to a record
-    // store and need to be subsequently combined.
-    std::vector<std::unique_ptr<vm::CodeFragment>> _mergingExprCodes;
 
     // Function object which can be used to check whether two materialized rows of key values are
     // equal. This comparison is collation-aware if the query has a non-simple collation.

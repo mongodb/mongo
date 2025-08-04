@@ -242,16 +242,19 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
-            makeAggExprVector(countsSlot,
-                              nullptr,
-                              makeFunction("sum",
-                                           makeE<EConstant>(value::TypeTags::NumberInt64,
-                                                            value::bitcastFrom<int64_t>(1)))),
+            makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
+                countsSlot,
+                generateSlotId(),
+                makeFunction(
+                    "sum",
+                    makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1))),
+                makeFunction("fail",
+                             makeInt32Constant(ErrorCodes::NotImplemented),
+                             makeStringConstant("Unexpected merge with allowDiskUse=false")))),
             makeSV(), /* Seek slot */
             true,
             boost::none,
             false /* allowDiskUse */,
-            makeSlotExprPairVec(), /* mergingExprs */
             nullptr /* yieldPolicy */,
             kEmptyPlanNodeId);
 

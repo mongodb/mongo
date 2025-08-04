@@ -521,29 +521,29 @@ public:
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeHashAgg(
         const VariableTypes& varTypes,
         SbStage stage,
-        const SbSlotVector& groupBySlots,
-        SbAggExprVector sbAggExprs,
-        boost::optional<sbe::value::SlotId> collatorSlot,
-        SbExprSlotVector mergingExprs);
+        const SbSlotVector& gbs,
+        const SbHashAggAccumulatorVector& accumulatorList,
+        boost::optional<sbe::value::SlotId> collatorSlot);
 
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeBlockHashAgg(
         const VariableTypes& varTypes,
         SbStage stage,
         const SbSlotVector& groupBySlots,
-        SbAggExprVector sbAggExprs,
+        SbBlockAggExprVector sbBlockAggExprs,
         SbSlot selectivityBitmapSlot,
         const SbSlotVector& blockAccArgSbSlots,
         SbSlot bitmapInternalSlot,
         const SbSlotVector& accumulatorDataSbSlots,
         SbExprSlotVector mergingExprs);
 
-    std::tuple<SbStage, SbSlotVector> makeAggProject(SbStage stage, SbAggExprVector sbAggExprs) {
-        return makeAggProject(VariableTypes{}, std::move(stage), std::move(sbAggExprs));
+    std::tuple<SbStage, SbSlotVector> makeAggProject(SbStage stage,
+                                                     SbBlockAggExprVector sbBlockAggExprs) {
+        return makeAggProject(VariableTypes{}, std::move(stage), std::move(sbBlockAggExprs));
     }
 
     std::tuple<SbStage, SbSlotVector> makeAggProject(const VariableTypes& varTypes,
                                                      SbStage stage,
-                                                     SbAggExprVector sbAggExprs);
+                                                     SbBlockAggExprVector sbBlockAggExprs);
 
     SbStage makeWindow(SbStage stage,
                        const SbSlotVector& currSlots,
@@ -642,7 +642,7 @@ public:
                                               SbSlot localKeySlot,
                                               SbSlot foreignKeySlot,
                                               SbSlot foreignRecordSlot,
-                                              SbAggExpr sbAggExpr,
+                                              SbBlockAggExpr sbBlockAggExpr,
                                               boost::optional<SbSlot> optOutputSlot,
                                               boost::optional<sbe::value::SlotId> collatorSlot) {
         return makeHashLookup(VariableTypes{},
@@ -651,7 +651,7 @@ public:
                               localKeySlot,
                               foreignKeySlot,
                               foreignRecordSlot,
-                              std::move(sbAggExpr),
+                              std::move(sbBlockAggExpr),
                               optOutputSlot,
                               collatorSlot);
     }
@@ -662,7 +662,7 @@ public:
                                               SbSlot localKeySlot,
                                               SbSlot foreignKeySlot,
                                               SbSlot foreignRecordSlot,
-                                              SbAggExpr sbAggExpr,
+                                              SbBlockAggExpr sbBlockAggExpr,
                                               boost::optional<SbSlot> optOutputSlot,
                                               boost::optional<sbe::value::SlotId> collatorSlot);
 
