@@ -533,7 +533,7 @@ pre-image is from), their `'ts'` (the timestamp associated with the pre-images o
 then by their `'applyOpsIndex'` (the index into the applyOps oplog entry which generated the
 pre-image, 0 if the pre-image isn't from an applyOps oplog entry).
 
-There is a set of CollectionTruncateMarkers for each 'nsUUD' within a tenant's pre-images
+There is a set of CollectionTruncateMarkers for each 'nsUUID' within a tenant's pre-images
 collection, `PreImagesTruncateMarkersPerNsUUID`.
 
 In a serverless environment, each tenant has a set 'expireAfterSeconds' parameter. An entry is
@@ -541,7 +541,7 @@ expired if the 'wall time' associated with the pre-image is more than 'expireAft
 than the node's current wall time.
 
 In a dedicated environment, a pre-image is expired if either (1) 'expireAfterSeconds' is set and the
-pre-image is expired by it or (2) it's 'ts' is less than or equal to the oldest oplog entry
+pre-image is expired by it or (2) its 'ts' is less than or equal to the oldest oplog entry
 timestamp.
 
 For each tenant, `ChangeStreamExpiredPreImagesRemover` iterates over each set of

@@ -535,7 +535,7 @@ PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(Operatio
     // modifications after a WriteConflictException.
     //
     // There are 2 assumptions which make it safe to hold locks in the current scope.
-    //      (1) Since ticket acquisiton is bypassed, we don't contribute to ticket exhaustion by
+    //      (1) Since ticket acquisition is bypassed, we don't contribute to ticket exhaustion by
     //      wrapping each truncate in it's own 'writeConflictRetry()' (see SERVER-65418 for more
     //      details).
     //      (2) The locks will never be yielded by a query, thus there can't be any concurrent DDL

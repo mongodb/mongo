@@ -132,11 +132,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getDeleteExpiredPreImagesEx
         filterPtr,
         filterPtr != nullptr);
 }
-
-bool useUnreplicatedTruncates() {
-    bool res = feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions.isEnabled();
-    return res;
-}
 }  // namespace
 
 BSONObj ChangeStreamPreImagesCollectionManager::PurgingJobStats::toBSON() const {
@@ -202,9 +197,7 @@ void ChangeStreamPreImagesCollectionManager::dropPreImagesCollection(
                           << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceNotFound);
 
-    if (useUnreplicatedTruncates()) {
-        _truncateManager.dropAllMarkersForTenant(tenantId);
-    }
+    _truncateManager.dropAllMarkersForTenant(tenantId);
 }
 
 void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* opCtx,
@@ -262,12 +255,10 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
             _docsInserted.fetchAndAddRelaxed(1);
         });
 
-    if (useUnreplicatedTruncates()) {
-        // This is a no-op until the 'tenantId' is registered with the 'truncateManager' in the
-        // expired pre-image removal path.
-        auto bytesInserted = insertStatement.doc.objsize();
-        _truncateManager.updateMarkersOnInsert(opCtx, tenantId, preImage, bytesInserted);
-    }
+    // This is a no-op until the 'tenantId' is registered with the 'truncateManager' in the
+    // expired pre-image removal path.
+    auto bytesInserted = insertStatement.doc.objsize();
+    _truncateManager.updateMarkersOnInsert(opCtx, tenantId, preImage, bytesInserted);
 }
 
 void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImagesRemovalPass(
@@ -278,38 +269,18 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
     ServiceContext::UniqueOperationContext opCtx;
     try {
         opCtx = client->makeOperationContext();
-
-        Date_t currentTimeForTimeBasedExpiration =
-            change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx.get());
         size_t numberOfRemovals = 0;
 
-        if (useUnreplicatedTruncates()) {
-            if (change_stream_serverless_helpers::isChangeCollectionsModeActive(
-                    VersionContext::getDecoration(opCtx.get()))) {
-                const auto tenantIds =
-                    change_stream_serverless_helpers::getConfigDbTenants(opCtx.get());
-                for (const auto& tenantId : tenantIds) {
-                    numberOfRemovals += _deleteExpiredPreImagesWithTruncate(opCtx.get(), tenantId);
-                }
-            } else {
-                numberOfRemovals =
-                    _deleteExpiredPreImagesWithTruncate(opCtx.get(), boost::none /** tenantId **/);
+        if (change_stream_serverless_helpers::isChangeCollectionsModeActive(
+                VersionContext::getDecoration(opCtx.get()))) {
+            const auto tenantIds =
+                change_stream_serverless_helpers::getConfigDbTenants(opCtx.get());
+            for (const auto& tenantId : tenantIds) {
+                numberOfRemovals += _deleteExpiredPreImagesWithTruncate(opCtx.get(), tenantId);
             }
         } else {
-            if (change_stream_serverless_helpers::isChangeCollectionsModeActive(
-                    VersionContext::getDecoration(opCtx.get()))) {
-                // A serverless environment is enabled and removal logic must take the tenantId into
-                // account.
-                const auto tenantIds =
-                    change_stream_serverless_helpers::getConfigDbTenants(opCtx.get());
-                for (const auto& tenantId : tenantIds) {
-                    numberOfRemovals += _deleteExpiredPreImagesWithCollScanForTenants(
-                        opCtx.get(), tenantId, currentTimeForTimeBasedExpiration);
-                }
-            } else {
-                numberOfRemovals = _deleteExpiredPreImagesWithCollScan(
-                    opCtx.get(), currentTimeForTimeBasedExpiration);
-            }
+            numberOfRemovals =
+                _deleteExpiredPreImagesWithTruncate(opCtx.get(), boost::none /** tenantId **/);
         }
 
         if (numberOfRemovals > 0) {
@@ -335,135 +306,6 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
 
     _purgingJobStats.timeElapsedMillis.fetchAndAddRelaxed(timer.millis());
     _purgingJobStats.totalPass.fetchAndAddRelaxed(1);
-}
-
-size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollScanCommon(
-    OperationContext* opCtx,
-    const CollectionAcquisition& preImageColl,
-    const MatchExpression* filterPtr,
-    Timestamp maxRecordIdTimestamp) {
-    size_t numberOfRemovals = 0;
-    boost::optional<UUID> currentCollectionUUID = boost::none;
-
-    // Placeholder for the wall time of the first document of the current pre-images internal
-    // collection being examined.
-    Date_t firstDocWallTime{};
-
-    while (
-        (currentCollectionUUID = change_stream_pre_image_util::findNextCollectionUUID(
-             opCtx, &preImageColl.getCollectionPtr(), currentCollectionUUID, firstDocWallTime))) {
-        writeConflictRetry(
-            opCtx,
-            "ChangeStreamExpiredPreImagesRemover",
-            NamespaceString::makePreImageCollectionNSS(boost::none),
-            [&] {
-                auto exec = getDeleteExpiredPreImagesExecutor(
-                    opCtx, preImageColl, filterPtr, maxRecordIdTimestamp, *currentCollectionUUID);
-                numberOfRemovals += exec->executeDelete();
-                auto batchedDeleteStats = exec->getBatchedDeleteStats();
-
-                _purgingJobStats.docsDeleted.fetchAndAddRelaxed(batchedDeleteStats.docsDeleted);
-                _purgingJobStats.bytesDeleted.fetchAndAddRelaxed(batchedDeleteStats.bytesDeleted);
-                _purgingJobStats.scannedInternalCollections.fetchAndAddRelaxed(1);
-            });
-        if (firstDocWallTime > _purgingJobStats.maxStartWallTime.load()) {
-            _purgingJobStats.maxStartWallTime.store(firstDocWallTime);
-        }
-    }
-    _purgingJobStats.scannedCollections.fetchAndAddRelaxed(1);
-    return numberOfRemovals;
-}
-
-size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollScan(
-    OperationContext* opCtx, Date_t currentTimeForTimeBasedExpiration) {
-    // Change stream collections can multiply the amount of user data inserted and deleted on each
-    // node. It is imperative that removal is prioritized so it can keep up with inserts and prevent
-    // users from running out of disk space.
-    ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
-        opCtx, AdmissionContext::Priority::kExempt);
-
-    // Acquire intent-exclusive lock on the change collection.
-    const auto preImageColl = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(boost::none),
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-
-    // Early exit if the collection doesn't exist or running on a secondary.
-    if (!preImageColl.exists() ||
-        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-            opCtx, DatabaseName::kConfig)) {
-        return 0;
-    }
-
-    // Get the timestamp of the earliest oplog entry.
-    const auto currentEarliestOplogEntryTs =
-        repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
-
-    const auto preImageExpirationTime =
-        change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
-            opCtx, boost::none /** tenantId **/, currentTimeForTimeBasedExpiration);
-
-    // Configure the filter for the case when expiration parameter is set.
-    if (preImageExpirationTime) {
-        OrMatchExpression filter;
-        filter.add(
-            std::make_unique<LTMatchExpression>("_id.ts"_sd, Value(currentEarliestOplogEntryTs)));
-        filter.add(std::make_unique<LTEMatchExpression>("operationTime"_sd,
-                                                        Value(*preImageExpirationTime)));
-        // If 'preImageExpirationTime' is set, set 'maxRecordIdTimestamp' is set to the maximum
-        // RecordId for this collection. Whether the pre-image has to be deleted will be determined
-        // by the 'filter' parameter.
-        return _deleteExpiredPreImagesWithCollScanCommon(
-            opCtx, preImageColl, &filter, Timestamp::max() /* maxRecordIdTimestamp */);
-    }
-
-    // 'preImageExpirationTime' is not set, so the last expired pre-image timestamp is less than
-    // 'currentEarliestOplogEntryTs'.
-    return _deleteExpiredPreImagesWithCollScanCommon(
-        opCtx,
-        preImageColl,
-        nullptr /* filterPtr */,
-        Timestamp(currentEarliestOplogEntryTs.asULL() - 1) /* maxRecordIdTimestamp */);
-}
-
-size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollScanForTenants(
-    OperationContext* opCtx, const TenantId& tenantId, Date_t currentTimeForTimeBasedExpiration) {
-    // Change stream collections can multiply the amount of user data inserted and deleted on each
-    // node. It is imperative that removal is prioritized so it can keep up with inserts and prevent
-    // users from running out of disk space.
-    ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
-        opCtx, AdmissionContext::Priority::kExempt);
-
-    // Acquire intent-exclusive lock on the change collection.
-    const auto preImageColl = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(
-                                         change_stream_serverless_helpers::resolveTenantId(
-                                             VersionContext::getDecoration(opCtx), tenantId)),
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-
-    // Early exit if the collection doesn't exist or running on a secondary.
-    if (!preImageColl.exists() ||
-        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-            opCtx, DatabaseName::kConfig)) {
-        return 0;
-    }
-
-    auto expiredAfterSeconds = change_stream_serverless_helpers::getExpireAfterSeconds(tenantId);
-    LTEMatchExpression filter{
-        "operationTime"_sd,
-        Value(currentTimeForTimeBasedExpiration - Seconds(expiredAfterSeconds))};
-
-    // Set the 'maxRecordIdTimestamp' parameter (upper scan boundary) to maximum possible. Whether
-    // the pre-image has to be deleted will be determined by the 'filter' parameter.
-    return _deleteExpiredPreImagesWithCollScanCommon(
-        opCtx, preImageColl, &filter, Timestamp::max() /* maxRecordIdTimestamp */);
 }
 
 size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTruncate(

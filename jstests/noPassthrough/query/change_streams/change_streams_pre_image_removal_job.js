@@ -142,44 +142,6 @@ function retryOnCappedPositionLostError(func, message) {
         () => "Existing pre-images: " + tojson(getPreImages(primaryNode)) +
             ", first oplog entry: " +
             tojson(getFirstOplogEntry(primaryNode, {readConcern: "majority"})));
-
-    // If the feature flag is on, then batched deletes will not be used for deletion. Additionally,
-    // since truncates are not replicated, the number of pre-images on the primary may differ from
-    // that of the secondary.
-    if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "UseUnreplicatedTruncatesForDeletions")) {
-        // Because the pre-images collection is implicitly replicated, validate that writes do not
-        // generate oplog entries, with the exception of deletions.
-        const preimagesNs = 'config.system.preimages';
-        // Multi-deletes are batched base on time before performing the deletion, therefore the
-        // deleted pre-images can span through multiple applyOps oplog entries.
-        //
-        // As pre-images span two collections, the minimum number of batches is 2, as we perform
-        // the range-deletion per collection. The maximum number of batches is 4 (one per single
-        // pre-image removed).
-        const expectedNumberOfBatchesRange = [2, 3, 4];
-        const serverStatusBatches = testDB.serverStatus()['batchedDeletes']['batches'];
-        const serverStatusDocs = testDB.serverStatus()['batchedDeletes']['docs'];
-        assert.contains(serverStatusBatches, expectedNumberOfBatchesRange);
-        assert.eq(serverStatusDocs, preImagesToExpire);
-        assert.contains(
-            retryOnCappedPositionLostError(
-                () =>
-                    localDB.oplog.rs
-                        .find(
-                            {ns: 'admin.$cmd', 'o.applyOps.op': 'd', 'o.applyOps.ns': preimagesNs})
-                        .itcount(),
-                "Failed to fetch oplog entries for pre-image deletes"),
-            expectedNumberOfBatchesRange);
-        assert.eq(0,
-                  retryOnCappedPositionLostError(
-                      () => localDB.oplog.rs.find({op: {'$ne': 'd'}, ns: preimagesNs}).itcount(),
-                      "Failed to fetch all oplog entries except pre-image deletes"));
-
-        // Verify that pre-images collection content on the primary node is the same as on the
-        // secondary.
-        rst.awaitReplication();
-        assert(bsonWoCompare(getPreImages(primaryNode), getPreImages(rst.getSecondary())) === 0);
-    }
 }
 
 // Increase oplog size on each node to prevent oplog entries from being deleted which removes a

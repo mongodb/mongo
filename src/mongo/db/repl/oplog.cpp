@@ -2003,10 +2003,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 // It is legal for a delete operation on the pre-images collection to delete
                 // zero documents - pre-image collections are not guaranteed to contain the same
                 // set of documents at all times. The same holds for change-collections as they
-                // both rely on unreplicated deletes when
-                // "featureFlagUseUnreplicatedTruncatesForDeletions" is enabled.
-                //
-                // TODO SERVER-70591: Remove feature flag requirement in comment above.
+                // both rely on unreplicated deletes.
                 //
                 // It is also legal for a delete operation on the config.image_collection (used
                 // for find-and-modify retries) to delete zero documents.  Since we do not write

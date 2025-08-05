@@ -414,11 +414,6 @@ void clearTempFilesExceptForResumableBuilds(const std::vector<ResumeIndexInfo>& 
     }
 }
 
-bool useUnreplicatedTruncatesForChangeStreamCollections() {
-    bool res = mongo::feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions.isEnabled();
-    return res;
-}
-
 void cleanupChangeCollectionAfterUncleanShutdown(OperationContext* opCtx,
                                                  const TenantId& tenantId) {
     auto currentTime =
@@ -997,12 +992,6 @@ void recoverChangeStreamCollections(OperationContext* opCtx,
     if (lastShutdownState != StorageEngine::LastShutdownState::kUnclean) {
         // The storage engine guarantees consistent data ranges after truncate on clean
         // shutdown.
-        return;
-    }
-
-    if (!useUnreplicatedTruncatesForChangeStreamCollections()) {
-        // This recovery procedure only applies to non-logged collections using untimestamped
-        // truncates.
         return;
     }
 

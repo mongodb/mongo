@@ -58,14 +58,13 @@ feature_flags:
         cpp_varname: gFeatureFlagStreams
         default: false
         fcv_gated: true
-    featureFlagUseUnreplicatedTruncatesForDeletions:
+    featureFlagUseReplicatedTruncatesForDeletions:
         description: >-
             Feature flag to enable pre-image collection and change collection maintenance
-            using unreplicated truncates instead of normal document deletions replicated from the
-            primary.
-        cpp_varname: feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
-        default: true
-        fcv_gated: false
+            using replicated truncates instead of unreplicated truncates.
+        cpp_varname: feature_flags::gFeatureFlagUseReplicatedTruncatesForDeletions
+        default: false
+        fcv_gated: true
     featureFlagEndOfTransactionChangeEvent:
         description: "Feature flag to enable endOfTransaction oplog entry and change stream event"
         cpp_varname: feature_flags::gFeatureFlagEndOfTransactionChangeEvent

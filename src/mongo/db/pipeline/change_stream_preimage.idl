@@ -58,8 +58,7 @@ server_parameters:
     preImagesCollectionTruncateMarkersMinBytes:
         description: >-
             Server parameter that specifies the minimum number of bytes contained in each
-            truncate marker. This is only of use if featureFlagUseUnreplicatedTruncatesForDeletions is
-            enabled
+            truncate marker.
         set_at: startup
         cpp_varname: gPreImagesCollectionTruncateMarkersMinBytes
         cpp_vartype: int32_t

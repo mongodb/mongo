@@ -371,35 +371,9 @@ TEST_F(PreImagesRemoverTest, RecordIdToPreImageTimstampRetrieval) {
     }
 }
 
-// TODO SERVER-70591: Remove this test as the feature flag will be removed.
-TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithCollectionScans) {
-    RAIIServerParameterControllerForTest truncateFeatureFlag{
-        "featureFlagUseUnreplicatedTruncatesForDeletions", false};
-
-    auto clock = clockSource();
-    insertPreImage(kPreImageEnabledCollection, Timestamp{clock->now()});
-    clock->advance(Milliseconds{1});
-    insertPreImage(kPreImageEnabledCollection, Timestamp{clock->now()});
-
-    setExpirationTime(Seconds{1});
-    // Verify that expiration works as expected.
-    auto passStats = performPass(Milliseconds{2000});
-    ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
-    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
-    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
-
-    // Assert that internal scans do not occur in the old collection scan approach.
-    passStats = performPass(Milliseconds{2000});
-    ASSERT_EQ(passStats["totalPass"].numberLong(), 2);
-    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
-    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
-}
-
 TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithTruncates) {
     RAIIServerParameterControllerForTest minBytesPerMarker{
         "preImagesCollectionTruncateMarkersMinBytes", 1};
-    RAIIServerParameterControllerForTest truncateFeatureFlag{
-        "featureFlagUseUnreplicatedTruncatesForDeletions", true};
 
     auto clock = clockSource();
     insertPreImage(kPreImageEnabledCollection, Timestamp{clock->now()});
@@ -437,9 +411,6 @@ TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithTruncates) {
 }
 
 TEST_F(PreImagesRemoverTest, EnsureAllDocsEventualyTruncatedFromPrePopulatedCollection) {
-    RAIIServerParameterControllerForTest truncateFeatureFlag{
-        "featureFlagUseUnreplicatedTruncatesForDeletions", true};
-
     auto clock = clockSource();
     auto startOperationTime = clock->now();
     auto numRecords = 1000;
@@ -461,9 +432,6 @@ TEST_F(PreImagesRemoverTest, EnsureAllDocsEventualyTruncatedFromPrePopulatedColl
 }
 
 TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollection) {
-    RAIIServerParameterControllerForTest truncateFeatureFlag{
-        "featureFlagUseUnreplicatedTruncatesForDeletions", true};
-
     setExpirationTime(Seconds{1});
 
     auto passStats = performPass(Milliseconds{0});
@@ -473,8 +441,6 @@ TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollection) {
 }
 
 TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurable) {
-    RAIIServerParameterControllerForTest truncateFeatureFlag{
-        "featureFlagUseUnreplicatedTruncatesForDeletions", true};
     RAIIServerParameterControllerForTest minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", 1};
 

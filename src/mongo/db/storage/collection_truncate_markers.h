@@ -345,7 +345,7 @@ protected:
     }
 
     /**
-     * Returns whether the truncate markers instace has no markers, whether partial or whole. Note
+     * Returns whether the truncate markers instance has no markers, whether partial or whole. Note
      * that this method can provide a stale result unless the caller can guarantee that no more
      * markers will be created.
      */
@@ -386,9 +386,9 @@ public:
      * 'highestRecordId' and 'highestWallTime' are:
      *      . Greater than or equal to the 'lastRecord' and 'wall' of the most recent marker
      *      generated, if any.
-     *      .Initialized provided records have been tracked at any point in time.
+     *      . Initialized provided records have been tracked at any point in time.
      *              * Records are tracked either by full markers, or a non-zero
-     *                'leftoverRecordsCount' or 'leftoveRecordsBytes'.
+     *                'leftoverRecordsCount' or 'leftoverRecordsBytes'.
      *      . Strictly increasing over time.
      *
      * Callers are responsible for ensuring the state requirements are met upon construction.
