@@ -2,7 +2,7 @@
  * Test the $createObjectId expression.
  * @tags: [
  *  featureFlagMqlJsEngineGap,
- *  requires_fcv_82
+ *  requires_fcv_83
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
