@@ -37,6 +37,18 @@
 
 namespace mongo {
 
+template <typename... Args>
+std::string tupleToString(const std::tuple<Args...>& tuple) {
+    std::ostringstream os;
+    std::apply(
+        [&](const auto& first, const auto&... rest) {
+            os << first;
+            ((os << ", " << rest), ...);
+        },
+        tuple);
+    return os.str();
+}
+
 template <class T, class ExactType>
 concept non_void = !std::same_as<T, void> && std::same_as<T, ExactType>;
 
@@ -52,7 +64,11 @@ public:
             }
             if (std::tie(args...) != expected.front()) {
                 throw std::logic_error(
-                    fmt::format("Expected call doesn't match for mock function \"{}\"", name));
+                    fmt::format("Expected call doesn't match for mock function \"{}\". Actual: {}, "
+                                "Expected: {}",
+                                name,
+                                tupleToString(std::tie(args...)),
+                                tupleToString(expected.front())));
             }
             expected.pop_front();
         }

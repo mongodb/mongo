@@ -41,6 +41,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
 #include <chrono>
@@ -50,11 +51,13 @@ namespace mongo {
 class TestSessionSimulator : public SessionSimulator {
 public:
     std::chrono::steady_clock::time_point now() const override {
-        return nowHook();
+        auto handle = nowHook.synchronize();
+        return (*handle)();
     }
 
     void sleepFor(std::chrono::steady_clock::duration duration) const override {
-        sleepHook(duration);
+        auto handle = sleepHook.synchronize();
+        (*handle)(duration);
     }
 
     ~TestSessionSimulator() override {
@@ -62,8 +65,10 @@ public:
         shutdown();
     }
 
-    mutable MiniMockFunction<std::chrono::steady_clock::time_point> nowHook{"now"};
-    mutable MiniMockFunction<void, std::chrono::steady_clock::duration> sleepHook{"sleepFor"};
+    using NowMockFunction = MiniMockFunction<std::chrono::steady_clock::time_point>;
+    using SleepMockFunction = MiniMockFunction<void, std::chrono::steady_clock::duration>;
+    mutable synchronized_value<NowMockFunction> nowHook{NowMockFunction{"now"}};
+    mutable synchronized_value<SleepMockFunction> sleepHook{SleepMockFunction{"sleepFor"}};
 };
 
 // Helper to allow adding mongo::Duration and std::chrono::duration.
@@ -97,7 +102,7 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWait) {
         auto recordingStartTimestamp = Date_t::now();
         auto eventTimestamp = recordingStartTimestamp;
         // For the next call to now(), report the timestamp the replay started at.
-        sessionSimulator.nowHook.ret(begin);
+        sessionSimulator.nowHook->ret(begin);
 
         // Recording and session both start "now".
         sessionSimulator.start(uri, begin, recordingStartTimestamp, eventTimestamp);
@@ -108,7 +113,7 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWait) {
         ReplayCommand command{packet};
         // For the next call to now(), report the replay is 1s in - the same time the find should be
         // issued at.
-        sessionSimulator.nowHook.ret(begin + 1s);
+        sessionSimulator.nowHook->ret(begin + 1s);
         sessionSimulator.run(command, eventTimestamp);
     }
 
@@ -141,9 +146,9 @@ TEST(SessionSimulatorTest, TestSimpleCommandWait) {
         auto eventTimestamp = recordingStartTimestamp + 2s;
 
         // For the first call to now() return the same timepoint the replay started at.
-        sessionSimulator.nowHook.ret(begin);
+        sessionSimulator.nowHook->ret(begin);
         // Expect the simulator to try sleep for 2 seconds.
-        sessionSimulator.sleepHook.expect(2s);
+        sessionSimulator.sleepHook->expect(2s);
 
         sessionSimulator.start(uri, begin, recordingStartTimestamp, eventTimestamp);
 
@@ -154,10 +159,10 @@ TEST(SessionSimulatorTest, TestSimpleCommandWait) {
         ReplayCommand command{packet};
 
         // Report "now" as if time has advanced to when the session started.
-        sessionSimulator.nowHook.ret(begin + 2s);
+        sessionSimulator.nowHook->ret(begin + 2s);
         // Simulator should attempt to sleep the remaining time to when the
         // find request was issued.
-        sessionSimulator.sleepHook.expect(3s);
+        sessionSimulator.sleepHook->expect(3s);
 
         sessionSimulator.run(command, eventTimestamp);
     }
@@ -191,7 +196,7 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWaitTimeInThePast) {
 
         // Pretend the replay is actually *10* seconds into the replay.
         // That means it is now "late" starting this session, so should not sleep.
-        sessionSimulator.nowHook.ret(begin + 10s);
+        sessionSimulator.nowHook->ret(begin + 10s);
 
         sessionSimulator.start(uri, begin, recordingStartTimestamp, eventTimestamp);
 
@@ -200,7 +205,7 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWaitTimeInThePast) {
         ReplayCommand command{packet};
 
         // Replay is also "late" trying to replay this find, so should not sleep.
-        sessionSimulator.nowHook.ret(begin + 10s);
+        sessionSimulator.nowHook->ret(begin + 10s);
         sessionSimulator.run(command, eventTimestamp);
     }
 
