@@ -5,7 +5,6 @@ py_library(
     srcs = [
         "__init__.py",
         "evergreen.py",
-        "yaml_load.py",
     ],
     visibility = ["//visibility:public"],
     deps = [
