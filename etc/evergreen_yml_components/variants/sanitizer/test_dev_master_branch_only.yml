@@ -360,7 +360,7 @@ buildvariants:
   - name: &enterprise-macos enterprise-macos
     display_name: "Enterprise macOS arm64 DEBUG"
     tags: []
-    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * 6" # Once per week on Saturday, this does not catch many bugs
     run_on:
       - macos-14-arm64
     expansions:
