@@ -1,5 +1,9 @@
 // Test that we correct return results for compound 2d and 2dsphere indices in
 // both the multikey and non-multikey cases.
+// @tags: [
+//    # $geoNear is not supported on views.
+//    incompatible_with_views,
+// ]
 
 var t = db.jstests_multikey_geonear;
 t.drop();

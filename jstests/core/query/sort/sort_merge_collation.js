@@ -4,6 +4,8 @@
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
  *   requires_getmore,
+ *   # Views do not inherit default collection collation.
+ *   incompatible_with_views,
  * ]
  */
 import {getPlanStages} from "jstests/libs/query/analyze_plan.js";

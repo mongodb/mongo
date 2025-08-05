@@ -5,6 +5,8 @@
 //   # TODO SERVER-32311: re-enable test in balancer suites when the relative issue is solved.
 //   assumes_balancer_off,
 //   requires_getmore,
+//   # $text is not supported on views.
+//   incompatible_with_views,
 // ]
 
 import {

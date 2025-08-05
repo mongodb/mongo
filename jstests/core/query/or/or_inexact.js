@@ -2,6 +2,8 @@
 // has special logic for such queries.
 // @tags: [
 //   requires_getmore,
+//   # $text is not supported on views.
+//   incompatible_with_views,
 // ]
 var t = db.jstests_or_inexact;
 var cursor;

@@ -3,6 +3,8 @@
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_getmore,
+//   # Positional projection is not supported on views.
+//   incompatible_with_views,
 // ]
 
 const collation = {

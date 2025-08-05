@@ -2,6 +2,8 @@
 // result depending on whether index key metadata is available or not.
 // @tags: [
 //   requires_getmore,
+//   # Metadata projection behavior differs between find and aggregate.
+//   incompatible_with_views,
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

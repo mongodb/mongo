@@ -156,3 +156,6 @@ filters:
   - "sharding_auth.yml":
     approvers:
       - 10gen/server-security
+  - "identity_views_passthrough.yml":
+    approvers:
+      - 10gen/query-optimization

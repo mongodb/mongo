@@ -1,6 +1,9 @@
 // Tests equality query on _id with a sort, intended to be tested on both mongos and mongod. For
 // SERVER-20641.
-
+// @tags: [
+//   # Metadata projection behavior differs between find and aggregate.
+//   incompatible_with_views,
+// ]
 var coll = db.sortl;
 coll.drop();
 

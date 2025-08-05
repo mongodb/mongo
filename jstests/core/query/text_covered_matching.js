@@ -10,6 +10,8 @@
 // @tags: [
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
+//   # $text is not supported on views.
+//   incompatible_with_views,
 // ]
 
 import {

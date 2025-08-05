@@ -1,6 +1,10 @@
 /**
  * Test that projection with a positional operator works with findAndModify
  * when remove=true or new=false, but not when new=true.
+ * @tags: [
+ *    # $elemMatch is not supported in find on a view.
+ *    incompatible_with_views,
+ * ]
  */
 const t = db[jsTestName()];
 t.drop();

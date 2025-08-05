@@ -191,6 +191,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/query_correctness_query_shape_hash_stability_generated_test.yml @10gen/query-execution-query-settings @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/timeseries_crud_jscore_passthrough.yml @10gen/query-integration-timeseries @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/sharding_auth.yml @10gen/server-security @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/identity_views_passthrough.yml @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
 /buildscripts/resmokelib/ @10gen/devprod-correctness @svc-auto-approve-bot
@@ -899,6 +900,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/override_methods/**/send_command_to_initial_sync_node* @10gen/server-initial-sync @svc-auto-approve-bot
 /jstests/libs/override_methods/**/txn_passthrough_cmd_massage.js @10gen/server-transactions @svc-auto-approve-bot
 /jstests/libs/override_methods/**/implicitly_retry_on_fcv_upgrade_downgrade.js @10gen/query-execution-query-settings @10gen/server-catalog-and-routing @10gen/server-replication @svc-auto-approve-bot
+/jstests/libs/override_methods/**/implicit_identity_views.js @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/override_methods/collection_write_path/OWNERS.yml
 /jstests/libs/override_methods/collection_write_path/**/* @10gen/server-collection-write-path @svc-auto-approve-bot

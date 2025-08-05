@@ -7,7 +7,9 @@
  *  does_not_support_transactions,
  *  # Refusing to run a test that issues an aggregation command with explain because it may return
  *  # incomplete results if interrupted by a stepdown.
- *  does_not_support_stepdowns
+ *  does_not_support_stepdowns,
+ *  # $text is not supported on views.
+ *  incompatible_with_views,
  * ]
  */
 

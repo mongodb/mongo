@@ -1,6 +1,10 @@
 // Some correctness checks for fast and normal count modes, including with skip and limit.
 //
-// @tags: [requires_fastcount]
+// @tags: [
+//    requires_fastcount,
+//    # Limit 0 is not supported on views.
+//    incompatible_with_views,
+// ]
 
 let t = db.jstests_count6;
 

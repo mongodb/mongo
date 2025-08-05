@@ -1,6 +1,8 @@
 // @tags: [
 //   requires_getmore,
 //   requires_non_retryable_writes,
+//   # $text is not supported on views.
+//   incompatible_with_views,
 // ]
 
 // Tests for invalidation during a getmore. This behavior is storage-engine dependent.

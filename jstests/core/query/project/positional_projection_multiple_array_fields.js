@@ -6,6 +6,8 @@
  * projection to work correctly.
  * @tags: [
  *   requires_getmore,
+ *   # $slice is not supported on views.
+ *   incompatible_with_views,
  * ]
  */
 import "jstests/libs/query/sbe_assert_error_override.js";

@@ -1,6 +1,8 @@
 // Tests for $elemMatch projection operator.
 // @tags: [
 //   requires_getmore,
+//   # $elemMatch is not supported in find on a view.
+//   incompatible_with_views,
 // ]
 const coll = db.elemmatch_projection;
 coll.drop();

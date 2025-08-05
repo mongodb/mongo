@@ -1,5 +1,7 @@
 // @tags: [
 //   requires_getmore,
+//   # $slice is not supported on views.
+//   incompatible_with_views,
 // ]
 
 let t = db.slice1;

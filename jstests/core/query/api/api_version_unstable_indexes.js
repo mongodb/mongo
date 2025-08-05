@@ -6,7 +6,9 @@
  * @tags: [
  *   uses_api_parameters,
  *   assumes_read_concern_local,
- *   not_allowed_with_signed_security_token
+ *   not_allowed_with_signed_security_token,
+ *   # $text is not supported on views.
+ *   incompatible_with_views,
  * ]
  */
 

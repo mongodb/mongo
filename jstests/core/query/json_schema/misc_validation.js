@@ -21,6 +21,8 @@
  *   simulate_atlas_proxy_incompatible,
  *   references_foreign_collection,
  *   requires_getmore,
+ *   # $text is not supported on views.
+ *   incompatible_with_views,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

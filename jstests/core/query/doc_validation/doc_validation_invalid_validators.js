@@ -6,6 +6,8 @@
 //   not_allowed_with_signed_security_token,
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_non_retryable_commands,
+//   # $text is not supported on views.
+//   incompatible_with_views,
 // ]
 
 // Verify invalid validator statements won't work and that we

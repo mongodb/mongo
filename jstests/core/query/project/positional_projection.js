@@ -1,6 +1,8 @@
 // Tests for $ projection operator.
 // @tags: [
 //   requires_getmore,
+//   # Positional projection is not supported on views.
+//   incompatible_with_views,
 // ]
 import "jstests/libs/query/sbe_assert_error_override.js";
 

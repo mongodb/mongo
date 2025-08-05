@@ -2,6 +2,8 @@
  * Tests the autoparameterization of the SBE cached plan that includes positional projection.
  *  @tags: [
  *    requires_getmore,
+ *    # Positional projection is not supported on views.
+ *    incompatible_with_views,
  *  ]
  */
 const coll = db.plan_cache_positional_projection;

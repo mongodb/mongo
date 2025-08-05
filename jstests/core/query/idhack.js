@@ -3,6 +3,8 @@
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
 //   requires_getmore,
+//   # $elemMatch is not supported in find on a view.
+//   incompatible_with_views,
 // ]
 // Include helpers for analyzing explain output.
 import {

@@ -16,6 +16,8 @@
  *   assumes_unsharded_collection,
  *   requires_fcv_81,
  *   requires_getmore,
+ *   # $text is not supported on views.
+ *   incompatible_with_views,
  * ]
  */
 

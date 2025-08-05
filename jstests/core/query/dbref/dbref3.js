@@ -3,6 +3,8 @@
 // is a DBRef. See http://docs.mongodb.org/manual/reference/database-references/#dbrefs.
 // @tags: [
 //   requires_getmore,
+//   # Positional projection is not supported on views.
+//   incompatible_with_views,
 // ]
 
 var t = db.dbref3;

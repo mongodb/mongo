@@ -9,6 +9,8 @@
  *   # This test uses a non-retryable multi-update command.
  *   requires_non_retryable_writes,
  *   requires_getmore,
+ *   # $text is not supported on views.
+ *   incompatible_with_views,
  * ]
  */
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";

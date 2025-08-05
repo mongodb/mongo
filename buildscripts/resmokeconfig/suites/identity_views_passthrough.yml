@@ -1,0 +1,63 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/query/**/*.js
+  exclude_files:
+    # These tests depend on the command being performed on the expected namespace.
+    - jstests/core/query/api/api_params_getmore.js
+    - jstests/core/query/comment_field.js
+    - jstests/core/query/explain/explain_explicit_false.js
+    - jstests/core/query/expr/expr.js
+    - jstests/core/query/find/find_getmore_bsonsize.js
+    - jstests/core/query/find/find_getmore_cmd.js
+    - jstests/core/query/plan_cache/cached_plan_trial_does_not_discard_work.js
+    - jstests/core/query/plan_cache/introspect_hidden_index_plan_cache_entries.js
+    - jstests/core/query/plan_cache/plan_cache_clear.js
+    - jstests/core/query/query_settings/query_settings_backfill.js
+    - jstests/core/query/query_settings/query_settings_index_application_distinct.js
+    - jstests/core/query/query_settings/query_settings_index_application_find.js
+    - jstests/core/query/query_settings/query_settings_index_application_aggregate.js
+    - jstests/core/query/query_settings/query_settings_reject_application.js
+    - jstests/core/query/query_settings/query_settings_strict_api.js
+    - jstests/core/query/query_settings/query_shape_hash_in_current_op.js
+    - jstests/core/query/queryable_encryption/**/*.js
+    - jstests/core/query/release_memory/getmore_retries.js
+    - jstests/core/query/release_memory/release_memory_basic.js
+    # Size limits are handled slightly differently between different command paths (e.g. aggregation vs distinct).
+    - jstests/core/query/bson_size_limit.js
+    # Behavior differs between view and collection because the view does not use an index for the distinct operation (see SERVER-14832).
+    - jstests/core/query/distinct/distinct_multikey_dotted_path.js
+    - jstests/core/query/explain/explain_distinct.js
+    # Uses dropDatabase().
+    - jstests/core/query/cursor/getmore_invalidated_cursors.js
+    # Project shapifies differently in find vs aggregate.
+    - jstests/core/query/plan_cache/plan_cache_list_shapes.js
+    # These tests use explain to help find plan cache entries, but the shell helper doesn't override explain, so it ends up being run differently than the query.
+    - jstests/core/query/plan_cache/plan_cache_distinct.js
+    - jstests/core/query/plan_cache/plan_cache_list_plans.js
+    - jstests/core/query/plan_cache/plan_cache_shell_helpers.js
+    - jstests/core/query/query_settings/query_settings_plan_cache.js
+  exclude_with_any_tags:
+    - incompatible_with_views
+    # $where is not supported on views.
+    - requires_scripting
+    # Validating collection UUIDs will fail when we do an implicit redirect to the view.
+    - assumes_stable_collection_uuid
+    - assumes_standalone_mongod
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: await import("jstests/libs/override_methods/implicit_identity_views.js");
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
