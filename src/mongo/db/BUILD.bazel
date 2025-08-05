@@ -1340,6 +1340,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/exec:sort_executor",
         "//src/mongo/db/exec:working_set",
+        "//src/mongo/db/exec/classic:histogram_server_status_metric",
         "//src/mongo/db/exec/sbe:query_sbe_stages",
         "//src/mongo/db/exec/sbe:query_sbe_storage",
         "//src/mongo/db/fts:base_fts",
