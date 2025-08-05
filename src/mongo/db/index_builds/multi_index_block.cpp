@@ -441,7 +441,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             index.bulk = index.real->initiateBulk(indexCatalogEntry,
                                                   eachIndexBuildMaxMemoryUsageBytes,
                                                   stateInfo,
-                                                  collection->ns().dbName());
+                                                  collection->ns().dbName(),
+                                                  _method);
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
 
@@ -612,7 +613,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                 indexCatalogEntry,
                 getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
                 /*stateInfo=*/boost::none,
-                collection->ns().dbName());
+                collection->ns().dbName(),
+                _method);
         }
     };
 
@@ -1205,10 +1207,8 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
                                                rss::consensus::IntentRegistry::Intent::LocalWrite});
     }
 
-    if (isResumable) {
+    if (isResumable && _method == IndexBuildMethod::kHybrid) {
         invariant(_buildUUID);
-        invariant(_method == IndexBuildMethod::kHybrid);
-
         _writeStateToDisk(opCtx, collection);
 
         for (auto& index : _indexes) {

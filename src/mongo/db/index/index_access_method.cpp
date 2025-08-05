@@ -894,22 +894,26 @@ const IndexCatalogEntry* IndexAccessMethod::BulkBuilder::yield(OperationContext*
         ->getEntry();
 }
 
-class SortedDataIndexAccessMethod::BulkBuilderImpl final : public IndexAccessMethod::BulkBuilder {
+class SortedDataIndexAccessMethod::BaseBulkBuilder : public IndexAccessMethod::BulkBuilder {
 public:
-    using Sorter = mongo::Sorter<key_string::Value, mongo::NullValue>;
+    using Data = std::pair<key_string::Value, mongo::NullValue>;
+    using Iterator = SortIteratorInterface<key_string::Value, mongo::NullValue>;
     using KeyHandlerFn = IndexAccessMethod::KeyHandlerFn;
     using RecordIdHandlerFn = IndexAccessMethod::RecordIdHandlerFn;
 
-    BulkBuilderImpl(const IndexCatalogEntry* entry,
+    BaseBulkBuilder(const IndexCatalogEntry* entry,
                     SortedDataIndexAccessMethod* iam,
                     size_t maxMemoryUsageBytes,
-                    const DatabaseName& dbName);
+                    const DatabaseName& dbName,
+                    StringData progressMessage);
 
-    BulkBuilderImpl(const IndexCatalogEntry* entry,
+    BaseBulkBuilder(const IndexCatalogEntry* entry,
                     SortedDataIndexAccessMethod* iam,
                     size_t maxMemoryUsageBytes,
                     const IndexStateInfo& stateInfo,
-                    const DatabaseName& dbName);
+                    const DatabaseName& dbName,
+                    StringData progressMessage);
+
 
     Status insert(OperationContext* opCtx,
                   const CollectionPtr& collection,
@@ -920,22 +924,6 @@ public:
                   const OnSuppressedErrorFn& onSuppressedError = nullptr,
                   const ShouldRelaxConstraintsFn& shouldRelaxConstraints = nullptr) final;
 
-    const MultikeyPaths& getMultikeyPaths() const final;
-
-    bool isMultikey() const final;
-
-    IndexStateInfo persistDataForShutdown() final;
-
-    std::unique_ptr<Sorter::Iterator> finalizeSort();
-
-    void debugEnsureSorted(const Sorter::Data& data);
-
-    bool duplicateCheck(OperationContext* opCtx,
-                        const IndexCatalogEntry* entry,
-                        const Sorter::Data& data,
-                        bool dupsAllowed,
-                        const RecordIdHandlerFn& onDuplicateRecord);
-
     Status commit(OperationContext* opCtx,
                   RecoveryUnit& ru,
                   const CollectionPtr& collection,
@@ -945,26 +933,48 @@ public:
                   const KeyHandlerFn& onDuplicateKeyInserted,
                   const RecordIdHandlerFn& onDuplicateRecord) final;
 
-private:
-    void _insertMultikeyMetadataKeysIntoSorter();
+protected:
+    const MultikeyPaths& getMultikeyPaths() const final;
 
-    std::unique_ptr<Sorter> _makeSorter(
-        size_t maxMemoryUsageBytes,
-        const DatabaseName& dbName,
-        boost::optional<StringData> fileName = boost::none,
-        const boost::optional<std::vector<SorterRange>>& ranges = boost::none) const;
+    void setMultikeyPaths(const MultikeyPaths& multikeyPaths);
 
-    Sorter::Settings _makeSorterSettings() const;
+    void setMultikeyPath(const MultikeyPaths& multikeyPaths, size_t idx);
+
+    void clearMultikeyMetadataKeys();
+
+    bool isMultikey() const final;
+
+    void setIsMultikey(size_t numberOfKeys, const MultikeyPaths& multikeyPaths);
 
     int64_t _keysInserted = 0;
+
+    SortedDataIndexAccessMethod* _iam;
+
+    // Caches the set of all multikey metadata keys generated during the bulk build process.
+    // These are inserted into the sorter after all normal data keys have been added, just
+    // before the bulk build is committed.
+    KeyStringSet _multikeyMetadataKeys;
+
+private:
+    virtual std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator>
+    _finalizeSort() = 0;
+
+    virtual SharedBufferFragmentBuilder& _getMemPool() = 0;
+
+    virtual void _insert(const key_string::Value& keyString) = 0;
+
+    void _debugEnsureSorted(const Data& data);
+
+    bool _duplicateCheck(OperationContext* opCtx,
+                         const IndexCatalogEntry* entry,
+                         const Data& data,
+                         bool dupsAllowed,
+                         const RecordIdHandlerFn& onDuplicateRecord);
+
+    key_string::Value _previousKey;
     const StringData _progressMessage;
     const std::string _indexName;
     NamespaceString _ns;
-
-    SortedDataIndexAccessMethod* _iam;
-    std::unique_ptr<Sorter> _sorter;
-
-    key_string::Value _previousKey;
 
     // Set to true if any document added to the BulkBuilder causes the index to become multikey.
     bool _isMultiKey = false;
@@ -972,184 +982,67 @@ private:
     // Holds the path components that cause this index to be multikey. The '_indexMultikeyPaths'
     // vector remains empty if this index doesn't support path-level multikey tracking.
     MultikeyPaths _indexMultikeyPaths;
-
-    // Caches the set of all multikey metadata keys generated during the bulk build process.
-    // These are inserted into the sorter after all normal data keys have been added, just
-    // before the bulk build is committed.
-    KeyStringSet _multikeyMetadataKeys;
 };
 
-std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::initiateBulk(
-    const IndexCatalogEntry* entry,
-    size_t maxMemoryUsageBytes,
-    const boost::optional<IndexStateInfo>& stateInfo,
-    const DatabaseName& dbName) {
-    return stateInfo
-        ? std::make_unique<BulkBuilderImpl>(entry, this, maxMemoryUsageBytes, *stateInfo, dbName)
-        : std::make_unique<BulkBuilderImpl>(entry, this, maxMemoryUsageBytes, dbName);
-}
-
-SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* entry,
+SortedDataIndexAccessMethod::BaseBulkBuilder::BaseBulkBuilder(const IndexCatalogEntry* entry,
                                                               SortedDataIndexAccessMethod* iam,
                                                               size_t maxMemoryUsageBytes,
-                                                              const DatabaseName& dbName)
-    : _progressMessage("Index Build: inserting keys from external sorter into index"),
-      _indexName(entry->descriptor()->indexName()),
-      _iam(iam),
-      _sorter(_makeSorter(maxMemoryUsageBytes, dbName)) {
+                                                              const DatabaseName& dbName,
+                                                              StringData progressMessage)
+    : _iam(iam), _progressMessage(progressMessage), _indexName(entry->descriptor()->indexName()) {
     countNewBuildInStats();
 }
 
-SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* entry,
+SortedDataIndexAccessMethod::BaseBulkBuilder::BaseBulkBuilder(const IndexCatalogEntry* entry,
                                                               SortedDataIndexAccessMethod* iam,
                                                               size_t maxMemoryUsageBytes,
                                                               const IndexStateInfo& stateInfo,
-                                                              const DatabaseName& dbName)
+                                                              const DatabaseName& dbName,
+                                                              StringData progressMessage)
     : _keysInserted(stateInfo.getNumKeys().value_or(0)),
-      _progressMessage("Index Build: inserting keys from external sorter into index"),
-      _indexName(entry->descriptor()->indexName()),
       _iam(iam),
-      _sorter(
-          _makeSorter(maxMemoryUsageBytes, dbName, stateInfo.getFileName(), stateInfo.getRanges())),
+      _progressMessage(progressMessage),
+      _indexName(entry->descriptor()->indexName()),
       _isMultiKey(stateInfo.getIsMultikey()),
       _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())) {
     countResumedBuildInStats();
 }
 
-Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
-    OperationContext* opCtx,
-    const CollectionPtr& collection,
-    const IndexCatalogEntry* entry,
-    const BSONObj& obj,
-    const RecordId& loc,
-    const InsertDeleteOptions& options,
-    const OnSuppressedErrorFn& onSuppressedError,
-    const ShouldRelaxConstraintsFn& shouldRelaxConstraints) {
-    auto& containerPool = PreallocatedContainerPool::get(opCtx);
-
-    auto keys = containerPool.keys();
-    auto multikeyPaths = containerPool.multikeyPaths();
-
-    try {
-        _iam->getKeys(opCtx,
-                      collection,
-                      entry,
-                      _sorter->memPool(),
-                      obj,
-                      options.getKeysMode,
-                      GetKeysContext::kAddingKeys,
-                      keys.get(),
-                      &_multikeyMetadataKeys,
-                      multikeyPaths.get(),
-                      loc,
-                      onSuppressedError,
-                      shouldRelaxConstraints);
-    } catch (...) {
-        return exceptionToStatus();
-    }
-
-    if (!multikeyPaths->empty()) {
-        if (_indexMultikeyPaths.empty()) {
-            _indexMultikeyPaths = *multikeyPaths;
-        } else {
-            invariant(_indexMultikeyPaths.size() == multikeyPaths->size());
-            for (size_t i = 0; i < multikeyPaths->size(); ++i) {
-                _indexMultikeyPaths[i].insert(boost::container::ordered_unique_range_t(),
-                                              (*multikeyPaths)[i].begin(),
-                                              (*multikeyPaths)[i].end());
-            }
-        }
-    }
-
-    for (const auto& keyString : *keys) {
-        _sorter->add(keyString, mongo::NullValue());
-        ++_keysInserted;
-    }
-
-    _isMultiKey = _isMultiKey ||
-        _iam->shouldMarkIndexAsMultikey(keys->size(), _multikeyMetadataKeys, *multikeyPaths);
-
-    return Status::OK();
-}
-
-const MultikeyPaths& SortedDataIndexAccessMethod::BulkBuilderImpl::getMultikeyPaths() const {
+const MultikeyPaths& SortedDataIndexAccessMethod::BaseBulkBuilder::getMultikeyPaths() const {
     return _indexMultikeyPaths;
 }
 
-bool SortedDataIndexAccessMethod::BulkBuilderImpl::isMultikey() const {
-    return _isMultiKey;
+void SortedDataIndexAccessMethod::BaseBulkBuilder::setMultikeyPaths(
+    const MultikeyPaths& multikeyPaths) {
+    _indexMultikeyPaths = multikeyPaths;
 }
 
-IndexStateInfo SortedDataIndexAccessMethod::BulkBuilderImpl::persistDataForShutdown() {
-    _insertMultikeyMetadataKeysIntoSorter();
-    auto state = _sorter->persistDataForShutdown();
-
-    IndexStateInfo stateInfo;
-    stateInfo.setFileName(state.fileName);
-    stateInfo.setNumKeys(_keysInserted);
-    stateInfo.setRanges(std::move(state.ranges));
-
-    return stateInfo;
+void SortedDataIndexAccessMethod::BaseBulkBuilder::setMultikeyPath(
+    const MultikeyPaths& multikeyPaths, size_t idx) {
+    _indexMultikeyPaths[idx].insert(boost::container::ordered_unique_range_t(),
+                                    (multikeyPaths)[idx].begin(),
+                                    (multikeyPaths)[idx].end());
 }
 
-void SortedDataIndexAccessMethod::BulkBuilderImpl::_insertMultikeyMetadataKeysIntoSorter() {
-    for (const auto& keyString : _multikeyMetadataKeys) {
-        _sorter->add(keyString, mongo::NullValue());
-        ++_keysInserted;
-    }
 
-    // We clear the multikey metadata keys to prevent them from being inserted into the Sorter
-    // twice in the case that done() is called and then persistDataForShutdown() is later called.
+void SortedDataIndexAccessMethod::BaseBulkBuilder::clearMultikeyMetadataKeys() {
     _multikeyMetadataKeys.clear();
 }
 
-SortedDataIndexAccessMethod::BulkBuilderImpl::Sorter::Settings
-SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
-    return std::pair<key_string::Value::SorterDeserializeSettings,
-                     mongo::NullValue::SorterDeserializeSettings>(
-        {_iam->getSortedDataInterface()->getKeyStringVersion(),
-         _iam->getSortedDataInterface()->rsKeyFormat()},
-        {});
+bool SortedDataIndexAccessMethod::BaseBulkBuilder::isMultikey() const {
+    return _isMultiKey;
 }
 
-std::unique_ptr<SortedDataIndexAccessMethod::BulkBuilderImpl::Sorter>
-SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorter(
-    size_t maxMemoryUsageBytes,
-    const DatabaseName& dbName,
-    boost::optional<StringData> fileName,
-    const boost::optional<std::vector<SorterRange>>& ranges) const {
-    return fileName
-        ? Sorter::makeFromExistingRanges(
-              std::string{*fileName},
-              *ranges,
-              makeSortOptions(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()),
-              BtreeExternalSortComparison(),
-              _makeSorterSettings())
-        : Sorter::make(makeSortOptions(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()),
-                       BtreeExternalSortComparison(),
-                       _makeSorterSettings());
+void SortedDataIndexAccessMethod::BaseBulkBuilder::setIsMultikey(
+    size_t numberOfKeys, const MultikeyPaths& multikeyPaths) {
+    _isMultiKey = _isMultiKey ||
+        _iam->shouldMarkIndexAsMultikey(numberOfKeys, _multikeyMetadataKeys, multikeyPaths);
 }
 
-std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator>
-SortedDataIndexAccessMethod::BulkBuilderImpl::finalizeSort() {
-    _insertMultikeyMetadataKeysIntoSorter();
-    return _sorter->done();
-}
-
-void SortedDataIndexAccessMethod::BulkBuilderImpl::debugEnsureSorted(const Sorter::Data& data) {
-    if (data.first.compare(_previousKey) < 0) {
-        LOGV2_FATAL_NOTRACE(31171,
-                            "Expected the next key to be greater than or equal to the previous key",
-                            "nextKey"_attr = data.first.toString(),
-                            "previousKey"_attr = _previousKey.toString(),
-                            "index"_attr = _indexName);
-    }
-}
-
-bool SortedDataIndexAccessMethod::BulkBuilderImpl::duplicateCheck(
+bool SortedDataIndexAccessMethod::BaseBulkBuilder::_duplicateCheck(
     OperationContext* opCtx,
     const IndexCatalogEntry* entry,
-    const Sorter::Data& data,
+    const Data& data,
     bool dupsAllowed,
     const RecordIdHandlerFn& onDuplicateRecord) {
 
@@ -1189,7 +1082,71 @@ bool SortedDataIndexAccessMethod::BulkBuilderImpl::duplicateCheck(
     MONGO_COMPILER_UNREACHABLE;  // The status will never be OK
 }
 
-Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
+void SortedDataIndexAccessMethod::BaseBulkBuilder::_debugEnsureSorted(const Data& data) {
+    if (data.first.compare(_previousKey) < 0) {
+        LOGV2_FATAL_NOTRACE(31171,
+                            "Expected the next key to be greater than or equal to the previous key",
+                            "nextKey"_attr = data.first.toString(),
+                            "previousKey"_attr = _previousKey.toString(),
+                            "index"_attr = _indexName);
+    }
+}
+
+Status SortedDataIndexAccessMethod::BaseBulkBuilder::insert(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const IndexCatalogEntry* entry,
+    const BSONObj& obj,
+    const RecordId& loc,
+    const InsertDeleteOptions& options,
+    const OnSuppressedErrorFn& onSuppressedError,
+    const ShouldRelaxConstraintsFn& shouldRelaxConstraints) {
+    auto& containerPool = PreallocatedContainerPool::get(opCtx);
+
+    auto keys = containerPool.keys();
+    auto multikeyPaths = containerPool.multikeyPaths();
+
+    try {
+        _iam->getKeys(opCtx,
+                      collection,
+                      entry,
+                      _getMemPool(),
+                      obj,
+                      options.getKeysMode,
+                      GetKeysContext::kAddingKeys,
+                      keys.get(),
+                      &_multikeyMetadataKeys,
+                      multikeyPaths.get(),
+                      loc,
+                      onSuppressedError,
+                      shouldRelaxConstraints);
+    } catch (...) {
+        return exceptionToStatus();
+    }
+
+    if (!multikeyPaths->empty()) {
+        auto currMultikeyPaths = getMultikeyPaths();
+        if (currMultikeyPaths.empty()) {
+            setMultikeyPaths(*multikeyPaths);
+        } else {
+            invariant(currMultikeyPaths.size() == multikeyPaths->size());
+            for (size_t i = 0; i < multikeyPaths->size(); ++i) {
+                setMultikeyPath(*multikeyPaths, i);
+            }
+        }
+    }
+
+    for (const auto& keyString : *keys) {
+        _insert(keyString);
+        ++_keysInserted;
+    }
+
+    setIsMultikey(keys->size(), *multikeyPaths);
+
+    return Status::OK();
+}
+
+Status SortedDataIndexAccessMethod::BaseBulkBuilder::commit(
     OperationContext* opCtx,
     RecoveryUnit& ru,
     const CollectionPtr& collection,
@@ -1202,7 +1159,7 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
 
     _ns = entry->getNSSFromCatalog(opCtx);
     auto builder = _iam->getSortedDataInterface()->makeBulkBuilder(opCtx, ru);
-    auto it = finalizeSort();
+    auto it = _finalizeSort();
 
     ProgressMeterHolder pm;
     {
@@ -1242,7 +1199,7 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
 
         auto data = it->next();
         if (kDebugBuild) {
-            debugEnsureSorted(data);
+            _debugEnsureSorted(data);
         }
 
         // Before attempting to insert, check if this key is a duplicate of the previous one
@@ -1250,7 +1207,7 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
         // potentially fail.
         bool isDup;
         try {
-            isDup = duplicateCheck(opCtx, entry, data, dupsAllowed, onDuplicateRecord);
+            isDup = _duplicateCheck(opCtx, entry, data, dupsAllowed, onDuplicateRecord);
         } catch (DBException& e) {
             return e.toStatus();
         }
@@ -1306,6 +1263,218 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
           "keysInserted"_attr = _keysInserted,
           "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()));
     return Status::OK();
+}
+
+class SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder final
+    : public SortedDataIndexAccessMethod::BaseBulkBuilder {
+public:
+    PrimaryDrivenBulkBuilder(const IndexCatalogEntry* entry,
+                             SortedDataIndexAccessMethod* iam,
+                             size_t maxMemoryUsageBytes,
+                             const DatabaseName& dbName);
+
+
+    IndexStateInfo persistDataForShutdown() final;
+
+private:
+    std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator> _finalizeSort()
+        final;
+
+    SharedBufferFragmentBuilder& _getMemPool() final;
+
+    void _insert(const key_string::Value& keyString) final;
+
+    void _insertMultikeyMetadataKeysIntoVec();
+
+    std::vector<std::pair<key_string::Value, mongo::NullValue>> _unsortedKeys;
+    SharedBufferFragmentBuilder _memPool;
+};
+
+SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::PrimaryDrivenBulkBuilder(
+    const IndexCatalogEntry* entry,
+    SortedDataIndexAccessMethod* iam,
+    size_t maxMemoryUsageBytes,
+    const DatabaseName& dbName)
+    : BaseBulkBuilder(entry,
+                      iam,
+                      maxMemoryUsageBytes,
+                      dbName,
+                      "Index Build: sorting and inserting keys into the index table"),
+      _memPool(sorter::makeMemPool()) {}
+
+SharedBufferFragmentBuilder& SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_getMemPool() {
+    return _memPool;
+}
+
+void SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_insert(
+    const key_string::Value& keyString) {
+    _unsortedKeys.emplace_back(keyString, mongo::NullValue());
+}
+
+std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator>
+SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_finalizeSort() {
+    _insertMultikeyMetadataKeysIntoVec();
+    std::sort(_unsortedKeys.begin(),
+              _unsortedKeys.end(),
+              [](const std::pair<key_string::Value, mongo::NullValue>& lhs,
+                 const std::pair<key_string::Value, mongo::NullValue>& rhs) {
+                  return lhs.first.compare(rhs.first) < 0;
+              });
+    return std::make_unique<sorter::InMemIterator<key_string::Value, mongo::NullValue>>(
+        _unsortedKeys);
+}
+
+IndexStateInfo SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::persistDataForShutdown() {
+    MONGO_UNREACHABLE_TASSERT(1081640);
+}
+
+void SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_insertMultikeyMetadataKeysIntoVec() {
+    for (const auto& keyString : _multikeyMetadataKeys) {
+        _unsortedKeys.emplace_back(keyString, mongo::NullValue());
+        ++_keysInserted;
+    }
+}
+
+class SortedDataIndexAccessMethod::HybridBulkBuilder final
+    : public SortedDataIndexAccessMethod::BaseBulkBuilder {
+public:
+    using Sorter = mongo::Sorter<key_string::Value, mongo::NullValue>;
+
+    HybridBulkBuilder(const IndexCatalogEntry* entry,
+                      SortedDataIndexAccessMethod* iam,
+                      size_t maxMemoryUsageBytes,
+                      const DatabaseName& dbName);
+
+    HybridBulkBuilder(const IndexCatalogEntry* entry,
+                      SortedDataIndexAccessMethod* iam,
+                      size_t maxMemoryUsageBytes,
+                      const IndexStateInfo& stateInfo,
+                      const DatabaseName& dbName);
+
+    IndexStateInfo persistDataForShutdown() final;
+
+private:
+    std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator> _finalizeSort()
+        final;
+
+    SharedBufferFragmentBuilder& _getMemPool() final;
+
+    void _insert(const key_string::Value& keyString) final;
+
+    void _insertMultikeyMetadataKeysIntoSorter();
+
+    std::unique_ptr<Sorter> _makeSorter(
+        size_t maxMemoryUsageBytes,
+        const DatabaseName& dbName,
+        boost::optional<StringData> fileName = boost::none,
+        const boost::optional<std::vector<SorterRange>>& ranges = boost::none) const;
+
+    Sorter::Settings _makeSorterSettings() const;
+    std::unique_ptr<Sorter> _sorter;
+};
+
+std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::initiateBulk(
+    const IndexCatalogEntry* entry,
+    size_t maxMemoryUsageBytes,
+    const boost::optional<IndexStateInfo>& stateInfo,
+    const DatabaseName& dbName,
+    const IndexBuildMethod& method) {
+    if (method == IndexBuildMethod::kPrimaryDriven) {
+        invariant(!stateInfo);
+        return std::make_unique<PrimaryDrivenBulkBuilder>(entry, this, maxMemoryUsageBytes, dbName);
+    }
+    return stateInfo
+        ? std::make_unique<HybridBulkBuilder>(entry, this, maxMemoryUsageBytes, *stateInfo, dbName)
+        : std::make_unique<HybridBulkBuilder>(entry, this, maxMemoryUsageBytes, dbName);
+}
+
+SortedDataIndexAccessMethod::HybridBulkBuilder::HybridBulkBuilder(const IndexCatalogEntry* entry,
+                                                                  SortedDataIndexAccessMethod* iam,
+                                                                  size_t maxMemoryUsageBytes,
+                                                                  const DatabaseName& dbName)
+    : BaseBulkBuilder(entry,
+                      iam,
+                      maxMemoryUsageBytes,
+                      dbName,
+                      "Index Build: inserting keys from external sorter into index"),
+      _sorter(_makeSorter(maxMemoryUsageBytes, dbName)) {}
+
+SortedDataIndexAccessMethod::HybridBulkBuilder::HybridBulkBuilder(const IndexCatalogEntry* entry,
+                                                                  SortedDataIndexAccessMethod* iam,
+                                                                  size_t maxMemoryUsageBytes,
+                                                                  const IndexStateInfo& stateInfo,
+                                                                  const DatabaseName& dbName)
+    : BaseBulkBuilder(entry,
+                      iam,
+                      maxMemoryUsageBytes,
+                      stateInfo,
+                      dbName,
+                      "Index Build: inserting keys from external sorter into index"),
+      _sorter(_makeSorter(
+          maxMemoryUsageBytes, dbName, stateInfo.getFileName(), stateInfo.getRanges())) {}
+
+SharedBufferFragmentBuilder& SortedDataIndexAccessMethod::HybridBulkBuilder::_getMemPool() {
+    return _sorter->memPool();
+}
+
+IndexStateInfo SortedDataIndexAccessMethod::HybridBulkBuilder::persistDataForShutdown() {
+    _insertMultikeyMetadataKeysIntoSorter();
+    auto state = _sorter->persistDataForShutdown();
+
+    IndexStateInfo stateInfo;
+    stateInfo.setFileName(state.fileName);
+    stateInfo.setNumKeys(_keysInserted);
+    stateInfo.setRanges(std::move(state.ranges));
+
+    return stateInfo;
+}
+
+void SortedDataIndexAccessMethod::HybridBulkBuilder::_insert(const key_string::Value& keyString) {
+    _sorter->add(keyString, mongo::NullValue());
+}
+
+void SortedDataIndexAccessMethod::HybridBulkBuilder::_insertMultikeyMetadataKeysIntoSorter() {
+    for (const auto& keyString : _multikeyMetadataKeys) {
+        _sorter->add(keyString, mongo::NullValue());
+        ++_keysInserted;
+    }
+
+    // We clear the multikey metadata keys to prevent them from being inserted into the Sorter
+    // twice in the case that done() is called and then persistDataForShutdown() is later called.
+    clearMultikeyMetadataKeys();
+}
+
+std::unique_ptr<SortedDataIndexAccessMethod::HybridBulkBuilder::Sorter>
+SortedDataIndexAccessMethod::HybridBulkBuilder::_makeSorter(
+    size_t maxMemoryUsageBytes,
+    const DatabaseName& dbName,
+    boost::optional<StringData> fileName,
+    const boost::optional<std::vector<SorterRange>>& ranges) const {
+    return fileName
+        ? Sorter::makeFromExistingRanges(
+              std::string{*fileName},
+              *ranges,
+              makeSortOptions(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()),
+              BtreeExternalSortComparison(),
+              _makeSorterSettings())
+        : Sorter::make(makeSortOptions(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()),
+                       BtreeExternalSortComparison(),
+                       _makeSorterSettings());
+}
+
+SortedDataIndexAccessMethod::HybridBulkBuilder::Sorter::Settings
+SortedDataIndexAccessMethod::HybridBulkBuilder::_makeSorterSettings() const {
+    return std::pair<key_string::Value::SorterDeserializeSettings,
+                     mongo::NullValue::SorterDeserializeSettings>(
+        {_iam->getSortedDataInterface()->getKeyStringVersion(),
+         _iam->getSortedDataInterface()->rsKeyFormat()},
+        {});
+}
+
+std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator>
+SortedDataIndexAccessMethod::HybridBulkBuilder::_finalizeSort() {
+    _insertMultikeyMetadataKeysIntoSorter();
+    return _sorter->done();
 }
 
 void SortedDataIndexAccessMethod::getKeys(

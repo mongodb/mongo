@@ -599,7 +599,14 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
     auto buildUUID = UUID::gen();
     ReplIndexBuildState::IndexCatalogStats stats;
-    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {.commitQuorum = commitQuorum};
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
+        .indexBuildMethod = ((fcvSnapshot.isVersionInitialized() &&
+                              feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                                  VersionContext::getDecoration(opCtx), fcvSnapshot))
+                                 ? IndexBuildMethod::kPrimaryDriven
+                                 : IndexBuildMethod::kHybrid),
+        .commitQuorum = commitQuorum};
 
     LOGV2(20438,
           "Index build: registering",

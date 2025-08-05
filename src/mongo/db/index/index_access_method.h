@@ -316,7 +316,8 @@ public:
         const IndexCatalogEntry* entry,
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
-        const DatabaseName& dbName) = 0;
+        const DatabaseName& dbName,
+        const IndexBuildMethod& method) = 0;
 };
 
 /**
@@ -636,7 +637,8 @@ public:
     std::unique_ptr<BulkBuilder> initiateBulk(const IndexCatalogEntry* entry,
                                               size_t maxMemoryUsageBytes,
                                               const boost::optional<IndexStateInfo>& stateInfo,
-                                              const DatabaseName& dbName) final;
+                                              const DatabaseName& dbName,
+                                              const IndexBuildMethod& method) final;
 
 protected:
     /**
@@ -673,7 +675,9 @@ protected:
                            const boost::optional<RecordId>& id) const = 0;
 
 private:
-    class BulkBuilderImpl;
+    class BaseBulkBuilder;
+    class PrimaryDrivenBulkBuilder;
+    class HybridBulkBuilder;
 
     /**
      * Removes a single key from the index.

@@ -7,6 +7,7 @@
  *   requires_replication,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
@@ -66,11 +67,19 @@ assert(serverStatus.hasOwnProperty('indexBulkBuilder'),
 let indexBulkBuilderSection = serverStatus.indexBulkBuilder;
 assert.eq(indexBulkBuilderSection.count, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.resumed, 0, tojson(indexBulkBuilderSection));
-assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
-assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
+// TODO(SERVER-107044) The filesOpenedForExternalSort, filesClosedForExternalSort, and spilledRanges
+// metrics are incremented when we use the Sorter, which isn't used in primary-driven index builds.
+assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort,
+          1 - FeatureFlagUtil.isEnabled(testDB, "featureFlagPrimaryDrivenIndexBuilds"),
+          tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesClosedForExternalSort,
+          1 - FeatureFlagUtil.isEnabled(testDB, "featureFlagPrimaryDrivenIndexBuilds"),
+          tojson(indexBulkBuilderSection));
 // Due to fragmentation in the allocator, which is counted towards mem usage, we can spill earlier
 // than we would expect.
-assert.between(expectedSpilledRanges,
+assert.between((FeatureFlagUtil.isEnabled(testDB, "featureFlagPrimaryDrivenIndexBuilds"))
+                   ? 0
+                   : expectedSpilledRanges,
                indexBulkBuilderSection.spilledRanges,
                1 + expectedSpilledRanges,
                tojson(indexBulkBuilderSection),
@@ -86,15 +95,27 @@ assert.between(0,
                approxMemoryUsage + spillOverhead,
                tojson(indexBulkBuilderSection),
                /*inclusive=*/ true);
-assert.eq(indexBulkBuilderSection.numSorted, numDocs, tojson(indexBulkBuilderSection));
-// Expect total bytes sorted to be greater than approxMemoryUsage because of the additional field in
-// the documents inserted which accounts for more bytes than in the rough calculation.
-assert.gte(indexBulkBuilderSection.bytesSorted, approxMemoryUsage, tojson(indexBulkBuilderSection));
+// TODO(SERVER-107044) The numSorted and bytesSorted metric are incremented when we use the Sorter,
+// which isn't used in primary-driven index builds.
+if (!FeatureFlagUtil.isEnabled(testDB, "featureFlagPrimaryDrivenIndexBuilds")) {
+    assert.eq(indexBulkBuilderSection.numSorted, numDocs, tojson(indexBulkBuilderSection));
+    // Expect total bytes sorted to be greater than approxMemoryUsage because of the additional
+    // field in the documents inserted which accounts for more bytes than in the rough calculation.
+    assert.gte(
+        indexBulkBuilderSection.bytesSorted, approxMemoryUsage, tojson(indexBulkBuilderSection));
+}
 assert.between(0,
                indexBulkBuilderSection.memUsage,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
                /*inclusive=*/ true);
+
+// Only run this portion of the test if we don't have primary-driven index builds because we don't
+// support resumable index builds with this feature.
+if (FeatureFlagUtil.isEnabled(testDB, "featureFlagPrimaryDrivenIndexBuilds")) {
+    replSet.stopSet();
+    quit();
+}
 
 (function resumeIndexBuild() {
     jsTestLog(

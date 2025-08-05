@@ -11,6 +11,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
@@ -60,7 +61,9 @@ function assertListIndexesOutputsMatch(
                 "Index expected to be in-progress building did not have indexBuildInfo.method: " +
                     tojson(withBuildInfo[i]));
             assert.eq(withBuildInfo[i].indexBuildInfo.method,
-                      'Hybrid',
+                      (FeatureFlagUtil.isEnabled(db, "featureFlagPrimaryDrivenIndexBuilds"))
+                          ? 'Primary driven'
+                          : 'Hybrid',
                       "Index expected to be in-progress is building with an unexpected method: " +
                           tojson(withBuildInfo[i]));
 
