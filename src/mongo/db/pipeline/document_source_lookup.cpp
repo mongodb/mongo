@@ -1453,8 +1453,12 @@ void DocumentSourceLookUp::detachFromOperationContext() {
         tassert(10713705,
                 "expecting _fromExpCtx->getOperationContext() == nullptr",
                 _fromExpCtx->getOperationContext() == nullptr);
-    } else if (_fromExpCtx) {
+    }
+    if (_fromExpCtx) {
         _fromExpCtx->setOperationContext(nullptr);
+    }
+    if (_resolvedIntrospectionPipeline) {
+        _resolvedIntrospectionPipeline->detachFromOperationContext();
     }
 }
 
@@ -1471,8 +1475,12 @@ void DocumentSourceLookUp::detachSourceFromOperationContext() {
         tassert(10713707,
                 "expecting _fromExpCtx->getOperationContext() == nullptr",
                 _fromExpCtx->getOperationContext() == nullptr);
-    } else if (_fromExpCtx) {
+    }
+    if (_fromExpCtx) {
         _fromExpCtx->setOperationContext(nullptr);
+    }
+    if (_resolvedIntrospectionPipeline) {
+        _resolvedIntrospectionPipeline->detachFromOperationContext();
     }
 }
 
@@ -1489,8 +1497,12 @@ void DocumentSourceLookUp::reattachToOperationContext(OperationContext* opCtx) {
         tassert(10713709,
                 "expecting _fromExpCtx->getOperationContext() == opCtx",
                 _fromExpCtx->getOperationContext() == opCtx);
-    } else if (_fromExpCtx) {
+    }
+    if (_fromExpCtx) {
         _fromExpCtx->setOperationContext(opCtx);
+    }
+    if (_resolvedIntrospectionPipeline) {
+        _resolvedIntrospectionPipeline->reattachToOperationContext(opCtx);
     }
 }
 
@@ -1507,8 +1519,12 @@ void DocumentSourceLookUp::reattachSourceToOperationContext(OperationContext* op
         tassert(10713711,
                 "expecting _fromExpCtx->getOperationContext() == opCtx",
                 _fromExpCtx->getOperationContext() == opCtx);
-    } else if (_fromExpCtx) {
+    }
+    if (_fromExpCtx) {
         _fromExpCtx->setOperationContext(opCtx);
+    }
+    if (_resolvedIntrospectionPipeline) {
+        _resolvedIntrospectionPipeline->reattachToOperationContext(opCtx);
     }
 }
 
@@ -1517,9 +1533,12 @@ bool DocumentSourceLookUp::validateOperationContext(const OperationContext* opCt
         (_fromExpCtx && _fromExpCtx->getOperationContext() != opCtx)) {
         return false;
     }
-
-    if (_execPipeline) {
-        return _execPipeline->validateOperationContext(opCtx);
+    if (_execPipeline && !_execPipeline->validateOperationContext(opCtx)) {
+        return false;
+    }
+    if (_resolvedIntrospectionPipeline &&
+        !_resolvedIntrospectionPipeline->validateOperationContext(opCtx)) {
+        return false;
     }
 
     return true;
@@ -1530,9 +1549,12 @@ bool DocumentSourceLookUp::validateSourceOperationContext(const OperationContext
         (_fromExpCtx && _fromExpCtx->getOperationContext() != opCtx)) {
         return false;
     }
-
-    if (_execPipeline) {
-        return _execPipeline->validateOperationContext(opCtx);
+    if (_execPipeline && !_execPipeline->validateOperationContext(opCtx)) {
+        return false;
+    }
+    if (_resolvedIntrospectionPipeline &&
+        !_resolvedIntrospectionPipeline->validateOperationContext(opCtx)) {
+        return false;
     }
 
     return true;
