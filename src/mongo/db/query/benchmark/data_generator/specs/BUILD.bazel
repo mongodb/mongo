@@ -9,3 +9,8 @@ py_library(
     name = "employee",
     srcs = ["employee.py"],
 )
+
+py_library(
+    name = "test",
+    srcs = ["test.py"],
+)

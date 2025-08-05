@@ -252,7 +252,7 @@ async def main():
                 if hasattr(module, index_set_name):
                     index_set = getattr(module, index_set_name)
                     indices = index_set() if callable(index_set) else index_set
-                    database_instance.database.get_collection(collection_name).create_indexes(
+                    await database_instance.database.get_collection(collection_name).create_indexes(
                         indices
                     )
                 else:

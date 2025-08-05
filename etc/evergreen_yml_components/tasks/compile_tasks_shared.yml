@@ -214,6 +214,7 @@ tasks:
             - "src/src/mongo/db/modules/enterprise/docs/**"
             - "src/src/mongo/db/modules/enterprise/jstests/**"
             - "src/src/mongo/db/modules/subscription/jstests/**"
+            - "src/src/mongo/db/query/benchmark/data_generator/**"
             - "src/src/mongo/db/query/query_tester/tests/**"
             - "src/src/mongo/util/options_parser/test_config_files/**"
             - "src/src/mongo/util/version/**"
