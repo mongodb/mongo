@@ -1,6 +1,10 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
+if [ "${push_name}" != "windows" ]; then
+  exit 0
+fi
+
 cd src
 
 echo "GRS_CONFIG_USER1_USERNAME=${garasign_jsign_username}" >> "signing-envfile"
