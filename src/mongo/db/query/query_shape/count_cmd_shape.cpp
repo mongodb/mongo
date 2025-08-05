@@ -45,7 +45,7 @@ void CountCmdShapeComponents::HashValue(absl::HashState state) const {
         std::move(state), simpleHash(representativeQuery), hasField.limit, hasField.skip);
 }
 
-inline size_t CountCmdShapeComponents::size() const {
+size_t CountCmdShapeComponents::size() const {
     return sizeof(CountCmdShapeComponents) + representativeQuery.objsize();
 }
 
