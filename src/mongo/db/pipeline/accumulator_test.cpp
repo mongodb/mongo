@@ -52,6 +52,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -2150,6 +2151,56 @@ Document parseAndSerializeAccumRepresentative(
     auto expr = func(expCtx.get(), elem, vps);
     auto accum = expr.factory();
     return accum->serialize(expr.initializer, expr.argument, options);
+}
+
+TEST(Accumulators, EmptySortByTop) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    // Create expression with an empty sortBy field.
+    auto top = BSON("$top" << BSON("output" << "$output"
+                                            << "sortBy" << BSONObj()));
+    ASSERT_THROWS_CODE(AccumulatorTop::parseTopBottomN(&expCtx, top.firstElement(), vps),
+                       AssertionException,
+                       9657900);
+}
+
+TEST(Accumulators, EmptySortByTopN) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    // Create expression with an empty sortBy field.
+    auto topN = BSON("$topN" << BSON("n" << 3 << "output"
+                                         << "$output"
+                                         << "sortBy" << BSONObj()));
+    ASSERT_THROWS_CODE(AccumulatorTopN::parseTopBottomN(&expCtx, topN.firstElement(), vps),
+                       AssertionException,
+                       9657900);
+}
+
+TEST(Accumulators, EmptySortByBottom) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    // Create expression with an empty sortBy field.
+    auto bottom = BSON("$bottom" << BSON("output" << "$output"
+                                                  << "sortBy" << BSONObj()));
+    ASSERT_THROWS_CODE(AccumulatorBottom::parseTopBottomN(&expCtx, bottom.firstElement(), vps),
+                       AssertionException,
+                       9657900);
+}
+
+TEST(Accumulators, EmptySortByBottomN) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    // Create expression with an empty sortBy field.
+    auto bottomN = BSON("$bottomN" << BSON("n" << 3 << "output"
+                                               << "$output"
+                                               << "sortBy" << BSONObj()));
+    ASSERT_THROWS_CODE(AccumulatorBottomN::parseTopBottomN(&expCtx, bottomN.firstElement(), vps),
+                       AssertionException,
+                       9657900);
 }
 
 TEST(Accumulators, SerializeWithRedaction) {

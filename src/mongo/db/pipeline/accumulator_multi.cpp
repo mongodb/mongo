@@ -450,6 +450,10 @@ accumulatorNParseArgs(ExpressionContext* expCtx,
         uassert(5788005,
                 str::stream() << "Missing value for '" << AccumulatorN::kFieldNameSortBy << "'",
                 sortBy);
+        uassert(9657900,
+                str::stream() << "Value for '" << AccumulatorN::kFieldNameSortBy
+                              << "' must be a non-empty object",
+                !sortBy->isEmpty());
     }
 
     return {n, *output, sortBy};

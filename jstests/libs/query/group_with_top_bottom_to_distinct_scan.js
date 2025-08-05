@@ -749,26 +749,19 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
         options: collationOption
     });
 
-    // These tests do not verify data but verify that the server does not die.
-    assert.eq(
-        database.nodata.aggregate([{$group: {_id: '$a', o: {$top: {output: 'a', sortBy: {}}}}}])
-            .toArray()
-            .length,
-        0);
-    assert.eq(database.nodata
-                  .aggregate([{$group: {_id: '$a', o: {$topN: {n: 1, output: 'a', sortBy: {}}}}}])
-                  .toArray()
-                  .length,
-              0);
-    assert.eq(
-        database.nodata.aggregate([{$group: {_id: '$a', o: {$bottom: {output: 'a', sortBy: {}}}}}])
-            .toArray()
-            .length,
-        0);
-    assert.eq(
-        database.nodata
-            .aggregate([{$group: {_id: '$a', o: {$bottomN: {n: 1, output: 'a', sortBy: {}}}}}])
-            .toArray()
-            .length,
-        0);
+    // Verify that errors are thrown when using $top/$bottom with empty sortBy.
+    assert.throwsWithCode(() => {
+        database.nodata.aggregate([{$group: {_id: '$a', o: {$top: {output: 'a', sortBy: {}}}}}]);
+    }, 9657900);
+    assert.throwsWithCode(() => {
+        database.nodata.aggregate(
+            [{$group: {_id: '$a', o: {$topN: {n: 1, output: 'a', sortBy: {}}}}}]);
+    }, 9657900);
+    assert.throwsWithCode(() => {
+        database.nodata.aggregate([{$group: {_id: '$a', o: {$bottom: {output: 'a', sortBy: {}}}}}]);
+    }, 9657900);
+    assert.throwsWithCode(() => {
+        database.nodata.aggregate(
+            [{$group: {_id: '$a', o: {$bottomN: {n: 1, output: 'a', sortBy: {}}}}}]);
+    }, 9657900);
 }

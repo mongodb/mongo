@@ -1,5 +1,8 @@
 /**
  * Basic tests for the $top/$bottom/$topN/$bottomN accumulators.
+ *
+ * @tags: [requires_fcv_83,
+ * ]
  */
 import "jstests/libs/query/sbe_assert_error_override.js";
 
@@ -313,6 +316,7 @@ rejectInvalidSpec("$bottomN", {}, 5788005, ["sortBy"]);
 rejectInvalidSpec("$bottomN", {sortBy: {sales: "coffee"}}, 15974);
 rejectInvalidSpec("$bottomN", {sortBy: {sales: 2}}, 15975);
 rejectInvalidSpec("$bottomN", {sortBy: "sales"}, 10065);
+rejectInvalidSpec("$bottomN", {sortBy: {}}, 9657900);
 
 // Extra field.
 rejectInvalidSpec("$bottomN", {edgar: true}, 5788002);
@@ -352,7 +356,7 @@ const bs = [1, 2, 3];
 const crossProduct = (arr1, arr2) =>
     arr1.map(a => arr2.map(b => ({a, b}))).reduce((docs, inner) => docs.concat(inner));
 const fullAscending = crossProduct(as, bs);
-const aAscendingBDecending = crossProduct(as, bs.reverse());
+const aAscendingBDescending = crossProduct(as, bs.reverse());
 
 assert.commandWorked(coll.insertMany(fullAscending));
 const actualFullAscending =
@@ -365,7 +369,7 @@ const actualFullAscending =
         .toArray();
 assert.eq(fullAscending, actualFullAscending[0]["sorted"]);
 
-const actualAAscendingBDecending =
+const actualAAscendingBDescending =
     coll.aggregate({
             $group: {
                 _id: "",
@@ -373,7 +377,7 @@ const actualAAscendingBDecending =
             }
         })
         .toArray();
-assert.eq(aAscendingBDecending, actualAAscendingBDecending[0]["sorted"]);
+assert.eq(aAscendingBDescending, actualAAscendingBDescending[0]["sorted"]);
 
 // $meta sort specification.
 assert(coll.drop());
