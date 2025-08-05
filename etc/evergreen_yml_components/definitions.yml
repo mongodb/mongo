@@ -321,7 +321,7 @@ functions:
         - "https://mciuploads.s3.amazonaws.com/${mongo_jstestshell}"
         - "mongodb-jstestshell.tgz"
 
-  "fetch extensions":
+  "fetch extensions": &fetch_extensions
     command: s3.get
     display_name: "fetch extensions"
     params:
@@ -330,6 +330,8 @@ functions:
       remote_file: ${mongo_extensions}
       bucket: mciuploads
       local_file: src/mongo-extensions.tgz
+      # Mark as optional to silence failures on build variants ineligible for extensions.
+      optional: true
 
   "write mongo binary URL to downstream_expansions.yml": &echo_mongo_binary_url
     command: subprocess.exec
@@ -384,18 +386,34 @@ functions:
         - "--change-dir=${extraction_change_dir}"
         - "--move-output=dist-test/:bazel-bin/install"
 
-  "extract extensions":
+  "extract extensions": &extract_extensions
     command: subprocess.exec
     display_name: "extract extensions"
     params:
       binary: bash
       args:
-        - "src/evergreen/run_python_script.sh"
+        - "src/evergreen/functions/extract_extensions.sh"
         - "evergreen/functions/binaries_extract.py"
         - "--tarball=mongo-extensions.tgz"
         - "--extraction-command=${decompress}"
         - "--change-dir=${extraction_change_dir}"
         - "${move_outputs}"
+
+  "find all extensions": &find_all_extensions
+    command: subprocess.exec
+    display_name: "find all extensions"
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/functions/find_extensions.sh"
+
+  "apply extensions expansions": &apply_extensions_expansions
+    command: expansions.update
+    display_name: "apply extensions expansions"
+    params:
+      # Ignore missing file to silence failures on build variants ineligible for extensions.
+      ignore_missing_file: true
+      file: src/extension_paths.yml
 
   "get version expansions": &get_version_expansions
     command: s3.get
@@ -812,8 +830,13 @@ functions:
     - *verify_binaries_sha
     - *fetch_jstestshell
     - *verify_jstestshell_sha
+    - *fetch_extensions
     - *extract_binaries
     - *extract_jstestshell
+    - *extract_extensions
+    - *find_all_extensions
+    - *apply_extensions_expansions
+    - *f_expansions_write
     - *get_buildnumber
     - *f_expansions_write
     - *set_up_credentials
@@ -3214,16 +3237,3 @@ functions:
           [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN]
         args:
           - "./src/evergreen/container_registry_login.sh"
-
-  "find all extensions":
-    - *f_expansions_write
-    - command: subprocess.exec
-      display_name: "find all extensions"
-      params:
-        binary: bash
-        args:
-          - "src/evergreen/functions/find_extensions.sh"
-    - command: expansions.update
-      params:
-        file: src/extension_paths.yml
-    - *f_expansions_write
