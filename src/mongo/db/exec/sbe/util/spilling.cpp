@@ -35,6 +35,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -77,6 +78,16 @@ static void storageUnavailableRetry(OperationContext* opCtx,
         Date_t::max(),
         Lock::InterruptBehavior::kThrow,
         Lock::GlobalLockOptions{.skipFlowControlTicket = true, .skipRSTLLock = true});
+}
+
+void updateSpillStorageStatsForOperation(OperationContext* opCtx, SpillTable* spillTable) {
+    if (!CurOp::get(opCtx)->debug().spillStorageStats) {
+        CurOp::get(opCtx)->debug().spillStorageStats =
+            spillTable->getOperationStatisticsSinceLastCall();
+        return;
+    }
+    *CurOp::get(opCtx)->debug().spillStorageStats +=
+        *spillTable->getOperationStatisticsSinceLastCall();
 }
 
 }  // namespace
@@ -261,6 +272,7 @@ void SpillingStore::switchToSpilling(OperationContext* opCtx) {
 }
 void SpillingStore::switchToOriginal(OperationContext* opCtx) {
     if (!_originalUnit) {
+        updateSpillStorageStatsForOperation(opCtx, _spillTable.get());
         return;
     }
 

@@ -386,6 +386,10 @@ Status SpillTable::rangeTruncate(OperationContext* opCtx,
         });
 }
 
+std::unique_ptr<StorageStats> SpillTable::getOperationStatisticsSinceLastCall() {
+    return _ru->computeOperationStatisticsSinceLastCall();
+}
+
 Status SpillTable::_checkDiskSpace() const {
     return _diskState && _diskState->full()
         ? Status(ErrorCodes::OutOfDiskSpace,
