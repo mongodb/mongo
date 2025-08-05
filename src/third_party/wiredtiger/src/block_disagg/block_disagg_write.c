@@ -153,8 +153,8 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
     blk->previous_checksum = block_meta->checksum;
     blk->checksum = 0;
     __block_disagg_header_byteswap(blk);
-    blk->checksum = checksum =
-      __wt_checksum(buf->mem, data_checksum ? buf->size : WT_BLOCK_COMPRESS_SKIP);
+    blk->checksum = checksum = __wt_checksum(
+      buf->mem, data_checksum ? buf->size : WT_MIN(buf->size, WT_BLOCK_COMPRESS_SKIP));
 
     put_args.backlink_lsn = block_meta->backlink_lsn;
     put_args.base_lsn = block_meta->base_lsn;
