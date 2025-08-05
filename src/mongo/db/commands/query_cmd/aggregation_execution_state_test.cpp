@@ -327,7 +327,7 @@ private:
 
 void AggregationExecutionStateTest::setUp() {
     ShardServerTestFixtureWithCatalogCacheMock::setUp();
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
     auto dbType = createTestDatabase(UUID::gen(), Timestamp(1, 0));
 

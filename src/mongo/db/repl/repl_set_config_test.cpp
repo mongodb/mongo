@@ -1009,8 +1009,7 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
         OID::gen()));
     ASSERT_FALSE(config2.getConfigServer_deprecated());
 
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
     ReplSetConfig config3;
@@ -1358,8 +1357,7 @@ TEST(ReplSetConfig, CheckConfigServerCantHaveSecondaryDelaySecs) {
 }
 
 TEST(ReplSetConfig, CheckConfigServerMustHaveTrueForWriteConcernMajorityJournalDefault) {
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
     ReplSetConfig configA;
     configA = ReplSetConfig::parse(BSON("_id" << "rs0"

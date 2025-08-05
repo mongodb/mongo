@@ -140,7 +140,7 @@ protected:
 
 void MultipleCollectionAccessorTest::setUp() {
     ShardServerTestFixture::setUp();
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
     // Create all the required collections
     for (const auto& nss : {mainNss, secondaryNss1, secondaryNss2}) {

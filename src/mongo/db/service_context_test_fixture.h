@@ -48,7 +48,7 @@ inline ClusterRole getClusterRole(ServerRoleIndex i) {
         case ServerRoleIndex::replicaSet:
             return ClusterRole::None;
         case ServerRoleIndex::shard:
-            return {ClusterRole::ShardServer, ClusterRole::RouterServer};
+            return ClusterRole::ShardServer;
         case ServerRoleIndex::router:
             return ClusterRole::RouterServer;
     }

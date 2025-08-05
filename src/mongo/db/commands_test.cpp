@@ -667,23 +667,17 @@ TEST_F(RouterCommandRegistryTest, ExecutePlanForService) {
     ASSERT_EQ(result.commandTypes, result.fullSet);
 }
 
-using ShardRouterCommandRegistryTest = CommandRegistryTest<ServerRoleIndex::shard>;
+using ShardCommandRegistryTest = CommandRegistryTest<ServerRoleIndex::shard>;
 
-TEST_F(ShardRouterCommandRegistryTest, ServicesInit) {
+TEST_F(ShardCommandRegistryTest, ServicesInit) {
     auto sc = getGlobalServiceContext();
     ASSERT(sc->getService(ClusterRole::ShardServer));
-    ASSERT(sc->getService(ClusterRole::RouterServer));
+    ASSERT(!sc->getService(ClusterRole::RouterServer));
 }
 
-TEST_F(ShardRouterCommandRegistryTest, ShardExecutePlanForService) {
+TEST_F(ShardCommandRegistryTest, ShardExecutePlanForService) {
     // The shard side of the shard+router ServiceContext.
     auto result = testExecutePlanForService(ClusterRole::ShardServer);
-    ASSERT_EQ(result.commandTypes, result.fullSet);
-}
-
-TEST_F(ShardRouterCommandRegistryTest, RouterExecutePlanForService) {
-    // The router side of the shard+router ServiceContext.
-    auto result = testExecutePlanForService(ClusterRole::RouterServer);
     ASSERT_EQ(result.commandTypes, result.fullSet);
 }
 

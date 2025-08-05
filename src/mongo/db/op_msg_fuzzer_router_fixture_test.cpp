@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,20 +27,33 @@
  *    it in the license file.
  */
 
-#pragma once
 
-#include "mongo/s/sharding_cluster_parameters_gen.h"
+#include "mongo/db/op_msg_fuzzer_router_fixture.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/unittest.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
+
 namespace mongo {
-namespace replica_set_endpoint {
+namespace {
 
-class ReplicaSetEndpointTest {
-protected:
-    void setHasTwoOrShardsClusterParameter(bool value);
+TEST(OpMsgFuzzerRouterFixtureTest, Ping) {
+    auto fixture = OpMsgFuzzerRouterFixture(/* skipGlobalInitializers */ true);
 
-    bool getHasTwoOrShardsClusterParameter();
-};
+    auto msg = [] {
+        OpMsgBuilder msgBuilder;
 
-}  // namespace replica_set_endpoint
+        msgBuilder.setBody(fromjson(R"({ ping: 1 })"));
+
+        return msgBuilder.finishWithoutSizeChecking();
+    }();
+    ASSERT_EQ(fixture.testOneInput(msg.buf(), msg.size()), 0);
+}
+
+}  // namespace
 }  // namespace mongo

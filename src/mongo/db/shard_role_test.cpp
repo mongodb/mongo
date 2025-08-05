@@ -177,7 +177,7 @@ protected:
 
 void ShardRoleTest::setUp() {
     ShardServerTestFixture::setUp();
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
     // Create nssUnshardedCollection1
     createTestCollection(operationContext(), nssUnshardedCollection1);

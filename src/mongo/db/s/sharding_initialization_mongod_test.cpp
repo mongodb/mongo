@@ -152,7 +152,7 @@ public:
     }
 
     ~ScopedSetStandaloneMode() {
-        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         _serviceContext->resetOpObserver_forTest([&] {
             auto opObserver = std::make_unique<OpObserverRegistry>();
             opObserver->addObserver(
@@ -368,7 +368,7 @@ TEST_F(
     ShardingInitializationMongoDTest,
     InitializeShardingAwarenessIfNeededQueryableBackupModeAndShardServerAndValidOverrideShardIdentity) {
     storageGlobalParams.queryableBackupMode = true;
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     serverGlobalParams.overrideShardIdentity = [&] {
         ShardIdentityType shardIdentity;
         shardIdentity.setConfigsvrConnectionString(
@@ -439,7 +439,7 @@ TEST_F(
  */
 TEST_F(ShardingInitializationMongoDTest,
        InitializeShardingAwarenessIfNeededNotQueryableBackupModeAndInvalidOverrideShardIdentity) {
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     serverGlobalParams.overrideShardIdentity = BSON("_id" << "shardIdentity"
                                                           << "configsvrConnectionString"
                                                           << "invalid");
@@ -457,7 +457,7 @@ TEST_F(ShardingInitializationMongoDTest,
 
 TEST_F(ShardingInitializationMongoDTest,
        InitializeShardingAwarenessIfNeededNotQueryableBackupModeAndValidOverrideShardIdentity) {
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     serverGlobalParams.overrideShardIdentity = [&] {
         ShardIdentityType shardIdentity;
         shardIdentity.setConfigsvrConnectionString(

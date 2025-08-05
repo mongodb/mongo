@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/op_msg_fuzzer_fixture.h"
+#include "mongo/db/op_msg_fuzzer_shard_fixture.h"
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -61,7 +61,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/rpc/message.h"
-#include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
@@ -84,7 +83,7 @@ constexpr auto kTempDirStem = "op_msg_fuzzer_fixture"_sd;
 
 // This must be called before creating any new threads that may access `AuthorizationManager` to
 // avoid a data-race.
-void OpMsgFuzzerFixture::_setAuthorizationManager() {
+void OpMsgFuzzerShardFixture::_setAuthorizationManager() {
     auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
     AuthorizationManager::set(
         _serviceContext->getService(),
@@ -92,14 +91,14 @@ void OpMsgFuzzerFixture::_setAuthorizationManager() {
     AuthorizationManager::get(_serviceContext->getService())->setAuthEnabled(true);
 }
 
-OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
+OpMsgFuzzerShardFixture::OpMsgFuzzerShardFixture(bool skipGlobalInitializers)
     : _dir(std::string{kTempDirStem}) {
     if (!skipGlobalInitializers) {
         auto ret = runGlobalInitializers(std::vector<std::string>{});
         invariant(ret);
     }
 
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
     setGlobalServiceContext(ServiceContext::make());
     _session = _transportLayer.createSession();
@@ -108,8 +107,6 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     _setAuthorizationManager();
     _serviceContext->getService(ClusterRole::ShardServer)
         ->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
-    _serviceContext->getService(ClusterRole::RouterServer)
-        ->setServiceEntryPoint(std::make_unique<ServiceEntryPointRouterRole>());
 
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
     _serviceContext->setOpObserver(std::move(observerRegistry));
@@ -118,8 +115,6 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
 
     _shardStrand = ClientStrand::make(
         _serviceContext->getService(ClusterRole::ShardServer)->makeClient("shardTest", _session));
-    _routerStrand = ClientStrand::make(
-        _serviceContext->getService(ClusterRole::RouterServer)->makeClient("routerTest", _session));
 
     auto clientGuard = _shardStrand->bind();
 
@@ -152,7 +147,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     _serviceContext->getStorageEngine()->notifyStorageStartupRecoveryComplete();
 }
 
-OpMsgFuzzerFixture::~OpMsgFuzzerFixture() {
+OpMsgFuzzerShardFixture::~OpMsgFuzzerShardFixture() {
     CollectionShardingStateFactory::clear(_serviceContext);
     DatabaseShardingStateFactory::clear(_serviceContext);
 
@@ -168,38 +163,30 @@ OpMsgFuzzerFixture::~OpMsgFuzzerFixture() {
                                                                     true /* memLeakAllowed */);
 }
 
-ClientStrand* OpMsgFuzzerFixture::_getStrand(ClusterRole role) {
-    return role.hasExclusively(ClusterRole::ShardServer) ? _shardStrand.get() : _routerStrand.get();
-}
-
-int OpMsgFuzzerFixture::testOneInput(const char* Data, size_t Size) {
+int OpMsgFuzzerShardFixture::testOneInput(const char* Data, size_t Size) {
     if (Size < sizeof(MSGHEADER::Value)) {
         return 0;
     }
 
-    auto testHandleRequest = [&](const ClusterRole& role) {
-        ClientStrand::Guard clientGuard = _getStrand(role)->bind();
+    ClientStrand::Guard clientGuard = _shardStrand->bind();
 
-        auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
-        VectorClockMutable::get(_serviceContext)->tickClusterTimeTo(kInMemoryLogicalTime);
+    auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
+    VectorClockMutable::get(_serviceContext)->tickClusterTimeTo(kInMemoryLogicalTime);
 
-        int new_size = Size + sizeof(int);
-        auto sb = SharedBuffer::allocate(new_size);
-        memcpy(sb.get(), &new_size, sizeof(int));
-        memcpy(sb.get() + sizeof(int), Data, Size);
-        Message msg(std::move(sb));
+    int new_size = Size + sizeof(int);
+    auto sb = SharedBuffer::allocate(new_size);
+    memcpy(sb.get(), &new_size, sizeof(int));
+    memcpy(sb.get() + sizeof(int), Data, Size);
+    Message msg(std::move(sb));
 
-        try {
-            _serviceContext->getService(role)
-                ->getServiceEntryPoint()
-                ->handleRequest(opCtx.get(), msg)
-                .get();
-        } catch (const AssertionException&) {
-            // We need to catch exceptions caused by invalid inputs
-        }
-    };
-    testHandleRequest(ClusterRole::ShardServer);
-    testHandleRequest(ClusterRole::RouterServer);
+    try {
+        _serviceContext->getService()
+            ->getServiceEntryPoint()
+            ->handleRequest(opCtx.get(), msg)
+            .get();
+    } catch (const AssertionException&) {
+        // We need to catch exceptions caused by invalid inputs
+    }
     return 0;
 }
 

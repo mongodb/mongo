@@ -45,13 +45,11 @@ namespace mongo {
  *
  * In essenence, this is equivalent to making a standalone mongod with a single client.
  */
-class OpMsgFuzzerFixture {
+class OpMsgFuzzerShardFixture {
 public:
-    OpMsgFuzzerFixture(bool skipGlobalInitializers = false);
+    OpMsgFuzzerShardFixture(bool skipGlobalInitializers = false);
 
-    ~OpMsgFuzzerFixture();
-
-    ClientStrand* _getStrand(ClusterRole role);
+    ~OpMsgFuzzerShardFixture();
 
     /**
      * Run a single operation as if it came from the network.
@@ -72,6 +70,5 @@ private:
     std::shared_ptr<transport::Session> _session;
 
     ClientStrandPtr _shardStrand;
-    ClientStrandPtr _routerStrand;
 };
 }  // namespace mongo

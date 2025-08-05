@@ -63,8 +63,7 @@ namespace {
 class ShardLocalTest : public ServiceContextMongoDTest {
 protected:
     ShardLocalTest() {
-        serverGlobalParams.clusterRole = {
-            ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     }
 
     ~ShardLocalTest() override {
