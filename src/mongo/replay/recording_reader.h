@@ -29,7 +29,9 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/traffic_reader.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -37,9 +39,12 @@ namespace mongo {
 class RecordingReader {
 public:
     RecordingReader(std::string filename) : filename(std::move(filename)) {}
-    std::vector<BSONObj> processRecording() const;
+    std::vector<TrafficReaderPacket> processRecording();
 
 private:
     std::string filename;
+    // Buffer containing data read from disk.
+    // TODO: SERVER-107823 removed when mmapped instead.
+    std::unique_ptr<char[]> buffer;
 };
 }  // namespace mongo

@@ -36,32 +36,17 @@
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_command_executor.h"
 #include "mongo/replay/replay_test_server.h"
+#include "mongo/replay/test_packet.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
 TEST(SessionHandlerTest, StartAndStopSession) {
     ReplayTestServer server;
 
-    BSONObj startRecordingBSON =
-        BSON("startTrafficRecording"
-             << "1.0" << "destination" << "rec" << "lsid"
-             << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")") << "$db" << "admin");
-
-    BSONObj stopRecordingBSON =
-        BSON("stopTrafficRecording"
-             << "1.0" << "destination" << "rec" << "lsid"
-             << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")") << "$db" << "admin");
-
-    RawOpDocument opDocStartRecording{"startTrafficRecording", startRecordingBSON};
-    opDocStartRecording.updateSeenField(Date_t::now());
-    ReplayCommand startRecording{opDocStartRecording.getDocument()};
-
-    RawOpDocument opDocStopRecording{"stopTrafficRecording", stopRecordingBSON};
-    opDocStopRecording.updateSeenField(Date_t::now() + Milliseconds(5));
-    ReplayCommand stopRecording{opDocStopRecording.getDocument()};
+    auto startRecording = cmds::start({.date = Date_t::now()});
+    auto stopRecording = cmds::stop({.date = Date_t::now() + Milliseconds(5)});
 
     {
         SessionHandler sessionHandler;
@@ -81,38 +66,20 @@ TEST(SessionHandlerTest, StartSessionSameSessionIDError) {
     ReplayTestServer server;
     const auto uri = server.getConnectionString();
 
-    BSONObj startRecording =
-        BSON("startTrafficRecording"
-             << "1.0" << "destination" << "rec" << "lsid"
-             << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")") << "$db" << "admin");
-    BSONObj stopRecording =
-        BSON("stopTrafficRecording"
-             << "1.0" << "destination" << "rec" << "lsid"
-             << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")") << "$db" << "admin");
-
-    RawOpDocument opDoc{"startTrafficRecording", startRecording};
-    opDoc.updateSeenField(Date_t::now());
-    opDoc.updateSessionId(1);
-    ReplayCommand commandStart1{opDoc.getDocument()};
+    auto commandStart1 = cmds::start({.date = Date_t::now()});
 
     {
         SessionHandler sessionHandler;
         sessionHandler.setStartTime(commandStart1.fetchRequestTimestamp());
         sessionHandler.onSessionStart(uri, commandStart1);
-        opDoc.updateSeenField(Date_t::now() + Milliseconds(100));
-        opDoc.updateSessionId(1);
-        ReplayCommand commandStart2{opDoc.getDocument()};
+        auto commandStart2 = cmds::start({.date = Date_t::now() + Milliseconds(100)});
         // this will throw. we can't have different sessions with same session id.
         ASSERT_THROWS_CODE(sessionHandler.onSessionStart(uri, commandStart2),
                            DBException,
                            ErrorCodes::ReplayClientSessionSimulationError);
 
-        // closig the first session and starting again with the same sessionId will work.
-
-        opDoc = RawOpDocument{"stopTrafficRecording", stopRecording};
-        opDoc.updateSeenField(Date_t::now());
-        opDoc.updateSessionId(1);
-        ReplayCommand commandStop1{opDoc.getDocument()};
+        // closing the first session and starting again with the same sessionId will work.
+        auto commandStop1 = cmds::stop({.date = Date_t::now()});
         sessionHandler.onSessionStop(commandStop1);
         // there should be 0 active sessions and 1 free session simulator to be re-used
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 0);
@@ -128,31 +95,14 @@ TEST(SessionHandlerTest, StartTwoSessionsDifferentSessionIDSameKey) {
     ReplayTestServer server;
     const auto uri = server.getConnectionString();
 
-    // start session 1
-    BSONObj startRecording =
-        BSON("startTrafficRecording"
-             << "1.0" << "destination" << "rec" << "lsid"
-             << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")") << "$db" << "admin");
-    RawOpDocument opDoc1{"startTrafficRecording", startRecording};
-    opDoc1.updateSeenField(Date_t::now());
-    opDoc1.updateSessionId(1);
-    ReplayCommand commandStart1{opDoc1.getDocument()};
+    // start command from session 1
+    auto commandStart1 = cmds::start({.id = 1, .date = Date_t::now()});
 
-    // start session2
-    RawOpDocument opDoc3{"startTrafficRecording", startRecording};
-    opDoc3.updateSeenField(Date_t::now());
-    opDoc3.updateSessionId(2);
-    ReplayCommand commandStart2{opDoc3.getDocument()};
+    // start command from session2
+    auto commandStart2 = cmds::start({.id = 2, .date = Date_t::now()});
 
-    // stop session1
-    BSONObj stopRecording =
-        BSON("stopTrafficRecording"
-             << "1.0" << "destination" << "rec" << "lsid"
-             << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")") << "$db" << "admin");
-    RawOpDocument opDoc2 = RawOpDocument{"stopTrafficRecording", stopRecording};
-    opDoc2.updateSeenField(Date_t::now());
-    opDoc2.updateSessionId(1);
-    ReplayCommand commandStop1{opDoc2.getDocument()};
+    // stop command from session1
+    auto commandStop1 = cmds::stop({.date = Date_t::now()});
 
     {
         SessionHandler sessionHandler;
@@ -177,35 +127,21 @@ TEST(SessionHandlerTest, StartTwoSessionsDifferentSessionIDSameKey) {
 
 TEST(SessionHandlerTest, ExecuteCommand) {
     // start
-    BSONObj startRecordingBSON =
-        BSON("startTrafficRecording"
-             << "1.0" << "destination" << "rec" << "lsid"
-             << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")") << "$db" << "admin");
-    RawOpDocument opDocStartRecording{"startTrafficRecording", startRecordingBSON};
-    opDocStartRecording.updateSeenField(Date_t::now());
-    ReplayCommand startRecording{opDocStartRecording.getDocument()};
+    auto startRecording = cmds::start({.date = Date_t::now()});
 
     // stop
-    BSONObj stopRecordingBSON =
-        BSON("stopTrafficRecording"
-             << "1.0" << "destination" << "rec" << "lsid"
-             << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")") << "$db" << "admin");
-    RawOpDocument opDocStopRecording{"stopTrafficRecording", stopRecordingBSON};
-    opDocStopRecording.updateSeenField(Date_t::now() + Milliseconds(20));
-    ReplayCommand stopRecording{opDocStopRecording.getDocument()};
+    auto stopRecording = cmds::stop({.date = Date_t::now() + Milliseconds(20)});
 
     // find
     BSONObj filterBSON = BSON("name" << "Alice");
-    BSONObj findCommandBSON = BSON("find" << "test" << "$db" << "test" << "filter" << filterBSON);
+    auto findCommand = cmds::find({.date = Date_t::now() + Milliseconds(10)}, filterBSON);
+
+
     std::string jsonStr = R"([{
     "_id": "681cb423980b72695075137f",
     "name": "Alice",
     "age": 30,
     "city": "New York"}])";
-    RawOpDocument findDoc{"find", findCommandBSON};
-    findDoc.updateSeenField(Date_t::now() + Milliseconds(10));
-    ReplayCommand findCommand{findDoc.getDocument()};
-
     // server
     ReplayTestServer server{{"find"}, {jsonStr}};
     const auto uri = server.getConnectionString();

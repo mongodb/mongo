@@ -41,17 +41,16 @@ void SessionHandler::setStartTime(Date_t recordStartTime) {
     _recordStartTime = recordStartTime;
 }
 
-void SessionHandler::onSessionStart(StringData uri, const ReplayCommand& startCommand) {
-    uassert(ErrorCodes::ReplayClientSessionSimulationError,
-            "Error, failed the command does not represent a start recording event.",
-            startCommand.isStartRecording());
-
-    const auto& [eventTimestamp, sessionId] = extractTimeStampAndSessionFromCommand(startCommand);
+void SessionHandler::onSessionStart(StringData uri, Date_t eventTimestamp, int64_t sessionId) {
     addToRunningSessionCache(sessionId);
     // now initialize the session.
     auto& session = getSessionSimulator(sessionId);
     // connects to the server
     session.start(uri, _replayStartTime, _recordStartTime, eventTimestamp);
+}
+void SessionHandler::onSessionStart(StringData uri, const ReplayCommand& command) {
+    auto [ts, sid] = extractTimeStampAndSessionFromCommand(command);
+    onSessionStart(uri, ts, sid);
 }
 
 void SessionHandler::onSessionStop(const ReplayCommand& stopCommand) {
@@ -73,7 +72,7 @@ void SessionHandler::onBsonCommand(StringData uri, const ReplayCommand& command)
     if (!isSessionActive(sessionId)) {
         // TODO SERVER-105627: When session start event will be added remove this code. This is
         // needed for making integration tests pass.
-        createNewSessionOnNewCommand(uri, sessionId);
+        createNewSessionOnNewCommand(uri, timestamp, sessionId);
     }
     const auto& session = getSessionSimulator(sessionId);
     session.run(command, timestamp);
@@ -111,13 +110,6 @@ const SessionSimulator& SessionHandler::getSessionSimulator(SessionHandler::key_
     return *(_runningSessions.at(key));
 }
 
-std::pair<Date_t, int64_t> SessionHandler::extractTimeStampAndSessionFromCommand(
-    const ReplayCommand& command) const {
-    const Date_t timestamp = command.fetchRequestTimestamp();
-    const int64_t sessionId = command.fetchRequestSessionId();
-    return {timestamp, sessionId};
-}
-
 bool SessionHandler::isSessionActive(SessionHandler::key_t key) {
     return _runningSessions.contains(key);
 }
@@ -125,19 +117,10 @@ bool SessionHandler::isSessionActive(SessionHandler::key_t key) const {
     return _runningSessions.contains(key);
 }
 
-void SessionHandler::createNewSessionOnNewCommand(StringData uri, int64_t sessionId) {
-    // TODO SERVER-105627: This is simulating a start traffic recording event. Because right now we
-    // don't have such event in the recording. It needs to be simulated until we won't provide a
-    // proper event. Otherwise no recording could be played.
-    BSONObj startRecording =
-        BSON("startTrafficRecording"
-             << "1.0" << "destination" << "rec" << "lsid"
-             << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")") << "$db" << "admin");
-    RawOpDocument opDoc{"startTrafficRecording", startRecording};
-    opDoc.updateSeenField(Date_t::now());
-    opDoc.updateSessionId(sessionId);
-    ReplayCommand commandStart{opDoc.getDocument()};
-    onSessionStart(uri, commandStart);
+void SessionHandler::createNewSessionOnNewCommand(StringData uri,
+                                                  Date_t timestamp,
+                                                  int64_t sessionId) {
+    onSessionStart(uri, timestamp, sessionId);
 }
 
 

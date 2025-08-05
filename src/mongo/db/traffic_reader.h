@@ -37,9 +37,20 @@
 
 namespace mongo {
 
+// Packet struct
+struct TrafficReaderPacket {
+    uint64_t id;
+    StringData session;
+    Date_t date;
+    uint64_t order;
+    MsgData::ConstView message;
+};
+
 // Method for testing, takes the recorded traffic and returns a BSONArray
 BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile);
 
 // This is the function that traffic_reader_main.cpp calls
 void trafficRecordingFileToMongoReplayFile(int inFile, std::ostream& outFile);
+
+boost::optional<TrafficReaderPacket> maybeReadPacket(ConstDataRangeCursor& cdr);
 }  // namespace mongo

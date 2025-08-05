@@ -42,7 +42,6 @@
 #include <string>
 
 namespace mongo {
-
 /**
  * Helper class for for applying a callable to a container of N elements,
  * spawning a new thread for each element.
@@ -158,6 +157,13 @@ private:
     std::exception_ptr exception = nullptr;
 };
 
+static std::unordered_set<std::string> forbiddenKeywords{
+    "legacy", "cursor", "endSessions", "ok", "isWritablePrimary", "n"};
+
+bool isReplayable(const std::string& commandType) {
+    return !commandType.empty() && !forbiddenKeywords.contains(commandType);
+}
+
 /**
  * Consumes a collection of recording files from a _single_ node.
  *
@@ -184,6 +190,9 @@ void recordingDispatcher(mongo::stop_token stop, const ReplayConfig& replayConfi
                 return;
             }
             ReplayCommand command{bsonCommand};
+            if (!isReplayable(command.parseOpType())) {
+                continue;
+            }
             if (command.isStartRecording()) {
                 // will associated the URI to a session task and run all the commands associated
                 // with this session id.

@@ -85,15 +85,6 @@ namespace mongo {
 
 namespace {
 
-// Packet struct
-struct TrafficReaderPacket {
-    uint64_t id;
-    StringData session;
-    Date_t date;
-    uint64_t order;
-    MsgData::ConstView message;
-};
-
 bool readBytes(size_t toRead, char* buf, int fd) {
     while (toRead) {
 #ifdef _WIN32
@@ -121,6 +112,18 @@ bool readBytes(size_t toRead, char* buf, int fd) {
     return true;
 }
 
+TrafficReaderPacket readPacket(ConstDataRangeCursor cdr) {
+    // Read the packet
+    cdr.skip<LittleEndian<uint32_t>>();
+    uint64_t id = cdr.readAndAdvance<LittleEndian<uint64_t>>();
+    StringData session = cdr.readAndAdvance<Terminated<'\0', StringData>>();
+    uint64_t date = cdr.readAndAdvance<LittleEndian<uint64_t>>();
+    uint64_t order = cdr.readAndAdvance<LittleEndian<uint64_t>>();
+    MsgData::ConstView message(cdr.data());
+
+    return TrafficReaderPacket{id, session, Date_t::fromMillisSinceEpoch(date), order, message};
+}
+
 boost::optional<TrafficReaderPacket> readPacket(char* buf, int fd) {
     if (!readBytes(4, buf, fd)) {
         return boost::none;
@@ -131,16 +134,7 @@ boost::optional<TrafficReaderPacket> readPacket(char* buf, int fd) {
     uassert(
         ErrorCodes::FailedToParse, "could not read full packet", readBytes(len - 4, buf + 4, fd));
 
-    ConstDataRangeCursor cdr(buf, buf + len);
-
-    // Read the packet
-    cdr.skip<LittleEndian<uint32_t>>();
-    uint64_t id = cdr.readAndAdvance<LittleEndian<uint64_t>>();
-    StringData session = cdr.readAndAdvance<Terminated<'\0', StringData>>();
-    uint64_t date = cdr.readAndAdvance<LittleEndian<uint64_t>>();
-    uint64_t order = cdr.readAndAdvance<LittleEndian<uint64_t>>();
-    MsgData::ConstView message(cdr.data());
-    return TrafficReaderPacket{id, session, Date_t::fromMillisSinceEpoch(date), order, message};
+    return readPacket(ConstDataRangeCursor(buf, buf + len));
 }
 
 void getBSONObjFromPacket(TrafficReaderPacket& packet, BSONObjBuilder* builder) {
@@ -267,6 +261,19 @@ void trafficRecordingFileToMongoReplayFile(int inputFd, std::ostream& outputStre
 
         bob.resetToEmpty();
     }
+}
+
+boost::optional<TrafficReaderPacket> maybeReadPacket(ConstDataRangeCursor& cdr) {
+    if (cdr.length() < 4) {
+        return {};
+    }
+    auto len = cdr.read<LittleEndian<uint32_t>>().value;
+
+    uassert(ErrorCodes::FailedToParse, "packet too large", len < MaxMessageSizeBytes);
+    uassert(ErrorCodes::FailedToParse, "could not read full packet", cdr.length() >= len);
+    auto packet = mongo::readPacket(cdr.slice(size_t(len)));
+    cdr.advance(len);
+    return packet;
 }
 
 }  // namespace mongo

@@ -66,6 +66,8 @@ mongo_cc_unit_test(
         "session_handler_test.cpp",
         "session_scheduler_test.cpp",
         "session_simulator_test.cpp",
+        "test_packet.cpp",
+        "test_packet.h",
     ],
     tags = ["mongo_unittest_sixth_group"],
     deps = [

@@ -30,6 +30,7 @@
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/traffic_reader.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/time_support.h"
@@ -40,7 +41,7 @@
 namespace mongo {
 class ReplayCommand {
 public:
-    explicit ReplayCommand(BSONObj bson) : _bsonCommand(std::move(bson)) {}
+    explicit ReplayCommand(TrafficReaderPacket packet) : _packet(std::move(packet)) {}
     /*
      * Converts a command to replay into an internal server msg request that is used to execute the
      * command.
@@ -64,29 +65,32 @@ public:
     /** Mostly for debugging purposes, converts the replay command to string. */
     std::string toString() const;
 
+    /**
+     * Extract opType. It represents the type of the command to execute. Start and Stop recording
+     * are 2 special commands to start and stop the simulation. OpType cannot be an empty string.
+     */
+    std::string parseOpType() const;
+
 
 private:
     /** Extract the actual message body containing the actual bson command containing the query */
-    OpMsgRequest parseBody(BSONObj command) const;
+    OpMsgRequest parseBody() const;
 
     /*
      * Extract timestamp of when the command was recorded on the server and use it for deciding
      * whether to replay the command or not
      */
-    Date_t parseSeenTimestamp(BSONObj command) const;
+    Date_t parseSeenTimestamp() const;
 
     /*
      * Extract sessionId. Used for pinning the command to a session simulator
      */
-    int64_t parseSessionId(BSONObj command) const;
+    int64_t parseSessionId() const;
 
-    /**
-     * Extract opType. It represents the type of the command to execute. Start and Stop recording
-     * are 2 special commands to start and stop the simulation. OpType cannot be an empty string.
-     */
-    std::string parseOpType(BSONObj command) const;
 
-    BSONObj _bsonCommand;
+    TrafficReaderPacket _packet;
 };
+
+std::pair<Date_t, int64_t> extractTimeStampAndSessionFromCommand(const ReplayCommand& command);
 
 }  // namespace mongo

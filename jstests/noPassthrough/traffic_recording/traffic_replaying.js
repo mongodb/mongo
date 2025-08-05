@@ -93,7 +93,7 @@ assert.throwsWithCode(() => replayWorkloadRecordingFile("foo", "bar", "baz"),
                       ErrorCodes.FailedToParse);
 
 // Invalid directory
-assert.throwsWithCode(() => replayWorkloadRecordingFile("asdf", "asdf"), ErrorCodes.FileNotOpen);
+assert.throwsWithCode(() => replayWorkloadRecordingFile("asdf", "asdf"), ErrorCodes.FileOpenFailed);
 
 // Empty directory
 // Burn-in runs multiple instances; ensure directory is unique.
@@ -107,7 +107,8 @@ removeFile(realDirectory);
 
 // ======================================================================================== //
 // Recording
-const initialResults = runInstances("traffic_recording", "recordings", defaultOperationsLambda);
+const initialResults =
+    runInstances("traffic_recording_" + UUID().hex(), "recordings", defaultOperationsLambda);
 assert.eq(initialResults.opTypes['serverStatus'], 1);
 assert.eq(initialResults.opTypes['insert'], 2);
 assert.eq(initialResults.opTypes['find'], 2);
@@ -119,16 +120,17 @@ assert.eq(initialResults.opTypes['stopTrafficRecording'], 1);
 
 // ======================================================================================== //
 // Replaying
-const replayResults = runInstances("replayed_recording", "replayed_recordings", (dbContext) => {
-    const {
-        testDB,
-        coll,
-        serverURI  // uri of the shadow cluster server.
-    } = dbContext;
-    const recordingFilePath = initialResults.recordingFilePath;
-    const replayingFilePath = replayWorkloadLambda(recordingFilePath, serverURI);
-    return replayingFilePath;
-});
+const replayResults =
+    runInstances("replayed_recording_" + UUID().hex(), "replayed_recordings", (dbContext) => {
+        const {
+            testDB,
+            coll,
+            serverURI  // uri of the shadow cluster server.
+        } = dbContext;
+        const recordingFilePath = initialResults.recordingFilePath;
+        const replayingFilePath = replayWorkloadLambda(recordingFilePath, serverURI);
+        return replayingFilePath;
+    });
 // in order to compute the filepath, we issue a server status inside runInstances, this plus the
 // one recorded will bring total count to 2.
 assert.eq(replayResults.opTypes['serverStatus'], 2);

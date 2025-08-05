@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/traffic_reader.h"
 #include "mongo/replay/session_simulator.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
@@ -49,7 +50,8 @@ public:
      * Start a new session given uri and start session recorded command. Returns the key for the
      * session just started
      */
-    void onSessionStart(StringData, const ReplayCommand&);
+    void onSessionStart(StringData, Date_t eventTimestamp, int64_t sessionId);
+    void onSessionStart(StringData, const ReplayCommand& command);
     /**
      * Stop the session started with the key provided as argument and use the stop command received
      */
@@ -83,8 +85,6 @@ private:
     SessionSimulator& getSessionSimulator(key_t);
     const SessionSimulator& getSessionSimulator(key_t) const;
 
-    std::pair<Date_t, int64_t> extractTimeStampAndSessionFromCommand(const ReplayCommand&) const;
-
-    void createNewSessionOnNewCommand(StringData, int64_t);
+    void createNewSessionOnNewCommand(StringData, Date_t timestamp, int64_t sessionId);
 };
 }  // namespace mongo

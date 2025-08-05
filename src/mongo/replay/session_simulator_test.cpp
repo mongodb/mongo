@@ -37,6 +37,7 @@
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_command_executor.h"
 #include "mongo/replay/replay_test_server.h"
+#include "mongo/replay/test_packet.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -77,11 +78,8 @@ auto operator+(const MongoDur& mongoDuration,
 }
 TEST(SessionSimulatorTest, TestSimpleCommandNoWait) {
 
-    BSONObj filter = BSON("name" << "Alice");
-    BSONObj findCommand = BSON("find" << "test"
-                                      << "$db"
-                                      << "test"
-                                      << "filter" << filter);
+    auto packet = TestReaderPacket::find(BSON("name" << "Alice"));
+
     std::string jsonStr = R"([{
     "_id": "681cb423980b72695075137f",
     "name": "Alice",
@@ -105,10 +103,9 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWait) {
         sessionSimulator.start(uri, begin, recordingStartTimestamp, eventTimestamp);
 
         using namespace std::chrono_literals;
-        RawOpDocument opDoc{"find", findCommand};
         eventTimestamp = recordingStartTimestamp + 1s;
-        opDoc.updateSeenField(eventTimestamp);
-        ReplayCommand command{opDoc.getDocument()};
+        packet.date = eventTimestamp;
+        ReplayCommand command{packet};
         // For the next call to now(), report the replay is 1s in - the same time the find should be
         // issued at.
         sessionSimulator.nowHook.ret(begin + 1s);
@@ -120,12 +117,8 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWait) {
 }
 
 TEST(SessionSimulatorTest, TestSimpleCommandWait) {
+    auto packet = TestReaderPacket::find(BSON("name" << "Alice"));
 
-    BSONObj filter = BSON("name" << "Alice");
-    BSONObj findCommand = BSON("find" << "test"
-                                      << "$db"
-                                      << "test"
-                                      << "filter" << filter);
     std::string jsonStr = R"([{
     "_id": "681cb423980b72695075137f",
     "name": "Alice",
@@ -156,11 +149,9 @@ TEST(SessionSimulatorTest, TestSimpleCommandWait) {
 
 
         // Issue a find request at 5s into the recording
-
-        RawOpDocument opDoc{"find", findCommand};
         eventTimestamp = recordingStartTimestamp + 5s;
-        opDoc.updateSeenField(eventTimestamp);
-        ReplayCommand command{opDoc.getDocument()};
+        packet.date = eventTimestamp;
+        ReplayCommand command{packet};
 
         // Report "now" as if time has advanced to when the session started.
         sessionSimulator.nowHook.ret(begin + 2s);
@@ -176,13 +167,9 @@ TEST(SessionSimulatorTest, TestSimpleCommandWait) {
 }
 
 TEST(SessionSimulatorTest, TestSimpleCommandNoWaitTimeInThePast) {
-
     // Simulate a real scenario where time is in the past. No wait should happen.
-    BSONObj filter = BSON("name" << "Alice");
-    BSONObj findCommand = BSON("find" << "test"
-                                      << "$db"
-                                      << "test"
-                                      << "filter" << filter);
+    auto packet = TestReaderPacket::find(BSON("name" << "Alice"));
+
     std::string jsonStr = R"([{
     "_id": "681cb423980b72695075137f",
     "name": "Alice",
@@ -208,10 +195,9 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWaitTimeInThePast) {
 
         sessionSimulator.start(uri, begin, recordingStartTimestamp, eventTimestamp);
 
-        RawOpDocument opDoc{"find", findCommand};
         eventTimestamp = recordingStartTimestamp + 2s;
-        opDoc.updateSeenField(eventTimestamp);
-        ReplayCommand command{opDoc.getDocument()};
+        packet.date = eventTimestamp;
+        ReplayCommand command{packet};
 
         // Replay is also "late" trying to replay this find, so should not sleep.
         sessionSimulator.nowHook.ret(begin + 10s);

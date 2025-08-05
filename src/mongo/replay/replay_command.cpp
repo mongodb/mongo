@@ -37,6 +37,7 @@
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/shared_buffer.h"
 
 #include <exception>
 
@@ -44,7 +45,7 @@ namespace mongo {
 
 OpMsgRequest ReplayCommand::fetchMsgRequest() const {
     try {
-        return parseBody(_bsonCommand);
+        return parseBody();
     } catch (const DBException& e) {
         auto lastError = e.toStatus();
         tasserted(ErrorCodes::ReplayClientFailedToProcessBSON, lastError.reason());
@@ -55,7 +56,7 @@ OpMsgRequest ReplayCommand::fetchMsgRequest() const {
 
 Date_t ReplayCommand::fetchRequestTimestamp() const {
     try {
-        return parseSeenTimestamp(_bsonCommand);
+        return parseSeenTimestamp();
     } catch (const DBException& e) {
         auto lastError = e.toStatus();
         tasserted(ErrorCodes::ReplayClientFailedToProcessBSON, lastError.reason());
@@ -66,7 +67,7 @@ Date_t ReplayCommand::fetchRequestTimestamp() const {
 
 int64_t ReplayCommand::fetchRequestSessionId() const {
     try {
-        return parseSessionId(_bsonCommand);
+        return parseSessionId();
     } catch (const DBException& e) {
         auto lastError = e.toStatus();
         tasserted(ErrorCodes::ReplayClientFailedToProcessBSON, lastError.reason());
@@ -80,110 +81,43 @@ std::string ReplayCommand::toString() const {
     return messageRequest.body.toString();
 }
 
-OpMsgRequest ReplayCommand::parseBody(BSONObj command) const {
-    // "rawop": {
-    //    "header": { messagelength: 339, requestid: 2, responseto: 0, opcode: 2004 },
-    //    "body": BinData(0, ...),
-    //  },
-    //   "seen": {
-    //     "sec": 63883941272,
-    //     "nsec": 8
-    //   },
-    //   "session": {
-    //     "remote": "127.0.0.1:54482",
-    //     "local": "127.0.0.1:27017"
-    //   },
-    //   "order": 8,
-    //   "seenconnectionnum": 3,
-    //   "playedconnectionnum": 0,
-    //   "generation": 0,
-    //   "opType": "find" }
-
-    tassert(ErrorCodes::InternalError,
-            "Ill-formed document. rawop is not a valid field",
-            command.hasField("rawop"));
-
-    BSONElement rawop = command["rawop"];
-
-    tassert(ErrorCodes::InternalError,
-            "Ill-formed document. body is not a valid field",
-            rawop.Obj().hasField("body"));
-
-    BSONElement bodyElem = rawop["body"];
-    int len = 0;
-    const char* data = static_cast<const char*>(bodyElem.binDataClean(len));
+OpMsgRequest ReplayCommand::parseBody() const {
     Message message;
-    const auto layoutSize = sizeof(MsgData::Layout);
-    message.setData(dbMsg, data + layoutSize, len - layoutSize);
+    // TODO: SERVER-107809 setData here copies the message unnecessarily.
+    // OpMsg should be changed to allow parsing from a "view" type.
+    message.setData(dbMsg, _packet.message.data(), _packet.message.dataLen());
     OpMsg::removeChecksum(&message);
     return rpc::opMsgRequestFromAnyProtocol(message);
 }
 
-Date_t ReplayCommand::parseSeenTimestamp(BSONObj command) const {
-
-    tassert(ErrorCodes::ReplayClientFailedToProcessBSON,
-            "Ill-formed document. rawop is not a valid field",
-            command.hasField("rawop"));
-
-    tassert(ErrorCodes::ReplayClientFailedToProcessBSON,
-            "Ill-formed document. Seen is not a valid field",
-            command.hasField("seen"));
-
-    BSONElement seenElem = command["seen"];
-
-    tassert(ErrorCodes::ReplayClientFailedToProcessBSON,
-            "Ill-formed recording document. `seen` does not have nested fields",
-            seenElem.type() == BSONType::object);
-
-    auto sec = seenElem["sec"].numberLong();
-    auto nano = seenElem["nsec"].numberLong();
-    // TODO SERVER-106702 will handle timestamps accordingly.
-    static constexpr long long unixToInternal = 62135596800LL;
-    uint64_t unixSeconds = sec - unixToInternal;
-    unixSeconds += nano;
-    return Date_t::fromMillisSinceEpoch(unixSeconds);
+Date_t ReplayCommand::parseSeenTimestamp() const {
+    return _packet.date;
 }
 
-int64_t ReplayCommand::parseSessionId(BSONObj command) const {
-
-    tassert(ErrorCodes::ReplayClientFailedToProcessBSON,
-            "Ill-formed document. rawop is not a valid field",
-            command.hasField("rawop"));
-
-    tassert(ErrorCodes::ReplayClientFailedToProcessBSON,
-            "Ill-formed document. Session id is not present",
-            command.hasField("seenconnectionnum"));
-
-    BSONElement sessionElem = command["seenconnectionnum"];
-
-    tassert(ErrorCodes::ReplayClientFailedToProcessBSON,
-            "Ill-formed recording document. SessionId is not a scalar type",
-            sessionElem.type() == BSONType::numberLong);
-
-    return sessionElem.Long();
+int64_t ReplayCommand::parseSessionId() const {
+    return _packet.id;
 }
 
-std::string ReplayCommand::parseOpType(BSONObj command) const {
-    tassert(ErrorCodes::InternalError,
-            "failed to parse bson commands, opType must be present",
-            command.hasField("opType"));
-    BSONElement opTypeElem = command["opType"];
-    tassert(ErrorCodes::InternalError,
-            "failed to parse bson commands, opType must be a string",
-            opTypeElem.type() == BSONType::string);
-    auto opType = opTypeElem.String();
-    tassert(ErrorCodes::InternalError,
-            "failed to parse bson commands, opType must not be empty",
-            !opType.empty());
-    return opType;
+std::string ReplayCommand::parseOpType() const {
+    if (_packet.message.getNetworkOp() == dbMsg) {
+        return std::string(parseBody().getCommandName());
+    } else {
+        return "legacy";
+    }
 }
 
 bool ReplayCommand::isStartRecording() const {
-    return parseOpType(_bsonCommand) == "startTrafficRecording";
+    return parseOpType() == "startTrafficRecording";
 }
 
 bool ReplayCommand::isStopRecording() const {
-    return parseOpType(_bsonCommand) == "stopTrafficRecording";
+    return parseOpType() == "stopTrafficRecording";
+}
+
+std::pair<Date_t, int64_t> extractTimeStampAndSessionFromCommand(const ReplayCommand& command) {
+    const Date_t timestamp = command.fetchRequestTimestamp();
+    const int64_t sessionId = command.fetchRequestSessionId();
+    return {timestamp, sessionId};
 }
 
 }  // namespace mongo

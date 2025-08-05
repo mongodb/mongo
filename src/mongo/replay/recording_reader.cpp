@@ -28,69 +28,43 @@
  */
 #include "mongo/replay/recording_reader.h"
 
+#include "mongo/base/data_range_cursor.h"
 #include "mongo/db/traffic_reader.h"
+#include "mongo/util/assert_util.h"
 
+#include <exception>
+#include <filesystem>
+#include <fstream>
+#include <ios>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace mongo {
 
-static std::unordered_set<std::string> forbiddenKeywords{
-    "legacy", "cursor", "endSessions", "ok", "isWritablePrimary", "n"};
+std::vector<TrafficReaderPacket> RecordingReader::processRecording() {
+    size_t size = 0;
+    std::ifstream f;
 
-inline bool isReplayable(const std::string& commandType) {
-    return !commandType.empty() && !forbiddenKeywords.contains(commandType);
-}
-
-std::vector<BSONObj> RecordingReader::processRecording() const {
-
-    // recording format.
-    // {
-    //   "rawop": {
-    //     "header": {
-    //       "messagelength": 120,
-    //       "requestid": 3,
-    //       "responseto": 0,
-    //       "opcode": 2013
-    //     },
-    //     "body": "BinData(0, ...)"
-    //   },
-    //   "seen": {
-    //     "sec": 63883941272,
-    //     "nsec": 8
-    //   },
-    //   "session": {
-    //     "remote": "127.0.0.1:54482",
-    //     "local": "127.0.0.1:27017"
-    //   },
-    //   "order": 8,
-    //   "seenconnectionnum": 3,
-    //   "playedconnectionnum": 0,
-    //   "generation": 0,
-    //   "opType": "find"
-    // }
-
-    std::vector<BSONObj> res;
-    BSONArray array = trafficRecordingFileToBSONArr(filename);
-    BSONObjIterator it(array);
-    while (it.more()) {
-        BSONElement elem = it.next();
-        std::string opType;
-        BSONElement opTypeElem = elem["opType"];
-        if (opTypeElem.type() == BSONType::string) {
-            opType = opTypeElem.String();
-        }
-
-        // skip all the messages we are neither able to parse
-        // nor we care about (for now)
-        if (!isReplayable(opType))
-            continue;
-
-        if (elem.type() == BSONType::object) {
-            // leave the interpretation of the binary data to replay command
-            res.push_back(elem.Obj().copy());
-        }
+    try {
+        size = std::filesystem::file_size(filename);
+        f.exceptions(std::ifstream::badbit | std::ifstream::failbit);
+        f.open(filename, std::ios_base::in | std::ios_base::binary);
+    } catch (const std::exception&) {
+        uasserted(ErrorCodes::FileOpenFailed, "Couldn't open recording file");
     }
+
+    buffer = std::make_unique<char[]>(size);
+    f.read(buffer.get(), size);
+
+    std::vector<TrafficReaderPacket> res;
+
+    ConstDataRangeCursor cdr(buffer.get(), size);
+
+    while (auto packet = maybeReadPacket(cdr)) {
+        res.push_back(*packet);
+    }
+
     return res;
 }
 }  // namespace mongo

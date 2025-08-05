@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/replay/rawop_document.h"
 #include "mongo/replay/replay_test_server.h"
+#include "mongo/replay/test_packet.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -52,11 +53,8 @@ TEST(ReplayCommandTest, TestFind) {
     BSONObj projection = BSON("_id" << 1 << "name" << 1 << "price" << 1 << "supplier.name"
                                     << 1  // Include nested "supplier.name"
     );
-    BSONObj findCommand = BSON("find" << "test"
-                                      << "$db" << "test"
-                                      << "filter" << filter << "projection" << projection);
-    RawOpDocument opDoc{"find", findCommand};
-    ReplayCommand command{opDoc.getDocument()};
+
+    auto command = cmds::find({}, filter, projection);
     OpMsgRequest m = command.fetchMsgRequest();
     ASSERT_TRUE(m.body.toString() == command.toString());
 }
@@ -82,11 +80,7 @@ TEST(ReplayCommandTest, TestInsert) {
                                    << "stock" << 100 << "discounted" << true << "supplier"
                                    << BSON("name" << "SupplierC" << "region" << "US"));
 
-    BSONObj insertCommand = BSON("insert" << "test" << "$db" << "test" << "documents"
-                                          << BSON_ARRAY(document1 << document2 << document3));
-
-    RawOpDocument opDoc{"insert", insertCommand};
-    ReplayCommand command{opDoc.getDocument()};
+    auto command = cmds::insert({}, BSON_ARRAY(document1 << document2 << document3));
     OpMsgRequest m = command.fetchMsgRequest();
     ASSERT_TRUE(m.body.toString() == command.toString());
 }
@@ -99,34 +93,21 @@ TEST(ReplayCommandTest, TestAggregate) {
     BSONObj projectStage =
         BSON("$project" << BSON("category" << "$_id" << "totalStock" << 1 << "_id" << 0));
     BSONArray pipeline = BSON_ARRAY(matchStage << groupStage << projectStage);
-    BSONObj aggregateCommand =
-        BSON("aggregate" << "test" << "$db" << "test" << "pipeline" << pipeline << "cursor"
-                         << BSON("batchSize" << 100));
-    RawOpDocument opDoc{"aggregate", aggregateCommand};
-    ReplayCommand command{opDoc.getDocument()};
+
+    auto command = cmds::aggregate({}, pipeline);
     OpMsgRequest m = command.fetchMsgRequest();
     ASSERT_TRUE(m.body.toString() == command.toString());
 }
 
 TEST(ReplayCommandTest, TestStartRecording) {
-    BSONObj startRecording =
-        BSON("startTrafficRecording"
-             << "1.0" << "destination" << "rec" << "lsid"
-             << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")") << "$db" << "admin");
-    RawOpDocument opDoc{"startTrafficRecording", startRecording};
-    ReplayCommand command{opDoc.getDocument()};
+    auto command = cmds::start({});
     OpMsgRequest m = command.fetchMsgRequest();
     ASSERT_TRUE(m.body.toString() == command.toString());
     ASSERT_TRUE(command.isStartRecording());
 }
 
 TEST(ReplayCommandTest, TestStopRecording) {
-    BSONObj stopRecording =
-        BSON("stopTrafficRecording"
-             << "1.0" << "lsid" << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")")
-             << "$db" << "admin");
-    RawOpDocument opDoc{"stopTrafficRecording", stopRecording};
-    ReplayCommand command{opDoc.getDocument()};
+    auto command = cmds::stop({});
     OpMsgRequest m = command.fetchMsgRequest();
     ASSERT_TRUE(m.body.toString() == command.toString());
     ASSERT_TRUE(command.isStopRecording());

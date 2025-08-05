@@ -38,6 +38,7 @@
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_command_executor.h"
 #include "mongo/replay/replay_test_server.h"
+#include "mongo/replay/test_packet.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/synchronized_value.h"
@@ -55,22 +56,22 @@ namespace mongo {
 
 class SessionSchedulerTest : public unittest::Test {
 public:
-    using Commands = std::vector<std::pair<std::string, BSONObj>>;
+    using Commands = std::vector<std::pair<std::string, TestReaderPacket>>;
 
     void setUp() override {
         // basic setup for the session pool tests.
         BSONObj filter = BSON("name" << "Alice");
-        BSONObj findCommand = BSON("find" << "test" << "$db" << "test" << "filter" << filter);
+        auto findCommand = TestReaderPacket::find(filter);
         _jsonStr = R"([{  
         "_id": "681cb423980b72695075137f",  
         "name": "Alice",  
         "age": 30,  
         "city": "New York"}])";
         // only one command for now.
-        addBSONCommand("find", findCommand, _jsonStr);
+        addPacket("find", findCommand, _jsonStr);
     }
 
-    void addBSONCommand(const std::string& name, BSONObj command, const std::string& response) {
+    void addPacket(const std::string& name, TestReaderPacket command, const std::string& response) {
         _server.setupServerResponse(name, response);
         _commands.push_back({name, command});
     }
@@ -91,9 +92,8 @@ public:
                          synchronized_value<BSONObj>& out) {
         ASSERT_TRUE(executor);
         ASSERT_TRUE(executor->isConnected());
-        for (const auto& [name, c] : getCommands()) {
-            RawOpDocument opDoc{name, c};
-            out = executor->runCommand(ReplayCommand{opDoc.getDocument()});
+        for (const auto& [name, packet] : getCommands()) {
+            out = executor->runCommand(ReplayCommand{packet});
         }
     }
 
