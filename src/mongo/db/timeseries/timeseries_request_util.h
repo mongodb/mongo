@@ -196,6 +196,14 @@ std::pair<bool, NamespaceString> isTimeseriesViewRequest(OperationContext* opCtx
  * Returns a pair where the first element is the CollectionPreConditions object for this class, and
  * the second is a bool indicating whether the request being performed is a request to perform a
  * logical time-series operation.
+ *
+ * There are two broad ways of interacting with a time-series collection - directly on the
+ * compressed buckets data, or logically on the measurements. The former are generally
+ * referred to as rawData operations and the latter can be considered logical time-series
+ * operations. Logical time-series operations have the concept of bucketing measurements
+ * - i.e, inserts will try to place measurements with the same metaField into the same bucket,
+ * updates will know to target a measurements within a bucket and update the rest of the bucket
+ * accordingly, etc. RawData operations treat the bucket document as a normal document.
  */
 template <typename T>
 requires IsRequestableOnTimeseries<T>

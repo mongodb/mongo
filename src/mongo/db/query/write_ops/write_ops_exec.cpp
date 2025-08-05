@@ -751,19 +751,15 @@ UpdateResult performUpdate(OperationContext* opCtx,
                            bool upsert,
                            const boost::optional<mongo::UUID>& collectionUUID,
                            boost::optional<BSONObj>& docFound,
-                           UpdateRequest* updateRequest) {
-    auto [isTimeseriesViewUpdate, nsString] =
-        timeseries::isTimeseriesViewRequest(opCtx, *updateRequest);
-
-    if (isTimeseriesViewUpdate) {
-        checkCollectionUUIDMismatch(
-            opCtx, nsString.getTimeseriesViewNamespace(), nullptr, collectionUUID);
-    }
+                           UpdateRequest* updateRequest,
+                           const timeseries::CollectionPreConditions& preConditions,
+                           bool isTimeseriesLogicalRequest) {
+    auto nsString = preConditions.getTargetNs(nss);
 
     // TODO SERVER-76583: Remove this check.
     uassert(7314600,
             "Retryable findAndModify on a timeseries is not supported",
-            !isTimeseriesViewUpdate || !updateRequest->shouldReturnAnyDocs() ||
+            !isTimeseriesLogicalRequest || !updateRequest->shouldReturnAnyDocs() ||
                 !opCtx->isRetryableWrite());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -784,6 +780,8 @@ UpdateResult performUpdate(OperationContext* opCtx,
                           CollectionAcquisitionRequest::fromOpCtx(
                               opCtx, nsString, AcquisitionPrerequisites::kWrite, collectionUUID),
                           MODE_IX);
+    timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+        opCtx, preConditions, collection);
     auto dbName = nsString.dbName();
     Database* db = [&]() {
         AutoGetDb autoDb(opCtx, dbName, MODE_IX);
@@ -836,7 +834,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
             !inTransaction);
     }
 
-    if (isTimeseriesViewUpdate) {
+    if (isTimeseriesLogicalRequest) {
         timeseries::timeseriesRequestChecks<UpdateRequest>(VersionContext::getDecoration(opCtx),
                                                            collection.getCollectionPtr(),
                                                            updateRequest,
@@ -849,7 +847,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
                               updateRequest,
                               collection.getCollectionPtr(),
                               false /*forgoOpCounterIncrements*/,
-                              isTimeseriesViewUpdate);
+                              isTimeseriesLogicalRequest);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     // Create an RAII object that prints useful information about the ExpressionContext in the case
@@ -925,19 +923,15 @@ long long performDelete(OperationContext* opCtx,
                         CurOp* curOp,
                         bool inTransaction,
                         const boost::optional<mongo::UUID>& collectionUUID,
-                        boost::optional<BSONObj>& docFound) {
-    auto [isTimeseriesViewDelete, nsString] =
-        timeseries::isTimeseriesViewRequest(opCtx, *deleteRequest);
-
-    if (isTimeseriesViewDelete) {
-        checkCollectionUUIDMismatch(
-            opCtx, nsString.getTimeseriesViewNamespace(), nullptr, collectionUUID);
-    }
+                        boost::optional<BSONObj>& docFound,
+                        const timeseries::CollectionPreConditions& preConditions,
+                        bool isTimeseriesLogicalRequest) {
+    auto nsString = preConditions.getTargetNs(nss);
 
     // TODO SERVER-76583: Remove this check.
     uassert(7308305,
             "Retryable findAndModify on a timeseries is not supported",
-            !isTimeseriesViewDelete || !deleteRequest->getReturnDeleted() ||
+            !isTimeseriesLogicalRequest || !deleteRequest->getReturnDeleted() ||
                 !opCtx->isRetryableWrite());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -952,7 +946,8 @@ long long performDelete(OperationContext* opCtx,
                           CollectionAcquisitionRequest::fromOpCtx(
                               opCtx, nsString, AcquisitionPrerequisites::kWrite, collectionUUID),
                           MODE_IX);
-
+    timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+        opCtx, preConditions, collection);
     // Create an RAII object that prints the collection's shard key in the case of a tassert
     // or crash.
     ScopedDebugInfo shardKeyDiagnostics(
@@ -969,7 +964,7 @@ long long performDelete(OperationContext* opCtx,
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
 
-    if (isTimeseriesViewDelete) {
+    if (isTimeseriesLogicalRequest) {
         timeseries::timeseriesRequestChecks<DeleteRequest>(VersionContext::getDecoration(opCtx),
                                                            collection.getCollectionPtr(),
                                                            deleteRequest,
@@ -978,7 +973,7 @@ long long performDelete(OperationContext* opCtx,
                                                              deleteRequest);
     }
 
-    ParsedDelete parsedDelete(opCtx, deleteRequest, collectionPtr, isTimeseriesViewDelete);
+    ParsedDelete parsedDelete(opCtx, deleteRequest, collectionPtr, isTimeseriesLogicalRequest);
     uassertStatusOK(parsedDelete.parseRequest());
 
     // Create an RAII object that prints useful information about the ExpressionContext in the case

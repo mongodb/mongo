@@ -4,7 +4,6 @@
  *   requires_timeseries,
  *   does_not_support_transactions,
  *   requires_non_retryable_writes,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

@@ -96,6 +96,7 @@ selector:
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_delete_one_transaction.js
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_direct_update.js
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_multi_update_spill_to_disk.js
+    - jstests/noPassthrough/timeseries/updates_deletes/timeseries_retry_delete_and_update.js
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_update_delete_transaction.js
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_update_one_transaction.js
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_update_oplog.js

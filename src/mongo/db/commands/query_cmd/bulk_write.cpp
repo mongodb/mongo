@@ -1105,13 +1105,18 @@ bool handleDeleteOp(OperationContext* opCtx,
             serviceOpCounters(opCtx).gotDelete();
             ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(
                 opCtx->getWriteConcern());
+            const auto [preConditions, isTimeseriesLogicalRequest] =
+                timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+                    opCtx, nsEntry.getNs(), nsEntry, nsEntry.getCollectionUUID());
             auto nDeleted = write_ops_exec::performDelete(opCtx,
                                                           nsString,
                                                           &deleteRequest,
                                                           &curOp,
                                                           inTransaction,
                                                           nsEntry.getCollectionUUID(),
-                                                          docFound);
+                                                          docFound,
+                                                          preConditions,
+                                                          isTimeseriesLogicalRequest);
             lastOpFixer.finishedOpSuccessfully();
             responses.addDeleteReply(
                 getQueryCounters(opCtx), currentOpIdx, nDeleted, boost::none, op->getMulti());
@@ -1719,6 +1724,9 @@ bool handleUpdateOp(OperationContext* opCtx,
                     serviceOpCounters(opCtx).gotUpdate();
                     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(
                         opCtx->getWriteConcern());
+                    const auto [preConditions, isTimeseriesLogicalRequest] =
+                        timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+                            opCtx, nsEntry.getNs(), nsEntry, nsEntry.getCollectionUUID());
                     auto result = write_ops_exec::performUpdate(opCtx,
                                                                 nsString,
                                                                 &curOp,
@@ -1727,7 +1735,9 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                 updateRequest.isUpsert(),
                                                                 nsEntry.getCollectionUUID(),
                                                                 docFound,
-                                                                &updateRequest);
+                                                                &updateRequest,
+                                                                preConditions,
+                                                                isTimeseriesLogicalRequest);
                     lastOpFixer.finishedOpSuccessfully();
 
                     responses.addUpdateReply(currentOpIdx, result, boost::none);

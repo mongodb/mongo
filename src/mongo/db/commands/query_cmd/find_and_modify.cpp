@@ -384,12 +384,11 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         return std::pair{request(), OpMsgRequest()};
     }();
     auto request = requestAndMsg.first;
+    auto nss = request.getNamespace();
+    const auto [preConditions, isTimeseriesLogicalRequest] =
+        timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(opCtx, nss, request);
 
-    auto [isTimeseriesViewRequest, nss] = timeseries::isTimeseriesViewRequest(opCtx, request);
-
-    if (isRawDataOperation(opCtx)) {
-        isTimeseriesViewRequest = false;
-    }
+    nss = preConditions.getTargetNs(nss);
 
     uassertStatusOK(userAllowedWriteNS(opCtx, nss));
     OpDebug* const opDebug = &curOp->debug();
@@ -408,11 +407,13 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                               CollectionAcquisitionRequest::fromOpCtx(
                                   opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
                               MODE_IX);
+        timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+            opCtx, preConditions, collection);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
 
-        if (isTimeseriesViewRequest) {
+        if (isTimeseriesLogicalRequest) {
             timeseries::timeseriesRequestChecks<DeleteRequest>(
                 VersionContext::getDecoration(opCtx),
                 collection.getCollectionPtr(),
@@ -423,7 +424,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         }
 
         ParsedDelete parsedDelete(
-            opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesViewRequest);
+            opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesLogicalRequest);
         uassertStatusOK(parsedDelete.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
@@ -453,10 +454,12 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                               CollectionAcquisitionRequest::fromOpCtx(
                                   opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
                               MODE_IX);
+        timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+            opCtx, preConditions, collection);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
-        if (isTimeseriesViewRequest) {
+        if (isTimeseriesLogicalRequest) {
             timeseries::timeseriesRequestChecks<UpdateRequest>(
                 VersionContext::getDecoration(opCtx),
                 collection.getCollectionPtr(),
@@ -470,7 +473,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                                   &updateRequest,
                                   collection.getCollectionPtr(),
                                   false /*forgoOpCounterIncrements*/,
-                                  isTimeseriesViewRequest);
+                                  isTimeseriesLogicalRequest);
         uassertStatusOK(parsedUpdate.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
@@ -501,6 +504,9 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     auto& curOp = *CurOp::get(opCtx);
     curOp.beginQueryPlanningTimer();
 
+    auto [preConditions, isTimeseriesLogicalRequest] =
+        timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+            opCtx, req.getNamespace(), request());
     if (req.getEncryptionInformation().has_value()) {
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -512,9 +518,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     }
 
     auto nsString = req.getNamespace();
-    if (isRawDataOperation(opCtx)) {
-        nsString = timeseries::isTimeseriesViewRequest(opCtx, this->request()).second;
-    }
+    nsString = preConditions.getTargetNs(nsString);
     uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
 
     static_cast<const CmdFindAndModify*>(definition())->collectMetrics(req);
@@ -597,8 +601,15 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 deleteRequest.setStmtId(stmtId);
             }
             boost::optional<BSONObj> docFound;
-            write_ops_exec::performDelete(
-                opCtx, nsString, &deleteRequest, &curOp, inTransaction, boost::none, docFound);
+            write_ops_exec::performDelete(opCtx,
+                                          nsString,
+                                          &deleteRequest,
+                                          &curOp,
+                                          inTransaction,
+                                          boost::none,
+                                          docFound,
+                                          preConditions,
+                                          isTimeseriesLogicalRequest);
             recordStatsForTopCommand(opCtx);
             return buildResponse(boost::none, true /* isRemove */, docFound);
         } else {
@@ -637,7 +648,9 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                                       req.getUpsert().value_or(false),
                                                       boost::none,
                                                       docFound,
-                                                      &updateRequest);
+                                                      &updateRequest,
+                                                      preConditions,
+                                                      isTimeseriesLogicalRequest);
                     recordStatsForTopCommand(opCtx);
                     return buildResponse(updateResult, req.getRemove().value_or(false), docFound);
 

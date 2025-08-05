@@ -7,7 +7,6 @@
  *   featureFlagTimeseriesUpdatesSupport,
  *   # Retryable findandmodify is not supported on timeseries collections
  *   does_not_support_retryable_writes,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {getWinningPlanFromExplain} from 'jstests/libs/query/analyze_plan.js';

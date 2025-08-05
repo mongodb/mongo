@@ -61,7 +61,9 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
@@ -535,6 +537,9 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (!arbitraryTimeseriesWritesEnabled || cri.hasRoutingTable() ||
         maybeTsNss.isTimeseriesBucketsCollection()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform findAndModify with sort on a sharded timeseries collection",
+                !cri.getChunkManager().isNewTimeseriesWithoutView() || !cmdObj.hasField("sort"));
         return cri;
     }
 
@@ -640,11 +645,11 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     const auto cri = getCollectionRoutingInfo(opCtx, cmdObj, nss);
     const auto& cm = cri.getChunkManager();
     auto isTrackedTimeseries = cm.hasRoutingTable() && cm.getTimeseriesFields();
-    auto isTimeseriesViewRequest = false;
+    auto isTimeseriesLogicalRequest = false;
     if (isTrackedTimeseries && !nss.isTimeseriesBucketsCollection()) {
         nss = std::move(cm.getNss());
         if (!isRawDataOperation(opCtx)) {
-            isTimeseriesViewRequest = true;
+            isTimeseriesLogicalRequest = true;
         }
     }
     // Note: at this point, 'nss' should be the timeseries buckets collection namespace if we're
@@ -659,7 +664,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     if (cri.hasRoutingTable()) {
         // If the request is for a view on a sharded timeseries buckets collection, we need to
         // replace the namespace by buckets collection namespace in the command object.
-        if (isTimeseriesViewRequest) {
+        if (!cri.getChunkManager().isNewTimeseriesWithoutView() && isTimeseriesLogicalRequest) {
             cmdObj = replaceNamespaceByBucketNss(cmdObj, nss);
         }
         auto expCtx = makeExpressionContextWithDefaultsForTargeter(
@@ -672,11 +677,11 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
                                                          collation,
                                                          let,
                                                          rc,
-                                                         isTimeseriesViewRequest)) {
-            shardId =
-                targetPotentiallySingleShard(expCtx, cm, query, collation, isTimeseriesViewRequest);
+                                                         isTimeseriesLogicalRequest)) {
+            shardId = targetPotentiallySingleShard(
+                expCtx, cm, query, collation, isTimeseriesLogicalRequest);
         } else {
-            shardId = targetSingleShard(expCtx, cm, query, collation, isTimeseriesViewRequest);
+            shardId = targetSingleShard(expCtx, cm, query, collation, isTimeseriesLogicalRequest);
         }
     } else {
         shardId = cri.getDbPrimaryShardId();
@@ -706,7 +711,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
         applyReadWriteConcern(opCtx, false, false, makeExplainCmd(opCtx, cmdObj, verbosity)),
         true /* isExplain */,
         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
-        isTimeseriesViewRequest,
+        isTimeseriesLogicalRequest,
         &bob);
 
     const auto millisElapsed = timer.millis();
@@ -804,7 +809,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
     if (cri.hasRoutingTable()) {
         // If the request is for a view on a sharded timeseries buckets collection, we need to
         // replace the namespace by buckets collection namespace in the command object.
-        if (isTimeseriesViewRequest) {
+        if (isTimeseriesViewRequest && !cri.getChunkManager().isNewTimeseriesWithoutView()) {
             cmdObjForShard = replaceNamespaceByBucketNss(cmdObjForShard, nss);
         }
 

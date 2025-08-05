@@ -133,7 +133,9 @@ UpdateResult performUpdate(OperationContext* opCtx,
                            bool upsert,
                            const boost::optional<mongo::UUID>& collectionUUID,
                            boost::optional<BSONObj>& docFound,
-                           UpdateRequest* updateRequest);
+                           UpdateRequest* updateRequest,
+                           const timeseries::CollectionPreConditions& preConditions,
+                           bool isTimeseriesLogicalRequest);
 
 /**
  * Executes a delete, supports returning the deleted document. the returned document is placed into
@@ -146,7 +148,9 @@ long long performDelete(OperationContext* opCtx,
                         CurOp* curOp,
                         bool inTransaction,
                         const boost::optional<mongo::UUID>& collectionUUID,
-                        boost::optional<BSONObj>& docFound);
+                        boost::optional<BSONObj>& docFound,
+                        const timeseries::CollectionPreConditions& preConditions,
+                        bool isTimeseriesLogicalRequest = false);
 
 /**
  * Generates a WriteError for a given Status.
