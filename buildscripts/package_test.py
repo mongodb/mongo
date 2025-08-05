@@ -249,6 +249,16 @@ VERSIONS_TO_SKIP: Set[str] = set(
 )
 DISABLED_TESTS: Set[Tuple[str, str]] = set()
 
+VALID_TAR_DIRECTORY_ARCHITECTURES = [
+    "linux-aarch64",
+    "linux-x86_64",
+    "linux-ppc64le",
+    "linux-s390x",
+    "macos-aarch64",
+    "macos-x86_64",
+    "windows-x86_64",
+]
+
 
 @dataclasses.dataclass
 class Test:
@@ -523,6 +533,12 @@ def get_edition_alias(edition_name: str) -> str:
         return "org"
     return edition_name
 
+def validate_top_level_directory(tar_name: str):
+    command = f"tar -tf {tar_name} | head -n 1 | awk -F/ '{{print $1}}'"
+    proc = subprocess.run(command, capture_output=True, shell=True, text=True)
+    top_level_directory = proc.stdout.strip()
+    if all(os_arch not in top_level_directory for os_arch in VALID_TAR_DIRECTORY_ARCHITECTURES):
+        raise Exception(f"Found an unexpected os-arch pairing as the top level directory. Top level directory: {top_level_directory}")
 
 arches: Set[str] = set()
 oses: Set[str] = set()
@@ -662,6 +678,8 @@ if args.command == "branch":
                 packages_urls=urls,
             )
         )
+
+        validate_top_level_directory("mongo-binaries.tgz")
 
         if not args.skip_enterprise_check:
             logging.info(

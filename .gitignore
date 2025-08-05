@@ -291,6 +291,8 @@ buildozer
 .bazelrc.gitinfo
 .bazelrc.workstation
 .bazelrc.common_bes
+.bazelrc.mongo_variables
+.bazelrc.mongo_version
 .bazelrc.compiledb
 .bazelrc.sync
 .compiledb
