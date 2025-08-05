@@ -1366,8 +1366,12 @@ void DocumentSourceLookUp::detachFromOperationContext() {
         // use Pipeline::detachFromOperationContext() to take care of updating '_fromExpCtx->opCtx'.
         _pipeline->detachFromOperationContext();
         invariant(_fromExpCtx->opCtx == nullptr);
-    } else if (_fromExpCtx) {
+    }
+    if (_fromExpCtx) {
         _fromExpCtx->opCtx = nullptr;
+    }
+    if (_resolvedIntrospectionPipeline) {
+        _resolvedIntrospectionPipeline->detachFromOperationContext();
     }
 }
 
@@ -1377,8 +1381,12 @@ void DocumentSourceLookUp::reattachToOperationContext(OperationContext* opCtx) {
         // use Pipeline::reattachToOperationContext() to take care of updating '_fromExpCtx->opCtx'.
         _pipeline->reattachToOperationContext(opCtx);
         invariant(_fromExpCtx->opCtx == opCtx);
-    } else if (_fromExpCtx) {
+    }
+    if (_fromExpCtx) {
         _fromExpCtx->opCtx = opCtx;
+    }
+    if (_resolvedIntrospectionPipeline) {
+        _resolvedIntrospectionPipeline->reattachToOperationContext(opCtx);
     }
 }
 
@@ -1389,9 +1397,15 @@ bool DocumentSourceLookUp::validateOperationContext(const OperationContext* opCt
 
     if (_pipeline) {
         const auto& sources = _pipeline->getSources();
-        return std::all_of(sources.begin(), sources.end(), [opCtx](const auto& s) {
-            return s->validateOperationContext(opCtx);
-        });
+        if (!std::all_of(sources.begin(), sources.end(), [opCtx](const auto& s) {
+                return s->validateOperationContext(opCtx);
+            })) {
+            return false;
+        }
+    }
+    if (_resolvedIntrospectionPipeline &&
+        !_resolvedIntrospectionPipeline->validateOperationContext(opCtx)) {
+        return false;
     }
 
     return true;
