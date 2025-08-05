@@ -453,6 +453,10 @@ public:
 
     SSLConnectionOpenSSL(SSL_CTX* ctx, Socket* sock, const char* initialBytes, int len);
 
+    void* getConnection() final {
+        return ssl;
+    }
+
     ~SSLConnectionOpenSSL() override;
 };
 

@@ -124,6 +124,7 @@ struct OpenSSLDeleter {
  */
 class SSLConnectionInterface {
 public:
+    virtual void* getConnection() = 0;
     virtual ~SSLConnectionInterface();
 };
 

@@ -257,6 +257,10 @@ public:
 
     SSLConnectionWindows(SCHANNEL_CRED* cred, Socket* sock, const char* initialBytes, int len);
 
+    void* getConnection() final {
+        return _engine.native_handle();
+    }
+
     ~SSLConnectionWindows();
 };
 

@@ -1179,6 +1179,10 @@ public:
         uassertOSStatusOK(status, ErrorCodes::SSLHandshakeFailed);
     }
 
+    void* getConnection() final {
+        return get();
+    }
+
     ::SSLContextRef get() const {
         return const_cast<::SSLContextRef>(_ssl.get());
     }

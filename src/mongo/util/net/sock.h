@@ -187,7 +187,7 @@ public:
      *  ssl - Pointer to the global SSLManager.
      *  remoteHost - The hostname of the remote server.
      */
-    bool secure(SSLManagerInterface* ssl, const std::string& remoteHost);
+    Status secure(SSLManagerInterface* ssl, const std::string& remoteHost);
 
     void secureAccepted(SSLManagerInterface* ssl);
 #endif

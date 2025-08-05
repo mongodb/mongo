@@ -251,33 +251,36 @@ void Socket::close() {
 }
 
 #ifdef MONGO_CONFIG_SSL
-bool Socket::secure(SSLManagerInterface* mgr, const std::string& remoteHost) {
+Status Socket::secure(SSLManagerInterface* mgr, const std::string& remoteHost) {
     fassert(16503, mgr);
     if (_fd == INVALID_SOCKET) {
-        return false;
+        return Status(ErrorCodes::SocketException, "Invalid socket");
     }
     _sslManager = mgr;
     _sslConnection.reset(_sslManager->connect(this));
-    mgr->parseAndValidatePeerCertificateDeprecated(_sslConnection.get(), remoteHost, HostAndPort());
-    return true;
-}
 
-void Socket::secureAccepted(SSLManagerInterface* ssl) {
-    _sslManager = ssl;
-}
-
-SSLPeerInfo Socket::doSSLHandshake(const char* firstBytes, int len) {
-    if (!_sslManager)
-        return SSLPeerInfo();
-    fassert(16506, _fd != INVALID_SOCKET);
-    if (_sslConnection.get()) {
-        throwSocketError(SocketErrorKind::RECV_ERROR,
-                         "Attempt to call SSL_accept on already secure Socket from " +
-                             remoteString());
+    StatusWith<SSLPeerInfo> peer =
+        mgr->parseAndValidatePeerCertificate(
+               static_cast<SSLConnectionType>(_sslConnection->getConnection()),
+               boost::none,
+               remoteHost,
+               HostAndPort(),
+               nullptr)
+            .getNoThrow();
+    if (peer.isOK()) {
+        SSLPeerInfo thisPeer = peer.getValue();
+        LOGV2_DEBUG(23207,
+                    _logLevel.toInt(),
+                    "Successfully parsed and validated peer certificate",
+                    "remoteHost"_attr = remoteHost,
+                    "subjectName"_attr = thisPeer.subjectName().toString());
+    } else {
+        LOGV2_ERROR(23227,
+                    "Failed to parse and validate peer certificate",
+                    "remoteHost"_attr = remoteHost,
+                    "error"_attr = peer.getStatus().toString());
     }
-    _sslConnection.reset(_sslManager->accept(this, firstBytes, len));
-    return _sslManager->parseAndValidatePeerCertificateDeprecated(
-        _sslConnection.get(), "", HostAndPort());
+    return peer.getStatus();
 }
 
 #endif
