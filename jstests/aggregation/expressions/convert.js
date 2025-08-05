@@ -2,7 +2,7 @@
  * Tests behavior of $convert aggregation operator.
  */
 
-import {runConvertTests} from "jstests/libs/convert_shared.js";
+import {runConvertTests} from "jstests/libs/query/convert_shared.js";
 
 const coll = db.expression_convert;
 coll.drop();

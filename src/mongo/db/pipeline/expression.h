@@ -3951,6 +3951,25 @@ private:
     std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> _defaults;
 };
 
+enum class ConversionBase {
+    kBinary = 2,
+    kOctal = 8,
+    kDecimal = 10,
+    kHexadecimal = 16,
+};
+
+static bool isValidConversionBase(int base) {
+    switch (base) {
+        case (stdx::to_underlying(ConversionBase::kBinary)):
+        case (stdx::to_underlying(ConversionBase::kOctal)):
+        case (stdx::to_underlying(ConversionBase::kDecimal)):
+        case (stdx::to_underlying(ConversionBase::kHexadecimal)):
+            return true;
+        default:
+            return false;
+    }
+}
+
 // This enum is not compatible with the QUERY_UTIL_NAMED_ENUM_DEFINE util since the "auto" type
 // conflicts with the C++ keyword "auto". Instead, we manually define the enum and the
 // toStringData function below.
@@ -4004,6 +4023,7 @@ public:
     ExpressionConvert(ExpressionContext* expCtx,
                       boost::intrusive_ptr<Expression> input,
                       boost::intrusive_ptr<Expression> to,
+                      boost::intrusive_ptr<Expression> base,
                       boost::intrusive_ptr<Expression> format,
                       boost::intrusive_ptr<Expression> onError,
                       boost::intrusive_ptr<Expression> onNull,
@@ -4047,6 +4067,9 @@ public:
     const Expression* getTo() const {
         return _children[_kTo].get();
     }
+    const Expression* getBase() const {
+        return _children[_kBase].get();
+    }
     const Expression* getFormat() const {
         return _children[_kFormat].get();
     }
@@ -4076,10 +4099,11 @@ private:
 
     static constexpr size_t _kInput = 0;
     static constexpr size_t _kTo = 1;
-    static constexpr size_t _kFormat = 2;
-    static constexpr size_t _kOnError = 3;
-    static constexpr size_t _kOnNull = 4;
-    static constexpr size_t _kByteOrder = 5;
+    static constexpr size_t _kBase = 2;
+    static constexpr size_t _kFormat = 3;
+    static constexpr size_t _kOnError = 4;
+    static constexpr size_t _kOnNull = 5;
+    static constexpr size_t _kByteOrder = 6;
 };
 
 class ExpressionRegex : public Expression {

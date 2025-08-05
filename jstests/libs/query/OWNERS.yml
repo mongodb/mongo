@@ -27,3 +27,6 @@ filters:
   - "wildcard_index_helpers.js":
     approvers:
       - 10gen/query-optimization
+  - "convert_shared.js":
+    approvers:
+      - 10gen/query-optimization

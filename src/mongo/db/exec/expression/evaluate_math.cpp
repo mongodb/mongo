@@ -735,11 +735,13 @@ public:
     using ConversionFuncWithExtraArgs =
         std::function<Value(ExpressionContext* const, Value, ExtraArgs...)>;
 
+    using BaseArg = boost::optional<ConversionBase>;
     using FormatArg = BinDataFormat;
     using SubtypeArg = Value;
     using ByteOrderArg = ConvertByteOrderType;
 
     using ConversionFunc = ConversionFuncWithExtraArgs<>;
+    using ConversionFuncWithBase = ConversionFuncWithExtraArgs<BaseArg>;
     using ConversionFuncWithFormat = ConversionFuncWithExtraArgs<FormatArg>;
     using ConversionFuncWithSubtype = ConversionFuncWithExtraArgs<SubtypeArg>;
     using ConversionFuncWithFormatAndSubtype = ConversionFuncWithExtraArgs<FormatArg, SubtypeArg>;
@@ -749,6 +751,7 @@ public:
 
     using AnyConversionFunc = std::variant<std::monostate,
                                            ConversionFunc,
+                                           ConversionFuncWithBase,
                                            ConversionFuncWithFormat,
                                            ConversionFuncWithSubtype,
                                            ConversionFuncWithFormatAndSubtype,
@@ -906,11 +909,7 @@ public:
             return Value(inputValue.coerceToDouble());
         };
         table[stdx::to_underlying(BSONType::numberInt)][stdx::to_underlying(BSONType::string)] =
-            [](ExpressionContext* const expCtx, Value inputValue) {
-                str::stream str;
-                str << inputValue.getInt();
-                return Value(StringData(str));
-            };
+            &performFormatInt;
         table[stdx::to_underlying(BSONType::numberInt)][stdx::to_underlying(BSONType::boolean)] =
             [](ExpressionContext* const expCtx, Value inputValue) {
                 return Value(inputValue.coerceToBool());
@@ -936,11 +935,7 @@ public:
             return Value(inputValue.coerceToDouble());
         };
         table[stdx::to_underlying(BSONType::numberLong)][stdx::to_underlying(BSONType::string)] =
-            [](ExpressionContext* const expCtx, Value inputValue) {
-                str::stream str;
-                str << inputValue.getLong();
-                return Value(StringData(str));
-            };
+            &performFormatLong;
         table[stdx::to_underlying(BSONType::numberLong)][stdx::to_underlying(BSONType::boolean)] =
             [](ExpressionContext* const expCtx, Value inputValue) {
                 return Value(inputValue.coerceToBool());
@@ -964,9 +959,7 @@ public:
         table[stdx::to_underlying(BSONType::numberDecimal)]
              [stdx::to_underlying(BSONType::numberDouble)] = &performCastDecimalToDouble;
         table[stdx::to_underlying(BSONType::numberDecimal)][stdx::to_underlying(BSONType::string)] =
-            [](ExpressionContext* const expCtx, Value inputValue) {
-                return Value(inputValue.getDecimal().toString());
-            };
+            &performFormatDecimal;
         table[stdx::to_underlying(BSONType::numberDecimal)][stdx::to_underlying(
             BSONType::boolean)] = [](ExpressionContext* const expCtx, Value inputValue) {
             return Value(inputValue.coerceToBool());
@@ -1009,6 +1002,7 @@ public:
 
     ConversionFunc findConversionFunc(BSONType inputType,
                                       BSONType targetType,
+                                      boost::optional<ConversionBase> base,
                                       boost::optional<FormatArg> format,
                                       SubtypeArg subtype,
                                       boost::optional<ByteOrderArg> byteOrder) const {
@@ -1035,6 +1029,7 @@ public:
         return makeConversionFunc(foundFunction,
                                   inputType,
                                   targetType,
+                                  std::move(base),
                                   std::move(format),
                                   std::move(subtype),
                                   std::move(byteOrder));
@@ -1047,6 +1042,7 @@ private:
     ConversionFunc makeConversionFunc(AnyConversionFunc foundFunction,
                                       BSONType inputType,
                                       BSONType targetType,
+                                      boost::optional<ConversionBase> base,
                                       boost::optional<FormatArg> format,
                                       SubtypeArg subtype,
                                       boost::optional<ByteOrderArg> byteOrder) const {
@@ -1069,6 +1065,9 @@ private:
                          [](ConversionFunc conversionFunc) {
                              tassert(4341109, "Conversion function can't be null", conversionFunc);
                              return conversionFunc;
+                         },
+                         [&](ConversionFuncWithBase conversionFunc) {
+                             return makeConvertWithExtraArgs(conversionFunc, std::move(base));
                          },
                          [&](ConversionFuncWithFormat conversionFunc) {
                              checkFormat();
@@ -1234,42 +1233,139 @@ private:
         return Value(Date_t::fromMillisSinceEpoch(millisSinceEpoch));
     }
 
-    static Value performFormatDouble(ExpressionContext* const expCtx, Value inputValue) {
-        double doubleValue = inputValue.getDouble();
-
-        if (std::isinf(doubleValue)) {
-            return Value(std::signbit(doubleValue) ? "-Infinity"_sd : "Infinity"_sd);
-        } else if (std::isnan(doubleValue)) {
-            return Value("NaN"_sd);
-        } else if (doubleValue == 0.0 && std::signbit(doubleValue)) {
-            return Value("-0"_sd);
-        } else {
-            str::stream str;
-            str << fmt::format("{}", doubleValue);
-            return Value(StringData(str));
+    static Value performFormatNumberWithBase(ExpressionContext* const expCtx,
+                                             long long inputValue,
+                                             ConversionBase base) {
+        switch (base) {
+            case mongo::ConversionBase::kBinary:
+                return Value(fmt::format("{:b}", inputValue));
+            case mongo::ConversionBase::kOctal:
+                return Value(fmt::format("{:o}", inputValue));
+            case mongo::ConversionBase::kHexadecimal:
+                return Value(fmt::format("{:X}", inputValue));
+            case mongo::ConversionBase::kDecimal:
+                return Value(fmt::format("{:d}", inputValue));
+            default:
+                MONGO_UNREACHABLE_TASSERT(3501302);
         }
     }
 
-    template <class targetType, int base>
-    static Value parseStringToNumber(ExpressionContext* const expCtx, Value inputValue) {
-        auto stringValue = inputValue.getStringData();
-        targetType result;
+    static Value performFormatDouble(ExpressionContext* const expCtx,
+                                     Value inputValue,
+                                     boost::optional<ConversionBase> base) {
+        double doubleValue = inputValue.getDouble();
+        if (!base) {
+            if (std::isinf(doubleValue)) {
+                return Value(std::signbit(doubleValue) ? "-Infinity"_sd : "Infinity"_sd);
+            } else if (std::isnan(doubleValue)) {
+                return Value("NaN"_sd);
+            } else if (doubleValue == 0.0 && std::signbit(doubleValue)) {
+                return Value("-0"_sd);
+            } else {
+                str::stream str;
+                str << fmt::format("{}", doubleValue);
+                return Value(StringData(str));
+            }
+        }
 
+        uassert(
+            ErrorCodes::ConversionFailure,
+            str::stream() << "Base conversion is not supported for non-integers in $convert with "
+                             "no onError value: ",
+            inputValue.integral());
+        try {
+            return performFormatNumberWithBase(
+                expCtx, boost::numeric_cast<long long>(doubleValue), *base);
+
+        } catch (boost::bad_numeric_cast&) {
+            uasserted(ErrorCodes::ConversionFailure,
+                      str::stream()
+                          << "Magnitude of the number provided for base conversion is too "
+                             "large in $convert with no onError value: ");
+        }
+    }
+
+    static Value performFormatInt(ExpressionContext* const expCtx,
+                                  Value inputValue,
+                                  boost::optional<ConversionBase> base) {
+        int intValue = inputValue.getInt();
+        if (!base)
+            return Value(StringData(str::stream() << intValue));
+        return performFormatNumberWithBase(expCtx, intValue, *base);
+    }
+
+    static Value performFormatLong(ExpressionContext* const expCtx,
+                                   Value inputValue,
+                                   boost::optional<ConversionBase> base) {
+        long long longValue = inputValue.getLong();
+        if (!base)
+            return Value(StringData(str::stream() << longValue));
+        return performFormatNumberWithBase(expCtx, longValue, *base);
+    }
+
+    static Value performFormatDecimal(ExpressionContext* const expCtx,
+                                      Value inputValue,
+                                      boost::optional<ConversionBase> base) {
+        Decimal128 decimalValue = inputValue.getDecimal();
+        if (!base)
+            return Value(decimalValue.toString());
+
+        uassert(
+            ErrorCodes::ConversionFailure,
+            str::stream() << "Base conversion is not supported for non-integers in $convert with "
+                             "no onError value: ",
+            inputValue.integral());
+        uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+        long long longValue = decimalValue.toLong(&signalingFlags);
+        if (signalingFlags == Decimal128::SignalingFlag::kNoFlag) {
+            return performFormatNumberWithBase(expCtx, longValue, *base);
+        }
+        uasserted(ErrorCodes::ConversionFailure,
+                  str::stream() << "Magnitude of the number provided for base conversion is too "
+                                   "large in $convert with no onError value: ");
+    }
+
+    template <class targetType, int defaultBase>
+    static Value parseStringToNumber(ExpressionContext* const expCtx,
+                                     Value inputValue,
+                                     boost::optional<ConversionBase> convBase) {
+        auto stringValue = inputValue.getStringData();
         // Reject any strings in hex format. This check is needed because the
         // NumberParser::parse call below allows an input hex string prefixed by '0x' when
         // parsing to a double.
         uassert(ErrorCodes::ConversionFailure,
                 str::stream() << "Illegal hexadecimal input in $convert with no onError value: "
                               << stringValue,
-                !stringValue.starts_with("0x"));
-
-        Status parseStatus = NumberParser().base(base)(stringValue, &result);
+                !stringValue.starts_with("0x") && !stringValue.starts_with("0X"));
+        if (!convBase) {
+            targetType result;
+            Status parseStatus = NumberParser().base(defaultBase)(stringValue, &result);
+            uassert(ErrorCodes::ConversionFailure,
+                    str::stream() << "Failed to parse number '" << stringValue
+                                  << "' in $convert with no onError value: "
+                                  << parseStatus.reason(),
+                    parseStatus.isOK());
+            return Value(result);
+        }
+        // NumberParser needs base 0 when converting to double or decimal, so when converting with a
+        // specified base, we first convert to long long and then convert the long long to the
+        // target type.
+        long long parseResult;
+        Status parseStatus =
+            NumberParser().base(static_cast<int>(*convBase))(stringValue, &parseResult);
         uassert(ErrorCodes::ConversionFailure,
                 str::stream() << "Failed to parse number '" << stringValue
                               << "' in $convert with no onError value: " << parseStatus.reason(),
                 parseStatus.isOK());
-
-        return Value(result);
+        // Convert long long into correct target type.
+        if constexpr (std::is_same_v<targetType, int>)
+            return performCastLongToInt(expCtx, Value(parseResult));
+        else if constexpr (std::is_same_v<targetType, double>)
+            return Value(static_cast<double>(parseResult));
+        else if constexpr (std::is_same_v<targetType, Decimal128>)
+            return Value(Decimal128(parseResult));
+        else
+            return Value(parseResult);
     }
 
     static Value parseStringToOID(ExpressionContext* const expCtx, Value inputValue) {
@@ -1551,6 +1647,24 @@ private:
     }
 };
 
+boost::optional<ConversionBase> parseBase(Value baseValue) {
+    if (baseValue.nullish()) {
+        return {};
+    }
+
+    uassert(3501300,
+            str::stream() << "In $convert, 'base' argument is not an integer",
+            baseValue.integral());
+
+    int base = baseValue.coerceToInt();
+
+    uassert(3501301,
+            str::stream() << "In $convert, 'base' argument is not a valid base",
+            isValidConversionBase(base));
+
+    return static_cast<ConversionBase>(base);
+}
+
 boost::optional<BinDataFormat> parseBinDataFormat(Value formatValue) {
     if (formatValue.nullish()) {
         return {};
@@ -1621,6 +1735,7 @@ bool requestingConvertBinDataNumeric(ExpressionConvert::ConvertTargetTypeInfo ta
 Value performConversion(const ExpressionConvert& expr,
                         ExpressionConvert::ConvertTargetTypeInfo targetTypeInfo,
                         Value inputValue,
+                        boost::optional<ConversionBase> base,
                         boost::optional<BinDataFormat> format,
                         boost::optional<ConvertByteOrderType> byteOrder) {
     invariant(!inputValue.nullish());
@@ -1645,7 +1760,7 @@ Value performConversion(const ExpressionConvert& expr,
                 !requestingConvertBinDataNumeric(targetTypeInfo, inputType));
 
     return table.findConversionFunc(
-        inputType, targetTypeInfo.type, format, targetTypeInfo.subtype, byteOrder)(
+        inputType, targetTypeInfo.type, base, format, targetTypeInfo.subtype, byteOrder)(
         expr.getExpressionContext(), inputValue);
 }
 
@@ -1654,6 +1769,7 @@ Value performConversion(const ExpressionConvert& expr,
 Value evaluate(const ExpressionConvert& expr, const Document& root, Variables* variables) {
     auto toValue = expr.getTo()->evaluate(root, variables);
     auto inputValue = expr.getInput()->evaluate(root, variables);
+    auto baseValue = expr.getBase() ? expr.getBase()->evaluate(root, variables) : Value();
     auto formatValue = expr.getFormat() ? expr.getFormat()->evaluate(root, variables) : Value();
     auto byteOrderValue =
         expr.getByteOrder() ? expr.getByteOrder()->evaluate(root, variables) : Value();
@@ -1669,11 +1785,12 @@ Value evaluate(const ExpressionConvert& expr, const Document& root, Variables* v
         return Value(BSONNULL);
     }
 
+    auto base = parseBase(baseValue);
     auto format = parseBinDataFormat(formatValue);
     auto byteOrder = parseByteOrder(byteOrderValue);
 
     try {
-        return performConversion(expr, *targetTypeInfo, inputValue, format, byteOrder);
+        return performConversion(expr, *targetTypeInfo, inputValue, base, format, byteOrder);
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         if (expr.getOnError()) {
             return expr.getOnError()->evaluate(root, variables);

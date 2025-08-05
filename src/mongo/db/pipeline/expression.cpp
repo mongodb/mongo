@@ -3729,6 +3729,7 @@ boost::intrusive_ptr<Expression> ExpressionConvert::create(
         expCtx,
         std::move(input),
         ExpressionConstant::create(expCtx, std::move(toValue)),
+        nullptr,
         format ? ExpressionConstant::create(expCtx, Value(toStringData(*format))) : nullptr,
         nullptr,
         nullptr,
@@ -3740,6 +3741,7 @@ boost::intrusive_ptr<Expression> ExpressionConvert::create(
 ExpressionConvert::ExpressionConvert(ExpressionContext* const expCtx,
                                      boost::intrusive_ptr<Expression> input,
                                      boost::intrusive_ptr<Expression> to,
+                                     boost::intrusive_ptr<Expression> base,
                                      boost::intrusive_ptr<Expression> format,
                                      boost::intrusive_ptr<Expression> onError,
                                      boost::intrusive_ptr<Expression> onNull,
@@ -3749,6 +3751,7 @@ ExpressionConvert::ExpressionConvert(ExpressionContext* const expCtx,
     : Expression(expCtx,
                  {std::move(input),
                   std::move(to),
+                  std::move(base),
                   std::move(format),
                   std::move(onError),
                   std::move(onNull),
@@ -3771,6 +3774,7 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
 
     boost::intrusive_ptr<Expression> input;
     boost::intrusive_ptr<Expression> to;
+    boost::intrusive_ptr<Expression> base;
     boost::intrusive_ptr<Expression> format;
     boost::intrusive_ptr<Expression> onError;
     boost::intrusive_ptr<Expression> onNull;
@@ -3781,6 +3785,15 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
             input = parseOperand(expCtx, elem, vps);
         } else if (field == "to"_sd) {
             to = parseOperand(expCtx, elem, vps);
+        } else if (field == "base"_sd) {
+            uassert(
+                ErrorCodes::FailedToParse,
+                str::stream() << "The 'base' argument to $convert is not allowed in the "
+                                 "current feature compatibility version. See "
+                              << feature_compatibility_version_documentation::compatibilityLink()
+                              << ".",
+                expCtx->isFeatureFlagMqlJsEngineGapEnabled());
+            base = parseOperand(expCtx, elem, vps);
         } else if (field == "format"_sd) {
             uassert(
                 ErrorCodes::FailedToParse,
@@ -3818,6 +3831,7 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
     return new ExpressionConvert(expCtx,
                                  std::move(input),
                                  std::move(to),
+                                 std::move(base),
                                  std::move(format),
                                  std::move(onError),
                                  std::move(onNull),
@@ -3859,6 +3873,9 @@ Value ExpressionConvert::evaluate(const Document& root, Variables* variables) co
 boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
     _children[_kInput] = _children[_kInput]->optimize();
     _children[_kTo] = _children[_kTo]->optimize();
+    if (_children[_kBase]) {
+        _children[_kBase] = _children[_kBase]->optimize();
+    }
     if (_children[_kFormat]) {
         _children[_kFormat] = _children[_kFormat]->optimize();
     }
@@ -3881,6 +3898,7 @@ boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
     // though.
     if (ExpressionConstant::allNullOrConstant({_children[_kInput],
                                                _children[_kTo],
+                                               _children[_kBase],
                                                _children[_kFormat],
                                                _children[_kOnError],
                                                _children[_kOnNull],
@@ -3913,6 +3931,7 @@ Value ExpressionConvert::serialize(const SerializationOptions& options) const {
          Document{
              {"input", _children[_kInput]->serialize(options)},
              {"to", toField},
+             {"base", _children[_kBase] ? _children[_kBase]->serialize(options) : Value()},
              {"format", _children[_kFormat] ? _children[_kFormat]->serialize(options) : Value()},
              {"onError", _children[_kOnError] ? _children[_kOnError]->serialize(options) : Value()},
              {"onNull", _children[_kOnNull] ? _children[_kOnNull]->serialize(options) : Value()},

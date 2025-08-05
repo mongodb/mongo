@@ -6,7 +6,7 @@
  * ]
  */
 
-import {runConvertTests} from "jstests/libs/convert_shared.js";
+import {runConvertTests} from "jstests/libs/query/convert_shared.js";
 
 const coll = db.expression_convert_bindata_numeric;
 coll.drop();
@@ -190,7 +190,7 @@ const illegalConversionTestDocs = [
 //
 // Conversions with invalid 'to' argument.
 //
-const invalidTargetTypeDocs = [
+const invalidArgumentValueDocs = [
     // Valid byteOrder is required when converting from / to BinData.
     {
         _id: 20,
@@ -219,7 +219,7 @@ const invalidTargetTypeDocs = [
 ];
 
 runConvertTests(
-    {coll, requiresFCV81, conversionTestDocs, illegalConversionTestDocs, invalidTargetTypeDocs});
+    {coll, requiresFCV81, conversionTestDocs, illegalConversionTestDocs, invalidArgumentValueDocs});
 
 // Additional tests covering shortcuts and string byteOrder.
 function testConvertNumeric({pipeline: convertPipeline, docs: documents}) {

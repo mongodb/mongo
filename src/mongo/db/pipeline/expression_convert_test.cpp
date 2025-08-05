@@ -188,6 +188,41 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnNull) {
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 }
 
+TEST_F(ExpressionConvertTest, ParseAndSerializeWithBase) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "int"
+                                                << "base" << 8));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, base: {$const: 8}}}")),
+        convertExp->serialize());
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, base: {$const: 8}}}")),
+        convertExp->serialize(SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
+
+    spec = BSON("$convert" << BSON("input" << "$path1"
+                                           << "to"
+                                           << "int"
+                                           << "base" << "$path2"));
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, base: '$path2'}}")),
+        convertExp->serialize());
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, base: '$path2'}}")),
+        convertExp->serialize(SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
+}
+
 TEST_F(ExpressionConvertTest, ConvertWithoutInputFailsToParse) {
     auto expCtx = getExpCtx();
 
@@ -284,6 +319,23 @@ TEST_F(ExpressionConvertTest, ConvertWithOnErrorOptimizesToExpressionConstant) {
     auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
     ASSERT(constResult);
     ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), "X"_sd, BSONType::string);
+}
+
+TEST_F(ExpressionConvertTest, ConvertWithBaseOptimizesToExpressionConstant) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input" << 160 << "to"
+                                                << "string"
+                                                << "base" << 16));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Value result{"A0"_sd};
+
+    auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
+    ASSERT(constResult);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), result, BSONType::string);
 }
 
 TEST_F(ExpressionConvertTest, ConvertBinDataToIntFeatureFlagOffFails) {

@@ -6,7 +6,7 @@
  * ]
  */
 
-import {runConvertTests} from "jstests/libs/convert_shared.js";
+import {runConvertTests} from "jstests/libs/query/convert_shared.js";
 
 const kUUIDSubtype = 4;
 const kNonUUIDSubtype = 0;
@@ -244,7 +244,7 @@ const illegalConversionTestDocs = [
 //
 // Conversions with invalid 'to' argument.
 //
-const invalidTargetTypeDocs = [
+const invalidArgumentValueDocs = [
     // Valid subtype is required when converting to BinData.
     {
         _id: 1,
@@ -282,4 +282,4 @@ const invalidTargetTypeDocs = [
 ];
 
 runConvertTests(
-    {coll, requiresFCV80, conversionTestDocs, illegalConversionTestDocs, invalidTargetTypeDocs});
+    {coll, requiresFCV80, conversionTestDocs, illegalConversionTestDocs, invalidArgumentValueDocs});
