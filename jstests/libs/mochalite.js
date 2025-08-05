@@ -87,6 +87,11 @@ class Scope {
         this.children = [];
     }
 
+    reset() {
+        this.ctx = new Context();
+        this.children = [];
+    }
+
     /**
      * Add a child scope to this scope.
      * @param {Scope} scope
@@ -439,8 +444,14 @@ function after(fn) {
  * Run all defined tests.
  * Returns a Promise.
  */
-function runTests() {
-    return currScope.run();
+async function runTests() {
+    const rootScope = currScope;
+    try {
+        await currScope.run();
+    } finally {
+        rootScope.reset();
+        currScope = rootScope;
+    }
 }
 
 function markUsage() {
