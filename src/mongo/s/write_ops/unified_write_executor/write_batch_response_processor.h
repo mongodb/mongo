@@ -60,20 +60,35 @@ public:
     using CollectionsToCreate =
         stdx::unordered_map<NamespaceString,
                             std::shared_ptr<const mongo::CannotImplicitlyCreateCollectionInfo>>;
+
+    /**
+     * An enum that represents the type of error encountered.
+     */
+    enum class ErrorType {
+        // No error occurred, continue with next batch.
+        kNone,
+        // Finish processing the current responses but ignore subsequent batches.
+        kUnrecoverable,
+        // Halt further processing and return immediately.
+        kStopProcessing,
+    };
+
     /**
      * A struct representing data to be returned to the higher level of control flow.
      */
     struct Result {
-        bool unrecoverableError{false};       // Whether an unrecoverable error occurred
-        std::vector<WriteOp> opsToRetry{};    // Ops to be retried due to recoverable errors
-        CollectionsToCreate collsToCreate{};  // Collections to be explicitly created
+        ErrorType errorType{ErrorType::kNone};  // Type of error encountered if any.
+        std::vector<WriteOp> opsToRetry{};      // Ops to be retried due to recoverable errors
+        CollectionsToCreate collsToCreate{};    // Collections to be explicitly created
     };
 
     /**
      * Process a response from each shard, handle errors, and collect statistics. Returns an
      * array containing ops that did not complete successfully that need to be resent.
      */
-    Result onWriteBatchResponse(RoutingContext& routingCtx, const WriteBatchResponse& response);
+    Result onWriteBatchResponse(OperationContext* opCtx,
+                                RoutingContext& routingCtx,
+                                const WriteBatchResponse& response);
 
     /**
      * Turns gathered statistics into a command reply for the client. Consumes any pending reply
@@ -86,23 +101,27 @@ public:
     BulkWriteCommandReply generateClientResponseForBulkWriteCommand();
 
 private:
-    Result _onWriteBatchResponse(RoutingContext& routingCtx,
+    Result _onWriteBatchResponse(OperationContext* opCtx,
+                                 RoutingContext& routingCtx,
                                  const SimpleWriteBatchResponse& response);
-    Result _onWriteBatchResponse(RoutingContext& routingCtx,
+    Result _onWriteBatchResponse(OperationContext* opCtx,
+                                 RoutingContext& routingCtx,
                                  const NonTargetedWriteBatchResponse& response);
 
     /**
      * Process a response from a shard, handle errors, and collect statistics. Returns an array
      * containing ops that did not complete successfully that need to be resent.
      */
-    Result onShardResponse(RoutingContext& routingCtx,
+    Result onShardResponse(OperationContext* opCtx,
+                           RoutingContext& routingCtx,
                            const ShardId& shardId,
                            const ShardResponse& response);
 
     /**
      * Process ReplyItems and pick out any ops that need to be retried.
      */
-    Result processOpsInReplyItems(RoutingContext& routingCtx,
+    Result processOpsInReplyItems(OperationContext* opCtx,
+                                  RoutingContext& routingCtx,
                                   const std::vector<WriteOp>& ops,
                                   const std::vector<BulkWriteReplyItem>&);
     /**
@@ -113,6 +132,21 @@ private:
                                                    const std::vector<BulkWriteReplyItem>&,
                                                    std::vector<WriteOp>&& toRetry);
 
+
+    /**
+     * Adds a BulkReplyItem with the opId and status to '_results' and increments '_nErrors'. Used
+     * when we need to abort the whole batch due to an error when we're in a transaction.
+     */
+    void noteErrorResponseOnAbort(int opId, const Status& status);
+
+    /**
+     * Returns the retriedStmtIds to set them in the client response.
+     */
+    std::vector<StmtId> getRetriedStmtIds() const {
+        std::vector<StmtId> retriedStmtIds{_retriedStmtIds.begin(), _retriedStmtIds.end()};
+        return retriedStmtIds;
+    };
+
     const WriteOpContext& _context;
     size_t _nErrors{0};
     size_t _nInserted{0};
@@ -122,6 +156,7 @@ private:
     size_t _nDeleted{0};
     std::map<WriteOpId, BulkWriteReplyItem> _results;
     std::vector<ShardWCError> _wcErrors;
+    stdx::unordered_set<StmtId> _retriedStmtIds;
 };
 
 }  // namespace mongo::unified_write_executor

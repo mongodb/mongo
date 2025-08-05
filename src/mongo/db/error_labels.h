@@ -126,6 +126,12 @@ bool isTransientTransactionError(ErrorCodes::Error code,
                                  bool isCommitOrAbort);
 
 /**
+ * Checks if an error reply has the TransientTransactionError label. We use this in cases where we
+ * want to defer to whether a shard attached the label to an error it gave us.
+ */
+bool hasTransientTransactionErrorLabel(const ErrorReply& reply);
+
+/**
  * Whether a stream processing error is retryable.
  */
 bool isStreamProcessorRetryableError(ErrorCodes::Error code);

@@ -1665,17 +1665,96 @@ tasks:
 
   - <<: *task_template
     name: unified_write_executor
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "experimental",
+        requires_large_host,
+      ]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: sharding_unified_write_executor
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "experimental",
+        requires_large_host,
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: unified_write_executor_sharded_jscore_txns
     tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
     commands:
       - func: "do setup"
       - func: "run tests"
+
+  - <<: *task_template
+    name: unified_write_executor_sharded_jscore_txns_sharded_collections
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: unified_write_executor_sharded_jscore_txns_without_snapshot
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: unified_write_executor_sharded_jscore_txns
+          resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
+
+  - <<: *gen_task_template
+    name: unified_write_executor_multi_shard_multi_stmt_txn_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 0 # No cap on number of jobs.
+
+  - <<: *gen_task_template
+    name: unified_write_executor_multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 0 # No cap on number of jobs.
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_multi_stmt_txn_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
 
   - <<: *task_template
     name: query_correctness_query_shape_hash_stability_generated_test_1
