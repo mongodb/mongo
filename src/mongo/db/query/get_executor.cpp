@@ -469,6 +469,8 @@ public:
                 auto samplingMode = _cq->getExpCtx()
                                         ->getQueryKnobConfiguration()
                                         .getInternalQuerySamplingCEMethod();
+                const auto& topLevelSampleFieldNames =
+                    ce::extractTopLevelFieldsFromMatchExpression(_cq->getPrimaryMatchExpression());
                 samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(
                     _cq->getOpCtx(),
                     getCollections(),
@@ -482,7 +484,10 @@ public:
                         EstimationSource::Metadata},
                     _cq->getExpCtx()->getQueryKnobConfiguration().getConfidenceInterval(),
                     samplingMarginOfError.load(),
-                    internalQueryNumChunksForChunkBasedSampling.load());
+                    internalQueryNumChunksForChunkBasedSampling.load(),
+                    topLevelSampleFieldNames.empty()
+                        ? ce::NoProjection{}
+                        : ce::ProjectionParams(topLevelSampleFieldNames));
             } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
                 exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
                     getCollections().getMainCollection(), *_cq, _opCtx);

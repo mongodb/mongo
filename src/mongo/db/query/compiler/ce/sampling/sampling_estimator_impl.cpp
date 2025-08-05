@@ -57,6 +57,12 @@ namespace mongo::ce {
 using CardinalityType = mongo::cost_based_ranker::CardinalityType;
 using EstimationSource = mongo::cost_based_ranker::EstimationSource;
 
+std::vector<std::string> extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr) {
+    DepsTracker deps;
+    dependency_analysis::addDependencies(expr, &deps);
+    return stage_builder::getTopLevelFields(deps.fields);
+}
+
 std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeEmptyCanonicalQuery(
     const NamespaceString& nss, OperationContext* opCtx) {
     auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
@@ -81,16 +87,22 @@ bool containsDottedPath(const std::vector<std::string>& topLevelSampleFieldNames
         [](const std::string& fieldName) { return fieldName.find('.') != std::string::npos; });
 }
 
+void validateTopLevelSampleFieldNames(const std::vector<std::string>& topLevelSampleFieldNames) {
+    tassert(10770100,
+            "topLevelSampleFieldNames must be a non-empty vector if specified.",
+            !topLevelSampleFieldNames.empty());
+    tassert(10670300,
+            "topLevelSampleFieldNames should not contain a dotted field path",
+            !containsDottedPath(topLevelSampleFieldNames));
+}
+
 /**
  * Helper function to determine if a given MatchExpression contains only fields present in the
  * sample.
  */
 void checkSampleContainsMatchExpressionFields(
     const std::vector<std::string>& topLevelSampleFieldNames, const MatchExpression* expr) {
-    DepsTracker deps;
-    dependency_analysis::addDependencies(expr, &deps);
-
-    const auto matchExpressionFields = stage_builder::getTopLevelFields(deps.fields);
+    const auto matchExpressionFields = extractTopLevelFieldsFromMatchExpression(expr);
     stdx::unordered_set<StringData> topLevelSampleFieldNamesSet(topLevelSampleFieldNames.begin(),
                                                                 topLevelSampleFieldNames.end());
     for (const auto& matchField : matchExpressionFields) {
@@ -729,17 +741,18 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              SamplingStyle samplingStyle,
                                              boost::optional<int> numChunks,
                                              CardinalityEstimate collectionCard,
-                                             std::vector<std::string> topLevelSampleFieldNames)
+                                             ce::ProjectionParams projectionParams)
     : _opCtx(opCtx),
       _collections(collections),
       _yieldPolicy(yieldPolicy),
       _sampleSize(sampleSize),
       _numChunks(numChunks),
       _collectionCard(collectionCard) {
-    tassert(10670300,
-            "topLevelSampleFieldNames should not contain a dotted field path",
-            !containsDottedPath(topLevelSampleFieldNames));
-    _topLevelSampleFieldNames = std::move(topLevelSampleFieldNames);
+    if (const auto topLevelSampleFieldNames =
+            std::get_if<ce::TopLevelFieldsProjection>(&projectionParams)) {
+        validateTopLevelSampleFieldNames(*topLevelSampleFieldNames);
+        _topLevelSampleFieldNames = std::move(*topLevelSampleFieldNames);
+    }
     if (internalQuerySamplingBySequentialScan.load()) {
         // This is only used for testing purposes when a repeatable sample is needed.
         generateSampleBySeqScanningForTesting();
@@ -766,7 +779,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              SamplingConfidenceIntervalEnum ci,
                                              double marginOfError,
                                              boost::optional<int> numChunks,
-                                             std::vector<std::string> topLevelSampleFieldNames)
+                                             ce::ProjectionParams projectionParams)
     : SamplingEstimatorImpl(opCtx,
                             collections,
                             yieldPolicy,
@@ -774,7 +787,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                             samplingStyle,
                             numChunks,
                             collectionCard,
-                            std::move(topLevelSampleFieldNames)) {}
+                            std::move(projectionParams)) {}
 
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 

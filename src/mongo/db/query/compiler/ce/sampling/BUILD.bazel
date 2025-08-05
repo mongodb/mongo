@@ -61,6 +61,7 @@ mongo_cc_unit_test(
     deps = [
         ":sampling_test_utils",
         "//src/mongo/db:query_exec",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:cbr_test_utils",
     ],
 )
 

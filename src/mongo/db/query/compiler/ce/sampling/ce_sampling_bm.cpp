@@ -211,7 +211,8 @@ void BM_CreateSample(benchmark::State& state) {
             sampleSize,
             sampling.first,
             sampling.second,
-            SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+            SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
+            ce::NoProjection{});
     }
 }
 
@@ -258,7 +259,8 @@ void BM_RunCardinalityEstimationOnSample(benchmark::State& state) {
         sampleSize,
         sampling.first,
         sampling.second,
-        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
+        ce::NoProjection{});
 
     // Generate queries.
     std::vector<std::vector<std::pair<stats::SBEValue, stats::SBEValue>>> queryFieldsIntervals =

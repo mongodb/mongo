@@ -293,7 +293,8 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
                 actualSampleSize,
                 samplingAlgoAndChunk.first,
                 samplingAlgoAndChunk.second,
-                SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+                SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
+                ce::NoProjection{});
 
             auto error = runQueries(queryConfig, dataBSON, &samplingEstimator);
 
@@ -305,7 +306,7 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
 }
 
 SamplingEstimatorForTesting SamplingEstimatorTest::createSamplingEstimatorForTesting(
-    size_t collCard, size_t sampleSize) {
+    size_t collCard, size_t sampleSize, ce::ProjectionParams projectionParams) {
     insertDocuments(_kTestNss, createDocuments(collCard));
 
     AutoGetCollection collPtr(operationContext(), _kTestNss, LockMode::MODE_IX);
@@ -322,7 +323,8 @@ SamplingEstimatorForTesting SamplingEstimatorTest::createSamplingEstimatorForTes
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         boost::none,
-        makeCardinalityEstimate(collCard));
+        makeCardinalityEstimate(collCard),
+        projectionParams);
 
     return samplingEstimator;
 }
