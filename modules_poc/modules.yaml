@@ -922,6 +922,7 @@ observability:
     - src/mongo/db/operation_cpu_timer*
     - src/mongo/db/process_health/
     - src/mongo/executor/split_timer*
+    - src/mongo/util/observable_mutex*
     - src/mongo/watchdog/
 
 observability.logging:

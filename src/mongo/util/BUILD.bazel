@@ -1080,6 +1080,27 @@ mongo_cc_unit_test(
     }),
 )
 
+mongo_cc_library(
+    name = "observable_mutex_registry",
+    srcs = ["observable_mutex_registry.cpp"],
+    hdrs = ["observable_mutex_registry.h"],
+    deps = ["//src/mongo:base"],
+)
+
+mongo_cc_unit_test(
+    name = "observable_mutex_registry_test",
+    srcs = ["observable_mutex_registry_test.cpp"],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "networking-and-observability",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:mutex_observation_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = ["observable_mutex_registry"],
+)
+
 mongo_cc_unit_test(
     name = "moving_average_test",
     srcs = [
