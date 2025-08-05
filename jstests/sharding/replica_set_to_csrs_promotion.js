@@ -254,3 +254,128 @@ describe("transitions", function() {
         });
     });
 });
+
+describe("operations during rolling restart", function() {
+    before(() => {
+        this.restartASecondaryAndStepItUp = (rs, startupFlags) => {
+            rs.awaitReplication();
+            const secondary = rs.getSecondary();
+            const id = rs.getNodeId(secondary);
+            rs.stop(id, null, {}, {
+                forRestart: true,
+                waitPid: true,
+            });
+            assert.doesNotThrow(() => {
+                rs.start(id, {
+                    ...startupFlags,
+                    remember: false,
+                });
+            });
+            rs.stepUp(secondary);
+        };
+
+        this.restartAllSecondaries = (rs, startupFlags) => {
+            rs.awaitReplication();
+            for (const secondary of rs.getSecondaries()) {
+                const id = rs.getNodeId(secondary);
+                rs.stop(id, null, {}, {
+                    forRestart: true,
+                    waitPid: true,
+                });
+                assert.doesNotThrow(() => {
+                    rs.start(id, {
+                        ...startupFlags,
+                        remember: false,
+                    });
+                });
+            }
+            rs.awaitReplication();
+        };
+    });
+
+    beforeEach(() => {
+        this.rs = new ReplSetTest({nodes: 3});
+    });
+
+    afterEach(() => {
+        this.rs.stopSet();
+    });
+
+    it("read during transition from replicaset to csrs", () => {
+        this.rs.startSet({
+            replSet: "replica_set_to_csrs_promotion",
+            remember: false,
+        });
+        this.rs.initiate();
+
+        assert.commandWorked(this.rs.getPrimary().getDB("foo").bar.insertOne({a: 42}));
+
+        this.restartAllSecondaries(this.rs, {
+            configsvr: "",
+            replicaSetConfigShardMaintenanceMode: "",
+        });
+
+        assert.eq(this.rs.getPrimary().getDB("foo").bar.count({}), 1);
+        assert.eq(this.rs.getSecondary().getDB("foo").bar.count({}), 1);
+    });
+
+    it("read during transition from csrs to replicaset", () => {
+        this.rs.startSet({
+            configsvr: "",
+            remember: false,
+        });
+        const cfg = this.rs.getReplSetConfig();
+        cfg.configsvr = true;
+        this.rs.initiate(cfg);
+
+        assert.commandWorked(this.rs.getPrimary().getDB("foo").bar.insertOne({a: 42}));
+
+        this.restartASecondaryAndStepItUp(this.rs, {
+            replSet: "replica_set_to_csrs_promotion",
+            replicaSetConfigShardMaintenanceMode: "",
+        });
+
+        assert.eq(this.rs.getPrimary().getDB("foo").bar.count({}), 1);
+        assert.eq(this.rs.getSecondary().getDB("foo").bar.count({}), 1);
+    });
+
+    it("write-read during transition from replicaset to csrs", () => {
+        this.rs.startSet({
+            replSet: "replica_set_to_csrs_promotion",
+            remember: false,
+        });
+        this.rs.initiate();
+
+        this.restartASecondaryAndStepItUp(this.rs, {
+            configsvr: "",
+            replicaSetConfigShardMaintenanceMode: "",
+        });
+
+        assert.commandWorked(
+            this.rs.getPrimary().getDB("foo").bar.insertOne({a: 42}, {writeConcern: {w: 3}}));
+
+        assert.eq(this.rs.getPrimary().getDB("foo").bar.count({}), 1);
+        assert.eq(this.rs.getSecondary().getDB("foo").bar.count({}), 1);
+    });
+
+    it("write-read during transition from csrs to replicaset", () => {
+        this.rs.startSet({
+            configsvr: "",
+            remember: false,
+        });
+        const cfg = this.rs.getReplSetConfig();
+        cfg.configsvr = true;
+        this.rs.initiate(cfg);
+
+        this.restartASecondaryAndStepItUp(this.rs, {
+            replSet: "replica_set_to_csrs_promotion",
+            replicaSetConfigShardMaintenanceMode: "",
+        });
+
+        assert.commandWorked(
+            this.rs.getPrimary().getDB("foo").bar.insertOne({a: 42}, {writeConcern: {w: 3}}));
+
+        assert.eq(this.rs.getPrimary().getDB("foo").bar.count({}), 1);
+        assert.eq(this.rs.getSecondary().getDB("foo").bar.count({}), 1);
+    });
+});
