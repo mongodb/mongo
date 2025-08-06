@@ -246,10 +246,16 @@ struct MakeObjSpec {
 
     size_t getApproximateSize() const;
 
+    const FieldAction* getActionsData() const {
+        return !actions.empty() ? actions.data() : &_singleKeepAction[0];
+    }
+
 private:
     StringListSet buildFieldDict(std::vector<std::string> names);
 
     void init();
+
+    static FieldAction _singleKeepAction[1];
 
 public:
     // 'fieldsScope' indicates how other fields not present in 'fields' should be handled.

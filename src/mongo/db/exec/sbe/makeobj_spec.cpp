@@ -35,6 +35,8 @@
 #include <iterator>
 
 namespace mongo::sbe {
+MakeObjSpec::FieldAction MakeObjSpec::_singleKeepAction[1] = {
+    MakeObjSpec::FieldAction{MakeObjSpec::Keep{}}};
 
 StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names) {
     const bool isClosed = fieldsScopeIsClosed();

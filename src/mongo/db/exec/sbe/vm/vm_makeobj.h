@@ -146,7 +146,7 @@ private:
         using Value = value::Value;
 
         const auto& fields = spec->fields;
-        const auto* actions = !spec->actions.empty() ? &spec->actions[0] : nullptr;
+        const auto* actions = spec->getActionsData();
 
         const bool isClosed = spec->fieldsScopeIsClosed();
         const bool recordVisits = !spec->mandatoryFields.empty();
