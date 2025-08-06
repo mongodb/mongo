@@ -52,6 +52,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -563,50 +564,79 @@ void ShardingCatalogManager::configureCollectionBalancing(
 }
 
 void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const CollModTimeseries& timeseriesParameters) {
+    OperationContext* opCtx, const NamespaceString& nss, const CollModRequest& collModRequest) {
     // Take _kChunkOpLock in exclusive mode to prevent concurrent updates of the collection
     // placement version.
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
+
+    const boost::optional<CollModTimeseries>& timeseriesParameters = collModRequest.getTimeseries();
+    const boost::optional<bool>& bucketsMayHaveMixedSchemaData =
+        collModRequest.getTimeseriesBucketsMayHaveMixedSchemaData();
+
+    tassert(10533700,
+            "Expected timeseries parameters or mixed schema flag to be set",
+            timeseriesParameters.has_value() || bucketsMayHaveMixedSchemaData.has_value());
 
     const auto cm = uassertStatusOK(
         RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss));
     std::set<ShardId> shardIds;
     cm.getAllShardIds(&shardIds);
+    tassert(10533701,
+            "Cannot update timeseries fields on a collection that is not a timeseries",
+            cm.isTimeseriesCollection());
 
     withTransaction(
         opCtx,
         CollectionType::ConfigNS,
-        [this, &nss, &timeseriesParameters, &shardIds](OperationContext* opCtx,
-                                                       TxnNumber txnNumber) {
+        [this, &nss, &timeseriesParameters, &bucketsMayHaveMixedSchemaData, &shardIds](
+            OperationContext* opCtx, TxnNumber txnNumber) {
             auto granularityFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
                 TypeCollectionTimeseriesFields::kGranularityFieldName;
             auto bucketSpanFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
                 TypeCollectionTimeseriesFields::kBucketMaxSpanSecondsFieldName;
             auto bucketRoundingFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
                 TypeCollectionTimeseriesFields::kBucketRoundingSecondsFieldName;
+            auto mixedSchemaFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
+                TypeCollectionTimeseriesFields::kTimeseriesBucketsMayHaveMixedSchemaDataFieldName;
 
-            BSONObjBuilder updateCmd;
-            BSONObj bucketUp;
-            if (timeseriesParameters.getGranularity().has_value()) {
-                auto bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(
-                    timeseriesParameters.getGranularity().get());
-                updateCmd.append("$unset", BSON(bucketRoundingFieldName << ""));
-                bucketUp = BSON(
-                    granularityFieldName
-                    << BucketGranularity_serializer(timeseriesParameters.getGranularity().get())
-                    << bucketSpanFieldName << bucketSpan);
-            } else {
-                invariant(timeseriesParameters.getBucketMaxSpanSeconds().has_value() &&
-                          timeseriesParameters.getBucketRoundingSeconds().has_value());
-                updateCmd.append("$unset", BSON(granularityFieldName << ""));
-                bucketUp = BSON(bucketSpanFieldName
-                                << timeseriesParameters.getBucketMaxSpanSeconds().get()
-                                << bucketRoundingFieldName
-                                << timeseriesParameters.getBucketRoundingSeconds().get());
+            BSONObjBuilder updateBob;
+
+            if (timeseriesParameters.has_value()) {
+                BSONObj bucketUp;
+                if (timeseriesParameters->getGranularity().has_value()) {
+                    auto bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(
+                        timeseriesParameters->getGranularity().get());
+                    updateBob.append("$unset", BSON(bucketRoundingFieldName << ""));
+                    bucketUp = BSON(granularityFieldName
+                                    << BucketGranularity_serializer(
+                                           timeseriesParameters->getGranularity().get())
+                                    << bucketSpanFieldName << bucketSpan);
+                } else {
+                    tassert(
+                        10533702,
+                        "Expected bucketMaxSpanSeconds and bucketRoundingSeconds to be both set",
+                        timeseriesParameters->getBucketMaxSpanSeconds().has_value() &&
+                            timeseriesParameters->getBucketRoundingSeconds().has_value());
+                    updateBob.append("$unset", BSON(granularityFieldName << ""));
+                    bucketUp = BSON(bucketSpanFieldName
+                                    << timeseriesParameters->getBucketMaxSpanSeconds().get()
+                                    << bucketRoundingFieldName
+                                    << timeseriesParameters->getBucketRoundingSeconds().get());
+                }
+                updateBob.append("$set", bucketUp);
             }
-            updateCmd.append("$set", bucketUp);
+
+            // TODO SERVER-108908: once 9.0 branches out, remove `isViewLessTimeseries` check
+            const bool isViewLessTimeseries = !nss.isTimeseriesBucketsCollection();
+            if (isViewLessTimeseries && bucketsMayHaveMixedSchemaData.has_value()) {
+                updateBob.append("$set",
+                                 BSON(mixedSchemaFieldName << bucketsMayHaveMixedSchemaData.get()));
+            }
+
+            const BSONObj update = updateBob.obj();
+            if (update.isEmpty()) {
+                return;
+            }
 
             writeToConfigDocumentInTxn(
                 opCtx,
@@ -615,7 +645,7 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
                     CollectionType::ConfigNS,
                     BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                              nss, SerializationContext::stateDefault())) /* query */,
-                    updateCmd.obj() /* update */,
+                    update,
                     false /* upsert */,
                     false /* multi */),
                 txnNumber);

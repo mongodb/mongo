@@ -1893,6 +1893,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/config:sharding_catalog_manager_assign_key_range_to_zone_test.cpp",
         "//src/mongo/db/s/config:sharding_catalog_manager_bump_collection_version_and_change_metadata_test.cpp",
         "//src/mongo/db/s/config:sharding_catalog_manager_clear_jumbo_flag_test.cpp",
+        "//src/mongo/db/s/config:sharding_catalog_manager_collection_operations_test.cpp",
         "//src/mongo/db/s/config:sharding_catalog_manager_commit_chunk_migration_test.cpp",
         "//src/mongo/db/s/config:sharding_catalog_manager_config_initialization_test.cpp",
         "//src/mongo/db/s/config:sharding_catalog_manager_configure_collection_balancing_test.cpp",

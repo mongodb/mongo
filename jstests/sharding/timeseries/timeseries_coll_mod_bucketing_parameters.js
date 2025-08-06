@@ -10,6 +10,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -34,6 +35,11 @@ const getConfigRoundingSeconds = function(db) {
     return db.getSiblingDB('config')
         .collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
         .timeseriesFields.bucketRoundingSeconds;
+};
+const getHasMixedSchemaData = function(db) {
+    return db.getSiblingDB('config')
+        .collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
+        .timeseriesFields.timeseriesBucketsMayHaveMixedSchemaData;
 };
 
 const checkConfigParametersAfterCollMod = function() {
@@ -125,6 +131,14 @@ const checkConfigParametersAfterCollMod = function() {
     assert.isnull(getConfigGranularity(db));
     assert.eq(getConfigMaxSpanSeconds(db), currentMaxSpan);
     assert.eq(getConfigRoundingSeconds(db), currentMaxSpan);
+
+    if (FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections")) {
+        // 7. Set timeseriesBucketsMayHaveMixedSchemaData flag
+        assert(!getHasMixedSchemaData(db));
+        assert.commandWorked(
+            db.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
+        assert(getHasMixedSchemaData(db));
+    }
 
     st.stop();
     jsTestLog("Exiting checkConfigParametersAfterCollMod.");

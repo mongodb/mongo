@@ -41,6 +41,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -500,7 +501,7 @@ public:
      */
     void updateTimeSeriesBucketingParameters(OperationContext* opCtx,
                                              const NamespaceString& nss,
-                                             const CollModTimeseries& timeseriesParameters);
+                                             const CollModRequest& collModRequest);
 
     //
     // Shard Operations

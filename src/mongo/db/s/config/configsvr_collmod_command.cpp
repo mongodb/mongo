@@ -97,12 +97,12 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
+            const auto bucketsMayHaveMixedSchemaData =
+                request().getCollModRequest().getTimeseriesBucketsMayHaveMixedSchemaData();
             auto& ts = request().getCollModRequest().getTimeseries();
-            if (ts.has_value() &&
-                (ts->getGranularity().has_value() || ts->getBucketMaxSpanSeconds().has_value() ||
-                 ts->getBucketRoundingSeconds().has_value())) {
+            if (ts.has_value() || bucketsMayHaveMixedSchemaData.has_value()) {
                 ShardingCatalogManager::get(opCtx)->updateTimeSeriesBucketingParameters(
-                    opCtx, ns(), ts.get());
+                    opCtx, ns(), request().getCollModRequest());
             }
         }
 

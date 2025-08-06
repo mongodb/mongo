@@ -90,12 +90,9 @@ MONGO_FAIL_POINT_DEFINE(collModBeforeConfigServerUpdate);
 namespace {
 
 
-bool hasTimeSeriesBucketingUpdate(const CollModRequest& request) {
-    if (!request.getTimeseries().has_value()) {
-        return false;
-    }
-    auto& ts = request.getTimeseries();
-    return ts->getGranularity() || ts->getBucketMaxSpanSeconds() || ts->getBucketRoundingSeconds();
+bool hasTimeseriesParams(const CollModRequest& request) {
+    return (request.getTimeseries().has_value() && !request.getTimeseries()->toBSON().isEmpty()) ||
+        request.getTimeseriesBucketsMayHaveMixedSchemaData().has_value();
 }
 
 template <typename CommandType>
@@ -323,7 +320,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
             _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
 
-            auto isGranularityUpdate = hasTimeSeriesBucketingUpdate(_request);
+            auto isGranularityUpdate = (_request.getTimeseries().has_value() &&
+                                        !_request.getTimeseries()->toBSON().isEmpty());
             uassert(6201808,
                     "Cannot use time-series options for a non-timeseries collection",
                     _collInfo->timeSeriesOptions || !isGranularityUpdate);
@@ -353,7 +351,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
-                if (_collInfo->isTracked && hasTimeSeriesBucketingUpdate(_request)) {
+                if (_collInfo->isTracked && _collInfo->timeSeriesOptions &&
+                    hasTimeseriesParams(_request)) {
                     ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
                     blockCRUDOperationsRequest.setBlockType(
                         CriticalSectionBlockTypeEnum::kReadsAndWrites);
@@ -377,7 +376,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isTracked && _collInfo->timeSeriesOptions &&
-                    hasTimeSeriesBucketingUpdate(_request)) {
+                    hasTimeseriesParams(_request)) {
                     ConfigsvrCollMod request(_collInfo->nsForTargeting, _request);
                     generic_argument_util::setMajorityWriteConcern(request);
 
@@ -440,7 +439,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                         ShardsvrCollModParticipant request(originalNss(), _request);
                         bool needsUnblock =
-                            _collInfo->timeSeriesOptions && hasTimeSeriesBucketingUpdate(_request);
+                            _collInfo->timeSeriesOptions && hasTimeseriesParams(_request);
                         request.setNeedsUnblock(needsUnblock);
 
                         std::vector<AsyncRequestsSender::Response> responses;
