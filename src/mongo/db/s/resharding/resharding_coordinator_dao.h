@@ -117,6 +117,12 @@ public:
         Date_t criticalSectionExpireTime,
         boost::optional<TxnNumber> txnNumber = boost::none);
 
+    ReshardingCoordinatorDocument transitionToAbortingPhase(
+        OperationContext* opCtx,
+        Date_t now,
+        Status abortReason,
+        boost::optional<TxnNumber> txnNumber = boost::none);
+
 private:
     const UUID _reshardingUUID;
     std::unique_ptr<DaoStorageClientFactory> _clientFactory;

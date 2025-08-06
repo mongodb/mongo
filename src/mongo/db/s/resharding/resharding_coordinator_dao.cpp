@@ -71,6 +71,35 @@ ReshardingCoordinatorDocument buildAndExecuteRequest(OperationContext* opCtx,
     client->alterState(opCtx, request);
     return client->readState(opCtx, reshardingUUID);
 }
+
+boost::optional<StringData> getTimedPhaseFieldNameFor(CoordinatorStateEnum coordinatorPhase) {
+    switch (coordinatorPhase) {
+        case CoordinatorStateEnum::kCloning:
+            return ReshardingCoordinatorMetrics::kDocumentCopyFieldName;
+        case CoordinatorStateEnum::kApplying:
+            return ReshardingCoordinatorMetrics::kOplogApplicationFieldName;
+        default:
+            return boost::none;
+    }
+    MONGO_UNREACHABLE;
+}
+
+boost::optional<std::string> getTimedPhaseStartFieldFor(CoordinatorStateEnum coordinatorPhase) {
+    auto timedPhase = getTimedPhaseFieldNameFor(coordinatorPhase);
+    if (!timedPhase) {
+        return boost::none;
+    }
+    return resharding_metrics::getIntervalStartFieldName<ReshardingCoordinatorDocument>(
+        *timedPhase);
+}
+
+boost::optional<std::string> getTimedPhaseEndFieldFor(CoordinatorStateEnum coordinatorPhase) {
+    auto timedPhase = getTimedPhaseFieldNameFor(coordinatorPhase);
+    if (!timedPhase) {
+        return boost::none;
+    }
+    return resharding_metrics::getIntervalEndFieldName<ReshardingCoordinatorDocument>(*timedPhase);
+}
 }  // namespace
 
 void DaoStorageClientImpl::alterState(OperationContext* opCtx,
@@ -107,9 +136,6 @@ ReshardingCoordinatorDocument TransactionalDaoStorageClientImpl::readState(
     return ReshardingCoordinatorDocument::parse(IDLParserContext("ReshardingCoordinatorDocument"),
                                                 *result);
 }
-
-using resharding_metrics::getIntervalEndFieldName;
-using resharding_metrics::getIntervalStartFieldName;
 
 CoordinatorStateEnum ReshardingCoordinatorDao::getPhase(OperationContext* opCtx,
                                                         boost::optional<TxnNumber> txnNumber) {
@@ -189,9 +215,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToCloningPhase
                           *doc.getApproxDocumentsToCopy());
 
         // Update cloning metrics.
-        setBuilder.append(getIntervalStartFieldName<ReshardingCoordinatorDocument>(
-                              ReshardingRecipientMetrics::kDocumentCopyFieldName),
-                          now);
+        setBuilder.append(*getTimedPhaseStartFieldFor(CoordinatorStateEnum::kCloning), now);
     }
 
     return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
@@ -214,9 +238,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToBlockingWrit
         setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
                           CoordinatorState_serializer(CoordinatorStateEnum::kBlockingWrites));
 
-        setBuilder.append(getIntervalEndFieldName<ReshardingCoordinatorDocument>(
-                              ReshardingRecipientMetrics::kOplogApplicationFieldName),
-                          now);
+        setBuilder.append(*getTimedPhaseEndFieldFor(CoordinatorStateEnum::kApplying), now);
 
         setBuilder.append(ReshardingCoordinatorDocument::kCriticalSectionExpiresAtFieldName,
                           criticalSectionExpireTime);
@@ -241,16 +263,42 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToApplyingPhas
                           CoordinatorState_serializer(CoordinatorStateEnum::kApplying));
 
         // Update applying metrics.
-        setBuilder.append(getIntervalEndFieldName<ReshardingCoordinatorDocument>(
-                              ReshardingRecipientMetrics::kDocumentCopyFieldName),
-                          now);
-        setBuilder.append(getIntervalStartFieldName<ReshardingCoordinatorDocument>(
-                              ReshardingRecipientMetrics::kOplogApplicationFieldName),
-                          now);
+        setBuilder.append(*getTimedPhaseEndFieldFor(CoordinatorStateEnum::kCloning), now);
+        setBuilder.append(*getTimedPhaseStartFieldFor(CoordinatorStateEnum::kApplying), now);
     }
 
     return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
 }
+
+ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToAbortingPhase(
+    OperationContext* opCtx, Date_t now, Status abortReason, boost::optional<TxnNumber> txnNumber) {
+
+    auto client = _clientFactory->createDaoStorageClient(txnNumber);
+    auto doc = client->readState(opCtx, _reshardingUUID);
+    // Participants are not aware of resharding until after the Initializing phase, so the
+    // coordinator will clean itself up and immediately move to Done instead of going through
+    // Aborting.
+    invariant(doc.getState() > CoordinatorStateEnum::kInitializing &&
+              doc.getState() < CoordinatorStateEnum::kAborting);
+
+    BSONObjBuilder updateBuilder;
+    {
+        BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+
+        setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
+                          CoordinatorState_serializer(CoordinatorStateEnum::kAborting));
+
+        setBuilder.append(ReshardingCoordinatorDocument::kAbortReasonFieldName,
+                          resharding::serializeAndTruncateReshardingErrorIfNeeded(abortReason));
+
+        if (auto endingTimedPhaseFieldName = getTimedPhaseEndFieldFor(doc.getState())) {
+            setBuilder.append(*endingTimedPhaseFieldName, now);
+        }
+    }
+
+    return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
+}
+
 
 }  // namespace resharding
 }  // namespace mongo

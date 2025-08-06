@@ -505,7 +505,7 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                                return _awaitAllParticipantShardsDone(executor);
                            })
                            .then([this, executor] {
-                               _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
+                               _metrics->setEndFor(CoordinatorStateEnum::kBlockingWrites,
                                                    resharding::getCurrentTime());
 
                                // Best-effort attempt to trigger a refresh on the participant shards
@@ -758,11 +758,14 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorAndParticipants(
                            // The coordinator only transitions into kAborting if there are
                            // participants to wait on before transitioning to kDone.
                            _updateCoordinatorDocStateAndCatalogEntries(
-                               CoordinatorStateEnum::kAborting,
-                               _coordinatorDoc,
-                               boost::none,
-                               boost::none,
-                               status);
+                               [=, this](OperationContext* opCtx, TxnNumber txnNumber) {
+                                   auto previousPhase = _coordinatorDao.getPhase(opCtx, txnNumber);
+                                   auto now = resharding::getCurrentTime();
+                                   auto updatedDocument = _coordinatorDao.transitionToAbortingPhase(
+                                       opCtx, now, status, txnNumber);
+                                   _metrics->setEndFor(previousPhase, now);
+                                   return updatedDocument;
+                               });
                        }
                    })
                    .then([this] {
@@ -1065,7 +1068,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
                     auto now = resharding::getCurrentTime();
                     auto updatedDocument = _coordinatorDao.transitionToCloningPhase(
                         opCtx, now, highestMinFetchTimestamp, approxCopySize, txnNumber);
-                    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCloning, now);
+                    _metrics->setStartFor(CoordinatorStateEnum::kCloning, now);
                     return updatedDocument;
                 });
         })
@@ -1223,8 +1226,8 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
                     auto updatedDocument =
                         _coordinatorDao.transitionToApplyingPhase(opCtx, now, txnNumber);
 
-                    _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, now);
-                    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kApplying, now);
+                    _metrics->setEndFor(CoordinatorStateEnum::kCloning, now);
+                    _metrics->setStartFor(CoordinatorStateEnum::kApplying, now);
                     return updatedDocument;
                 });
         })
@@ -1315,7 +1318,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
                 [=, this](OperationContext* opCtx, TxnNumber txnNumber) {
                     auto updatedDocument = _coordinatorDao.transitionToBlockingWritesPhase(
                         opCtx, now, criticalSectionExpiresAt, txnNumber);
-                    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection, now);
+                    _metrics->setStartFor(CoordinatorStateEnum::kBlockingWrites, now);
                     return updatedDocument;
                 });
         })

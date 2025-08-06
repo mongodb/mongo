@@ -121,6 +121,20 @@ ReshardingProvenanceEnum readProvenance(const CommonReshardingMetadata& metadata
     return ReshardingProvenanceEnum::kReshardCollection;
 }
 
+boost::optional<TimedPhase> getAssociatedTimedPhase(CoordinatorStateEnum coordinatorPhase) {
+    switch (coordinatorPhase) {
+        case CoordinatorStateEnum::kCloning:
+            return TimedPhase::kCloning;
+        case CoordinatorStateEnum::kApplying:
+            return TimedPhase::kApplying;
+        case CoordinatorStateEnum::kBlockingWrites:
+            return TimedPhase::kCriticalSection;
+        default:
+            return boost::none;
+    }
+    MONGO_UNREACHABLE
+}
+
 }  // namespace
 
 void ReshardingMetrics::ExternallyTrackedRecipientFields::accumulateFrom(
@@ -536,6 +550,18 @@ void ReshardingMetrics::setStartFor(TimedPhase phase, Date_t date) {
 
 void ReshardingMetrics::setEndFor(TimedPhase phase, Date_t date) {
     _phaseDurations.setEndFor(phase, date);
+}
+
+void ReshardingMetrics::setStartFor(CoordinatorStateEnum phase, Date_t date) {
+    if (auto associatedPhase = getAssociatedTimedPhase(phase)) {
+        setStartFor(*associatedPhase, date);
+    }
+}
+
+void ReshardingMetrics::setEndFor(CoordinatorStateEnum phase, Date_t date) {
+    if (auto associatedPhase = getAssociatedTimedPhase(phase)) {
+        setEndFor(*associatedPhase, date);
+    }
 }
 
 ReshardingMetrics::UniqueScopedObserver ReshardingMetrics::registerInstanceMetrics() {

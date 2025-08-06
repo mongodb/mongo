@@ -87,6 +87,13 @@ private:
     std::shared_ptr<SpyingDaoStorageClientState> _state;
 };
 
+struct PhaseTransitionTestCase {
+    CoordinatorStateEnum initialPhase;
+    std::function<void()> transitionFn;
+    boost::optional<BSONObj> set = boost::none;
+    boost::optional<BSONObj> unset = boost::none;
+};
+
 class ReshardingCoordinatorDaoFixture : public unittest::Test {
 protected:
     void setUp() override {
@@ -95,10 +102,27 @@ protected:
         _dao = std::make_unique<ReshardingCoordinatorDao>(_uuid, std::move(clientFactory));
     }
 
-    void runPhaseTransition(CoordinatorStateEnum initialPhase,
-                            std::function<void()> transitionToNextPhase) {
-        _state->document.setState(initialPhase);
-        transitionToNextPhase();
+    BSONObj wrapUpdate(boost::optional<BSONObj> set, boost::optional<BSONObj> unset) {
+        BSONObjBuilder update;
+        if (set) {
+            update.append("$set", *set);
+        }
+        if (unset) {
+            update.append("$unset", *unset);
+        }
+        return BSON_ARRAY(BSON("q" << BSON("_id" << _uuid) << "u" << update.obj() << "multi"
+                                   << false << "upsert" << false));
+    }
+
+    void runPhaseTransitionTest(PhaseTransitionTestCase testCase) {
+        _state->document.setState(testCase.initialPhase);
+        testCase.transitionFn();
+
+        const auto& lastRequest = _state->lastRequest;
+        ASSERT_EQUALS(lastRequest.getStringField("update"),
+                      NamespaceString::kConfigReshardingOperationsNamespace.coll());
+        auto updates = lastRequest.getObjectField("updates");
+        ASSERT_BSONOBJ_EQ_UNORDERED(updates, wrapUpdate(testCase.set, testCase.unset));
     }
 
     UUID _uuid{UUID::gen()};
@@ -135,10 +159,6 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToPreparingToDonatePhaseSuccee
     auto shardsAndChunks =
         ParticipantShardsAndChunks({donorShards, recipientShards, initialChunks});
 
-    runPhaseTransition(CoordinatorStateEnum::kInitializing, [&]() {
-        _dao->transitionToPreparingToDonatePhase(_opCtx, shardsAndChunks);
-    });
-
     BSONArrayBuilder donorShardsArrayBuilder;
     for (const auto& shard : donorShards) {
         donorShardsArrayBuilder.append(shard.toBSON());
@@ -149,22 +169,16 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToPreparingToDonatePhaseSuccee
         recipientShardsArrayBuilder.append(shard.toBSON());
     }
 
-    auto expectedUpdates = BSON_ARRAY(
-        BSON("q" << BSON("_id" << _uuid) << "u"
-                 << BSON("$set" << BSON("state" << "preparing-to-donate"
-                                                << "donorShards" << donorShardsArrayBuilder.arr()
-                                                << "recipientShards"
-                                                << recipientShardsArrayBuilder.arr())
-                                << "$unset"
-                                << BSON("presetReshardedChunks" << ""
-                                                                << "zones" << ""))
-                 << "multi" << false << "upsert" << false));
-
-    const auto& lastRequest = _state->lastRequest;
-    ASSERT_EQUALS(lastRequest.getStringField("update"),
-                  NamespaceString::kConfigReshardingOperationsNamespace.coll());
-    auto updates = lastRequest.getObjectField("updates");
-    ASSERT_BSONOBJ_EQ(updates, expectedUpdates);
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kInitializing,
+        .transitionFn =
+            [&]() { _dao->transitionToPreparingToDonatePhase(_opCtx, shardsAndChunks); },
+        .set = BSON("state" << "preparing-to-donate"
+                            << "donorShards" << donorShardsArrayBuilder.arr() << "recipientShards"
+                            << recipientShardsArrayBuilder.arr()),
+        .unset = BSON("presetReshardedChunks" << ""
+                                              << "zones"
+                                              << "")});
 }
 
 DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
@@ -185,9 +199,10 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
     auto shardsAndChunks =
         ParticipantShardsAndChunks({donorShards, recipientShards, initialChunks});
 
-    runPhaseTransition(CoordinatorStateEnum::kPreparingToDonate, [&]() {
-        _dao->transitionToPreparingToDonatePhase(_opCtx, shardsAndChunks);
-    });
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kPreparingToDonate, .transitionFn = [&]() {
+            _dao->transitionToPreparingToDonatePhase(_opCtx, shardsAndChunks);
+        }});
 }
 
 TEST_F(ReshardingCoordinatorDaoFixture, TransitionToCloningPhaseSucceeds) {
@@ -200,24 +215,17 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToCloningPhaseSucceeds) {
     Timestamp cloneTimestamp(10, 50);
     auto cloneStartTime = _clock->now();
 
-    runPhaseTransition(CoordinatorStateEnum::kPreparingToDonate, [&]() {
-        _dao->transitionToCloningPhase(_opCtx, cloneStartTime, cloneTimestamp, approxCopySize);
-    });
-
-    auto expectedUpdates = BSON_ARRAY(
-        BSON("q" << BSON("_id" << _uuid) << "u"
-                 << BSON("$set" << BSON("state" << "cloning"
-                                                << "cloneTimestamp" << cloneTimestamp
-                                                << "approxBytesToCopy" << bytesToCopy
-                                                << "approxDocumentsToCopy" << documentsToCopy
-                                                << "metrics.documentCopy.start" << cloneStartTime))
-                 << "multi" << false << "upsert" << false));
-
-    const auto& lastRequest = _state->lastRequest;
-    ASSERT_EQUALS(lastRequest.getStringField("update"),
-                  NamespaceString::kConfigReshardingOperationsNamespace.coll());
-    auto updates = lastRequest.getObjectField("updates");
-    ASSERT_BSONOBJ_EQ(updates, expectedUpdates);
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kPreparingToDonate,
+        .transitionFn =
+            [&]() {
+                _dao->transitionToCloningPhase(
+                    _opCtx, cloneStartTime, cloneTimestamp, approxCopySize);
+            },
+        .set = BSON("state" << "cloning"
+                            << "cloneTimestamp" << cloneTimestamp << "approxBytesToCopy"
+                            << bytesToCopy << "approxDocumentsToCopy" << documentsToCopy
+                            << "metrics.documentCopy.start" << cloneStartTime)});
 }
 
 DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
@@ -230,29 +238,21 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
     Timestamp cloneTimestamp(10, 50);
     auto cloneStartTime = _clock->now();
 
-    runPhaseTransition(CoordinatorStateEnum::kCloning, [&]() {
-        _dao->transitionToCloningPhase(_opCtx, cloneStartTime, cloneTimestamp, approxCopySize);
-    });
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kCloning, .transitionFn = [&]() {
+            _dao->transitionToCloningPhase(_opCtx, cloneStartTime, cloneTimestamp, approxCopySize);
+        }});
 }
 
 TEST_F(ReshardingCoordinatorDaoFixture, TransitionToApplyingPhaseSucceeds) {
     auto applyStartTime = _clock->now();
 
-    runPhaseTransition(CoordinatorStateEnum::kCloning,
-                       [&]() { _dao->transitionToApplyingPhase(_opCtx, applyStartTime); });
-
-    auto expectedUpdates = BSON_ARRAY(BSON(
-        "q" << BSON("_id" << _uuid) << "u"
-            << BSON("$set" << BSON("state" << "applying"
-                                           << "metrics.documentCopy.stop" << applyStartTime
-                                           << "metrics.oplogApplication.start" << applyStartTime))
-            << "multi" << false << "upsert" << false));
-
-    const auto& lastRequest = _state->lastRequest;
-    ASSERT_EQUALS(lastRequest.getStringField("update"),
-                  NamespaceString::kConfigReshardingOperationsNamespace.coll());
-    auto updates = lastRequest.getObjectField("updates");
-    ASSERT_BSONOBJ_EQ(updates, expectedUpdates);
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kCloning,
+        .transitionFn = [&]() { _dao->transitionToApplyingPhase(_opCtx, applyStartTime); },
+        .set = BSON("state" << "applying"
+                            << "metrics.documentCopy.stop" << applyStartTime
+                            << "metrics.oplogApplication.start" << applyStartTime)});
 }
 
 DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
@@ -260,30 +260,23 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
              "invariant") {
     auto applyStartTime = _clock->now();
 
-    runPhaseTransition(CoordinatorStateEnum::kApplying,
-                       [&]() { _dao->transitionToApplyingPhase(_opCtx, applyStartTime); });
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kApplying, .transitionFn = [&]() {
+            _dao->transitionToApplyingPhase(_opCtx, applyStartTime);
+        }});
 }
 
 TEST_F(ReshardingCoordinatorDaoFixture, TransitionToBlockingWritesPhaseSucceeds) {
     auto now = _clock->now();
     auto criticalSectionExpiresAt = now + Seconds(5);
 
-    runPhaseTransition(CoordinatorStateEnum::kApplying, [&]() {
-        _dao->transitionToBlockingWritesPhase(_opCtx, now, criticalSectionExpiresAt);
-    });
-
-    auto expectedUpdates = BSON_ARRAY(BSON(
-        "q" << BSON("_id" << _uuid) << "u"
-            << BSON("$set" << BSON("state" << "blocking-writes"
-                                           << "criticalSectionExpiresAt" << criticalSectionExpiresAt
-                                           << "metrics.oplogApplication.stop" << now))
-            << "multi" << false << "upsert" << false));
-
-    const auto& lastRequest = _state->lastRequest;
-    ASSERT_EQUALS(lastRequest.getStringField("update"),
-                  NamespaceString::kConfigReshardingOperationsNamespace.coll());
-    auto updates = lastRequest.getObjectField("updates");
-    ASSERT_BSONOBJ_EQ_UNORDERED(updates, expectedUpdates);
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kApplying,
+        .transitionFn =
+            [&]() { _dao->transitionToBlockingWritesPhase(_opCtx, now, criticalSectionExpiresAt); },
+        .set = BSON("state" << "blocking-writes"
+                            << "criticalSectionExpiresAt" << criticalSectionExpiresAt
+                            << "metrics.oplogApplication.stop" << now)});
 }
 
 DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
@@ -292,9 +285,85 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
     auto now = _clock->now();
     auto criticalSectionExpiresAt = now + Seconds(5);
 
-    runPhaseTransition(CoordinatorStateEnum::kAborting, [&]() {
-        _dao->transitionToBlockingWritesPhase(_opCtx, now, criticalSectionExpiresAt);
-    });
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kAborting, .transitionFn = [&]() {
+            _dao->transitionToBlockingWritesPhase(_opCtx, now, criticalSectionExpiresAt);
+        }});
+}
+
+TEST_F(ReshardingCoordinatorDaoFixture, TransitionToAbortPhaseSucceeds) {
+    auto now = _clock->now();
+    Status abortReason{ErrorCodes::InternalError, "Something went horribly wrong"};
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kPreparingToDonate,
+        .transitionFn = [&]() { _dao->transitionToAbortingPhase(_opCtx, now, abortReason); },
+        .set =
+            BSON("state" << "aborting"
+                         << "abortReason"
+                         << resharding::serializeAndTruncateReshardingErrorIfNeeded(abortReason))});
+}
+
+TEST_F(ReshardingCoordinatorDaoFixture, TransitionToAbortPhaseTruncatesLongErrors) {
+    auto now = _clock->now();
+    std::string longMessage(6000, 'x');
+    Status abortReason{ErrorCodes::InternalError, longMessage};
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kPreparingToDonate,
+        .transitionFn = [&]() { _dao->transitionToAbortingPhase(_opCtx, now, abortReason); },
+        .set =
+            BSON("state" << "aborting"
+                         << "abortReason"
+                         << resharding::serializeAndTruncateReshardingErrorIfNeeded(abortReason))});
+}
+
+TEST_F(ReshardingCoordinatorDaoFixture, TransitionToAbortPhaseEndsCloningMetrics) {
+    auto now = _clock->now();
+    Status abortReason{ErrorCodes::InternalError, "Something went horribly wrong"};
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kCloning,
+        .transitionFn = [&]() { _dao->transitionToAbortingPhase(_opCtx, now, abortReason); },
+        .set = BSON("state" << "aborting"
+                            << "abortReason"
+                            << resharding::serializeAndTruncateReshardingErrorIfNeeded(abortReason)
+                            << "metrics.documentCopy.stop" << now)});
+}
+
+TEST_F(ReshardingCoordinatorDaoFixture, TransitionToAbortPhaseEndsApplyingMetrics) {
+    auto now = _clock->now();
+    Status abortReason{ErrorCodes::InternalError, "Something went horribly wrong"};
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kApplying,
+        .transitionFn = [&]() { _dao->transitionToAbortingPhase(_opCtx, now, abortReason); },
+        .set = BSON("state" << "aborting"
+                            << "abortReason"
+                            << resharding::serializeAndTruncateReshardingErrorIfNeeded(abortReason)
+                            << "metrics.oplogApplication.stop" << now)});
+}
+
+DEATH_TEST_F(ReshardingCoordinatorDaoFixture, TransitionToAbortCannotHaveOkReason, "invariant") {
+    auto now = _clock->now();
+    Status abortReason = Status::OK();
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kApplying, .transitionFn = [&]() {
+            _dao->transitionToAbortingPhase(_opCtx, now, abortReason);
+        }});
+}
+
+DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
+             TransitionToAbortPhasePreviousStateInvariant,
+             "invariant") {
+    auto now = _clock->now();
+    Status abortReason{ErrorCodes::InternalError, "Something went horribly wrong"};
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kCommitting, .transitionFn = [&]() {
+            _dao->transitionToAbortingPhase(_opCtx, now, abortReason);
+        }});
 }
 
 }  // namespace resharding

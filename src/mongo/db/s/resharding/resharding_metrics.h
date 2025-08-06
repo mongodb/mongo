@@ -312,6 +312,9 @@ public:
     void setStartFor(TimedPhase phase, Date_t date);
     void setEndFor(TimedPhase phase, Date_t date);
 
+    void setStartFor(CoordinatorStateEnum phase, Date_t date);
+    void setEndFor(CoordinatorStateEnum phase, Date_t date);
+
     template <typename TimeUnit>
     boost::optional<TimeUnit> getElapsed(TimedPhase phase, ClockSource* clock) const {
         return _phaseDurations.getElapsed<TimeUnit>(phase, clock);

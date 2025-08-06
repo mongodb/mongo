@@ -1021,6 +1021,40 @@ TEST_F(ReshardingMetricsTest, RecipientRestoreAppliedOplogEntries) {
     ASSERT_EQ(report.getIntField("oplogEntriesApplied"), 30);
 }
 
+TEST_F(ReshardingMetricsTest, SetTimedPhaseViaCoordinatorState) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    {
+        const auto cloneStart = Date_t::fromMillisSinceEpoch(1);
+        metrics->setStartFor(CoordinatorStateEnum::kCloning, cloneStart);
+        ASSERT_EQ(metrics->getStartFor(TimedPhase::kCloning), cloneStart);
+    }
+    {
+        const auto cloneEnd = Date_t::fromMillisSinceEpoch(2);
+        metrics->setEndFor(CoordinatorStateEnum::kCloning, cloneEnd);
+        ASSERT_EQ(metrics->getEndFor(TimedPhase::kCloning), cloneEnd);
+    }
+    {
+        const auto applyStart = Date_t::fromMillisSinceEpoch(3);
+        metrics->setStartFor(CoordinatorStateEnum::kApplying, applyStart);
+        ASSERT_EQ(metrics->getStartFor(TimedPhase::kApplying), applyStart);
+    }
+    {
+        const auto applyEnd = Date_t::fromMillisSinceEpoch(4);
+        metrics->setEndFor(CoordinatorStateEnum::kApplying, applyEnd);
+        ASSERT_EQ(metrics->getEndFor(TimedPhase::kApplying), applyEnd);
+    }
+    {
+        const auto criticalSectionStart = Date_t::fromMillisSinceEpoch(5);
+        metrics->setStartFor(CoordinatorStateEnum::kBlockingWrites, criticalSectionStart);
+        ASSERT_EQ(metrics->getStartFor(TimedPhase::kCriticalSection), criticalSectionStart);
+    }
+    {
+        const auto criticalSectionEnd = Date_t::fromMillisSinceEpoch(6);
+        metrics->setEndFor(CoordinatorStateEnum::kBlockingWrites, criticalSectionEnd);
+        ASSERT_EQ(metrics->getEndFor(TimedPhase::kCriticalSection), criticalSectionEnd);
+    }
+}
+
 TEST_F(ReshardingMetricsTest, CurrentOpReportsCopyingTime) {
     runTimeReportTest<ReshardingMetrics>(
         "CurrentOpReportsCopyingTime",
