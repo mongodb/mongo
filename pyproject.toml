@@ -75,6 +75,11 @@ typing-extensions = "^4.12.2"
 typer = "^0.12.3"
 tenacity = "^9.0.0"
 
+# specifically rapidyaml is broken on atlas distros with powercycle.
+# current we exclude this when running poetry install in powercycle.
+[tool.poetry.group.powercycle-incompatible.dependencies]
+rapidyaml = {git = "https://github.com/mongodb-forks/rapidyaml.git@master", rev = "a5d485fd44719e1c03e059177fc1f695fc462b66", markers = "platform_system != 'Windows'"}
+
 [tool.poetry.group.export.dependencies]
 pipx = "1.6.0"
 # TODO: Add in pex as we move forward with this
