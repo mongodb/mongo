@@ -376,7 +376,7 @@ protected:
                                              std::function<bool(OperationContext*)>&& shouldExecute,
                                              std::function<void(OperationContext*)>&& handlerFn) {
         return [=, this] {
-            const auto& currPhase = _doc.getPhase();
+            const auto currPhase = _getDoc().getPhase();
 
             if (currPhase > newPhase) {
                 // Do not execute this phase if we already reached a subsequent one.
