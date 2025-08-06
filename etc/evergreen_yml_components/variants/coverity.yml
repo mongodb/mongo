@@ -42,6 +42,9 @@ functions:
 
 tasks:
   - name: run_coverity
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
     tags:
       [
         "assigned_to_jira_team_devprod_build",
@@ -60,6 +63,8 @@ tasks:
       - func: f_expansions_write
       - func: f_setup_python
       - func: f_expansions_write
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
       - func: f_generate_evergreen_bazelrc
       - func: f_download_and_extract_coverity
         vars:
