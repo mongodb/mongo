@@ -1192,6 +1192,42 @@ size_t Value::getApproximateSize() const {
     MONGO_verify(false);
 }
 
+int32_t Value::depth(int32_t maxDepth, int32_t curDepth /*=0*/) const {
+    if (curDepth >= maxDepth) {
+        return -1;
+    }
+    int32_t maxChildDepth = -1;
+    switch (getType()) {
+        case BSONType::object: {
+            FieldIterator f(getDocument());
+            while (f.more()) {
+                auto fp = f.next();
+                int32_t childDepth = fp.second.depth(maxDepth, curDepth + 1);
+                if (childDepth == -1) {
+                    return -1;
+                }
+                maxChildDepth = std::max(maxChildDepth, childDepth);
+            }
+            break;
+        }
+        case BSONType::array: {
+            for (const auto& val : getArray()) {
+                int32_t childDepth = val.depth(maxDepth, curDepth + 1);
+                if (childDepth == -1) {
+                    return -1;
+                }
+                maxChildDepth = std::max(maxChildDepth, childDepth);
+            }
+            break;
+        }
+        default:
+            // No op
+            break;
+    }
+    // Increment depth to account for this level.
+    return maxChildDepth + 1;
+}
+
 string Value::toString() const {
     // TODO use StringBuilder when operator << is ready
     stringstream out;

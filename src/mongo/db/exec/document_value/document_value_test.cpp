@@ -195,6 +195,77 @@ TEST(DocumentSerialization, CannotSerializeDocumentThatExceedsDepthLimit) {
     throwaway.abandon();
 }
 
+TEST(DocumentDepthCalculations, Sanity) {
+    {
+        // A scalar has depth 0.
+        ASSERT_EQ(0, Value(1).depth(BSONDepth::getMaxAllowableDepth()));
+    }
+    {
+        // Nesting documents increments depth.
+        int32_t initialDepth = 1;
+        MutableDocument md;
+        md.addField("a", Value(1));
+        Document doc(md.freeze());
+        Value val(doc);
+        int32_t iters = 16;
+        ASSERT_EQ(initialDepth, val.depth(BSONDepth::getMaxAllowableDepth()));
+        for (int32_t idx = 0; idx < iters; ++idx) {
+            MutableDocument md;
+            md.addField("a", Value(doc));
+            doc = md.freeze();
+            Value val(doc);
+            ASSERT_EQ(idx + initialDepth + 1, val.depth(BSONDepth::getMaxAllowableDepth()));
+        }
+    }
+    {
+        // Simple document with no nested paths has depth 1.
+        Value val(BSON("a" << 1));
+        ASSERT_EQ(1, val.depth(BSONDepth::getMaxAllowableDepth()));
+    }
+    {
+        // Depth is max of children.
+        BSONObj bson = BSON("a" << 1 << "b" << BSON("c" << 1));
+        Document document = fromBson(bson);
+        Value val(document);
+        ASSERT_EQ(2, val.depth(BSONDepth::getMaxAllowableDepth()));
+    }
+    {
+        // Arrays increment depth.
+        BSONObj bson = BSON("a" << BSON_ARRAY(1 << 1));
+        Value val(fromBson(bson));
+        ASSERT_EQ(2, val.depth(BSONDepth::getMaxAllowableDepth()));
+    }
+    {
+        // Array length does not affect depth.
+        BSONObj bson = BSON("a" << BSON_ARRAY(1 << 1));
+        BSONObj bson2 = BSON("a" << BSON_ARRAY(1 << 1 << 1));
+        Value val(fromBson(bson));
+        Value val2(fromBson(bson2));
+        ASSERT_EQ(val.depth(BSONDepth::getMaxAllowableDepth()),
+                  val2.depth(BSONDepth::getMaxAllowableDepth()));
+    }
+    {
+        // Nested arrays increment depth.
+        BSONObj bson = BSON("a" << BSON_ARRAY(1 << BSON_ARRAY(1 << 1)));
+        Value val(fromBson(bson));
+        ASSERT_EQ(3, val.depth(BSONDepth::getMaxAllowableDepth()));
+    }
+    {
+        // If maxDepth at least document depth, this function returns -1.
+        BSONObj bson = BSON("a" << 1 << "b" << BSON("c" << 1));
+        Document document = fromBson(bson);
+        Value val(document);
+        int32_t depth = 2;
+        for (int32_t maxDepth = 0; maxDepth < 2 * depth; maxDepth++) {
+            if (maxDepth <= depth) {
+                ASSERT_EQ(-1, val.depth(maxDepth));
+            } else {
+                ASSERT_EQ(depth, val.depth(maxDepth));
+            }
+        }
+    }
+}
+
 TEST(DocumentGetFieldNonCaching, UncachedTopLevelFields) {
     BSONObj bson = BSON("scalar" << 1 << "scalar2" << true);
     Document document = fromBson(bson);

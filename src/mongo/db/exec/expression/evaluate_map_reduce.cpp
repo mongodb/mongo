@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/expression/evaluate.h"
@@ -132,6 +133,9 @@ Value evaluate(const ExpressionReduce& expr, const Document& root, Variables* va
     size_t memLimit = internalQueryMaxMapFilterReduceBytes.load();
     Value accumulatedValue = expr.getInitial()->evaluate(root, variables);
 
+    size_t itr = 0;
+    int32_t prevDepth = -1;
+    size_t interval = expr.getAccumulatedValueDepthCheckInterval();
     for (auto&& elem : inputVal.getArray()) {
         checkForInterrupt();
 
@@ -139,10 +143,28 @@ Value evaluate(const ExpressionReduce& expr, const Document& root, Variables* va
         variables->setValue(expr.getValueVar(), accumulatedValue);
 
         accumulatedValue = expr.getIn()->evaluate(root, variables);
+        if ((interval > 0) && (itr % interval) == 0 &&
+            (accumulatedValue.isObject() || accumulatedValue.isArray())) {
+            int32_t depth =
+                accumulatedValue.depth(2 * BSONDepth::getMaxAllowableDepth() /*maxDepth*/);
+            if (MONGO_unlikely(depth == -1)) {
+                uasserted(ErrorCodes::Overflow,
+                          "$reduce accumulated value exceeded max allowable BSON depth");
+            }
+            // Exponential backoff if depth has not increased.
+            if (depth == prevDepth) {
+                tassert(10236400,
+                        "unexpected control flow in $reduce object/array depth verification",
+                        prevDepth != -1);
+                interval *= 2;
+            }
+            prevDepth = depth;
+        }
         if (MONGO_unlikely(accumulatedValue.getApproximateSize() > memLimit)) {
             uasserted(ErrorCodes::ExceededMemoryLimit,
                       "$reduce would use too much memory and cannot spill");
         }
+        itr++;
     }
 
     return accumulatedValue;
