@@ -248,6 +248,10 @@ public:
      */
     LookupHashTableIter htIter{*this};
 
+    int64_t getMemUsage() const {
+        return _computedTotalMemUsage;
+    }
+
 private:
     void init() {
         if (_collator) {

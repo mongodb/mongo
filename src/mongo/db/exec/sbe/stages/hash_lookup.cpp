@@ -37,6 +37,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/stage_visitors.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -132,6 +133,9 @@ void HashLookupStage::prepare(CompileCtx& ctx) {
 
     _outInnerProject.resize(1);
     _lookupStageOutput.resize(1);
+
+    _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
+        _opCtx, loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill));
 }  // HashLookupStage::prepare
 
 value::SlotAccessor* HashLookupStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -167,6 +171,7 @@ void HashLookupStage::doRestoreState() {
 void HashLookupStage::reset(bool fromClose) {
     // Also resets the memory threshold if the knob changes between re-open calls.
     _hashTable.reset(fromClose);
+    _memoryTracker.value().set(_hashTable.getMemUsage());
 }
 
 void HashLookupStage::open(bool reOpen) {
@@ -190,6 +195,7 @@ void HashLookupStage::open(bool reOpen) {
 
         // This where we put the value in here. This can grow need to spill.
         size_t bufferIndex = _hashTable.bufferValueOrSpill(value);
+        _memoryTracker.value().set(_hashTable.getMemUsage());
 
         auto [tagKeyView, valKeyView] = _inInnerMatchAccessor->getViewOfValue();
         if (value::isArray(tagKeyView)) {
@@ -198,12 +204,15 @@ void HashLookupStage::open(bool reOpen) {
 
             while (!arrayAccessor.atEnd()) {
                 _hashTable.addHashTableEntry(&arrayAccessor, bufferIndex);
+                _memoryTracker.value().set(_hashTable.getMemUsage());
                 arrayAccessor.advance();
             }
         } else {
             _hashTable.addHashTableEntry(_inInnerMatchAccessor, bufferIndex);
+            _memoryTracker.value().set(_hashTable.getMemUsage());
         }
     }
+
     innerChild()->close();
     outerChild()->open(reOpen);
 }  // HashLookupStage::open
@@ -264,6 +273,10 @@ std::unique_ptr<PlanStageStats> HashLookupStage::getStats(bool includeDebugInfo)
             .appendNumber("spilledBytes", static_cast<long long>(spillingStats.getSpilledBytes()))
             .appendNumber("spilledDataStorageSize",
                           static_cast<long long>(spillingStats.getSpilledDataStorageSize()));
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("maxUsedMemBytes",
+                             static_cast<long long>(specificStats->maxUsedMemBytes));
+        }
         ret->debugInfo = bob.obj();
     }
     return ret;

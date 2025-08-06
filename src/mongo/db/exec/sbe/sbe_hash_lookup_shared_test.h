@@ -73,12 +73,17 @@ namespace mongo::sbe {
 
 class HashLookupSharedTest : public PlanStageTestFixture {
 public:
-    virtual void runVariation(unittest::GoldenTestContext& gctx,
-                              const std::string& name,
-                              const BSONArray& outer,
-                              const BSONArray& inner,
-                              bool outerKeyOnly = true,
-                              CollatorInterface* collator = nullptr) = 0;
+    struct RunVariationParams {
+        unittest::GoldenTestContext& gctx;
+        std::string name;
+        BSONArray outer;
+        BSONArray inner;
+        bool outerKeyOnly = true;
+        CollatorInterface* collator = nullptr;
+        bool expectMemUse = true;
+    };
+
+    virtual void runVariation(const RunVariationParams& params) = 0;
 
     void cloneAndEvalStage(std::ostream& stream,
                            const StageResultsPrinters::SlotNames& slotNames,
@@ -103,7 +108,8 @@ public:
     void prepareAndEvalStageWithReopen(CompileCtx* ctx,
                                        std::ostream& stream,
                                        const StageResultsPrinters::SlotNames& slotNames,
-                                       PlanStage* stage);
+                                       PlanStage* stage,
+                                       bool expectMemUse = true);
 
 public:
     PrintOptions printOptions =

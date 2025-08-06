@@ -41,16 +41,8 @@ function assertNoMatchInLog(logLine, regex) {
  * corresponding to this aggregation.
  */
 function runPipelineAndGetDiagnostics({db, collName, commandObj, source}) {
-    const pipelineComment = commandObj.comment;
-
     // Retrieve the cursor.
-    const aggregateCommandResult = db.runCommand({
-        aggregate: collName,
-        pipeline: commandObj.pipeline,
-        cursor: commandObj.cursor,
-        comment: pipelineComment,
-        allowDiskUse: commandObj.allowDiskUse,
-    });
+    const aggregateCommandResult = db.runCommand(commandObj);
     const cursorId = aggregateCommandResult.cursor.id;
     let currentCursorId = cursorId;
 
@@ -60,7 +52,7 @@ function runPipelineAndGetDiagnostics({db, collName, commandObj, source}) {
             getMore: currentCursorId,
             collection: collName,
             batchSize: commandObj.cursor.batchSize,
-            comment: pipelineComment,
+            comment: commandObj.comment,
         });
         currentCursorId = getMoreResult.cursor.id;
     }
@@ -258,9 +250,8 @@ function verifyProfilerMetrics({
 }
 
 function verifyExplainMetrics(
-    {db, collName, pipeline, stageName, featureFlagEnabled, numStages, allowDiskUse}) {
-    const explainRes =
-        db[collName].explain("executionStats").aggregate(pipeline, {allowDiskUse: allowDiskUse});
+    {db, collName, pipeline, stageName, featureFlagEnabled, numStages, options = {}}) {
+    const explainRes = db[collName].explain("executionStats").aggregate(pipeline, options);
 
     // If a query uses sbe, the explain version will be 2.
     const isSbeExplain = explainRes.explainVersion === "2";
@@ -358,7 +349,6 @@ export function runMemoryStatsTest({
     assert("pipeline" in commandObj, "Command object must include a pipeline field.");
     assert("comment" in commandObj, "Command object must include a comment field.");
     assert("cursor" in commandObj, "Command object must include a cursor field.");
-    assert("allowDiskUse" in commandObj, "Command object must include allowDiskUse field.");
     assert("aggregate" in commandObj, "Command object must include an aggregate field.");
 
     const featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
@@ -398,7 +388,8 @@ export function runMemoryStatsTest({
         stageName: stageName,
         featureFlagEnabled: featureFlagEnabled,
         numStages: 1,
-        allowDiskUse: commandObj.allowDiskUse,
+        options: commandObj.allowDiskUse !== undefined ? {allowDiskUse: commandObj.allowDiskUse}
+                                                       : {},
     });
 }
 

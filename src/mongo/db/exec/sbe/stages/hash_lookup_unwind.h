@@ -176,6 +176,7 @@ private:
 
     void doForceSpill() final {
         _hashTable.forceSpill();
+        _memoryTracker.value().set(_hashTable.getMemUsage());
     };
 };  // class HashLookupUnwindStage
 }  // namespace mongo::sbe

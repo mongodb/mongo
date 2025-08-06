@@ -35,6 +35,8 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_options.h"
 
+#include <algorithm>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::sbe {
@@ -246,6 +248,8 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
             _memoryHt->erase(htIt);
         }
     }
+    _hashLookupStats.maxUsedMemBytes =
+        std::max(_hashLookupStats.maxUsedMemBytes, static_cast<uint64_t>(_computedTotalMemUsage));
 }  // LookupHashTable::addHashTableEntry
 
 void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
@@ -282,6 +286,8 @@ size_t LookupHashTable::bufferValueOrSpill(value::MaterializedRow& value) {
     if (!hasSpilledBufToDisk() && newMemUsage <= _memoryUseInBytesBeforeSpill) {
         _buffer.emplace_back(std::move(value));
         _computedTotalMemUsage = newMemUsage;
+        _hashLookupStats.maxUsedMemBytes = std::max(_hashLookupStats.maxUsedMemBytes,
+                                                    static_cast<uint64_t>(_computedTotalMemUsage));
     } else {
         if (!hasSpilledBufToDisk()) {
             makeTemporaryRecordStore();
@@ -412,6 +418,7 @@ void LookupHashTable::reset(bool fromClose) {
     _memoryUseInBytesBeforeSpill =
         loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill);
     _memoryHt = boost::none;
+    _computedTotalMemUsage = 0;
 
     if (_recordStoreHt) {
         if (_opCtx) {
@@ -485,6 +492,8 @@ void LookupHashTable::forceSpill() {
         spillIndicesToRecordStore(_recordStoreHt.get(), tagKey, valKey, value);
     }
     _memoryHt.reset();
+    _computedTotalMemUsage = 0;
+
     // Initialise the _memoryHt again to make sure it is valid;
     init();
 }

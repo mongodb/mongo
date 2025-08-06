@@ -354,6 +354,9 @@ struct HashLookupStats : public SpecificStats {
     bool usedDisk{false};
     SpillingStats spillingHtStats;
     SpillingStats spillingBuffStats;
+
+    // The maximum amount of memory that was used.
+    uint64_t maxUsedMemBytes = 0u;
 };
 
 struct WindowStats : public SpecificStats {

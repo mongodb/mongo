@@ -38,27 +38,22 @@ namespace mongo::sbe {
 
 class HashLookupStageTest : public HashLookupSharedTest {
 public:
-    void runVariation(unittest::GoldenTestContext& gctx,
-                      const std::string& name,
-                      const BSONArray& outer,
-                      const BSONArray& inner,
-                      bool outerKeyOnly = true,
-                      CollatorInterface* collator = nullptr) override {
-        auto& stream = gctx.outStream();
+    void runVariation(const RunVariationParams& params) override {
+        auto& stream = params.gctx.outStream();
         if (stream.tellp()) {
             stream << std::endl;
         }
 
-        stream << "==== VARIATION: " << name << " ====" << std::endl;
-        if (collator) {
+        stream << "==== VARIATION: " << params.name << " ====" << std::endl;
+        if (params.collator) {
             stream << "COLLATOR: ";
-            value::ValuePrinters::make(stream, printOptions).writeCollatorToStream(collator);
+            value::ValuePrinters::make(stream, printOptions).writeCollatorToStream(params.collator);
             stream << std::endl;
         }
         stream << "-- INPUTS:" << std::endl;
 
         // Build a scan for the outer loop.
-        auto [outerScanSlots, outerScanStage] = generateVirtualScanMulti(2, outer);
+        auto [outerScanSlots, outerScanStage] = generateVirtualScanMulti(2, params.outer);
         stream << "OUTER ";
         cloneAndEvalStage(stream,
                           {{outerScanSlots[0], "value"}, {outerScanSlots[1], "key"}},
@@ -66,25 +61,25 @@ public:
         stream << std::endl;
 
         // Build a scan for the inner loop.
-        auto [innerScanSlots, innerScanStage] = generateVirtualScanMulti(2, inner);
+        auto [innerScanSlots, innerScanStage] = generateVirtualScanMulti(2, params.inner);
         stream << "INNER ";
         cloneAndEvalStage(stream,
                           {{innerScanSlots[0], "value"}, {innerScanSlots[1], "key"}},
                           innerScanStage.get());
         stream << std::endl;
 
-        // Prepare and eval stage
+        // Prepare and eval stage.
         auto ctx = makeCompileCtx();
 
         value::ViewOfValueAccessor collatorAccessor;
         boost::optional<value::SlotId> collatorSlot;
 
-        if (collator) {
+        if (params.collator) {
             // Setup collator and insert it into the ctx.
             collatorSlot = generateSlotId();
             ctx->pushCorrelated(collatorSlot.value(), &collatorAccessor);
             collatorAccessor.reset(value::TypeTags::collator,
-                                   value::bitcastFrom<CollatorInterface*>(collator));
+                                   value::bitcastFrom<CollatorInterface*>(params.collator));
         }
 
         // Build and prepare for execution loop join of the two scan stages.
@@ -101,64 +96,65 @@ public:
                                                   kEmptyPlanNodeId);
 
         StageResultsPrinters::SlotNames slotNames;
-        if (outerKeyOnly) {
+        if (params.outerKeyOnly) {
             slotNames.emplace_back(outerScanSlots[1], "outer_key");
         } else {
             slotNames.emplace_back(outerScanSlots[0], "outer");
         }
         slotNames.emplace_back(lookupStageOutputSlot, "inner_agg");
 
-        prepareAndEvalStageWithReopen(ctx.get(), stream, slotNames, lookupStage.get());
+        prepareAndEvalStageWithReopen(
+            ctx.get(), stream, slotNames, lookupStage.get(), params.expectMemUse);
     }  // runVariation
 };  // class HashLookupStageTest
 
 TEST_F(HashLookupStageTest, BasicTests) {
     unittest::GoldenTestContext gctx(&goldenTestConfigSbe);
 
-    runVariation(gctx,
-                 "simple scalar key",
-                 BSONArray(fromjson(R"""([
+    runVariation({.gctx = gctx,
+                  .name = "simple scalar key",
+                  .outer = BSONArray(fromjson(R"""([
                     [{_id: 1}, 1],
                     [{_id: 2}, 2],
                     [{_id: 3}, 2],
                     [{_id: 4}, 7]
                  ])""")),
-                 BSONArray(fromjson(R"""([
+                  .inner = BSONArray(fromjson(R"""([
                     [{_id: 11}, 1],
                     [{_id: 12}, 2],
                     [{_id: 13}, 2],
                     [{_id: 14}, 7]
-                 ])""")));
+                 ])"""))});
 
-    runVariation(gctx,
-                 "no matches",
-                 BSONArray(fromjson(R"""([
+    runVariation({.gctx = gctx,
+                  .name = "no matches",
+                  .outer = BSONArray(fromjson(R"""([
                   [{_id: 1}, 1],
                   [{_id: 2}, 4]
                ])""")),
-                 BSONArray(fromjson(R"""([
+                  .inner = BSONArray(fromjson(R"""([
                   [{_id: 11}, 2],
                   [{_id: 12}, 3]
-               ])""")));
+               ])"""))});
 
-    runVariation(gctx,
-                 "simple array key",
-                 BSONArray(fromjson(R"""([
+    runVariation({.gctx = gctx,
+                  .name = "simple array key",
+                  .outer = BSONArray(fromjson(R"""([
                   [{_id: 1}, 1],
                   [{_id: 2}, [2, 3]],
                   [{_id: 3}, [2, 4]],
                   [{_id: 4}, []]
                ])""")),
-                 BSONArray(fromjson(R"""([
+                  .inner = BSONArray(fromjson(R"""([
                   [{_id: 11}, 2],
                   [{_id: 12}, 4],
                   [{_id: 13}, [1, 2, 3]],
                   [{_id: 14}, []]
-               ])""")));
+               ])"""))});
 
-    runVariation(gctx,
-                 "nested array key",
-                 BSONArray(fromjson(R"""([
+    runVariation({.gctx = gctx,
+                  .name = "nested array key",
+                  .outer = BSONArray(fromjson(R"""([
                 [{_id: 1}, 1],
                 [{_id: 2}, 2],
                 [{_id: 3}, 3],
@@ -167,7 +163,7 @@ TEST_F(HashLookupStageTest, BasicTests) {
                 [{_id: 6}, [[3]]],
                 [{_id: 7}, [2, [3]]]
              ])""")),
-                 BSONArray(fromjson(R"""([
+                  .inner = BSONArray(fromjson(R"""([
                 [{_id: 11}, 1],
                 [{_id: 12}, 2],
                 [{_id: 13}, 3],
@@ -175,11 +171,11 @@ TEST_F(HashLookupStageTest, BasicTests) {
                 [{_id: 15}, [3]],
                 [{_id: 16}, [[3]]],
                 [{_id: 17}, [2, [3]]]
-             ])""")));
+             ])"""))});
 
-    runVariation(gctx,
-                 "nested object key",
-                 BSONArray(fromjson(R"""([
+    runVariation({.gctx = gctx,
+                  .name = "nested object key",
+                  .outer = BSONArray(fromjson(R"""([
                 [{_id: 1}, {a: 1}],
                 [{_id: 2}, {b: 1}],
                 [{_id: 3}, {a: 1, b: 1}],
@@ -189,7 +185,7 @@ TEST_F(HashLookupStageTest, BasicTests) {
                 [{_id: 7}, [{a: 1, b: 1}]],
                 [{_id: 8}, [{b: 1, a: 1}]]
              ])""")),
-                 BSONArray(fromjson(R"""([
+                  .inner = BSONArray(fromjson(R"""([
                 [{_id: 11}, {a: 1}],
                 [{_id: 12}, {b: 1}],
                 [{_id: 13}, {a: 1, b: 1}],
@@ -198,11 +194,12 @@ TEST_F(HashLookupStageTest, BasicTests) {
                 [{_id: 16}, [{a: 1}, {b: 1}]],
                 [{_id: 17}, [{a: 1, b: 1}]],
                 [{_id: 18}, [{b: 1, a: 1}]]
-             ])""")));
+             ])"""))});
 
-    runVariation(gctx,
-                 "mixed key",
-                 BSONArray(fromjson(R"""([
+
+    runVariation({.gctx = gctx,
+                  .name = "mixed key",
+                  .outer = BSONArray(fromjson(R"""([
               [{_id: 1}, null],
               [{_id: 2}, 1],
               [{_id: 3}, "abc"],
@@ -213,7 +210,7 @@ TEST_F(HashLookupStageTest, BasicTests) {
               [{_id: 8}, [null, "1", "abc", NumberDecimal("1")]],
               [{_id: 9}, [{x:1, y: "abc"}]]
            ])""")),
-                 BSONArray(fromjson(R"""([
+                  .inner = BSONArray(fromjson(R"""([
               [{_id: 11}, null],
               [{_id: 12}, 1],
               [{_id: 13}, "abc"],
@@ -223,53 +220,57 @@ TEST_F(HashLookupStageTest, BasicTests) {
               [{_id: 17}, [null]],
               [{_id: 18}, [null, "1", "abc", NumberDecimal("1")]],
               [{_id: 19}, [{x:1, y: "abc"}]]
-           ])""")));
+           ])"""))});
 
     auto toLowerCollator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
-    runVariation(gctx,
-                 "with toLower collator",
-                 BSONArray(fromjson(R"""([
+
+    runVariation({.gctx = gctx,
+                  .name = "with toLower collator",
+                  .outer = BSONArray(fromjson(R"""([
               [{_id: 1}, null],
               [{_id: 2}, "abc"],
               [{_id: 3}, "ABC"],
               [{_id: 4}, "Abc"],
               [{_id: 5}, "def"]
            ])""")),
-                 BSONArray(fromjson(R"""([
+                  .inner = BSONArray(fromjson(R"""([
               [{_id: 11}, null],
               [{_id: 12}, "abc"],
               [{_id: 13}, "ABC"],
               [{_id: 14}, "Abc"],
               [{_id: 15}, "def"]
            ])""")),
-                 true,
-                 toLowerCollator.get());
+                  .collator = toLowerCollator.get()});
 
-    runVariation(gctx,
-                 "empty",
-                 BSONArray(fromjson(R"""([
+    runVariation({.gctx = gctx,
+                  .name = "empty",
+                  .outer = BSONArray(fromjson(R"""([
            ])""")),
-                 BSONArray(fromjson(R"""([
-           ])""")));
+                  .inner = BSONArray(fromjson(R"""([
+           ])""")),
+                  .expectMemUse = false /*expectMemUse*/});
 
-    runVariation(gctx,
-                 "empty outer",
-                 BSONArray(fromjson(R"""([
+    runVariation({.gctx = gctx,
+                  .name = "empty outer",
+                  .outer = BSONArray(fromjson(R"""([
            ])""")),
-                 BSONArray(fromjson(R"""([
+                  .inner = BSONArray(fromjson(R"""([
                 [{_id: 11}, 2],
                 [{_id: 12}, 3]
-           ])""")));
+           ])"""))});
 
-    runVariation(gctx,
-                 "empty inner",
-                 BSONArray(fromjson(R"""([
+    // We don't expect a memory footprint to be recorded because the hash table never needs to be
+    // constructed-- there are no "inner" side documents.
+    runVariation({.gctx = gctx,
+                  .name = "empty inner",
+                  .outer = BSONArray(fromjson(R"""([
               [{_id: 1}, 1],
               [{_id: 2}, 2]
          ])""")),
-                 BSONArray(fromjson(R"""([
-         ])""")));
+                  .inner = BSONArray(fromjson(R"""([
+         ])""")),
+                  .expectMemUse = false});
 }
 
 TEST_F(HashLookupStageTest, ForceSpillTest) {
@@ -354,11 +355,13 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
 
         if (idx == 1) {
             // Make sure it has not spilled already.
-            auto stats = static_cast<const HashLookupStats*>(lookupStage->getSpecificStats());
+            auto* stats = static_cast<const HashLookupStats*>(lookupStage->getSpecificStats());
             auto totalSpillingStats = stats->getTotalSpillingStats();
             ASSERT_FALSE(stats->usedDisk);
             ASSERT_EQ(0, totalSpillingStats.getSpills());
             ASSERT_EQ(0, totalSpillingStats.getSpilledRecords());
+            ASSERT_GT(lookupStage->getMemoryTracker()->currentMemoryBytes(), 0);
+            ASSERT_GT(stats->maxUsedMemBytes, 0);
 
             // Get ready to yield.
             lookupStage->saveState();
@@ -372,6 +375,8 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
             ASSERT_TRUE(stats->usedDisk);
             ASSERT_EQ(7, totalSpillingStats.getSpills());
             ASSERT_EQ(7, totalSpillingStats.getSpilledRecords());
+            ASSERT_EQ(0, lookupStage->getMemoryTracker()->currentMemoryBytes());
+            ASSERT_GT(stats->maxUsedMemBytes, 0);
 
             // Get ready to retrieve more records.
             lookupStage->restoreState();

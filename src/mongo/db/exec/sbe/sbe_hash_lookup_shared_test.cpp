@@ -40,7 +40,8 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     CompileCtx* ctx,
     std::ostream& stream,
     const StageResultsPrinters::SlotNames& slotNames,
-    PlanStage* stage) {
+    PlanStage* stage,
+    bool expectMemUse) {
     prepareTree(ctx, stage);
 
     // Execute the stage normally.
@@ -49,6 +50,17 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     std::string firstStr = firstStream.str();
     stream << "--- First Stats" << std::endl;
     printHashLookupStats(stream, stage);
+    auto* stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
+    auto firstMaxUsedMemBytes = stats->maxUsedMemBytes;
+    ASSERT(stage->getMemoryTracker());
+
+    if (expectMemUse) {
+        ASSERT_GT(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+        ASSERT_GT(firstMaxUsedMemBytes, 0);
+    } else {
+        ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+        ASSERT_EQ(firstMaxUsedMemBytes, 0);
+    }
 
     // Execute the stage after reopen and verify that output is the same.
     stage->open(true);
@@ -58,6 +70,14 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     ASSERT_EQ(firstStr, secondStr);
     stream << "--- Second Stats" << std::endl;
     printHashLookupStats(stream, stage);
+    stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
+    auto secondMaxUsedMemBytes = stats->maxUsedMemBytes;
+    ASSERT_EQ(firstMaxUsedMemBytes, secondMaxUsedMemBytes);
+    if (expectMemUse) {
+        ASSERT_GT(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+    } else {
+        ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+    }
 
     // Execute the stage after close and open and verify that output is the same.
     stage->close();
@@ -68,7 +88,14 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     ASSERT_EQ(firstStr, thirdStr);
     stream << "--- Third Stats" << std::endl;
     printHashLookupStats(stream, stage);
-
+    stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
+    auto thirdMaxUsedMemBytes = stats->maxUsedMemBytes;
+    ASSERT_EQ(firstMaxUsedMemBytes, thirdMaxUsedMemBytes);
+    if (expectMemUse) {
+        ASSERT_GT(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+    } else {
+        ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+    }
     stage->close();
 
     // Execute the stage with spilling to disk.
@@ -86,6 +113,10 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     stream << "--- Fourth Stats" << std::endl;
     printHashLookupStats(stream, stage);
     stream << std::endl;
+    stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
+    auto fourthMaxUsedMemBytes = stats->maxUsedMemBytes;
+    ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+    ASSERT_EQ(firstMaxUsedMemBytes, fourthMaxUsedMemBytes);
 
     // Execute the stage after close and open and verify that output is the same.
     stage->close();
@@ -97,6 +128,10 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     stream << "--- Fifth Stats" << std::endl;
     printHashLookupStats(stream, stage);
     stream << std::endl;
+    stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
+    auto fifthMaxUsedMemBytes = stats->maxUsedMemBytes;
+    ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+    ASSERT_EQ(firstMaxUsedMemBytes, fifthMaxUsedMemBytes);
 
     // Execute the stage after reopen and we have spilled to disk and verify that output is the
     // same.
@@ -108,6 +143,10 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     stream << "--- Sixth Stats" << std::endl;
     printHashLookupStats(stream, stage);
     stream << std::endl;
+    stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
+    auto sixthMaxUsedMemBytes = stats->maxUsedMemBytes;
+    ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+    ASSERT_EQ(firstMaxUsedMemBytes, sixthMaxUsedMemBytes);
 
     stage->close();
 
