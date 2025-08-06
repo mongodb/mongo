@@ -48,6 +48,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/serialization_context.h"
@@ -426,6 +427,10 @@ public:
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
+
+    // Disable the query settings backfill for the duration of this test.
+    RAIIServerParameterControllerForTest disableBackfillGuard{
+        "internalQuerySettingsDisableBackfill", true};
 };
 
 TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForFind) {
