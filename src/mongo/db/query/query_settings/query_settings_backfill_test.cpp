@@ -199,6 +199,12 @@ TEST_F(BackfillCoordinatorTest, ShouldmarkForBackfillAndScheduleIfNeeded) {
     // It should skip backfilling queries if they originate from an explain command.
     expCtx->setExplain(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_FALSE(BackfillCoordinator::shouldBackfill(expCtx, /* hasRepresentativeQuery*/ false));
+
+    // It should skip backfilling queries if 'internalQuerySettingsDisableBackfill' is set to true.
+    RAIIServerParameterControllerForTest internalQuerySettingsDisableBackfill{
+        "internalQuerySettingsDisableBackfill", true};
+    expCtx->setExplain(boost::none);
+    ASSERT_FALSE(BackfillCoordinator::shouldBackfill(expCtx, /* hasRepresentativeQuery*/ false));
 }
 
 TEST_F(BackfillCoordinatorTest, markForBackfillAndScheduleIfNeededShouldWaitBufferAndExecute) {

@@ -1550,6 +1550,14 @@ server_parameters:
         condition:
             min_fcv: 8.2
 
+    internalQuerySettingsDisableBackfill:
+        description: "Disables the query settings backfill mechanism."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: internalQuerySettingsDisableBackfill
+        default: false
+        redact: false
+
     internalQuerySettingsBackfillDelaySeconds:
         description: >-
             The time delay in seconds to wait for representative queries to be buffered in between
