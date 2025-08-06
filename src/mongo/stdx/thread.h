@@ -171,6 +171,10 @@ public:
      * NOTE: The `Function f` parameter must be taken by value, not reference or forwarding
      * reference, as it is used on the far side of the thread launch, and this ctor has to properly
      * transfer ownership to the far side's thread.
+     *
+     * Marked noexcept to ensure that the server eagerly crashes when we reach resource limits.
+     * Otherwise, the server will continue to operate in a degraded state and prevent failovers to
+     * healthier nodes.
      */
     template <class Function,
               class... Args,
