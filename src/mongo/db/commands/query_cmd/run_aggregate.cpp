@@ -56,6 +56,7 @@
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/agg/exchange_stage.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/logical_time.h"
@@ -587,8 +588,8 @@ std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
         // opCtx for the ExpressionContextBuilder call below, store the pointer ahead of the
         // Exchange() call.
         auto* opCtx = aggExState.getOpCtx();
-        auto exchange = make_intrusive<Exchange>(aggExState.getRequest().getExchange().value(),
-                                                 std::move(pipeline));
+        auto exchange = make_intrusive<exec::agg::Exchange>(
+            aggExState.getRequest().getExchange().value(), std::move(pipeline));
 
         for (size_t idx = 0; idx < exchange->getConsumers(); ++idx) {
             // For every new pipeline we have create a new ExpressionContext as the context

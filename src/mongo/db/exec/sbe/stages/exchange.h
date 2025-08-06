@@ -41,10 +41,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 
 #include <cstddef>
