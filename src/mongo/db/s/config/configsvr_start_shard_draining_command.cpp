@@ -40,12 +40,9 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/remove_shard_command_helpers.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/replica_set_endpoint_feature_flag.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -99,24 +96,13 @@ public:
             const auto requestShardId = request().getCommandParameter();
             boost::optional<ShardId> shardId;
 
+            DDLLockManager::ScopedCollectionDDLLock ddlLock(
+                opCtx,
+                NamespaceString::kConfigsvrShardsNamespace,
+                "startShardDraining",
+                LockMode::MODE_X);
 
             auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, requestShardId);
-
-            if (swShard == ErrorCodes::ShardNotFound) {
-                // If the replica set endpoint is not active, then it isn't safe to allow
-                // direct connections again after a second shard has been added. Unsharded
-                // collections are allowed to be tracked and moved as soon as a second shard
-                // is added to the cluster, and these collections will not handle direct
-                // connections properly.
-                if (replica_set_endpoint::isFeatureFlagEnabled(
-                        VersionContext::getDecoration(opCtx))) {
-                    uassertStatusOK(ShardingCatalogManager::get(opCtx)
-                                        ->updateClusterCardinalityParameterIfNeeded(opCtx));
-                }
-                uassert(ErrorCodes::ShardNotFound,
-                        str::stream() << "Couldn't find the shard" << shardId << "in the cluster",
-                        swShard == ErrorCodes::ShardNotFound);
-            }
             const auto shard = uassertStatusOK(swShard);
             shardId.emplace(shard->getId());
 
@@ -126,7 +112,7 @@ public:
                     "transitionToDedicatedConfigServer command.",
                     *shardId != ShardId::kConfigServerId);
 
-            topology_change_helpers::startShardDraining(opCtx, *shardId);
+            topology_change_helpers::startShardDraining(opCtx, *shardId, ddlLock);
         }
 
     private:

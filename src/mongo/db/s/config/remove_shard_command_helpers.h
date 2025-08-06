@@ -59,8 +59,10 @@ RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId)
 /**
  * Starts the draining process.
  */
-boost::optional<RemoveShardProgress> startShardDraining(OperationContext* opCtx,
-                                                        const ShardId& shardId);
+boost::optional<RemoveShardProgress> startShardDraining(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    DDLLockManager::ScopedCollectionDDLLock& ddlLock);
 
 
 void stopShardDraining(OperationContext* opCtx, const ShardId& shardId);
