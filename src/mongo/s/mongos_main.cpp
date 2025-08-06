@@ -460,7 +460,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             opCtx->setIsExecutingShutdown();
         }
 
-        if (serviceContext) {
+        {
             SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                            TimedSectionId::killAllOperations,
                                            &shutdownTimeElapsedBuilder);
