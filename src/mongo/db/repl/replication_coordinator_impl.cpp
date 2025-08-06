@@ -1461,9 +1461,11 @@ void ReplicationCoordinatorImpl::signalApplierDrainComplete(OperationContext* op
     lk.lock();
 
     // Exit drain mode only if we're actually in draining mode, the apply buffer is empty in the
-    // current term, and we're allowed to become the writable primary.
+    // current term, and we're allowed to become the writable primary. We check the member state to
+    // ensure we haven't encountered a new term during catchup.
     if (_oplogSyncState != OplogSyncState::ApplierDraining ||
-        !_topCoord->canCompleteTransitionToPrimary(termWhenExhausted)) {
+        !_topCoord->canCompleteTransitionToPrimary(termWhenExhausted) ||
+        (_memberState.primary() && _catchupState && _pendingTermUpdateDuringStepDown)) {
         LOGV2(6015308,
               "Applier left draining state or not allowed to become writeable primary, exiting");
         return;
