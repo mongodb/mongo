@@ -644,7 +644,8 @@ TEST(AsioTransportLayer, SwitchTimeoutModes) {
 class Acceptor {
 public:
     struct Connection {
-        explicit Connection(asio::io_context& ioCtx) : socket(ioCtx) {}
+        template <typename Executor>
+        explicit Connection(const Executor& executor) : socket(executor) {}
         asio::ip::tcp::socket socket;
     };
 
@@ -669,7 +670,7 @@ public:
 
 private:
     void _acceptLoop() {
-        auto conn = std::make_shared<Connection>(_acceptor.get_executor().context());
+        auto conn = std::make_shared<Connection>(_acceptor.get_executor());
         LOGV2(6101603, "Acceptor: await connection");
         _acceptor.async_accept(conn->socket, [this, conn](const asio::error_code& ec) {
             if (ec != asio::error_code{}) {
@@ -1044,7 +1045,8 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
      * Creates a server and a client thread:
      * - The server listens for incoming connections, but doesn't participate in SSL handshake.
      * - The client connects to the server, and is configured to perform SSL handshake.
-     * The server never writes on the socket in response to the handshake request, thus the client
+     * The server never writes on the socket in response to the handshake request, thus the
+     client
      * should block until it is timed out.
      * The goal is to simulate a server crash, and verify the behavior of the client, during the
      * handshake process.

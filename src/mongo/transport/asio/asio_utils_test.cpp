@@ -29,8 +29,8 @@
 
 #include "mongo/transport/asio/asio_utils.h"
 
+#include "mongo/transport/asio/asio_socket_test_util.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 
 #include <asio.hpp>
@@ -93,121 +93,88 @@ void peekPastBuffer(Stream& writeSocket, Stream& readSocket, StringData data) {
 }
 
 #ifdef ASIO_HAS_LOCAL_SOCKETS
-auto prepareUnixSocketPair(asio::io_context& io_context, bool blocking) {
-    asio::local::stream_protocol::socket writeSocket(io_context);
-    asio::local::stream_protocol::socket readSocket(io_context);
-    asio::local::connect_pair(writeSocket, readSocket);
-    readSocket.non_blocking(blocking);
 
-    return std::pair(std::move(writeSocket), std::move(readSocket));
-}
-
-TEST(ASIOUtils, PeekEmptySocketBlocking) {
-    asio::io_context io_context;
-    auto [_, readSocket] = prepareUnixSocketPair(io_context, false);
+TEST(ASIOUtils, PeekEmptySocketUnixBlocking) {
+    UnixSocketPair socks;
+    auto& readSocket = socks.clientSocket();
 
     peekEmptySocket(readSocket);
 }
 
-TEST(ASIOUtils, PeekEmptySocketNonBlocking) {
-    asio::io_context io_context;
-    auto [_, readSocket] = prepareUnixSocketPair(io_context, true);
+TEST(ASIOUtils, PeekEmptySocketUnixNonBlocking) {
+    UnixSocketPair socks;
+    auto& readSocket = socks.clientSocket();
+    readSocket.non_blocking(true);
 
     peekEmptySocket(readSocket);
 }
 
-TEST(ASIOUtils, PeekAvailableBytesBlocking) {
-    asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareUnixSocketPair(io_context, false);
+TEST(ASIOUtils, PeekAvailableBytesUnixBlocking) {
+    UnixSocketPair socks;
+    auto& writeSocket = socks.serverSocket();
+    auto& readSocket = socks.clientSocket();
 
     peekAllSubstrings(writeSocket, readSocket, "example"_sd);
 }
 
-TEST(ASIOUtils, PeekAvailableBytesNonBlocking) {
-    asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareUnixSocketPair(io_context, true);
+TEST(ASIOUtils, PeekAvailableBytesUnixNonBlocking) {
+    UnixSocketPair socks;
+    auto& writeSocket = socks.serverSocket();
+    auto& readSocket = socks.clientSocket();
+    readSocket.non_blocking(true);
 
     peekAllSubstrings(writeSocket, readSocket, "example"_sd);
 }
 
-TEST(ASIOUtils, PeekPastAvailableBytesBlocking) {
-    asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareUnixSocketPair(io_context, false);
+TEST(ASIOUtils, PeekPastAvailableBytesUnixBlocking) {
+    UnixSocketPair socks;
+    auto& writeSocket = socks.serverSocket();
+    auto& readSocket = socks.clientSocket();
 
     peekPastBuffer(writeSocket, readSocket, "example"_sd);
 }
 
-TEST(ASIOUtils, PeekPastAvailableBytesNonBlocking) {
-    asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareUnixSocketPair(io_context, true);
+TEST(ASIOUtils, PeekPastAvailableBytesUnixNonBlocking) {
+    UnixSocketPair socks;
+    auto& writeSocket = socks.serverSocket();
+    auto& readSocket = socks.clientSocket();
+    readSocket.non_blocking(true);
 
     peekPastBuffer(writeSocket, readSocket, "example"_sd);
 }
 #endif  // ASIO_HAS_LOCAL_SOCKETS
 
-auto prepareTCPSocketPair(asio::io_context& io_context, bool blocking) {
-    // Make a local loopback connection on an arbitrary ephemeral port.
-    asio::ip::tcp::endpoint ep(asio::ip::make_address("127.0.0.1"), 0);
-    asio::ip::tcp::acceptor acceptor(io_context, ep.protocol());
-    {
-        std::error_code ec;
-        (void)acceptor.bind(ep, ec);
-        uassertStatusOK(errorCodeToStatus(ec, "prepareTCPSocketPair bind"));
-    }
-    acceptor.listen();
-
-    asio::ip::tcp::socket readSocket(io_context, ep.protocol());
-    readSocket.connect(acceptor.local_endpoint());
-    asio::ip::tcp::socket writeSocket(io_context);
-    acceptor.accept(writeSocket);
-    writeSocket.non_blocking(false);
-    // Set no_delay so that our output doesn't get buffered in a kernel buffer.
-    writeSocket.set_option(asio::ip::tcp::no_delay(true));
-    readSocket.non_blocking(blocking);
-
-    return std::pair(std::move(writeSocket), std::move(readSocket));
-}
-
 TEST(ASIOUtils, PeekEmptySocketTCPBlocking) {
-    asio::io_context io_context;
-    auto [_, readSocket] = prepareTCPSocketPair(io_context, false);
-
-    peekEmptySocket(readSocket);
+    TCPSocketPair sockets;
+    peekEmptySocket(sockets.clientSocket());
 }
 
 TEST(ASIOUtils, PeekEmptySocketTCPNonBlocking) {
-    asio::io_context io_context;
-    auto [_, readSocket] = prepareTCPSocketPair(io_context, true);
-
-    peekEmptySocket(readSocket);
+    TCPSocketPair sockets;
+    sockets.clientSocket().non_blocking(true);
+    peekEmptySocket(sockets.clientSocket());
 }
 
 TEST(ASIOUtils, PeekAvailableBytesTCPBlocking) {
-    asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareTCPSocketPair(io_context, false);
-
-    peekAllSubstrings(writeSocket, readSocket, "example"_sd);
+    TCPSocketPair sockets;
+    peekAllSubstrings(sockets.serverSocket(), sockets.clientSocket(), "example"_sd);
 }
 
 TEST(ASIOUtils, PeekAvailableBytesTCPNonBlocking) {
-    asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareTCPSocketPair(io_context, true);
-
-    peekAllSubstrings(writeSocket, readSocket, "example"_sd);
+    TCPSocketPair sockets;
+    sockets.clientSocket().non_blocking(true);
+    peekAllSubstrings(sockets.serverSocket(), sockets.clientSocket(), "example"_sd);
 }
 
 TEST(ASIOUtils, PeekPastAvailableBytesTCPBlocking) {
-    asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareTCPSocketPair(io_context, false);
-
-    peekPastBuffer(writeSocket, readSocket, "example"_sd);
+    TCPSocketPair sockets;
+    peekPastBuffer(sockets.serverSocket(), sockets.clientSocket(), "example"_sd);
 }
 
 TEST(ASIOUtils, PeekPastAvailableBytesTCPNonBlocking) {
-    asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareTCPSocketPair(io_context, true);
-
-    peekPastBuffer(writeSocket, readSocket, "example"_sd);
+    TCPSocketPair sockets;
+    sockets.clientSocket().non_blocking(true);
+    peekPastBuffer(sockets.serverSocket(), sockets.clientSocket(), "example"_sd);
 }
 }  // namespace
 }  // namespace mongo::transport

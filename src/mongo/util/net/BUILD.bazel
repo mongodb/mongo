@@ -240,7 +240,7 @@ mongo_cc_library(
             "//src/mongo/util:icu",
             "//src/mongo/util:winutil",
             "//src/mongo/util/concurrency:thread_pool",
-            "//src/third_party/asio-master:asio",
+            "//src/third_party/asio",
         ],
         "//conditions:default": [],
     }) + select({

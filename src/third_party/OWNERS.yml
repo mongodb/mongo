@@ -3,7 +3,7 @@ filters:
   - "abseil-cpp":
     approvers:
       - 10gen/server-programmability
-  - "asio-master":
+  - "asio":
     approvers:
       - 10gen/server-networking-and-observability
   - "aws-sdk":
@@ -56,7 +56,7 @@ filters:
       - 10gen/streams-engine
   - "libstemmer_c":
     approvers:
-      - 10gen/query-integration  
+      - 10gen/query-integration
   - "mock_ocsp_responder":
     approvers:
       - 10gen/server-security

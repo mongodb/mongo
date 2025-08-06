@@ -47,20 +47,8 @@
 #include <memory>
 #include <string>
 
-namespace asio {
-class io_context;
-
-template <typename Protocol>
-class basic_socket_acceptor;
-
-namespace generic {
-class stream_protocol;
-}  // namespace generic
-
-namespace ssl {
-class context;
-}  // namespace ssl
-}  // namespace asio
+#include <asio/basic_socket_acceptor.hpp>
+#include <asio/generic/stream_protocol.hpp>
 
 namespace mongo {
 

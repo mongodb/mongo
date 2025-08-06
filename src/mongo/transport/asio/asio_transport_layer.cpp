@@ -64,8 +64,10 @@
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/strong_weak_finish_line.h"
 
-#include <asio.hpp>
+#include <type_traits>
 
+#include <asio/io_context.hpp>
+#include <asio/is_executor.hpp>
 #include <asio/system_timer.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -85,6 +87,20 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
+
+// The default member-function-detection-based implementation of `asio::is_executor` involves
+// inheriting from the target type; but our target type, `AsioReactor`, is `final`.
+// Instead, forward declare `AsioReactor` and then explicitly mark `AsioReactor` as an executor
+// by providing a full specialization of `asio::is_executor`.
+namespace mongo {
+namespace transport {
+class AsioReactor;
+}  // namespace transport
+}  // namespace mongo
+namespace asio {
+template <>
+struct is_executor<mongo::transport::AsioReactor> : public std::true_type {};
+}  // namespace asio
 
 namespace mongo {
 namespace transport {
@@ -154,7 +170,7 @@ public:
 
 
     Future<void> waitUntil(Date_t expiration, const BatonHandle& baton = nullptr) override {
-        if ((**_timer)->get_executor().context().stopped()) {
+        if (static_cast<asio::io_context&>((**_timer)->get_executor().context()).stopped()) {
             return Future<void>::makeReady(
                 Status(ErrorCodes::ShutdownInProgress,
                        "The reactor associated with this timer has been shutdown"));
@@ -213,7 +229,7 @@ public:
     void run() override {
         try {
             ThreadIdGuard threadIdGuard(this);
-            asio::io_context::work work(_ioContext);
+            const auto work = asio::make_work_guard(_ioContext);
             _ioContext.run();
         } catch (...) {
             auto status = exceptionToStatus();
@@ -262,6 +278,12 @@ public:
 
     operator asio::io_context&() {
         return _ioContext;
+    }
+
+    using executor_type = asio::io_context::executor_type;
+
+    executor_type get_executor() {
+        return _ioContext.get_executor();
     }
 
     void appendStats(BSONObjBuilder& bob) const override {

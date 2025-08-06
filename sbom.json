@@ -161,11 +161,11 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/chriskohlhoff/asio@asio-1-12-2",
+      "bom-ref": "pkg:github/chriskohlhoff/asio@asio-1-34-2",
       "author": "Christopher M. Kohlhoff",
       "group": "chriskohlhoff",
       "name": "Asio C++ Library",
-      "version": "1.12.2",
+      "version": "1.34.2",
       "licenses": [
         {
           "license": {
@@ -173,8 +173,8 @@
           }
         }
       ],
-      "copyright": "Copyright \u00a9 2003-2024 Christopher M. Kohlhoff",
-      "purl": "pkg:github/chriskohlhoff/asio@asio-1-12-2",
+      "copyright": "Copyright \u00a9 2003-2025 Christopher M. Kohlhoff",
+      "purl": "pkg:github/chriskohlhoff/asio@asio-1-34-2",
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -190,13 +190,13 @@
         },
         {
           "name": "import_script_path",
-          "value": "src/third_party/scripts/asio_get_sources.sh"
+          "value": "src/third_party/asio/scripts/import.sh"
         }
       ],
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/asio-master"
+            "location": "src/third_party/asio"
           }
         ]
       },
@@ -2703,7 +2703,7 @@
         "pkg:github/aws/aws-sdk-cpp@1.11.471",
         "pkg:github/boostorg/boost@boost-1.88.0",
         "pkg:github/c-ares/c-ares@cares-1_27_0",
-        "pkg:github/chriskohlhoff/asio@asio-1-12-2",
+        "pkg:github/chriskohlhoff/asio@asio-1-34-2",
         "pkg:github/confluentinc/librdkafka@v2.6.0",
         "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
         "pkg:github/dcleblanc/safeint@3.0.26",
@@ -2790,7 +2790,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/chriskohlhoff/asio@asio-1-12-2",
+      "ref": "pkg:github/chriskohlhoff/asio@asio-1-34-2",
       "dependsOn": []
     },
     {

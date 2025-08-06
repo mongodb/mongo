@@ -48,6 +48,8 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 
+#include <asio/detail/socket_option.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport {
@@ -66,53 +68,22 @@ using NoDelayOption = SocketOption<IPPROTO_TCP, TCP_NODELAY>;
 using KeepAliveOption = SocketOption<SOL_SOCKET, SO_KEEPALIVE>;
 
 template <int optionName>
-class ASIOSocketTimeoutOption {
+class ASIOSocketTimeoutOption
+    : public asio::detail::socket_option::timeout<SOL_SOCKET, optionName> {
+    using Base = asio::detail::socket_option::timeout<SOL_SOCKET, optionName>;
+
 public:
-#ifdef _WIN32
-    using TimeoutType = DWORD;
-
-    explicit ASIOSocketTimeoutOption(Milliseconds timeoutVal) : _timeout(timeoutVal.count()) {}
-
-#else
-    using TimeoutType = timeval;
-
-    explicit ASIOSocketTimeoutOption(Milliseconds timeoutVal) {
-        _timeout.tv_sec = duration_cast<Seconds>(timeoutVal).count();
-        const auto minusSeconds = timeoutVal - Seconds{_timeout.tv_sec};
-        _timeout.tv_usec = duration_cast<Microseconds>(minusSeconds).count();
-    }
-#endif
-
-    template <typename Protocol>
-    int name(const Protocol&) const {
-        return optionName;
-    }
-
-    template <typename Protocol>
-    const TimeoutType* data(const Protocol&) const {
-        return &_timeout;
-    }
-
-    template <typename Protocol>
-    std::size_t size(const Protocol&) const {
-        return sizeof(_timeout);
-    }
-
-    template <typename Protocol>
-    int level(const Protocol&) const {
-        return SOL_SOCKET;
-    }
+    explicit ASIOSocketTimeoutOption(Milliseconds timeoutVal)
+        : Base(timeoutVal.toSystemDuration()) {}
 
     BSONObj toBSON() const {
         return BSONObjBuilder{}
-            .append("level", SOL_SOCKET)
-            .append("name", optionName)
-            .append("data", hexdump(&_timeout, sizeof(_timeout)))
+            .append("level", Base::level())
+            .append("name", Base::name())
+            .append("data", hexdump(Base::data(), sizeof(*Base::data())))
+            .append("milliseconds", duration_cast<Milliseconds>(Base::value()).count())
             .obj();
     }
-
-private:
-    TimeoutType _timeout;
 };
 
 Status makeCanceledStatus() {
@@ -618,7 +589,7 @@ Future<void> CommonAsioSession::read(const MutableBufferSequence& buffers,
     if (_sslSocket) {
         return opportunisticRead(*_sslSocket, buffers, baton);
     } else if (!_ranHandshake) {
-        invariant(asio::buffer_size(buffers) >= sizeof(MSGHEADER::Value));
+        invariant(buffers.size() >= sizeof(MSGHEADER::Value));
 
         return opportunisticRead(_socket, buffers, baton)
             .then([this, buffers]() mutable {
@@ -794,8 +765,8 @@ Future<void> CommonAsioSession::opportunisticWrite(Stream& stream,
 #ifdef MONGO_CONFIG_SSL
 template <typename MutableBufferSequence>
 Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferSequence& buffer) {
-    invariant(asio::buffer_size(buffer) >= sizeof(MSGHEADER::Value));
-    MSGHEADER::ConstView headerView(asio::buffer_cast<char*>(buffer));
+    invariant(buffer.size() >= sizeof(MSGHEADER::Value));
+    MSGHEADER::ConstView headerView(static_cast<const char*>(buffer.data()));
     auto responseTo = headerView.getResponseToMsgId();
 
     if (checkForHTTPRequest(buffer)) {
@@ -803,7 +774,7 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
     }
 
     if (maybeProxyProtocolHeader(
-            StringData(asio::buffer_cast<const char*>(buffer), asio::buffer_size(buffer)))) {
+            StringData(static_cast<const char*>(buffer.data()), buffer.size()))) {
         // Protocol requirements mean that neither raw mongorpc nor TLS client hello will look like
         // Proxy.
         return Future<bool>::makeReady(
@@ -843,7 +814,7 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
             if (_blockingMode == sync) {
                 std::error_code ec;
                 _sslSocket->handshake(asio::ssl::stream_base::server, buffer, ec);
-                return futurize(ec, asio::buffer_size(buffer));
+                return futurize(ec, buffer.size());
             } else {
                 return _sslSocket->async_handshake(
                     asio::ssl::stream_base::server, buffer, UseFuture{});
@@ -902,8 +873,8 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
 
 template <typename Buffer>
 bool CommonAsioSession::checkForHTTPRequest(const Buffer& buffers) {
-    invariant(asio::buffer_size(buffers) >= 4);
-    const StringData bufferAsStr(asio::buffer_cast<const char*>(buffers), 4);
+    invariant(buffers.size() >= 4);
+    const StringData bufferAsStr(static_cast<const char*>(buffers.data()), 4);
     return (bufferAsStr == "GET "_sd);
 }
 

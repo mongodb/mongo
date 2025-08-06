@@ -280,35 +280,10 @@ public:
 };
 
 template <typename Stream, typename Operation, typename Handler>
-inline void* asio_handler_allocate(std::size_t size,
-                                   io_op<Stream, Operation, Handler>* this_handler) {
-    return asio_handler_alloc_helpers::allocate(size, this_handler->handler_);
-}
-
-template <typename Stream, typename Operation, typename Handler>
-inline void asio_handler_deallocate(void* pointer,
-                                    std::size_t size,
-                                    io_op<Stream, Operation, Handler>* this_handler) {
-    asio_handler_alloc_helpers::deallocate(pointer, size, this_handler->handler_);
-}
-
-template <typename Stream, typename Operation, typename Handler>
 inline bool asio_handler_is_continuation(io_op<Stream, Operation, Handler>* this_handler) {
     return this_handler->start_ == 0
         ? true
         : asio_handler_cont_helpers::is_continuation(this_handler->handler_);
-}
-
-template <typename Function, typename Stream, typename Operation, typename Handler>
-inline void asio_handler_invoke(Function& function,
-                                io_op<Stream, Operation, Handler>* this_handler) {
-    asio_handler_invoke_helpers::invoke(function, this_handler->handler_);
-}
-
-template <typename Function, typename Stream, typename Operation, typename Handler>
-inline void asio_handler_invoke(const Function& function,
-                                io_op<Stream, Operation, Handler>* this_handler) {
-    asio_handler_invoke_helpers::invoke(function, this_handler->handler_);
 }
 
 template <typename Stream, typename Operation, typename Handler>

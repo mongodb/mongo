@@ -3967,7 +3967,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:change_stream_pipeline",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/idl:server_parameter_test_util",
-        "//src/third_party/asio-master:asio",
+        "//src/third_party/asio",
     ],
 )
 
@@ -4011,7 +4011,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util:clock_source_mock",
-        "//src/third_party/asio-master:asio",
+        "//src/third_party/asio",
     ],
 )
 
@@ -4041,7 +4041,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/util:clock_source_mock",
-        "//src/third_party/asio-master:asio",
+        "//src/third_party/asio",
     ],
 )
 
@@ -4088,7 +4088,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/transport:transport_layer_mock",
-        "//src/third_party/asio-master:asio",
+        "//src/third_party/asio",
     ],
 )
 
@@ -4137,7 +4137,7 @@ mongo_cc_unit_test(
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util:periodic_runner_factory",
-        "//src/third_party/asio-master:asio",
+        "//src/third_party/asio",
     ],
 )
 
@@ -4206,7 +4206,7 @@ mongo_cc_unit_test(
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util/concurrency:thread_pool",
-        "//src/third_party/asio-master:asio",
+        "//src/third_party/asio",
     ],
 )
 

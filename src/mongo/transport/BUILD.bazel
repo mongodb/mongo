@@ -53,7 +53,7 @@ mongo_cc_library(
         ":transport_layer",
         "//src/mongo/db:server_base",
         "//src/mongo/rpc:client_metadata",
-        "//src/third_party/asio-master:asio",
+        "//src/third_party/asio",
     ] + select({
         "//bazel/config:build_grpc_enabled": [
             "//src/mongo/transport/grpc:grpc_transport_layer",
@@ -134,7 +134,7 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/net:ssl_manager",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/options_parser",  # TODO(SERVER-93876): Remove.
-        "//src/third_party/asio-master:asio",
+        "//src/third_party/asio",
     ],
 )
 
@@ -158,7 +158,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:processinfo",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:thread_pool",  # TODO(SERVER-93876): Remove.
-        "//src/third_party/asio-master:asio",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/asio",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -429,9 +429,10 @@ mongo_cc_unit_test(
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/rpc",
         "//src/mongo/rpc:message",
+        "//src/mongo/transport/asio:asio_socket_test_util",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util/concurrency:thread_pool",
-        "//src/third_party/asio-master:asio",
+        "//src/third_party/asio",
     ],
 )
 
@@ -455,7 +456,7 @@ mongo_cc_integration_test(
         ":transport_layer_egress_init",
         ":transport_layer_integration_test_fixture",
         "//src/mongo:base",
-        "//src/third_party/asio-master:asio",
+        "//src/third_party/asio",
     ],
 )
 
