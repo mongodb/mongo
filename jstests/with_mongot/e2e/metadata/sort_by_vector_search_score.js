@@ -9,7 +9,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieVectorSearchIndexSpec,
-    makeMovieVectorExactQuery
+    makeMovieVectorQuery
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {waitUntilDocIsVisibleByQuery} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
@@ -28,7 +28,7 @@ function runTest(metadataSortFieldName) {
     // Our main use case of interest: using the score to compute a rank, with no 'partitionBy'.
     const testRankingPipeline = [
         // Get the embedding for 'Beauty and the Beast', which has _id = 14.
-        makeMovieVectorExactQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10}),
+        makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10}),
         {
             $setWindowFields:
                 {sortBy: {score: {$meta: metadataSortFieldName}}, output: {rank: {$rank: {}}}}
@@ -52,20 +52,20 @@ function runTest(metadataSortFieldName) {
     {
         // Test with a 'partitionBy' argument. We segment the even _ids and the odd _ids, which
         // should create two streams of ranks of approximately equal size.
-        const results = coll.aggregate([
-                                makeMovieVectorExactQuery(
-                                    {queryVector: getMoviePlotEmbeddingById(14), limit: 20}),
-                                {
-                                    $setWindowFields: {
-                                        sortBy: {score: {$meta: metadataSortFieldName}},
-                                        partitionBy: {$mod: ['$_id', 2]},
-                                        output: {rank: {$rank: {}}}
-                                    }
-                                },
-                                {$sort: {score: {$meta: metadataSortFieldName}, _id: 1}},
-                                {$project: {rank: 1, score: 1, _id: 1}}
-                            ])
-                            .toArray();
+        const results =
+            coll.aggregate([
+                    makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 20}),
+                    {
+                        $setWindowFields: {
+                            sortBy: {score: {$meta: metadataSortFieldName}},
+                            partitionBy: {$mod: ['$_id', 2]},
+                            output: {rank: {$rank: {}}}
+                        }
+                    },
+                    {$sort: {score: {$meta: metadataSortFieldName}, _id: 1}},
+                    {$project: {rank: 1, score: 1, _id: 1}}
+                ])
+                .toArray();
 
         assert.eq(
             results.length,
@@ -89,7 +89,7 @@ function runTest(metadataSortFieldName) {
             docId: "duplicate",
             coll: coll,
             queryPipeline:
-                [makeMovieVectorExactQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10})]
+                [makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10})]
         });
 
         const results = coll.aggregate(testRankingPipeline).toArray();

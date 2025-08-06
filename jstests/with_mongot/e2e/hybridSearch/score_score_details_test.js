@@ -4,10 +4,6 @@
  *
  * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
-import {
-    fieldPresent,
-    scoreDetailsDescription,
-} from "jstests/with_mongot/e2e_lib/hybrid_search_score_details_utils.js";
 
 const coll = db[jsTestName()];
 
@@ -21,6 +17,13 @@ for (let i = 1; i <= nDocs; i++) {
     bulk.insert({i, "single": i, "double": i * 2});
 }
 assert.commandWorked(bulk.execute());
+
+function fieldPresent(field, containingObj) {
+    return containingObj.hasOwnProperty(field);
+}
+
+const scoreDetailsDescription =
+    "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:";
 
 // Test Explanation: Verify that the set scoreDetails for $score contains the correct fields and
 // values when the normalize function is one of the following: "none", "sigmoid", or "minMaxScaler"
