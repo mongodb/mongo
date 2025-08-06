@@ -158,6 +158,7 @@ private:
     X(abortAllTransactions)                     \
     X(joinLogicalSessionCache)                  \
     X(shutDownCursorManager)                    \
+    X(shutDownSLSStateMachine)                  \
     /* For magic restore: */                    \
     X(magicRestoreToolTotal)                    \
     X(readMagicRestoreConfig)                   \
