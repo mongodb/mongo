@@ -138,23 +138,25 @@ void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type) {
     if (shouldBeValidated) {
         auto& availableMetadataBitSet = std::get<QueryMetadataBitSet>(_availableMetadata);
 
-        // Occasionally log a message in the logs when this error is hit for gently validated
-        // fields.
-        if (kMetadataFieldsToBeGentlyValidatedWithTicker.contains(type) &&
-            kMetadataFieldsToBeGentlyValidatedWithTicker.at(type).tick()) {
-            LOGV2_WARNING(10846800,
-                          "The query attempts to retrieve metadata at a place in the pipeline "
-                          "where that metadata type is not available",
-                          "metadataType"_attr =
-                              DocumentMetadataFields::typeNameToDebugString(type));
-        }
+        // If the metadata type is not available, we either log a warning or throw an error.
+        if (!availableMetadataBitSet[type]) {
+            // Occasionally log a message in the logs when this error is hit for gently validated
+            // fields.
+            if (kMetadataFieldsToBeGentlyValidatedWithTicker.contains(type) &&
+                kMetadataFieldsToBeGentlyValidatedWithTicker.at(type).tick()) {
+                LOGV2_WARNING(10846800,
+                              "The query attempts to retrieve metadata at a place in the pipeline "
+                              "where that metadata type is not available",
+                              "metadataType"_attr =
+                                  DocumentMetadataFields::typeNameToDebugString(type));
+            }
 
-        // uassert for stages that should be strictly validated.
-        if (kMetadataFieldsToBeStrictlyValidated.contains(type)) {
-            uassert(40218,
-                    str::stream() << "query requires " << type
-                                  << " metadata, but it is not available",
-                    availableMetadataBitSet[type]);
+            // uassert for stages that should be strictly validated.
+            if (kMetadataFieldsToBeStrictlyValidated.contains(type)) {
+                uasserted(40218,
+                          str::stream()
+                              << "query requires " << type << " metadata, but it is not available");
+            }
         }
     }
 

@@ -2,6 +2,14 @@
  * Tests that when "searchScore" and "vectorSearchScore" metadata fields are referenced in an
  * invalid way, a warning log line will occasionally be printed to the logs.
  *
+ * The test in with_mongot/e2e/metadata/search_score_meta_validation_warning_log.js is responsible
+ * for testing that the warning log lines are _not_ printed when the metadata is referenced
+ * correctly.
+ *
+ * The testing must be separate since this test requires noPassthrough to manually check the
+ * correct node's logs, but the other test requires a real mongot to run valid $search/$vectorSearch
+ * queries. We do not have the infrastructure to run a noPassthrough test on a real mongot.
+ *
  * @tags: [requires_fcv_82]
  */
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
