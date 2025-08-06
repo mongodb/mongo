@@ -127,7 +127,8 @@ def teams_for_file(f: ClangFile | str | None):
 
 
 def glob_paths():
-    for path in glob("src/mongo/**/*", recursive=True):
+    repo_root = os.environ.get("BUILD_WORKSPACE_DIRECTORY", ".")
+    for path in glob("src/mongo/**/*", recursive=True, root_dir=repo_root):
         if "/third_party/" in path:
             continue
         extensions = ("h", "cpp", "idl", "c", "defs", "inl", "hpp")

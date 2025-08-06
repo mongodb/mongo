@@ -13,6 +13,7 @@ import pyzstd
 import typer  # nicer error dump on exceptions
 from progressbar import ProgressBar, progressbar
 
+REPO_ROOT = os.environ.get("BUILD_WORKSPACE_DIRECTORY", os.path.dirname(os.path.abspath(sys.argv[0])) + "/..")
 
 class Decl(TypedDict):
     display_name: str
@@ -121,11 +122,10 @@ def is_submodule_usage(decl: Decl, mod: str) -> bool:
 
 
 def get_paths(timer: Timer):
-    project_root = os.path.dirname(os.path.abspath(sys.argv[0])) + "/.."
     proc = subprocess.run(
         ["bazel", "build", "--config=mod-scanner", "//src/mongo/..."],
         text=True,  # unnecessary since we don't use stdout, but makes the types match
-        cwd=project_root,
+        cwd=REPO_ROOT,
         check=False,
     )
     timer.mark("scanned sources")
@@ -143,7 +143,7 @@ def get_paths(timer: Timer):
         ],
         capture_output=True,
         text=True,
-        cwd=project_root,
+        cwd=REPO_ROOT,
         check=True,
     )
 
@@ -152,7 +152,7 @@ def get_paths(timer: Timer):
         if line.startswith("  Environment:") and "MOD_SCANNER_OUTPUT=" in line:
             m = re.search("MOD_SCANNER_OUTPUT=([^,]+),", line)
             if m:
-                outputs.append(m.group(1))
+                outputs.append(REPO_ROOT + "/" + m.group(1))
     timer.mark("queried bazel for mod_scanner outputs")
     return outputs
 
@@ -214,7 +214,7 @@ def main(
             decl["other_mods"] = {k: sorted(v) for k, v in decl["other_mods"].items()}  # type: ignore
     timer.mark("massaged output for json")
 
-    with open("merged_decls.json", "w") as f:
+    with open(f"{REPO_ROOT}/merged_decls.json", "w") as f:
         json.dump(out, f)
     timer.mark("dumped json")
 

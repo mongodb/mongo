@@ -24,6 +24,7 @@ from textual.widgets.tree import TreeNode
 cpp_language = tree_sitter.Language(tree_sitter_cpp.language())
 cpp_highlight_query = (Path(__file__).parent / "cpp-highlights.scm").read_text()
 
+REPO_ROOT = os.environ.get("BUILD_WORKSPACE_DIRECTORY", ".")
 
 class Loc(NamedTuple):
     file: str
@@ -648,7 +649,7 @@ input_path = "merged_decls.json"
 def load_decls() -> list[File]:
     files = dict[str, File]()
 
-    with open(input_path, "rb") as file:
+    with open(REPO_ROOT + "/" + input_path, "rb") as file:
         raw_decls = json.load(file)
 
     for d in raw_decls:

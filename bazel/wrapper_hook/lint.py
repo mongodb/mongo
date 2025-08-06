@@ -12,6 +12,8 @@ sys.path.append(str(REPO_ROOT))
 
 LARGE_FILE_THRESHOLD = 10 * 1024 * 1024 #10MiB
 
+SUPPORTED_EXTENSIONS = (".cpp", ".c", ".h", ".hpp", ".py", ".js", ".mjs", ".json", ".lock", ".toml", ".defs", ".inl", ".idl")
+
 def create_build_files_in_new_js_dirs() -> None:
     base_dirs = ["src/mongo/db/modules/enterprise/jstests", "jstests"]
     for base_dir in base_dirs:
@@ -220,6 +222,12 @@ def get_parsed_args(args):
     )
     return parser.parse_known_args(args)
 
+def lint_mod(bazel_bin: str) -> bool:
+    subprocess.run([bazel_bin, "run", "//modules_poc:mod_mapping", "--", "--validate-modules"], check=True)
+    #TODO add support for the following steps
+    #subprocess.run([bazel_bin, "run", "//modules_poc:merge_decls"], check=True)
+    #subprocess.run([bazel_bin, "run", "//modules_poc:browse", "--", "merged_decls.json", "--parse-only"], check=True)
+
 def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     parsed_args, args = get_parsed_args(args)
     if platform.system() == "Windows":
@@ -261,7 +269,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
             files_to_lint = [
                 file
                 for file in _get_files_changed_since_fork_point(origin_branch)
-                if file.endswith((".cpp", ".c", ".h", ".py", ".js", ".mjs", ".json", ".lock", ".toml"))
+                if file.endswith((SUPPORTED_EXTENSIONS))
             ]
 
     if lint_all or "sbom.json" in files_to_lint:
@@ -296,6 +304,12 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     # Default to linting everything in rules_lint if no path was passed in.
     if len([arg for arg in args if not arg.startswith("--")]) == 0:
         args = ["//..."] + args
+
+    if lint_all or any(
+        file.endswith((".cpp", ".c", ".h", ".hpp", ".idl", ".inl", ".defs"))
+        for file in files_to_lint
+    ):
+        lint_mod(bazel_bin)
 
     fix = ""
     with tempfile.NamedTemporaryFile(delete=False) as buildevents:

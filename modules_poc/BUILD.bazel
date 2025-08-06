@@ -37,3 +37,79 @@ py_binary(
         ),
     ],
 )
+
+py_binary(
+    name = "merge_decls",
+    srcs = [
+        "merge_decls.py",
+    ],
+    deps = [
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "pyzstd",
+            group = "modules_poc",
+        ),
+        dependency(
+            "progressbar2",
+            group = "modules_poc",
+        ),
+    ],
+)
+
+py_binary(
+    name = "browse",
+    srcs = [
+        "browse.py",
+    ],
+    data = [
+        "cpp-highlights.scm",
+    ],
+    deps = [
+        dependency(
+            "textual",
+            group = "modules_poc",
+        ),
+        dependency(
+            "tree-sitter",
+            group = "modules_poc",
+        ),
+        dependency(
+            "tree-sitter-cpp",
+            group = "modules_poc",
+        ),
+    ],
+)
+
+py_binary(
+    name = "mod_mapping",
+    srcs = [
+        "mod_mapping.py",
+    ],
+    data = [
+        "modules.yaml",
+        "//.github:CODEOWNERS",
+        # These are runtime deps, but switched to getting them via the dependency on
+        # on cc_toolchain.all_files injected by the aspect that is needed in order to get
+        # access to the toolchain headers. Ideally there would be an all_headers file list
+        # that we could depend on.
+        # "@mongo_toolchain//:v4/lib/libLLVM-12.so",
+        # "@mongo_toolchain//:v4/lib/libclang.so",
+    ],
+    deps = [
+        dependency(
+            "regex",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "codeowners",
+            group = "modules_poc",
+        ),
+    ],
+)
