@@ -73,8 +73,7 @@ void OplogVisibilityManagerTest::setUp() {
                                 boost::none /* uuid */);
 
     _notifier = _rs->capped()->getInsertNotifier();
-    _manager.setRecordStore(_rs.get());
-    _manager.init(Timestamp(1) /* initialTs */);
+    _manager.reInit(_rs.get(), Timestamp(1) /* initialTs */);
     ASSERT_EQ(_manager.getOplogVisibilityTimestamp(), Timestamp(1));
 }
 

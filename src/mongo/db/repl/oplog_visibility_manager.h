@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/slotted_timestamp_list.h"
 #include "mongo/stdx/mutex.h"
@@ -43,13 +45,7 @@ public:
     using iterator = SlottedTimestampList::iterator;
     using const_iterator = SlottedTimestampList::const_iterator;
 
-    static OplogVisibilityManager* get(ServiceContext& service);
-    static OplogVisibilityManager* get(ServiceContext* service);
-    static OplogVisibilityManager* get(OperationContext* opCtx);
-
     RecordStore* getRecordStore() const;
-    void setRecordStore(RecordStore* rs);
-    void resetRecordStore();
 
     OplogVisibilityManager() = default;
     OplogVisibilityManager(const OplogVisibilityManager& rhs) = delete;
@@ -58,9 +54,15 @@ public:
     OplogVisibilityManager& operator=(const OplogVisibilityManager&& rhs) = delete;
 
     /**
-     * Initializes oplog visibility using the given initialTs.
+     * Re-initializes the oplog visibility manager with the given record store and initial
+     * timestamp. Called by LocalOplogInfo when the oplog record store pointer is set.
      */
-    void init(const Timestamp& initialTs);
+    void reInit(RecordStore* rs, const Timestamp& initialTs);
+
+    /**
+     * Clears the oplog visibility manager.
+     */
+    void clear();
 
     /**
      * Start tracking the timestamps given the first and last timestamp.

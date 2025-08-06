@@ -703,7 +703,7 @@ TEST_F(StorageInterfaceImplTest, CreateCollectionThatAlreadyExistsFails) {
 TEST_F(StorageInterfaceImplTest, CreateOplogCreateCappedCollection) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("local.oplog.X");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("local.oplog.rs");
     {
         const auto coll = getCollectionForRead(opCtx, nss);
         ASSERT_FALSE(coll.exists());
@@ -722,7 +722,7 @@ TEST_F(StorageInterfaceImplTest,
        CreateCollectionReturnsUserExceptionAsStatusIfCollectionCreationThrows) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("local.oplog.Y");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("local.oplog.rs");
     {
         const auto coll = getCollectionForRead(opCtx, nss);
         ASSERT_FALSE(coll.exists());

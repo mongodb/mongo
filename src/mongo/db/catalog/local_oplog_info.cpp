@@ -47,6 +47,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/scopeguard.h"
 
+#include <memory>
 #include <mutex>
 #include <utility>
 
@@ -85,6 +86,12 @@ RecordStore* LocalOplogInfo::getRecordStore() const {
 }
 
 void LocalOplogInfo::setRecordStore(OperationContext* opCtx, RecordStore* rs) {
+    Timestamp lastAppliedOpTime;
+    if (repl::feature_flags::gFeatureFlagOplogVisibility.isEnabled()) {
+        lastAppliedOpTime =
+            repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp();
+    }
+
     stdx::lock_guard<stdx::mutex> lk(_rsMutex);
     _rs = rs;
     // If the server was started in read-only mode or if we are restoring the node, skip
@@ -95,11 +102,21 @@ void LocalOplogInfo::setRecordStore(OperationContext* opCtx, RecordStore* rs) {
     if (needsTruncateMarkers) {
         _truncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     }
+
+    if (repl::feature_flags::gFeatureFlagOplogVisibility.isEnabled()) {
+        _oplogVisibilityManager.reInit(_rs, lastAppliedOpTime);
+    }
 }
 
 void LocalOplogInfo::resetRecordStore() {
     stdx::lock_guard<stdx::mutex> lk(_rsMutex);
     _rs = nullptr;
+
+    if (repl::feature_flags::gFeatureFlagOplogVisibility.isEnabled()) {
+        // It's possible for the oplog visibility manager to be uninitialized because
+        // resetRecordStore may be called before setRecordStore in repair/standalone mode.
+        _oplogVisibilityManager.clear();
+    }
 }
 
 std::shared_ptr<OplogTruncateMarkers> LocalOplogInfo::getTruncateMarkers() const {

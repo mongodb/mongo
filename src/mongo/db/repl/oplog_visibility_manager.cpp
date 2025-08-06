@@ -40,8 +40,6 @@ namespace repl {
 
 namespace {
 
-const auto oplogVisibilityManager = ServiceContext::declareDecoration<OplogVisibilityManager>();
-
 /**
  * Returns a lambda expression that notifies capped waiters if visibility is changed.
  */
@@ -56,36 +54,21 @@ auto notifyCappedWaitersIfVisibilityChanged(const bool& visibilityChanged, Recor
 
 }  // namespace
 
-// static
-OplogVisibilityManager* OplogVisibilityManager::get(ServiceContext& service) {
-    return get(&service);
-}
-
-// static
-OplogVisibilityManager* OplogVisibilityManager::get(ServiceContext* service) {
-    return &oplogVisibilityManager(service);
-}
-
-// static
-OplogVisibilityManager* OplogVisibilityManager::get(OperationContext* opCtx) {
-    return get(opCtx->getServiceContext());
-}
-
 RecordStore* OplogVisibilityManager::getRecordStore() const {
     return _rs;
 }
 
-void OplogVisibilityManager::setRecordStore(RecordStore* rs) {
+void OplogVisibilityManager::reInit(RecordStore* rs, const Timestamp& initialTs) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    invariant(_oplogTimestampList.empty());
+    _oplogVisibilityTimestamp.store(initialTs);
     _rs = rs;
 }
 
-void OplogVisibilityManager::resetRecordStore() {
+void OplogVisibilityManager::clear() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    invariant(_oplogTimestampList.empty());
     _rs = nullptr;
-}
-
-void OplogVisibilityManager::init(const Timestamp& initialTs) {
-    _oplogVisibilityTimestamp.store(initialTs);
-    _latestTimeSeen = initialTs;
 }
 
 OplogVisibilityManager::const_iterator OplogVisibilityManager::trackTimestamps(
