@@ -466,6 +466,8 @@ last-continuous:
       ticket: SERVER-105874
     - test_file: jstests/sharding/query/lookup/union_with_doubly_nested_lookup.js
       ticket: SERVER-108341
+    - test_file: jstests/core/timeseries/write/timeseries_insert_mixed_schema_docs.js
+      ticket: SERVER-107361
   suites: null
 last-lts:
   all:
@@ -989,4 +991,6 @@ last-lts:
       ticket: SERVER-107352
     - test_file: jstests/sharding/query/lookup/union_with_doubly_nested_lookup.js
       ticket: SERVER-108341
+    - test_file: jstests/core/timeseries/write/timeseries_insert_mixed_schema_docs.js
+      ticket: SERVER-107361
   suites: null
