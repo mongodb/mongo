@@ -33,7 +33,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
 #include <bit>
 
@@ -394,7 +394,8 @@ private:
     // The memory size for each window accumulator state.
     std::vector<std::vector<WindowStateMemoryEstimator>> _windowStateMemoryEstimators;
     // Memory threshold before spilling.
-    const size_t _memoryThreshold = internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load();
+    const size_t _memoryThreshold =
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes);
 
     // The failpoint counter to force spilling, incremented for every window function update,
     // every document.

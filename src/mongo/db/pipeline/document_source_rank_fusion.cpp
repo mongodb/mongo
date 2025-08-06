@@ -57,7 +57,7 @@
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
@@ -149,7 +149,7 @@ boost::intrusive_ptr<DocumentSource> setWindowFields(const auto& expCtx,
             rankFieldName,
             window_function::Expression::parse(
                 BSON("$rank" << BSONObj()), dummySortPattern, expCtx.get())}},
-        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes),
         SbeCompatibility::notCompatible);
 }
 

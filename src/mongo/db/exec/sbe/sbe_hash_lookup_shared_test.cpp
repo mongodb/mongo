@@ -33,6 +33,8 @@
 
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
 
+#include "mongo/idl/server_parameter_test_util.h"
+
 namespace mongo::sbe {
 void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     CompileCtx* ctx,
@@ -70,13 +72,8 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     stage->close();
 
     // Execute the stage with spilling to disk.
-    auto defaultInternalQuerySBELookupApproxMemoryUseInBytesBeforeSpill =
-        internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.load();
-    internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.store(10);
-    ON_BLOCK_EXIT([&] {
-        internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.store(
-            defaultInternalQuerySBELookupApproxMemoryUseInBytesBeforeSpill);
-    });
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill", 10);
 
     // Run the stage after the knob is set and spill to disk. We need to hold a global IS lock
     // to read from WT.

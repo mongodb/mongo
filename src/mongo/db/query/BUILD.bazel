@@ -29,6 +29,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/query/datetime:init_timezone_data",
+        "//src/mongo/db/query/stage_memory_limit_knobs",
     ],
 )
 
@@ -226,14 +227,6 @@ idl_generator(
     ],
 )
 
-idl_generator(
-    name = "query_stage_memory_limit_knobs_gen",
-    src = "query_stage_memory_limit_knobs.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
 mongo_cc_library(
     name = "plan_yield_policy",
     srcs = [
@@ -331,19 +324,10 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "query_knobs",
+    name = "on_parameter_change_updaters",
     srcs = [
-        "framework_control.cpp",
-        "plan_ranker_mode.cpp",
-        "query_feature_flags_gen",
-        "query_knobs_gen",
-        "query_stage_memory_limit_knobs_gen",
-        "sampling_ce_method.cpp",
-        "sampling_confidence_interval.cpp",
-        "sbe_hashAgg_increased_spilling_mode.cpp",
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.cpp",
         "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.cpp",
-        "//src/mongo/db/query/query_stats:rate_limiting.h",
     ],
     hdrs = [
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.h",
@@ -353,6 +337,24 @@ mongo_cc_library(
         ":memory_util",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_knobs",
+    srcs = [
+        "framework_control.cpp",
+        "plan_ranker_mode.cpp",
+        "query_feature_flags_gen",
+        "query_knobs_gen",
+        "sampling_ce_method.cpp",
+        "sampling_confidence_interval.cpp",
+        "sbe_hashAgg_increased_spilling_mode.cpp",
+        "//src/mongo/db/query/query_stats:rate_limiting.h",
+    ],
+    deps = [
+        ":on_parameter_change_updaters",
+        "//src/mongo/db:server_base",
         "//src/mongo/idl:cluster_server_parameter",
     ],
 )

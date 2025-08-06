@@ -2513,6 +2513,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/stage_builder/sbe/abt/**/* @10gen/query-execution-sbe @svc-auto-approve-bot
 /src/mongo/db/query/stage_builder/sbe/abt/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/query/stage_memory_limit_knobs/OWNERS.yml
+/src/mongo/db/query/stage_memory_limit_knobs/**/* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/query/stage_memory_limit_knobs/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/query/timeseries/OWNERS.yml
 /src/mongo/db/query/timeseries/**/* @10gen/query-integration-timeseries @svc-auto-approve-bot
 /src/mongo/db/query/timeseries/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot

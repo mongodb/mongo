@@ -34,7 +34,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 
@@ -49,7 +49,8 @@ namespace {
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceSequentialDocumentCacheTest = AggregationContextFixture;
 
-const long long kDefaultMaxCacheSize = internalDocumentSourceLookupCacheSizeBytes.load();
+const long long kDefaultMaxCacheSize =
+    loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes);
 
 TEST_F(DocumentSourceSequentialDocumentCacheTest, ReturnsEOFOnSubsequentCallsAfterSourceExhausted) {
     SequentialDocumentCache cache(kDefaultMaxCacheSize);

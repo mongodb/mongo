@@ -39,9 +39,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/temp_dir.h"
@@ -151,8 +151,10 @@ public:
             expCtx()->setAllowDiskUse(maxAllowedDiskUsageBytes.has_value());
         }
 
-        internalQueryMaxSpoolMemoryUsageBytes.store(maxAllowedMemoryUsageBytes);
-        internalQueryMaxSpoolDiskUsageBytes.store(maxAllowedDiskUsageBytes.value_or(0));
+        RAIIServerParameterControllerForTest maxMemoryUsage("internalQueryMaxSpoolMemoryUsageBytes",
+                                                            maxAllowedMemoryUsageBytes);
+        RAIIServerParameterControllerForTest maxDiskUsage("internalQueryMaxSpoolDiskUsageBytes",
+                                                          maxAllowedDiskUsageBytes.value_or(1));
 
         return SpoolStage(expCtx(), &ws, std::move(root));
     }
@@ -389,7 +391,7 @@ TEST_F(SpoolStageTest, spillingDisabled) {
     mock->enqueueAdvanced(makeRecord(1));
 
     auto spool = makeSpool(std::move(mock),
-                           0 /* maxAllowedMemoryUsageBytes */,
+                           1 /* maxAllowedMemoryUsageBytes */,
                            boost::none /* maxAllowedDiskUsageBytes */);
 
     WorkingSetID id;

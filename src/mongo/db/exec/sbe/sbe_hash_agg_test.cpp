@@ -50,9 +50,9 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/record_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
@@ -636,13 +636,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
 TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
     // We estimate the size of result row like {int64, int64} at 50B. Set the memory threshold to
     // 64B so that exactly one row fits in memory.
-    auto defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill =
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
-    internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(64);
-    ON_BLOCK_EXIT([&] {
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(
-            defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill);
-    });
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 64);
 
     auto ctx = makeCompileCtx();
 
@@ -709,20 +704,12 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
     // 64B so that exactly one row fits in memory and spill would be required. At the same time, set
     // the memory check bounds to exceed the number of processed records so the checks are never run
     // and the need to spill is never discovered.
-    auto defaultMemoryLimit = internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
-    internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(64);
-
-    auto defaultAtMost = internalQuerySBEAggMemoryCheckPerAdvanceAtMost.load();
-    internalQuerySBEAggMemoryCheckPerAdvanceAtMost.store(100);
-
-    auto defaultAtLeast = internalQuerySBEAggMemoryCheckPerAdvanceAtLeast.load();
-    internalQuerySBEAggMemoryCheckPerAdvanceAtLeast.store(100);
-
-    ON_BLOCK_EXIT([&] {
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(defaultMemoryLimit);
-        internalQuerySBEAggMemoryCheckPerAdvanceAtMost.store(defaultAtMost);
-        internalQuerySBEAggMemoryCheckPerAdvanceAtLeast.store(defaultAtLeast);
-    });
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 64);
+    RAIIServerParameterControllerForTest checkPerAdvanceAtMost(
+        "internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtMost", 100);
+    RAIIServerParameterControllerForTest checkPerAdvanceAtLeast(
+        "internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast", 100);
 
     auto ctx = makeCompileCtx();
 
@@ -781,13 +768,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
 TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     // We estimate the size of result row like {double, int64} at 50B. Set the memory threshold to
     // 64B so that exactly one row fits in memory.
-    auto defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill =
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
-    internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(64);
-    ON_BLOCK_EXIT([&] {
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(
-            defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill);
-    });
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 64);
 
     auto ctx = makeCompileCtx();
 
@@ -850,13 +832,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
 }
 
 TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
-    auto defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill =
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
-    internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(1);
-    ON_BLOCK_EXIT([&] {
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(
-            defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill);
-    });
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 128);
 
     auto ctx = makeCompileCtx();
 
@@ -915,13 +892,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
 TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     // We estimate the size of result row like {double, int64} at 59B. Set the memory threshold to
     // 128B so that two rows fit in memory.
-    auto defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill =
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
-    internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(128);
-    ON_BLOCK_EXIT([&] {
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(
-            defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill);
-    });
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 128);
 
     auto ctx = makeCompileCtx();
 
@@ -995,14 +967,9 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
 }
 
 TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
-    // Set available memory to zero so all aggregated rows have to be spilled.
-    auto defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill =
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
-    internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(0);
-    ON_BLOCK_EXIT([&] {
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(
-            defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill);
-    });
+    // Set available memory to 1 byte so all aggregated rows have to be spilled.
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 1);
 
     auto ctx = makeCompileCtx();
 
@@ -1171,13 +1138,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
 TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
     // We estimate the size of result row like {double, int64} at 59B. Set the memory threshold to
     // 128B so that two rows fit in memory.
-    auto defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill =
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
-    internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(128);
-    ON_BLOCK_EXIT([&] {
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(
-            defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill);
-    });
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 128);
 
     auto ctx = makeCompileCtx();
 
@@ -1262,13 +1224,8 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
     // estimated size is >= 128. This should spilt the number of ints between the hash table and
     // the record store somewhat evenly.
     const auto memLimit = 128;
-    auto defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill =
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
-    internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(memLimit);
-    ON_BLOCK_EXIT([&] {
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(
-            defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill);
-    });
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", memLimit);
 
     auto ctx = makeCompileCtx();
 

@@ -52,7 +52,7 @@
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
@@ -820,7 +820,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _memoryUsageTracker(OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
           *expCtx,
           expCtx->getAllowDiskUse(),
-          internalDocumentSourceGraphLookupMaxMemoryBytes.load())),
+          loadMemoryLimit(StageMemoryLimit::DocumentSourceGraphLookupMaxMemoryBytes))),
       _queue(pExpCtx.get(), &_memoryUsageTracker),
       _visitedDocuments(pExpCtx.get(), &_memoryUsageTracker, "VisitedDocumentsMap"),
       _visitedFromValues(pExpCtx.get(), &_memoryUsageTracker, "VisitedFromValuesSet"),
@@ -865,7 +865,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _memoryUsageTracker(OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
           *newExpCtx,
           newExpCtx->getAllowDiskUse(),
-          internalDocumentSourceGraphLookupMaxMemoryBytes.load())),
+          loadMemoryLimit(StageMemoryLimit::DocumentSourceGraphLookupMaxMemoryBytes))),
       _queue(pExpCtx.get(), &_memoryUsageTracker),
       _visitedDocuments(pExpCtx.get(), &_memoryUsageTracker, "VisitedDocumentsMap"),
       _visitedFromValues(pExpCtx.get(), &_memoryUsageTracker, "VisitedFromValuesSet"),

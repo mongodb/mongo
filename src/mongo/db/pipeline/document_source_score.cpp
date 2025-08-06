@@ -44,7 +44,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -231,7 +231,7 @@ boost::intrusive_ptr<DocumentSource> buildSetWindowFieldsStage(
                 BSON("$minMaxScaler" << BSON("input" << BSON("$meta" << "score"))),
                 sortPattern,
                 expCtx.get())}},
-        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes),
         SbeCompatibility::notCompatible);
 }
 

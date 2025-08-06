@@ -39,7 +39,7 @@ server_parameters:
             will cache before abandoning the cache and executing the full pipeline on each iteration."
         set_at: [startup, runtime]
         cpp_varname: "internalDocumentSourceLookupCacheSizeBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: AtomicWord<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -102,7 +102,7 @@ server_parameters:
         description: "Limits the number of bytes densification can use to store partition information."
         set_at: [startup, runtime]
         cpp_varname: "internalDocumentSourceDensifyMaxMemoryBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: AtomicWord<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -113,7 +113,7 @@ server_parameters:
         description: "The number of bytes to buffer at once during a $facet stage."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryFacetBufferSizeBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: AtomicWord<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
@@ -181,7 +181,7 @@ server_parameters:
             possible to sort more data, but this limit will still constrain the memory consumption.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxBlockingSortMemoryUsageBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: AtomicWord<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:

@@ -92,10 +92,6 @@ extern AtomicWord<bool> internalQueryForceIntersectionPlans;
 
 extern AtomicWord<bool> internalQueryPlannerEnableHashIntersection;
 
-extern AtomicWord<int> internalQueryMaxBlockingSortMemoryUsageBytes;
-
-extern AtomicWord<int> internalQueryPlanEvaluationMaxResults;
-
 namespace cbr = cost_based_ranker;
 
 namespace PlanRankingTests {
@@ -293,20 +289,11 @@ public:
     PlanRankingPreferNonFailed()
         : PlanRankingTestBase(),
           _internalQueryMaxBlockingSortMemoryUsageBytes(
-              internalQueryMaxBlockingSortMemoryUsageBytes.load()),
+              "internalQueryMaxBlockingSortMemoryUsageBytes", 10),
           // We set the max results to decrease the amount of work that is done during the trial
           // period. We want it to do less work than there are docs to ensure that no plan reaches
           // EOF.
-          _internalQueryPlanEvaluationMaxResults(internalQueryPlanEvaluationMaxResults.load()) {
-        internalQueryMaxBlockingSortMemoryUsageBytes.store(10);
-        internalQueryPlanEvaluationMaxResults.store(100);
-    }
-
-    ~PlanRankingPreferNonFailed() override {
-        internalQueryMaxBlockingSortMemoryUsageBytes.store(
-            _internalQueryMaxBlockingSortMemoryUsageBytes);
-        internalQueryPlanEvaluationMaxResults.store(_internalQueryPlanEvaluationMaxResults);
-    }
+          _internalQueryPlanEvaluationMaxResults("internalQueryPlanEvaluationMaxResults", 100) {}
 
     void run() {
         const size_t numDocs = 1000;
@@ -378,10 +365,8 @@ public:
     }
 
 private:
-    // Holds the value of global "internalQueryMaxBlockingSortMemoryUsageBytes" setParameter flag.
-    // Restored at end of test invocation regardless of test result.
-    int _internalQueryMaxBlockingSortMemoryUsageBytes;
-    int _internalQueryPlanEvaluationMaxResults;
+    RAIIServerParameterControllerForTest _internalQueryMaxBlockingSortMemoryUsageBytes;
+    RAIIServerParameterControllerForTest _internalQueryPlanEvaluationMaxResults;
 };
 
 /**

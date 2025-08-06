@@ -32,7 +32,7 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -59,7 +59,8 @@ public:
      * 'bufferSizeBytes' is a soft cap, and may be exceeded by one document's worth (~16MB).
      */
     static boost::intrusive_ptr<TeeBuffer> create(
-        size_t nConsumers, int bufferSizeBytes = internalQueryFacetBufferSizeBytes.load());
+        size_t nConsumers,
+        int bufferSizeBytes = loadMemoryLimit(StageMemoryLimit::QueryFacetBufferSizeBytes));
 
     void setSource(exec::agg::Stage* source) {
         _source = source;

@@ -45,7 +45,7 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -139,14 +139,15 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
       _sortExecutor(std::make_shared<SortExecutor<Document>>(
           sortOrder,
           options.limit,
-          options.maxMemoryUsageBytes.value_or(internalQueryMaxBlockingSortMemoryUsageBytes.load()),
+          options.maxMemoryUsageBytes.value_or(
+              loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes)),
           pExpCtx->getTempDir(),
           pExpCtx->getAllowDiskUse())),
       _memoryTracker(std::make_shared<SimpleMemoryUsageTracker>(
           OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
               *pExpCtx,
               options.maxMemoryUsageBytes.value_or(
-                  internalQueryMaxBlockingSortMemoryUsageBytes.load())))),
+                  loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes))))),
       _outputSortKeyMetadata(options.outputSortKeyMetadata) {
     uassert(15976,
             "$sort stage must have at least one sort key",
@@ -397,7 +398,8 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     auto ds = DocumentSourceSort::create(expCtx, pat);
 
     SortOptions opts;
-    opts.maxMemoryUsageBytes = internalQueryMaxBlockingSortMemoryUsageBytes.load();
+    opts.maxMemoryUsageBytes =
+        loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes);
     if (expCtx->getAllowDiskUse()) {
         opts.extSortAllowed = true;
         opts.tempDir = expCtx->getTempDir();
@@ -498,7 +500,8 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     auto ds = DocumentSourceSort::create(expCtx, pat);
 
     SortOptions opts;
-    opts.MaxMemoryUsageBytes(internalQueryMaxBlockingSortMemoryUsageBytes.load());
+    opts.MaxMemoryUsageBytes(
+        loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes));
     if (expCtx->getAllowDiskUse()) {
         opts.ExtSortAllowed(true);
         opts.TempDir(expCtx->getTempDir());

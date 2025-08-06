@@ -52,7 +52,7 @@
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -90,7 +90,8 @@ protected:
     }
 };
 
-const long long kDefaultMaxCacheSize = internalDocumentSourceLookupCacheSizeBytes.load();
+const long long kDefaultMaxCacheSize =
+    loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes);
 const auto kExplain = SerializationOptions{
     .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 

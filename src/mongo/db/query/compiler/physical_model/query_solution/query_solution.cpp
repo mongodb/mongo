@@ -47,7 +47,7 @@
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution_helpers.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
 #include <algorithm>
 #include <queue>
@@ -1467,7 +1467,7 @@ std::unique_ptr<QuerySolutionNode> SortNodeSimple::clone() const {
 }
 
 uint64_t SortNode::_loadMaxMemoryUsageBytes() {
-    return internalQueryMaxBlockingSortMemoryUsageBytes.loadRelaxed();
+    return loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes);
 }
 
 //

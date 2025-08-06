@@ -36,7 +36,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -324,7 +324,7 @@ private:
 
     // Memory tracking and spilling to disk.
     long long _memoryUseInBytesBeforeSpill =
-        internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.load();
+        loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill);
 
     // The portion of the inner collection hash table that has spilled to disk.
     std::unique_ptr<SpillingStore> _recordStoreHt;

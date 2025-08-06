@@ -409,7 +409,8 @@ boost::optional<std::pair<value::TypeTags, value::Value>> LookupHashTable::getVa
 }  // HashLookupUnwindStage::getValueAtIndex
 
 void LookupHashTable::reset(bool fromClose) {
-    _memoryUseInBytesBeforeSpill = internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.load();
+    _memoryUseInBytesBeforeSpill =
+        loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill);
     _memoryHt = boost::none;
 
     if (_recordStoreHt) {

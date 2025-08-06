@@ -1362,6 +1362,7 @@ mongo_cc_library(
         "//src/mongo/db/query/plan_cache:query_plan_cache",
         "//src/mongo/db/query/query_settings",
         "//src/mongo/db/query/stage_builder/sbe:stage_builder",
+        "//src/mongo/db/query/stage_memory_limit_knobs",
         "//src/mongo/db/query/write_ops:delete_request_idl",
         "//src/mongo/db/query/write_ops:parsed_update",
         "//src/mongo/db/query/write_ops:parsed_update_and_delete",
@@ -2405,6 +2406,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/datetime:date_time_support",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/stage_memory_limit_knobs",
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage/key_string",
         "//src/mongo/util:pcre_util",

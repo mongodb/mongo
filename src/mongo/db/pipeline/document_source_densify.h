@@ -49,7 +49,7 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -335,7 +335,7 @@ public:
                                   RangeStatement range)
         : DocumentSource(kStageName, pExpCtx),
           exec::agg::Stage(kStageName, pExpCtx),
-          _memTracker(internalDocumentSourceDensifyMaxMemoryBytes.load()),
+          _memTracker(loadMemoryLimit(StageMemoryLimit::DocumentSourceDensifyMaxMemoryBytes)),
           _field(std::move(field)),
           _partitions(std::move(partitions)),
           _range(std::move(range)),

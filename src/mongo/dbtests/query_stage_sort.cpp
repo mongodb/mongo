@@ -66,7 +66,7 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -322,7 +322,7 @@ public:
     };
 
     uint64_t maxMemoryUsageBytes() const {
-        return internalQueryMaxBlockingSortMemoryUsageBytes.load();
+        return loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes);
     }
 
     static const char* ns() {

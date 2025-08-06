@@ -76,7 +76,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
@@ -333,7 +333,7 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
         if (localForeignFields != boost::none) {
             std::tie(_localField, _foreignField) = *localForeignFields;
         } else {
-            _cache.emplace(internalDocumentSourceLookupCacheSizeBytes.load());
+            _cache.emplace(loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes));
         }
         return;
     }
@@ -358,7 +358,7 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
         // When local/foreignFields are included, we cannot enable the cache because the $match
         // is a correlated prefix that will not be detected. Here, local/foreignFields are absent,
         // so we enable the cache.
-        _cache.emplace(internalDocumentSourceLookupCacheSizeBytes.load());
+        _cache.emplace(loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes));
 
         // Add the user pipeline to '_resolvedPipeline' after any potential view prefix and $match
         _resolvedPipeline.insert(_resolvedPipeline.end(), pipeline.begin(), pipeline.end());

@@ -52,7 +52,7 @@
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -307,7 +307,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
         simplePartitionByExpr,
         std::move(sortBy),
         std::move(outputFields),
-        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes),
         sbeCompatibility));
 
     // $unset
@@ -432,7 +432,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         partitionBy,
         sortBy,
         outputFields,
-        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes),
         sbeCompatibility);
 }
 

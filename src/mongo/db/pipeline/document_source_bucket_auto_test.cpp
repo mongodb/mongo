@@ -45,7 +45,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
@@ -508,7 +508,7 @@ TEST_F(BucketAutoTests, ShouldBeAbleToForceSpillWhileLoadingDocuments) {
         expCtx,
         groupByExpression,
         numBuckets,
-        internalDocumentSourceBucketAutoMaxMemoryBytes.loadRelaxed());
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceBucketAutoMaxMemoryBytes));
 
     string largeStr(1000, 'x');
     auto mock =
@@ -567,7 +567,7 @@ TEST_F(BucketAutoTests, ShouldBeAbleToForceSpillWhileReturningDocuments) {
         expCtx,
         groupByExpression,
         numBuckets,
-        internalDocumentSourceBucketAutoMaxMemoryBytes.loadRelaxed());
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceBucketAutoMaxMemoryBytes));
 
     string largeStr(1000, 'x');
     auto mock = DocumentSourceMock::createForTest({Document{{"a", 0}, {"largeStr", largeStr}},
@@ -724,13 +724,14 @@ TEST_F(BucketAutoTests, FailsWithInvalidNumberOfBuckets) {
 
     // Use the create() helper.
     const int numBuckets = 0;
-    ASSERT_THROWS_CODE(DocumentSourceBucketAuto::create(
-                           getExpCtx(),
-                           ExpressionConstant::create(getExpCtxRaw(), Value(0)),
-                           numBuckets,
-                           internalDocumentSourceBucketAutoMaxMemoryBytes.loadRelaxed()),
-                       AssertionException,
-                       40243);
+    ASSERT_THROWS_CODE(
+        DocumentSourceBucketAuto::create(
+            getExpCtx(),
+            ExpressionConstant::create(getExpCtxRaw(), Value(0)),
+            numBuckets,
+            loadMemoryLimit(StageMemoryLimit::DocumentSourceBucketAutoMaxMemoryBytes)),
+        AssertionException,
+        40243);
 }
 
 TEST_F(BucketAutoTests, FailsWithNonOrInvalidExpressionGroupBy) {

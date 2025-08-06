@@ -38,7 +38,7 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/plan_executor_impl.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
@@ -70,7 +70,7 @@ TextOrStage::TextOrStage(ExpressionContext* expCtx,
       _keyPrefixSize(keyPrefixSize),
       _ws(ws),
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-          *expCtx, internalTextOrStageMaxMemoryBytes.loadRelaxed())),
+          *expCtx, loadMemoryLimit(StageMemoryLimit::TextOrStageMaxMemoryBytes))),
       _filter(filter),
       _idRetrying(WorkingSet::INVALID_ID) {}
 

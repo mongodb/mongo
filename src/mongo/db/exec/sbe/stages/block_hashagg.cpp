@@ -34,7 +34,7 @@
 #include "mongo/db/exec/sbe/stages/hashagg_base.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -289,7 +289,7 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
     _compiled = true;
 
     _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
-        _opCtx, internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load());
+        _opCtx, loadMemoryLimit(StageMemoryLimit::QuerySBEAggApproxMemoryUseInBytesBeforeSpill));
 }
 
 value::SlotAccessor* BlockHashAggStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {

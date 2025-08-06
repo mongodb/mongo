@@ -49,7 +49,7 @@
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -366,7 +366,7 @@ boost::intrusive_ptr<DocumentSource> builtSetWindowFieldsStageForMinMaxScalerNor
             internalFieldsScore,  // output field
             window_function::Expression::parse(
                 BSON("$minMaxScaler" << BSON("input" << dollarScore)), sortPattern, expCtx.get())}},
-        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes),
         SbeCompatibility::notCompatible);
 }
 

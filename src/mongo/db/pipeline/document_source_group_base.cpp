@@ -56,7 +56,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/query_stage_memory_limit_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 
@@ -262,8 +262,9 @@ DocumentSourceGroupBase::DocumentSourceGroupBase(
     : DocumentSource(stageName, expCtx),
       _groupProcessor(std::make_shared<GroupProcessor>(
           expCtx,
-          maxMemoryUsageBytes ? *maxMemoryUsageBytes
-                              : internalDocumentSourceGroupMaxMemoryBytes.load())),
+          maxMemoryUsageBytes
+              ? *maxMemoryUsageBytes
+              : loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes))),
       _sbeCompatibility(SbeCompatibility::notCompatible) {}
 
 namespace {
