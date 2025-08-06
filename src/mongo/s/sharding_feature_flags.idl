@@ -227,7 +227,7 @@ feature_flags:
         cpp_varname: feature_flags::gUseTwoStepRSToShardPromotion
         default: false
         fcv_gated: true
-    # TODO (SERVER-106948): remove feature once 9.0 becomes LTS.
+    # TODO (SERVER-107148): remove feature once 9.0 becomes LTS.
     featureFlagDropIndexesDDLCoordinator:
         description: "Enable the sharding DDL coordinator for drop indexes operations"
         cpp_varname: feature_flags::gFeatureFlagDropIndexesDDLCoordinator
