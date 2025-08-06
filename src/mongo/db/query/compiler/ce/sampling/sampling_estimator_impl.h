@@ -37,19 +37,6 @@
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 
 namespace mongo::ce {
-enum class NoProjection {};
-
-using TopLevelFieldsProjection = std::vector<std::string>;
-
-/**
- * std::variant type used to specify whether we should project fields when generating the sample.
- */
-using ProjectionParams = std::variant<NoProjection, TopLevelFieldsProjection>;
-
-/**
- * This helper extracts the top level field names from a given MatchExpression.
- */
-std::vector<std::string> extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr);
 
 /**
  * This CE Estimator estimates cardinality of predicates by running a filter/MatchExpression against
@@ -64,9 +51,9 @@ public:
     /**
      * 'opCtx' is used to create a new CanonicalQuery for the sampling SBE plan.
      * 'collections' is needed to create a sampling SBE plan. 'samplingStyle' can specify the
-     * sampling method. 'projectionParams' is a std::variant that specifies whether we want to
-     * project the top level fields in a sample. If the variant type is TopLevelFieldsProjection we
-     * expect a vector of top level fields that we want to include in the sampled documents.
+     * sampling method. 'topLevelSampleFieldNames' is the set of top level field names that we want
+     * to include in the sampled documents. We assume that topLevelSampleFieldNames are all the top
+     * level predicate fields of a given query.
      */
     SamplingEstimatorImpl(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
@@ -76,7 +63,7 @@ public:
                           SamplingConfidenceIntervalEnum ci,
                           double marginOfError,
                           boost::optional<int> numChunks,
-                          ProjectionParams projectionParams);
+                          std::vector<std::string> topLevelSampleFieldNames = {});
 
     /*
      * This constructor allows the caller to specify the sample size if necessary. This constructor
@@ -91,7 +78,7 @@ public:
                           SamplingStyle samplingStyle,
                           boost::optional<int> numChunks,
                           CardinalityEstimate collectionCard,
-                          ProjectionParams projectionParams);
+                          std::vector<std::string> topLevelSampleFieldNames = {});
     ~SamplingEstimatorImpl() override;
 
     /**

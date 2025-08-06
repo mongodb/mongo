@@ -217,8 +217,6 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
         }();
         auto samplingMode =
             _query->getExpCtx()->getQueryKnobConfiguration().getInternalQuerySamplingCEMethod();
-        const auto& topLevelSampleFieldNames =
-            ce::extractTopLevelFieldsFromMatchExpression(_query->getPrimaryMatchExpression());
         samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(
             _query->getOpCtx(),
             multiCollectionAccessor,
@@ -231,9 +229,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
                 EstimationSource::Metadata},
             _query->getExpCtx()->getQueryKnobConfiguration().getConfidenceInterval(),
             samplingMarginOfError.load(),
-            internalQueryNumChunksForChunkBasedSampling.load(),
-            topLevelSampleFieldNames.empty() ? ce::NoProjection{}
-                                             : ce::ProjectionParams(topLevelSampleFieldNames));
+            internalQueryNumChunksForChunkBasedSampling.load());
     } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
         exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
             collectionPtr(), *_query, expCtx()->getOperationContext());

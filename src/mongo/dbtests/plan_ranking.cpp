@@ -223,8 +223,7 @@ public:
                 static_cast<size_t>(N),
                 ce::SamplingEstimatorImpl::SamplingStyle::kRandom,
                 boost::none,
-                collCard,
-                ce::extractTopLevelFieldsFromMatchExpression(cq->getPrimaryMatchExpression()));
+                collCard);
 
         QueryPlannerParams plannerParams{
             QueryPlannerParams::ArgsForSingleCollectionQuery{

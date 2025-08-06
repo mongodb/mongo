@@ -29,7 +29,6 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_rewrites.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
@@ -643,8 +642,7 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScans) {
     size_t collCard = 1000;
     ce::SamplingEstimatorTest samplingEstimatorTest;
     samplingEstimatorTest.setUp();
-    auto samplingEstimator =
-        samplingEstimatorTest.createSamplingEstimatorForTesting(collCard, 200, ce::NoProjection{});
+    auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(collCard, 200);
 
     // Create indexed plan without filter.
     std::vector<std::string> indexFields = {"a", "b"};
@@ -670,8 +668,7 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanAndFetch) {
     size_t collCard = 1000;
     ce::SamplingEstimatorTest samplingEstimatorTest;
     samplingEstimatorTest.setUp();
-    auto samplingEstimator =
-        samplingEstimatorTest.createSamplingEstimatorForTesting(collCard, 200, ce::NoProjection{});
+    auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(collCard, 200);
 
     // Create indexed plan with a fetch filter.
     std::vector<std::string> indexFields = {"a"};
