@@ -100,6 +100,11 @@ export var MetadataConsistencyChecker = (function() {
                 } else {
                     throw e;
                 }
+            } else if (e.code === ErrorCodes.ConflictingOperationInProgress) {
+                // If this were an unexpected collection disappearance, the test would tassert so
+                // simply accept the error here.
+                jsTest.log(
+                    "Ignoring ConflictingOperationInProgress error during checkMetadataConsistency");
             } else {
                 // For all the other errors re-throw the exception
                 throw e;

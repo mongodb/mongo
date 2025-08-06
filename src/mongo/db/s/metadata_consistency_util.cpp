@@ -98,6 +98,30 @@ MONGO_FAIL_POINT_DEFINE(insertFakeInconsistencies);
 MONGO_FAIL_POINT_DEFINE(simulateCatalogTopLevelMetadataInconsistency);
 
 /*
+ * This helper throws an error for the namespace which has disappeared. The error will be a tassert
+ * if it is an unexpected scenario for the collection to disappear so that our testing
+ * infrastructure will catch these cases. It is a uassert with ConflictingOperationInProgress if the
+ * scenario is acceptable for this to happen.
+ *
+ * The two accepted scenarios are:
+ * 1. The collection is `config.system.sessions` - this is acceptable since this collection is only
+ * droppable via direct shard connection.
+ * 2. This node is a config server - this can happen since transitionToDedicated drops collections
+ * in the background.
+ */
+void throwCollectionDisappearedError(OperationContext* opCtx, const NamespaceString& nss) {
+    tassert(9690601,
+            str::stream() << "Collection unexpectedly disappeared while holding database DDL lock: "
+                          << nss.toStringForErrorMsg(),
+            nss == NamespaceString::kLogicalSessionsNamespace ||
+                ShardingState::get(opCtx)->shardId() == ShardId::kConfigServerId);
+
+    uasserted(ErrorCodes::ConflictingOperationInProgress,
+              str::stream() << "Collection " << nss.toStringForErrorMsg()
+                            << " was dropped during CheckMetadataConsistency.");
+}
+
+/*
  * Returns the number of documents in the local collection.
  *
  * TODO SERVER-24266: get rid of the `getNumDocs` function and simply rely on `numRecords`.
@@ -105,7 +129,11 @@ MONGO_FAIL_POINT_DEFINE(simulateCatalogTopLevelMetadataInconsistency);
 long long getNumDocs(OperationContext* opCtx, const Collection* localColl) {
     // Since users are advised to delete empty misplaced collections, rely on isEmpty
     // that is safe because the implementation guards against SERVER-24266.
-    if (AutoGetCollection ac(opCtx, localColl->ns(), MODE_IS); ac->isEmpty(opCtx)) {
+    AutoGetCollection ac(opCtx, localColl->ns(), MODE_IS);
+    if (!ac) {
+        throwCollectionDisappearedError(opCtx, localColl->ns());
+    }
+    if (ac->isEmpty(opCtx)) {
         return 0;
     }
     DBDirectClient client(opCtx);
@@ -325,10 +353,9 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
 
     // Pessimistic check under collection lock to serialize with chunk migration commit.
     AutoGetCollection ac(opCtx, nss, MODE_IS);
-    tassert(7531700,
-            str::stream() << "Collection unexpectedly disappeared while holding database DDL lock: "
-                          << nss.toStringForErrorMsg(),
-            ac);
+    if (!ac) {
+        throwCollectionDisappearedError(opCtx, nss);
+    }
 
     const auto scopedCsr =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
