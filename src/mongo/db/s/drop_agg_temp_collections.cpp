@@ -32,11 +32,13 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/router_role.h"
+#include "mongo/util/log_and_backoff.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -88,11 +90,36 @@ void dropAggTempCollections(OperationContext* opCtx) {
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     ExecutorFuture<void>(executor)
         .then([serviceContext, tempCollectionsToDrop] {
-            for (const auto& nss : tempCollectionsToDrop) {
-                ThreadClient tc{"dropAggTempCollections",
-                                serviceContext->getService(ClusterRole::ShardServer)};
-                const auto opCtx = tc->makeOperationContext();
+            ThreadClient tc{"dropAggTempCollections",
+                            serviceContext->getService(ClusterRole::ShardServer)};
+            const auto opCtx = tc->makeOperationContext();
 
+            // Wait for the node to become a writable primary before processing the list
+            // (since each drop also implies updating the content of the non-local
+            // 'config.agg_temp_collections')
+            if (gFeatureFlagIntentRegistration.isEnabled()) {
+                auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+                for (size_t retryAttempts = 0; !replCoord->canAcceptNonLocalWrites();
+                     ++retryAttempts) {
+                    if (!replCoord->getMemberState().primary()) {
+                        // This node started a step down before reaching a writable primary state;
+                        // abort the task.
+                        LOGV2(10834500,
+                              "Background deletion of aggregation temporary collections aborted; "
+                              "this node started a step down before becoming a writable primary");
+                        return;
+                    }
+                    logAndBackoff(
+                        10834501,
+                        MONGO_LOGV2_DEFAULT_COMPONENT,
+                        logv2::LogSeverity::Debug(3),
+                        retryAttempts,
+                        "Waiting until node is writable primary to start dropping temporary "
+                        "agg collections");
+                }
+            }
+
+            for (const auto& nss : tempCollectionsToDrop) {
                 // Enable write blocking bypass to allow dropping temporary collections when user
                 // writes are blocked.
                 WriteBlockBypass::get(opCtx.get()).set(true);
