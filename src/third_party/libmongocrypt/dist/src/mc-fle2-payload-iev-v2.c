@@ -268,12 +268,14 @@ void mc_FLE2IndexedEncryptedValueV2_destroy(mc_FLE2IndexedEncryptedValueV2_t *ie
     _mongocrypt_buffer_cleanup(&iev->ServerEncryptedValue);
     _mongocrypt_buffer_cleanup(&iev->S_KeyId);
 
-    for (uint32_t i = 0; i < iev->edge_count; i++) {
-        mc_FLE2TagAndEncryptedMetadataBlock_cleanup(&iev->metadata[i]);
-    }
+    if (iev->metadata) {
+        for (uint32_t i = 0; i < iev->edge_count; i++) {
+            mc_FLE2TagAndEncryptedMetadataBlock_cleanup(&iev->metadata[i]);
+        }
 
-    // Metadata array is dynamically allocated
-    bson_free(iev->metadata);
+        // Metadata array is dynamically allocated
+        bson_free(iev->metadata);
+    }
 
     bson_free(iev);
 }

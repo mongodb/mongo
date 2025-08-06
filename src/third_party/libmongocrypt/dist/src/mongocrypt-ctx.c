@@ -16,8 +16,12 @@
 
 #include <bson/bson.h>
 
+#include "mc-textopts-private.h"
+#include "mlib/str.h"
+#include "mongocrypt-binary-private.h"
 #include "mongocrypt-ctx-private.h"
 #include "mongocrypt-key-broker-private.h"
+#include "mongocrypt-private.h"
 
 bool _mongocrypt_ctx_fail_w_msg(mongocrypt_ctx_t *ctx, const char *msg) {
     BSON_ASSERT_PARAM(ctx);
@@ -264,6 +268,9 @@ bool mongocrypt_ctx_setopt_algorithm(mongocrypt_ctx_t *ctx, const char *algorith
     } else if (mstr_eq_ignore_case(algo_str, mstrv_lit(MONGOCRYPT_ALGORITHM_RANGEPREVIEW_DEPRECATED_STR))) {
         _mongocrypt_ctx_fail_w_msg(ctx, "Algorithm 'rangePreview' is deprecated, please use 'range'");
         return false;
+    } else if (mstr_eq_ignore_case(algo_str, mstrv_lit(MONGOCRYPT_ALGORITHM_TEXTPREVIEW_STR))) {
+        ctx->opts.index_type.value = MONGOCRYPT_INDEX_TYPE_TEXTPREVIEW;
+        ctx->opts.index_type.set = true;
     } else {
         char *error = bson_strdup_printf("unsupported algorithm string \"%.*s\"",
                                          algo_str.len <= (size_t)INT_MAX ? (int)algo_str.len : INT_MAX,
@@ -1066,6 +1073,15 @@ bool mongocrypt_ctx_setopt_query_type(mongocrypt_ctx_t *ctx, const char *query_t
     } else if (mstr_eq_ignore_case(qt_str, mstrv_lit(MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW_DEPRECATED_STR))) {
         _mongocrypt_ctx_fail_w_msg(ctx, "Query type 'rangePreview' is deprecated, please use 'range'");
         return false;
+    } else if (mstr_eq_ignore_case(qt_str, mstrv_lit(MONGOCRYPT_QUERY_TYPE_PREFIXPREVIEW_STR))) {
+        ctx->opts.query_type.value = MONGOCRYPT_QUERY_TYPE_PREFIXPREVIEW;
+        ctx->opts.query_type.set = true;
+    } else if (mstr_eq_ignore_case(qt_str, mstrv_lit(MONGOCRYPT_QUERY_TYPE_SUFFIXPREVIEW_STR))) {
+        ctx->opts.query_type.value = MONGOCRYPT_QUERY_TYPE_SUFFIXPREVIEW;
+        ctx->opts.query_type.set = true;
+    } else if (mstr_eq_ignore_case(qt_str, mstrv_lit(MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW_STR))) {
+        ctx->opts.query_type.value = MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW;
+        ctx->opts.query_type.set = true;
     } else {
         /* don't check if qt_str.len fits in int; we want the diagnostic output */
         char *error = bson_strdup_printf("Unsupported query_type \"%.*s\"",
@@ -1084,6 +1100,7 @@ const char *_mongocrypt_index_type_to_string(mongocrypt_index_type_t val) {
     case MONGOCRYPT_INDEX_TYPE_EQUALITY: return "Equality";
     case MONGOCRYPT_INDEX_TYPE_RANGE: return "Range";
     case MONGOCRYPT_INDEX_TYPE_RANGEPREVIEW_DEPRECATED: return "RangePreview";
+    case MONGOCRYPT_INDEX_TYPE_TEXTPREVIEW: return "TextPreview";
     default: return "Unknown";
     }
 }
@@ -1093,6 +1110,9 @@ const char *_mongocrypt_query_type_to_string(mongocrypt_query_type_t val) {
     case MONGOCRYPT_QUERY_TYPE_EQUALITY: return "Equality";
     case MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW_DEPRECATED: return "RangePreview";
     case MONGOCRYPT_QUERY_TYPE_RANGE: return "Range";
+    case MONGOCRYPT_QUERY_TYPE_PREFIXPREVIEW: return "PrefixPreview";
+    case MONGOCRYPT_QUERY_TYPE_SUFFIXPREVIEW: return "SuffixPreview";
+    case MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW: return "SubstringPreview";
     default: return "Unknown";
     }
 }
@@ -1125,5 +1145,34 @@ bool mongocrypt_ctx_setopt_algorithm_range(mongocrypt_ctx_t *ctx, mongocrypt_bin
     }
 
     ctx->opts.rangeopts.set = true;
+    return true;
+}
+
+bool mongocrypt_ctx_setopt_algorithm_text(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *opts) {
+    bson_t as_bson;
+    if (!ctx) {
+        return false;
+    }
+
+    if (ctx->initialized) {
+        return _mongocrypt_ctx_fail_w_msg(ctx, "cannot set options after init");
+    }
+
+    if (ctx->state == MONGOCRYPT_CTX_ERROR) {
+        return false;
+    }
+
+    if (ctx->opts.textopts.set) {
+        return _mongocrypt_ctx_fail_w_msg(ctx, "TextOpts already set");
+    }
+
+    if (!_mongocrypt_binary_to_bson(opts, &as_bson)) {
+        return _mongocrypt_ctx_fail_w_msg(ctx, "invalid BSON");
+    }
+
+    if (!mc_TextOpts_parse(&ctx->opts.textopts.value, &as_bson, ctx->status)) {
+        return _mongocrypt_ctx_fail(ctx);
+    }
+    ctx->opts.textopts.set = true;
     return true;
 }

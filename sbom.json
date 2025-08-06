@@ -1171,7 +1171,7 @@
       "author": "MongoDB, Inc.",
       "group": "mongodb",
       "name": "libmongocrypt",
-      "version": "1.14.0",
+      "version": "1.15.0",
       "description": "Required C library for Client Side and Queryable Encryption in MongoDB",
       "licenses": [
         {
@@ -1181,8 +1181,8 @@
         }
       ],
       "copyright": "Copyright 2019-present MongoDB, Inc.",
-      "cpe": "cpe:2.3:a:mongodb:libmongocrypt:1.14.0:*:*:*:*:*:*:*",
-      "purl": "pkg:github/mongodb/libmongocrypt@1.14.0",
+      "cpe": "cpe:2.3:a:mongodb:libmongocrypt:1.15.0:*:*:*:*:*:*:*",
+      "purl": "pkg:github/mongodb/libmongocrypt@1.15.0",
       "properties": [
         {
           "name": "internal:team_responsible",

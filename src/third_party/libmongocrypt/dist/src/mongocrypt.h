@@ -712,6 +712,8 @@ bool mongocrypt_ctx_setopt_algorithm(mongocrypt_ctx_t *ctx, const char *algorith
 // DEPRECATED: support "RangePreview" has been removed in favor of "range".
 #define MONGOCRYPT_ALGORITHM_RANGEPREVIEW_DEPRECATED_STR "RangePreview"
 #define MONGOCRYPT_ALGORITHM_RANGE_STR "Range"
+/// NOTE: "textPreview" is experimental only and may be removed in a future non-major release.
+#define MONGOCRYPT_ALGORITHM_TEXTPREVIEW_STR "textPreview"
 
 /**
  * Identify the AWS KMS master key to use for creating a data key.
@@ -1529,6 +1531,34 @@ bool mongocrypt_ctx_setopt_query_type(mongocrypt_ctx_t *ctx, const char *query_t
  */
 MONGOCRYPT_EXPORT
 bool mongocrypt_ctx_setopt_algorithm_range(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *opts);
+
+/**
+ * Set options for explicit encryption with the "textPreview" algorithm.
+ *
+ * NOTE: "textPreview" is experimental only and may be removed in a future non-major release.
+ * @p opts is a BSON document of the form:
+ * {
+ *   "caseSensitive": bool,
+ * . "diacriticSensitive": bool,
+ * . "prefix": Optional{
+ * .   "strMaxQueryLength": Int32,
+ * .   "strMinQueryLength": Int32,
+ * . },
+ * . "suffix": Optional{
+ * .   "strMaxQueryLength": Int32,
+ * .   "strMinQueryLength": Int32,
+ * . },
+ * . "substring": Optional{
+ * .   "strMaxLength": Int32,
+ * .   "strMaxQueryLength": Int32,
+ * .   "strMinQueryLength": Int32,
+ * . },
+ * }
+ *
+ * "prefix" and "suffix" can both be set.
+ */
+MONGOCRYPT_EXPORT
+bool mongocrypt_ctx_setopt_algorithm_text(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *opts);
 
 /**
  * Set the expiration time for the data encryption key cache. Defaults to 60 seconds if not set.
