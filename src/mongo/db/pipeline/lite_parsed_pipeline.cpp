@@ -179,7 +179,6 @@ void LiteParsedPipeline::checkStagesAllowedInViewDefinition() const {
     for (auto stage_it = _stageSpecs.begin(); stage_it != _stageSpecs.end(); stage_it++) {
         const auto& stage = *stage_it;
 
-        // TODO SERVER-101721 Enable $rankFusion/$scoreFusion run in a view definition.
         uassert(ErrorCodes::OptionNotSupportedOnView,
                 "$rankFusion and $scoreFusion is currently unsupported in a view definition",
                 !stage->isHybridSearchStage());

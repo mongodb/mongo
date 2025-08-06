@@ -1,8 +1,6 @@
 /**
  * Tests that $rankFusion in a view definition is always rejected.
  *
- * TODO SERVER-101721 Enable $rankFusion to be run in a view definition.
- *
  * @tags: [featureFlagRankFusionBasic, requires_fcv_82]
  */
 

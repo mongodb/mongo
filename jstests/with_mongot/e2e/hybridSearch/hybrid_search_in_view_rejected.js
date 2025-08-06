@@ -1,8 +1,6 @@
 /**
  * Tests that $rankFusion/$scoreFusion in a view definition is always rejected.
  *
- * TODO SERVER-101721 Enable $rankFusion/$scoreFusion to be run in a view definition.
- *
  * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_82]
  */
 
