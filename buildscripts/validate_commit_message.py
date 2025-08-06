@@ -66,12 +66,11 @@ def is_valid_commit(commit: Commit) -> bool:
     # 4. Revert "Import wiredtiger
     if not VALID_SUMMARY.match(commit.summary):
         LOGGER.error(
-            f"""Commit did not contain a valid summary.
-Please update the PR title and description to match the following regular expressions {VALID_SUMMARY}.
-If you are seeing this on a PR, after changing the title/description you will need to rerun this check before being able to submit your PR.
+            f"""PR summary is not valid; it must match the regular expression: {VALID_SUMMARY}
+Current summary: {commit.summary}
+Please update the PR title and description to match the expected format.
+If you are seeing this on a PR, after changing the title/description, you will need to rerun this check before being able to submit your PR.
 The decision to add this check was made in SERVER-101443, please feel free to leave comments/feedback on that ticket.""",
-            commit_hexsha=commit.hexsha,
-            commit_summary=commit.summary,
         )
         return False
 
@@ -81,12 +80,11 @@ The decision to add this check was made in SERVER-101443, please feel free to le
     for banned_string in BANNED_STRINGS:
         if "".join(banned_string.split()) in stripped_message:
             LOGGER.error(
-                """Commit contains banned string (ignoring whitespace).
+                """PR title/description contains a banned string (ignoring whitespace).
 Please update the PR title and description to not contain the following banned string.
-If you are seeing this on a PR, after changing the title/description you will need to rerun this check before being able to submit your PR.
+If you are seeing this on a PR, after changing the title/description, you will need to rerun this check before being able to submit your PR.
 The decision to add this check was made in SERVER-101443, please feel free to leave comments/feedback on that ticket.""",
                 banned_string=banned_string,
-                commit_hexsha=commit.hexsha,
                 commit_message=commit.message,
             )
             return False
@@ -136,9 +134,11 @@ def get_non_merge_queue_squashed_commits(
     fake_repo = Repo()
     return [
         Commit(
+            message="\n".join([pr_info["viewerMergeHeadlineText"], pr_info["viewerMergeBodyText"]]),
+            # required fields, but faked out - these aren't helpful in user-facing logs
             repo=fake_repo,
             binsha=b"00000000000000000000",
-            message="\n".join([pr_info["viewerMergeHeadlineText"], pr_info["viewerMergeBodyText"]]),
+            
         )
     ]
 
@@ -208,7 +208,7 @@ def main(
 
     for commit in commits:
         if not is_valid_commit(commit):
-            LOGGER.error("Found an invalid commit", commit=commit)
+            LOGGER.error("Invalid commit, unable to merge")
             raise typer.Exit(code=STATUS_ERROR)
 
     return
