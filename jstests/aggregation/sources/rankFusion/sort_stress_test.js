@@ -4,14 +4,13 @@
  * @tags: [ featureFlagRankFusionBasic, featureFlagRankFusionFull, requires_fcv_82 ]
  */
 import {orderedArrayEq} from "jstests/aggregation/extras/utils.js";
+import {
+    scoreDetailsDescription,
+} from "jstests/with_mongot/e2e_lib/hybrid_search_score_details_utils.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
-
-const scoreDetailsDescription =
-    "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / (60 " +
-    "+ rank))) across input pipelines from which this document is output, from:";
 
 const allDocs = [
     {

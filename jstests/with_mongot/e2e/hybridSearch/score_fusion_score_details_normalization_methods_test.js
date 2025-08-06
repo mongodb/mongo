@@ -4,32 +4,18 @@
  *
  * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
+import {
+    fieldPresent,
+    projectScoreAndScoreDetailsStage,
+    projectScoreStage,
+    scoreDetailsDescription,
+    scoreFusionScoreDetailsDescription,
+    sortAscendingStage,
+} from "jstests/with_mongot/e2e_lib/hybrid_search_score_details_utils.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
-
-const projectScoreScoreDetails = {
-    $project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}
-};
-
-const sortAscending = {
-    $sort: {_id: 1}
-};
-
-const projectScore = {
-    $project: {score: {$meta: "score"}}
-};
-
-function fieldPresent(field, containingObj) {
-    return containingObj.hasOwnProperty(field);
-}
-
-const scoreFusionDetailsDescription =
-    "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:";
-
-const scoreDetailsDescription =
-    "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:";
 
 assert.commandWorked(coll.insertMany([
     {_id: 0, textField: "three blind mice", geoField: [23, 51]},
@@ -70,13 +56,11 @@ assert.commandWorked(coll.createIndex({geoField: "2d"}));
  * @param normalization - Specify $scoreFusion.normalization (can be one of the following: 'none',
  * 'sigmoid' or 'minMaxScaler')
  * @param combinationMethod - Specify $scoreFusion.combinationMethod (can be 'average' or
- 'expression')
+ * 'expression')
  * @param scorePipeline1IncludesScoreDetails - Specify $score.scoreDetails (for first input
- pipeline) to be
- * true or false.
+ * pipeline) to be true or false.
  * @param scorePipeline2IncludesScoreDetails - Specify $score.scoreDetails (for first second
- pipeline) to be
- * true or false.
+ * pipeline) to be true or false.
  *
  * Runs a test query where $scoreFusion takes 2 input pipelines, each a $score stage. Validate that
  * the $scoreFusion's scoreDetails structure is accurate. Validates the top-level $scoreFusion
@@ -113,9 +97,9 @@ function checkScoreDetailsNormalizationCombinationMethod(normalization,
         combination['expression'] = {$add: [{$multiply: ["$$scorePipe1", 0.5]}, "$$scorePipe2"]};
     }
     const testQuery = (scoreDetails) => {
-        let project = projectScoreScoreDetails;
+        let project = projectScoreAndScoreDetailsStage;
         if (!scoreDetails) {
-            project = projectScore;
+            project = projectScoreStage;
         }
         let query = [
             {
@@ -130,7 +114,7 @@ function checkScoreDetailsNormalizationCombinationMethod(normalization,
                 },
             },
             project,
-            sortAscending
+            sortAscendingStage
         ];
         return query;
     };
@@ -141,32 +125,50 @@ function checkScoreDetailsNormalizationCombinationMethod(normalization,
     // Run original query without scoreDetails.
     let resultsNoScoreDetails = coll.aggregate(testQuery(false)).toArray();
 
-    // Run $scoreFusion's first pipeline input. We will use the score value it calculates to assert
-    // that the calculated rawScore for the first input pipeline is correct.
+    // Run $scoreFusion's input pipelines. We will use the score value it calculates to assert
+    // that the calculated rawScore for the second input pipeline is correct. We avoid doing any
+    // normalization that the inner $score stage would do.
     const inputPipeline1RawScoreExpectedResults =
-        coll.aggregate([geoNear, scoreGeoNearMetadata, projectScore, sortAscending]).toArray();
-
-    // Run $scoreFusion's second pipeline input. We will use the score value it calculates to assert
-    // that the calculated rawScore for the second input pipeline is correct.
+        coll.aggregate([
+                geoNear,
+                {$score: {...scoreGeoNearMetadata.$score, normalization: "none"}},
+                projectScoreStage,
+                sortAscendingStage
+            ])
+            .toArray();
     const inputPipeline2RawScoreExpectedResults =
-        coll.aggregate([scoreAdd, projectScore, sortAscending]).toArray();
+        coll.aggregate([
+                {$score: {...scoreAdd.$score, normalization: "none"}},
+                projectScoreStage,
+                sortAscendingStage
+            ])
+            .toArray();
+
+    // Now run $scoreFusion's input pipelines with the inner $score stage's normalization
+    // applied. We will use the score value it calculates to assert that the calculated
+    // normalizedScore for the input pipelines is correct.
+    const inputPipeline1InnerNormalizedScoreExpectedResults =
+        coll.aggregate([geoNear, scoreGeoNearMetadata, projectScoreStage, sortAscendingStage])
+            .toArray();
+    const inputPipeline2InnerNormalizedScoreExpectedResults =
+        coll.aggregate([scoreAdd, projectScoreStage, sortAscendingStage]).toArray();
 
     // We will use the score value it calculates to assert that the calculated
     // $scoreFusion.normalization applied to the first input pipeline is correct.
-    let inputPipeline1NormalizedScoreExpectedResults;
+    let inputPipeline1ScoreFusionNormalizedScoreExpectedResults;
     // We will use the score value it calculates to assert that the calculated
     // $scoreFusion.normalization applied to the second input pipeline is correct.
-    let inputPipeline2NormalizedScoreExpectedResults;
+    let inputPipeline2ScoreFusionNormalizedScoreExpectedResults;
     // Calculate expected normalization results for each input pipeline to $scoreFusion.
     if (normalization === "sigmoid") {
         const projectSigmoidScore = {$project: {score: {$sigmoid: {$meta: "score"}}}};
         // Run $scoreFusion's first pipeline input with normalization.
-        inputPipeline1NormalizedScoreExpectedResults =
-            coll.aggregate([geoNear, scoreGeoNearMetadata, projectSigmoidScore, sortAscending])
+        inputPipeline1ScoreFusionNormalizedScoreExpectedResults =
+            coll.aggregate([geoNear, scoreGeoNearMetadata, projectSigmoidScore, sortAscendingStage])
                 .toArray();
         // Run $scoreFusion's second pipeline input with normalization.
-        inputPipeline2NormalizedScoreExpectedResults =
-            coll.aggregate([scoreAdd, projectSigmoidScore, sortAscending]).toArray();
+        inputPipeline2ScoreFusionNormalizedScoreExpectedResults =
+            coll.aggregate([scoreAdd, projectSigmoidScore, sortAscendingStage]).toArray();
     } else if (normalization === "minMaxScaler") {
         const minMaxScalerStage = {
             $setWindowFields: {
@@ -180,12 +182,12 @@ function checkScoreDetailsNormalizationCombinationMethod(normalization,
             }
         };
         // Run $scoreFusion's first pipeline input with normalization.
-        inputPipeline1NormalizedScoreExpectedResults =
-            coll.aggregate([geoNear, scoreGeoNearMetadata, minMaxScalerStage, sortAscending])
+        inputPipeline1ScoreFusionNormalizedScoreExpectedResults =
+            coll.aggregate([geoNear, scoreGeoNearMetadata, minMaxScalerStage, sortAscendingStage])
                 .toArray();
         // Run $scoreFusion's second pipeline input with normalization.
-        inputPipeline2NormalizedScoreExpectedResults =
-            coll.aggregate([scoreAdd, minMaxScalerStage, sortAscending]).toArray();
+        inputPipeline2ScoreFusionNormalizedScoreExpectedResults =
+            coll.aggregate([scoreAdd, minMaxScalerStage, sortAscendingStage]).toArray();
     } else {
         throw 'passed an invalid normalization option to $scoreFusion';
     }
@@ -209,6 +211,7 @@ function checkScoreDetailsNormalizationCombinationMethod(normalization,
                                                         generatedScoreDetailsOfInputPipeline,
                                                         pipelineName,
                                                         rawScore,
+                                                        innerNormalizedScore,
                                                         normalizedScore,
                                                         scorePipelineIncludesScoreDetails,
                                                         scoreScoreDetailsString,
@@ -216,7 +219,8 @@ function checkScoreDetailsNormalizationCombinationMethod(normalization,
         assertFieldPresent("inputPipelineName", generatedScoreDetailsOfInputPipeline);
         assert.eq(generatedScoreDetailsOfInputPipeline["inputPipelineName"], pipelineName);
         assertFieldPresent("inputPipelineRawScore", generatedScoreDetailsOfInputPipeline);
-        assert.eq(generatedScoreDetailsOfInputPipeline["inputPipelineRawScore"], rawScore["score"]);
+        assert.eq(generatedScoreDetailsOfInputPipeline["inputPipelineRawScore"],
+                  innerNormalizedScore["score"]);
         assertFieldPresent("weight", generatedScoreDetailsOfInputPipeline);
         assert.eq(generatedScoreDetailsOfInputPipeline["weight"], 1);
         assertFieldPresent("value",
@@ -227,36 +231,21 @@ function checkScoreDetailsNormalizationCombinationMethod(normalization,
         let inputPipelineNormalizedScore = inputPipelineScoreValue / 1;
         assert.eq(inputPipelineNormalizedScore, normalizedScore["score"]);
 
-        // Asserts that the $score input pipeline's scoreDetails has the correct values for the
+        // Assert that the $score input pipeline's scoreDetails has the correct values for the
         // following fields: value, description, rawScore, normalization, weight, expression, and
         // details.
-        function assertScoreScoreDetails(scoreDetailsDetails,
-                                         inputPipelineRawScore,
-                                         scoreNormalization,
-                                         scoreWeight,
-                                         scoreExpression) {
-            assertFieldPresent("value", scoreDetailsDetails);
-            assert.eq(scoreDetailsDetails["value"], inputPipelineRawScore);
-            assertFieldPresent("description", scoreDetailsDetails);
-            assert.eq(scoreDetailsDetails["description"], scoreDetailsDescription);
-            assertFieldPresent("rawScore", scoreDetailsDetails);
-            assertFieldPresent("normalization", scoreDetailsDetails);
-            assert.eq(scoreDetailsDetails["normalization"], scoreNormalization);
-            assertFieldPresent("weight", scoreDetailsDetails);
-            assert.eq(scoreDetailsDetails["weight"], scoreWeight);
-            assertFieldPresent("expression", scoreDetailsDetails);
-            assert.eq(scoreDetailsDetails["expression"], scoreExpression);
-            assertFieldPresent("details", scoreDetailsDetails);
-            assert.eq(scoreDetailsDetails["details"], []);
-        }
         if (scorePipelineIncludesScoreDetails) {
             assertFieldPresent("details", generatedScoreDetailsOfInputPipeline);
-            const scoreDetailsDetails = generatedScoreDetailsOfInputPipeline["details"];
-            assertScoreScoreDetails(scoreDetailsDetails,
-                                    generatedScoreDetailsOfInputPipeline["inputPipelineRawScore"],
-                                    scorePipelineNormalizationMethod,
-                                    1,
-                                    scoreScoreDetailsString);
+            let subComparisonBlob = {
+                "value": innerNormalizedScore["score"],
+                "description": scoreDetailsDescription,
+                "rawScore": rawScore["score"],
+                "normalization": scorePipelineNormalizationMethod,
+                "weight": 1,
+                "expression": scoreScoreDetailsString,
+                "details": []
+            };
+            assert.eq(generatedScoreDetailsOfInputPipeline["details"], subComparisonBlob);
         } else {
             assert.eq(generatedScoreDetailsOfInputPipeline["details"], []);
         }
@@ -279,7 +268,7 @@ function checkScoreDetailsNormalizationCombinationMethod(normalization,
         // when the same $scoreFusion pipeline is run without scoreDetails.
         assert.eq(details["value"], resultsNoScoreDetails[i]["score"]);
         assert(fieldPresent("description", details), details);
-        assert.eq(details["description"], scoreFusionDetailsDescription);
+        assert.eq(details["description"], scoreFusionScoreDetailsDescription);
         assert.eq(details["normalization"], normalization);
         const combination = details["combination"];
         assert(fieldPresent("method", combination), combination);
@@ -309,7 +298,8 @@ function checkScoreDetailsNormalizationCombinationMethod(normalization,
             inputPipeline1ScoreDetails,
             "scorePipe1",
             inputPipeline1RawScoreExpectedResults[i],
-            inputPipeline1NormalizedScoreExpectedResults[i],
+            inputPipeline1InnerNormalizedScoreExpectedResults[i],
+            inputPipeline1ScoreFusionNormalizedScoreExpectedResults[i],
             scorePipeline1IncludesScoreDetails,
             "{ string: { $meta: 'geoNearDistance' } }",
             scorePipeline1Normalization);
@@ -319,7 +309,8 @@ function checkScoreDetailsNormalizationCombinationMethod(normalization,
             inputPipeline2ScoreDetails,
             "scorePipe2",
             inputPipeline2RawScoreExpectedResults[i],
-            inputPipeline2NormalizedScoreExpectedResults[i],
+            inputPipeline2InnerNormalizedScoreExpectedResults[i],
+            inputPipeline2ScoreFusionNormalizedScoreExpectedResults[i],
             scorePipeline2IncludesScoreDetails,
             "{ string: { $add: [ 10.0, 2.0 ] } }",
             scorePipeline2Normalization);

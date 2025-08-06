@@ -7,7 +7,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieVectorSearchIndexSpec,
-    makeMovieVectorQuery
+    makeMovieVectorExactQuery
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 
 const kUnavailableMetadataErrCode = 40218;
@@ -36,7 +36,7 @@ assert.throwsWithCode(() => coll.aggregate([
     {
         $unionWith: {
             coll: coll.getName(),
-            pipeline: [makeMovieVectorQuery({
+            pipeline: [makeMovieVectorExactQuery({
                 queryVector: getMoviePlotEmbeddingById(8),
                 limit: 10,
             })]

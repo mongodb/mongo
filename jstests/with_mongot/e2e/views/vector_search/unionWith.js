@@ -13,11 +13,11 @@
  */
 import {
     actionMoviesViewPipeline,
-    createMoviesCollAndIndex,
+    createMoviesCollAndVectorIndex,
     createMoviesViewAndIndex,
     enrichedTitleViewPipeline,
     getMoviePlotEmbeddingById,
-    makeMovieVectorQuery
+    makeMovieVectorExactQuery
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertUnionWithSearchSubPipelineAppliedViews
@@ -33,18 +33,18 @@ import {
 // both views in this test.
 const moviesWithEnrichedTitle = createMoviesViewAndIndex(datasets.MOVIES_WITH_ENRICHED_TITLE);
 const actionMovies = createMoviesViewAndIndex(datasets.ACTION_MOVIES);
-const moviesColl = createMoviesCollAndIndex();
-const moviesWithEnrichedTitleQuery = makeMovieVectorQuery({
+const moviesColl = createMoviesCollAndVectorIndex();
+const moviesWithEnrichedTitleQuery = makeMovieVectorExactQuery({
     queryVector: getMoviePlotEmbeddingById(6),
     limit: 5,
     indexName: datasets.MOVIES_WITH_ENRICHED_TITLE.indexName
 });
-const actionMoviesQuery = makeMovieVectorQuery({
+const actionMoviesQuery = makeMovieVectorExactQuery({
     queryVector: getMoviePlotEmbeddingById(11),
     limit: 2,
     indexName: datasets.ACTION_MOVIES.indexName
 });
-const moviesCollQuery = makeMovieVectorQuery(
+const moviesCollQuery = makeMovieVectorExactQuery(
     {queryVector: getMoviePlotEmbeddingById(11), limit: 3, indexName: datasets.MOVIES.indexName});
 
 // ===============================================================================
