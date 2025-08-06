@@ -62,11 +62,15 @@ Value evaluate(const ExpressionInternalFLEBetween& expr,
         return Value(BSONNULL);
     }
 
+    // Hang on to the FLE2IndexedRangeEncryptedValueV2 object, because getMetadataBlocks
+    // returns a view on its member and its lifetime must last through the completion of evaluate.
+    boost::optional<FLE2IndexedRangeEncryptedValueV2> value;
     return Value(expr.getEncryptedPredicateEvaluator().evaluate(
-        fieldValue, EncryptedBinDataType::kFLE2RangeIndexedValueV2, [](auto serverValue) {
-            auto [subType, data] = fromEncryptedConstDataRange(serverValue);
-            return uassertStatusOK(FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(data))
-                .metadataBlocks;
+        fieldValue, EncryptedBinDataType::kFLE2RangeIndexedValueV2, [&value](auto serverValue) {
+            // extractMetadataBlocks should only be run once.
+            tassert(9588707, "extractMetadataBlocks should only be run once by evaluate", !value);
+            value.emplace(serverValue);
+            return value->getMetadataBlocks();
         }));
 }
 

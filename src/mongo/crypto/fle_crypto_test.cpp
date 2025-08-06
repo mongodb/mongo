@@ -1692,7 +1692,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2) {
     ASSERT_EQ(pTag, tag);
 }
 
-TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_InvalidArgs) {
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2_InvalidArgs) {
     TestKeyVault keyVault;
     auto value = ConstDataRange(0, 0);
     PrfBlock bogusTag;
@@ -1709,19 +1709,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_InvalidArgs) {
     iupayload.setServerDerivedFromDataToken({{}});
     iupayload.setEncryptedTokens(bogusEncryptedTokens);
 
-    std::vector<EdgeTokenSetV2> tokens;
-    EdgeTokenSetV2 ets;
-    ets.setEdcDerivedToken({{}});
-    ets.setEscDerivedToken({{}});
-    ets.setServerDerivedFromDataToken({{}});
-    ets.setEncryptedTokens(bogusEncryptedTokens);
-
-    tokens.push_back(ets);
-    tokens.push_back(ets);
-
-    iupayload.setEdgeTokenSet(tokens);
-
-    // Test bogus client encrypted value fails for FLE2 indexed equality value v2
+    // Test client encrypted value too small for server-side reencryption
     ASSERT_THROWS_CODE(
         FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(iupayload, bogusTag, 0, {{}}, {{}}),
         DBException,
@@ -1736,29 +1724,6 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_InvalidArgs) {
                            {{}}),
                        DBException,
                        ErrorCodes::LibmongocryptError);
-
-    // Test bogus client encrypted value fails for FLE2 indexed range value v2
-    ASSERT_THROWS_CODE(
-        FLE2IndexedRangeEncryptedValueV2(iupayload, {bogusTag}, {0}), DBException, 7290902);
-
-    std::vector<uint8_t> arr{0x12, 0x34};
-    iupayload.setValue(arr);
-
-    iupayload.setType(100);
-
-    // Test setting bogus type byte throws
-    ASSERT_THROWS_CODE(
-        FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(iupayload, bogusTag, 0, {{}}, {{}}),
-        DBException,
-        ErrorCodes::LibmongocryptError);
-
-    ASSERT_THROWS_CODE(
-        FLE2IndexedRangeEncryptedValueV2(iupayload, {bogusTag}, {0}), DBException, 7290901);
-
-    // Test mismatch vector length throws for range encrypted value v2
-    ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2(iupayload, {bogusTag, bogusTag}, {0}),
-                       DBException,
-                       7290900);
 }
 
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_ParseInvalidInput) {
@@ -1766,84 +1731,48 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_ParseInvalidInput) {
     auto serverToken = ServerDataEncryptionLevel1Token::deriveFrom(getIndexKey());
     ServerDerivedFromDataToken serverDataDerivedToken(serverToken.asPrfBlock());
 
-    constexpr size_t cipherTextSize = 32;
-    constexpr size_t typeOffset = UUID::kNumBytes;
+    // cipherTextSize minimum enforced by libmongocrypt is 17 (16 byte IV + 1 byte CTR)
+    constexpr size_t minCipherTextLen = 17;
+    constexpr size_t mblockSize = sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob);
+    constexpr size_t typeOffset = 1 + UUID::kNumBytes;
     constexpr size_t edgeCountOffset = typeOffset + 1;
 
-    std::vector<uint8_t> shortInput(edgeCountOffset + 1);
-    shortInput.at(typeOffset) = static_cast<uint8_t>(BSONType::boolean);
-    shortInput.at(edgeCountOffset) = 1;
+    std::vector<uint8_t> equalityInput(1 + UUID::kNumBytes + 1 + minCipherTextLen + mblockSize);
+    equalityInput.at(0) = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValueV2);
+    std::vector<uint8_t> rangeInput(1 + UUID::kNumBytes + 1 + 1 + minCipherTextLen + mblockSize);
+    rangeInput.at(0) = static_cast<uint8_t>(EncryptedBinDataType::kFLE2RangeIndexedValueV2);
+    rangeInput.at(edgeCountOffset) = 1;
 
-    // test short input for equality payload
-    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2(shortInput),
-                       DBException,
-                       ErrorCodes::LibmongocryptError);
+    // first, test that the shortest valid buffers can be parsed successfully
+    ASSERT_DOES_NOT_THROW(FLE2IndexedEqualityEncryptedValueV2{equalityInput});
+    ASSERT_DOES_NOT_THROW(FLE2IndexedRangeEncryptedValueV2{rangeInput});
 
+    // test parsing equality as range fails
+    ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2{equalityInput}, DBException, 9588706);
 
-    // test short input for range payload
-    ASSERT_THROWS_CODE(
-        FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(shortInput), DBException, 7290908);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedRangeEncryptedValueV2::readKeyId(shortInput), DBException, 7290908);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedRangeEncryptedValueV2::readBsonType(shortInput), DBException, 7290908);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedRangeEncryptedValueV2::parseAndDecryptCiphertext(serverToken, shortInput),
-        DBException,
-        7290908);
-    ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseAndDecryptMetadataBlocks(
-                           {serverDataDerivedToken}, shortInput),
-                       DBException,
-                       7290908);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedRangeEncryptedValueV2::parseMetadataBlockTags(shortInput), DBException, 7290908);
+    // test parsing range as equality fails
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2{rangeInput}, DBException, 9588708);
 
-    // test bad bson type for equality payload
-    std::vector<uint8_t> badTypeInput(edgeCountOffset + 1 + cipherTextSize +
-                                      sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
-    badTypeInput.at(typeOffset) = 124;  // bad bsonType
-    badTypeInput.at(edgeCountOffset) = 1;
+    std::vector<size_t> truncatedLengths = {
+        0, 1, 10, typeOffset, /*edgeCountOffset, edgeCountOffset + 1,
+        edgeCountOffset + 1 + mblockSize*/};
 
-    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2(badTypeInput),
-                       DBException,
-                       ErrorCodes::LibmongocryptError);
+    // test short inputs for equality payload
+    for (auto& testLength : truncatedLengths) {
+        std::vector<uint8_t> testBuf(testLength);
+        std::copy(equalityInput.begin(), equalityInput.begin() + testLength, testBuf.begin());
+        ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2{testBuf},
+                           DBException,
+                           ErrorCodes::LibmongocryptError);
+    }
 
-    // test bad bson type for range payload
-    ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(badTypeInput),
-                       DBException,
-                       7290906);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedRangeEncryptedValueV2::readKeyId(badTypeInput), DBException, 7290906);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedRangeEncryptedValueV2::readBsonType(badTypeInput), DBException, 7290906);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedRangeEncryptedValueV2::parseAndDecryptCiphertext(serverToken, badTypeInput),
-        DBException,
-        7290906);
-    ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseAndDecryptMetadataBlocks(
-                           {serverDataDerivedToken}, badTypeInput),
-                       DBException,
-                       7290906);
-    ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseMetadataBlockTags(badTypeInput),
-                       DBException,
-                       7290906);
-
-    // test invalid ciphertext length for equality payload fails to decrypt
-    std::vector<uint8_t> emptyEqualityCipherText(
-        typeOffset + 1 + sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
-    emptyEqualityCipherText.at(typeOffset) = static_cast<uint8_t>(BSONType::boolean);
-    auto swDecryptedData = IndexedEqualityEncryptedValueV2Helpers::parseAndDecryptCiphertext(
-        serverToken, emptyEqualityCipherText);
-    ASSERT_NOT_OK(swDecryptedData.getStatus());
-
-    // test invalid ciphertext length for range payload fails to decrypt
-    std::vector<uint8_t> emptyRangeCipherText(
-        edgeCountOffset + 1 + sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
-    emptyRangeCipherText.at(typeOffset) = static_cast<uint8_t>(BSONType::boolean);
-    emptyRangeCipherText.at(edgeCountOffset) = 1;
-    swDecryptedData = FLE2IndexedRangeEncryptedValueV2::parseAndDecryptCiphertext(
-        serverToken, emptyRangeCipherText);
-    ASSERT_NOT_OK(swDecryptedData.getStatus());
+    // test short inputs for range payload
+    for (auto& testLength : truncatedLengths) {
+        std::vector<uint8_t> testBuf(testLength);
+        std::copy(rangeInput.begin(), rangeInput.begin() + testLength, testBuf.begin());
+        ASSERT_THROWS_CODE(
+            FLE2IndexedRangeEncryptedValueV2{testBuf}, DBException, ErrorCodes::LibmongocryptError);
+    }
 }
 
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_IsValidZerosBlob) {
@@ -1893,19 +1822,17 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
     auto ecocToken = ECOCToken::deriveFrom(collectionToken);
     auto serverDerivedFromDataToken =
         ServerDerivedFromDataToken::deriveFrom(serverDerivationToken, value);
-
-    FLECounter counter = 0;
+    FLECounter contention = 3;
 
     EDCDerivedFromDataToken edcDatakey = EDCDerivedFromDataToken::deriveFrom(edcToken, value);
     ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
     ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
-        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, counter);
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, contention);
     EDCDerivedFromDataTokenAndContentionFactorToken edcDataCounterkey =
-        EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(edcDatakey, counter);
+        EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(edcDatakey, contention);
 
     FLE2InsertUpdatePayloadV2 iupayload;
-
     iupayload.setEdcDerivedToken(edcDataCounterkey);
     iupayload.setEscDerivedToken(escDataCounterkey);
     iupayload.setServerEncryptionToken(serverEncryptToken);
@@ -1921,7 +1848,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
     iupayload.setValue(value);
     iupayload.setType(stdx::to_underlying(element.type()));
 
-    iupayload.setContentionFactor(counter);
+    iupayload.setContentionFactor(contention);
 
     std::vector<EdgeTokenSetV2> tokens;
     EdgeTokenSetV2 ets;
@@ -1937,73 +1864,150 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
 
     auto edcTwiceDerived = EDCTwiceDerivedToken::deriveFrom(edcDataCounterkey);
 
-    auto tag = EDCServerCollection::generateTag(&hmacCtx, edcTwiceDerived, 123456);
-
+    std::vector<uint64_t> counters = {123456, 456789};
     std::vector<PrfBlock> tags;
-    tags.push_back(tag);
-    tags.push_back(tag);
+    std::transform(counters.begin(), counters.end(), std::back_inserter(tags), [&](uint64_t ct) {
+        return EDCServerCollection::generateTag(&hmacCtx, edcTwiceDerived, ct);
+    });
 
-    FLE2IndexedRangeEncryptedValueV2 serverPayload(iupayload, tags, {123456, 123456});
+    // serialize to on-disk format
+    auto serverPayload =
+        FLE2IndexedRangeEncryptedValueV2::fromUnencrypted(iupayload, tags, counters);
+    auto buf = uassertStatusOK(serverPayload.serialize());
 
-    std::vector<ServerDerivedFromDataToken> derivedDataTokens;
-    derivedDataTokens.push_back(serverDerivedFromDataToken);
-    derivedDataTokens.push_back(serverDerivedFromDataToken);
+    const size_t expectedSize = 1 + UUID::kNumBytes + 1 + sizeof(uint8_t) +
+        (crypto::aesCTRIVSize + iupayload.getValue().length()) +
+        (tags.size() * sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+    ASSERT_EQ(buf.size(), expectedSize);
 
-    auto swBuf = serverPayload.serialize(serverEncryptToken, derivedDataTokens);
-    ASSERT_OK(swBuf.getStatus());
+    // parse it back
+    FLE2IndexedRangeEncryptedValueV2 parsed(buf);
 
+    ASSERT_EQ(parsed.getKeyId(), indexKeyId);
+    ASSERT_EQ(parsed.getBsonType(), element.type());
+    ASSERT_EQ(parsed.getTagCount(), tags.size());
+
+    auto generatedSEV = serverPayload.getServerEncryptedValue();
+    auto parsedSEV = parsed.getServerEncryptedValue();
+    ASSERT_EQ(parsedSEV.length(), generatedSEV.length());
+    ASSERT_EQ(memcmp(parsedSEV.data(), generatedSEV.data(), generatedSEV.length()), 0);
+
+    ASSERT_EQ(parsed.getMetadataBlocks().size(), tags.size());
+    ASSERT_EQ(serverPayload.getMetadataBlocks().size(), tags.size());
+
+    // verify the server-encrypted value decrypts back to client-encrypted value
+    auto swValue = FLEUtil::decryptData(serverEncryptToken.toCDR(), parsedSEV);
+    ASSERT(swValue.isOK());
+    ASSERT_EQ(swValue.getValue().size(), iupayload.getValue().length());
+    ASSERT(std::equal(swValue.getValue().begin(),
+                      swValue.getValue().end(),
+                      iupayload.getValue().data<uint8_t>()));
+
+    // verify the metadata blocks have the correct tags
+    for (uint32_t i = 0; i < parsed.getTagCount(); i++) {
+        auto swMeta = FLE2TagAndEncryptedMetadataBlock::decryptAndParse(
+            serverDerivedFromDataToken, parsed.getMetadataBlocks().at(i));
+        ASSERT(swMeta.isOK());
+        ASSERT_EQ(swMeta.getValue().count, counters[i]);
+        ASSERT_EQ(swMeta.getValue().contentionFactor, contention);
+        ASSERT_EQ(swMeta.getValue().tag, tags[i]);
+    }
+}
+
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2_InvalidArgs) {
+    TestKeyVault keyVault;
+    auto doc = BSON("sample" << 3);
+    auto element = doc.firstElement();
+    auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
+
+    FLE2InsertUpdatePayloadV2 iupayload;
+
+    iupayload.setValue(value);
+    iupayload.setType(stdx::to_underlying(BSONType::numberLong));
+    iupayload.setContentionFactor(0);
+    iupayload.setIndexKeyId(indexKeyId);
+    iupayload.setEdcDerivedToken({{}});
+    iupayload.setEscDerivedToken({{}});
+    iupayload.setServerEncryptionToken({{}});
+    iupayload.setServerDerivedFromDataToken({{}});
+
+    auto fakeEncryptedTokens = StateCollectionTokensV2({{}}, false, boost::none).encrypt({{}});
+    iupayload.setEncryptedTokens(fakeEncryptedTokens);
+    PrfBlock fakeTag;
+
+    // test no edge token set in iupayload
     {
-        // Test that serialize and parseAndDecryptMetadataBlocks don't work with derivedDataTokens
-        // of incorrect length.
-        std::vector<ServerDerivedFromDataToken> derivedDataTokensBad = derivedDataTokens;
-        derivedDataTokensBad.push_back(serverDerivedFromDataToken);
-        ASSERT_THROWS_CODE(serverPayload.serialize(serverEncryptToken, derivedDataTokensBad),
-                           DBException,
-                           7290909);
-
-        ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseAndDecryptMetadataBlocks(
-                               derivedDataTokensBad, swBuf.getValue()),
-                           DBException,
-                           7290907);
+        ASSERT_THROWS_CODE(
+            FLE2IndexedRangeEncryptedValueV2::fromUnencrypted(iupayload, {fakeTag}, {0}),
+            DBException,
+            9588700);
     }
 
-    auto swIndexKeyId = FLE2IndexedRangeEncryptedValueV2::readKeyId(swBuf.getValue());
-    ASSERT_OK(swIndexKeyId.getStatus());
+    std::vector<EdgeTokenSetV2> tokens;
+    EdgeTokenSetV2 ets;
+    ets.setEdcDerivedToken({{}});
+    ets.setEscDerivedToken({{}});
+    ets.setServerDerivedFromDataToken({{}});
+    ets.setEncryptedTokens(fakeEncryptedTokens);
+    tokens.push_back(ets);
+    iupayload.setEdgeTokenSet(tokens);
 
-    auto swBsonType = FLE2IndexedRangeEncryptedValueV2::readBsonType(swBuf.getValue());
-    ASSERT_OK(swBsonType.getStatus());
+    // test bad bson type in iupayload
+    {
+        iupayload.setType(255);
+        ASSERT_THROWS_CODE(
+            FLE2IndexedRangeEncryptedValueV2::fromUnencrypted(iupayload, {fakeTag}, {0}),
+            DBException,
+            9588701);
 
-    auto swDecryptedValue = FLE2IndexedRangeEncryptedValueV2::parseAndDecryptCiphertext(
-        serverEncryptToken, swBuf.getValue());
-    ASSERT_OK(swDecryptedValue.getStatus());
-    auto& clientEncryptedValue = swDecryptedValue.getValue();
-
-    auto swBlocks = FLE2IndexedRangeEncryptedValueV2::parseAndDecryptMetadataBlocks(
-        derivedDataTokens, swBuf.getValue());
-    ASSERT_OK(swBlocks.getStatus());
-    auto& metadataBlocks = swBlocks.getValue();
-
-    ASSERT_EQ(stdx::to_underlying(swBsonType.getValue()), iupayload.getType());
-    ASSERT(swIndexKeyId.getValue() == iupayload.getIndexKeyId());
-
-    ASSERT_EQ(metadataBlocks.size(), 2);
-    for (size_t i = 0; i < metadataBlocks.size(); i++) {
-        ASSERT_EQ(metadataBlocks[i].contentionFactor, counter);
-        ASSERT_EQ(metadataBlocks[i].count, 123456);
-        ASSERT(metadataBlocks[i].tag == tag);
+        iupayload.setType(stdx::to_underlying(BSONType::string));
+        ASSERT_THROWS_CODE(
+            FLE2IndexedRangeEncryptedValueV2::fromUnencrypted(iupayload, {fakeTag}, {0}),
+            DBException,
+            7291908);
+        iupayload.setType(stdx::to_underlying(BSONType::numberLong));
     }
 
-    ASSERT(clientEncryptedValue == serverPayload.clientEncryptedValue);
-    ASSERT_EQ(serverPayload.clientEncryptedValue.size(), value.length());
-    ASSERT(std::equal(serverPayload.clientEncryptedValue.begin(),
-                      serverPayload.clientEncryptedValue.end(),
-                      value.data<uint8_t>()));
+    // test tags and counters vectors don't match the edge count
+    {
+        ASSERT_THROWS_CODE(
+            FLE2IndexedRangeEncryptedValueV2::fromUnencrypted(iupayload, {fakeTag, fakeTag}, {0}),
+            DBException,
+            9588703);
+        ASSERT_THROWS_CODE(
+            FLE2IndexedRangeEncryptedValueV2::fromUnencrypted(iupayload, {fakeTag}, {0, 1}),
+            DBException,
+            9588704);
+    }
 
-    auto swTags = FLE2IndexedRangeEncryptedValueV2::parseMetadataBlockTags(swBuf.getValue());
-    ASSERT_OK(swTags.getStatus());
-    ASSERT_EQ(swTags.getValue().size(), 2);
-    ASSERT(swTags.getValue()[0] == tag);
-    ASSERT(swTags.getValue()[1] == tag);
+    // test empty client ciphertext
+    {
+        iupayload.setValue(ConstDataRange{0, 0});
+        ASSERT_THROWS_CODE(
+            FLE2IndexedRangeEncryptedValueV2::fromUnencrypted(iupayload, {fakeTag}, {0}),
+            DBException,
+            9588705);
+        iupayload.setValue(value);
+    }
+
+    // test edge count over limit
+    {
+        std::vector<EdgeTokenSetV2> t(EncryptionInformationHelpers::kFLE2PerFieldTagLimit + 1);
+        std::vector<PrfBlock> tags(EncryptionInformationHelpers::kFLE2PerFieldTagLimit + 1);
+        std::vector<uint64_t> counts(EncryptionInformationHelpers::kFLE2PerFieldTagLimit + 1);
+        std::for_each(t.begin(), t.end(), [&](EdgeTokenSetV2 ets) {
+            ets.setEdcDerivedToken({{}});
+            ets.setEscDerivedToken({{}});
+            ets.setServerDerivedFromDataToken({{}});
+            ets.setEncryptedTokens(fakeEncryptedTokens);
+        });
+        iupayload.setEdgeTokenSet(t);
+
+        ASSERT_THROWS_CODE(
+            FLE2IndexedRangeEncryptedValueV2::fromUnencrypted(iupayload, tags, counts),
+            DBException,
+            9588702);
+    }
 }
 
 static FLE2InsertUpdatePayloadV2 generateTestIUPV2ForTextSearch(BSONElement element) {

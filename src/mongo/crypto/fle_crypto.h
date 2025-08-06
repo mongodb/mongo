@@ -792,48 +792,37 @@ struct FLEEdgeToken {
  *
  * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
  */
-struct FLE2IndexedRangeEncryptedValueV2 {
-    FLE2IndexedRangeEncryptedValueV2(const FLE2InsertUpdatePayloadV2& payload,
-                                     std::vector<PrfBlock> tags,
-                                     const std::vector<uint64_t>& counters);
-    FLE2IndexedRangeEncryptedValueV2(
-        BSONType typeParam,
-        UUID indexKeyIdParam,
-        std::vector<uint8_t> clientEncryptedValueParam,
-        std::vector<FLE2TagAndEncryptedMetadataBlock> metadataBlockParam);
+class FLE2IndexedRangeEncryptedValueV2 {
+public:
+    // Deserialize a buffer into a FLE2IndexedRangeEncryptedValueV2.
+    // No decryption is performed.
+    FLE2IndexedRangeEncryptedValueV2(ConstDataRange toParse);
 
-    struct ParsedFields {
-        UUID keyId;
-        BSONType bsonType;
-        uint8_t edgeCount;
-        ConstDataRange ciphertext;
-        std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
-    };
-    static StatusWith<ParsedFields> parseAndValidateFields(ConstDataRange serializedServerValue);
+    // Converts a FLE2InsertUpdatePayloadV2 containing a range field, into a
+    // FLE2IndexedRangeEncryptedValueV2. This encrypts the client ciphertext
+    // to get the server ciphertext. This also creates the vector of tag and
+    // encrypted metadata blocks.
+    static FLE2IndexedRangeEncryptedValueV2 fromUnencrypted(
+        const FLE2InsertUpdatePayloadV2& payload,
+        const std::vector<PrfBlock>& tags,
+        const std::vector<uint64_t>& counters);
 
-    static StatusWith<std::vector<uint8_t>> parseAndDecryptCiphertext(
-        ServerDataEncryptionLevel1Token serverEncryptionToken,
-        ConstDataRange serializedServerValue);
+    // Returns a buffer containing the final serialized payload.
+    // The first byte of the buffer is always the fle_blob_subtype.
+    // This performs no encryption.
+    StatusWith<std::vector<uint8_t>> serialize() const;
 
-    static StatusWith<std::vector<FLE2TagAndEncryptedMetadataBlock>> parseAndDecryptMetadataBlocks(
-        const std::vector<ServerDerivedFromDataToken>& serverDataDerivedTokens,
-        ConstDataRange serializedServerValue);
+    UUID getKeyId() const;
+    BSONType getBsonType() const;
+    uint32_t getTagCount() const;
+    ConstDataRange getServerEncryptedValue() const;
+    std::vector<FLE2TagAndEncryptedMetadataBlockView> getMetadataBlocks() const;
 
-    static StatusWith<std::vector<PrfBlock>> parseMetadataBlockTags(
-        ConstDataRange serializedServerValue);
-
-    static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
-
-    static StatusWith<BSONType> readBsonType(ConstDataRange serializedServerValue);
-
-    StatusWith<std::vector<uint8_t>> serialize(
-        ServerDataEncryptionLevel1Token serverEncryptionToken,
-        const std::vector<ServerDerivedFromDataToken>& serverDataDerivedTokens);
-
-    BSONType bsonType;
-    UUID indexKeyId;
-    std::vector<uint8_t> clientEncryptedValue;
-    std::vector<FLE2TagAndEncryptedMetadataBlock> metadataBlocks;
+private:
+    FLE2IndexedRangeEncryptedValueV2();
+    UniqueMCFLE2IndexedEncryptedValueV2 _value;
+    // Cached parsed values
+    mutable boost::optional<std::vector<uint8_t>> _cachedSerializedPayload;
 };
 
 /**
@@ -861,7 +850,6 @@ struct FLE2IndexedRangeEncryptedValueV2 {
  * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
  */
 class FLE2IndexedTextEncryptedValue {
-public:
 public:
     FLE2IndexedTextEncryptedValue(ConstDataRange toParse);
     static FLE2IndexedTextEncryptedValue fromUnencrypted(const FLE2InsertUpdatePayloadV2& payload,
@@ -983,7 +971,7 @@ public:
                                 EDCTwiceDerivedToken edcTwiceDerived,
                                 FLECounter count);
     static PrfBlock generateTag(const EDCServerPayloadInfo& payload);
-    static std::vector<PrfBlock> generateTags(const EDCServerPayloadInfo& rangePayload);
+    static std::vector<PrfBlock> generateTagsForRange(const EDCServerPayloadInfo& rangePayload);
     static std::vector<PrfBlock> generateTagsForTextSearch(const EDCServerPayloadInfo& textPayload);
 
     /**
