@@ -96,6 +96,16 @@ typedef TAILQ_HEAD(__wt_cursor_list, __wt_cursor) WT_CURSOR_LIST;
 /* Maximum number of buckets to visit during a regular cursor sweep. */
 #define WT_SESSION_CURSOR_SWEEP_MAX 64
 
+/* Initial session ID. */
+#define WT_SESSION_ID_INITIAL 0
+
+/*
+ * Check if the session is the default session. A default session is a special session created
+ * during the initialization of a WiredTiger connection. It serves as the initial session for the
+ * connection before any user sessions are created.
+ */
+#define WT_SESSION_IS_DEFAULT(s) ((s)->id == WT_SESSION_ID_INITIAL)
+
 /* Invalid session ID. */
 #define WT_SESSION_ID_INVALID 0xffffffff
 

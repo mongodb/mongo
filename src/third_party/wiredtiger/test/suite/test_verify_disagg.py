@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, wiredtiger, wttest
+import errno, os, wiredtiger, wttest
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
@@ -72,15 +72,11 @@ class test_verify_disagg(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     def verify(self, sessions, expected_error = None):
         for session in sessions:
-            try:
+            if expected_error:
+                self.assertRaisesException(wiredtiger.WiredTigerError, \
+                    lambda: session.verify(self.uri), os.strerror(expected_error))
+            else:
                 session.verify(self.uri)
-                if expected_error:
-                    self.fail(f"Expected error '{expected_error}' but no error was raised.")
-            except wiredtiger.WiredTigerError as e:
-                if (expected_error):
-                    self.assertTrue(expected_error == str(e))
-                else:
-                    raise(e)
 
     def create_follower(self):
         self.conn_follow = self.wiredtiger_open('follower', self.extensionsConfig() + ',create,' +
@@ -100,7 +96,7 @@ class test_verify_disagg(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.create_follower()
         # The leader's table stays empty, the follower creation doesn't mean loading tables from the leader (it requires reconfiguration)
         self.verify([self.session])
-        self.verify([self.session_follow], "No such file or directory")
+        self.verify([self.session_follow], errno.ENOENT)
 
         # Create an empty checkpoint
         self.session.checkpoint()
@@ -116,7 +112,7 @@ class test_verify_disagg(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.leader_put_data(value_prefix = 'aaa')
         self.leader_put_data(value_prefix = 'bbb')
         # That's not allowed to perform verification if there is some dirty data
-        self.verify([self.session], "Device or resource busy")
+        self.verify([self.session], errno.EBUSY)
 
         # Checkpoint the data on the leader
         self.session.checkpoint()

@@ -130,10 +130,13 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
                 for (stable_upd = stable_upd->next; stable_upd != NULL;
                      stable_upd = stable_upd->next) {
                     if (stable_upd->txnid != WT_TXN_ABORTED) {
-                        WT_ASSERT(session,
-                          stable_upd->type != WT_UPDATE_TOMBSTONE &&
-                            F_ISSET(stable_upd, WT_UPDATE_HS | WT_UPDATE_TO_DELETE_FROM_HS));
-                        break;
+                        if (F_ISSET(stable_upd, WT_UPDATE_HS | WT_UPDATE_TO_DELETE_FROM_HS))
+                            break;
+                        else
+                            WT_ASSERT(session,
+                              stable_upd->txnid == tombstone->txnid &&
+                                stable_upd->upd_start_ts == tombstone->upd_start_ts &&
+                                stable_upd->upd_durable_ts == tombstone->upd_durable_ts);
                     }
                 }
             }

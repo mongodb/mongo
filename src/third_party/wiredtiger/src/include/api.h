@@ -14,30 +14,30 @@
  * isn't trivial because some API calls re-enter via public API entry points and the session with ID
  * 0 is the default session in the connection handle which can be used across multiple threads.
  */
-#define WT_SINGLE_THREAD_CHECK_START(s)                                           \
-    {                                                                             \
-        uintmax_t __tmp_api_tid;                                                  \
-        __wt_thread_id(&__tmp_api_tid);                                           \
-                                                                                  \
-        /*                                                                        \
-         * Only a single thread should use this session at a time. It's ok        \
-         * (but unexpected) if different threads use the session consecutively,   \
-         * but concurrent access is not allowed. Verify this by having the thread \
-         * take a lock on first API access. Failing to take the lock implies      \
-         * another thread holds it and we're attempting concurrent access of the  \
-         * session.                                                               \
-         *                                                                        \
-         * The default session (ID == 0) is an exception where concurrent access  \
-         * is allowed. We can also skip taking the lock if we're re-entrant and   \
-         * already hold it.                                                       \
-         */                                                                       \
-        if ((s)->id != 0 && (s)->thread_check.owning_thread != __tmp_api_tid) {   \
-            bool lock_success = __wt_spin_trylock((s), &(s)->thread_check.lock);  \
-            WT_ASSERT((s), lock_success == 0);                                    \
-            (s)->thread_check.owning_thread = __tmp_api_tid;                      \
-        }                                                                         \
-                                                                                  \
-        ++(s)->thread_check.entry_count;                                          \
+#define WT_SINGLE_THREAD_CHECK_START(s)                                                      \
+    {                                                                                        \
+        uintmax_t __tmp_api_tid;                                                             \
+        __wt_thread_id(&__tmp_api_tid);                                                      \
+                                                                                             \
+        /*                                                                                   \
+         * Only a single thread should use this session at a time. It's ok                   \
+         * (but unexpected) if different threads use the session consecutively,              \
+         * but concurrent access is not allowed. Verify this by having the thread            \
+         * take a lock on first API access. Failing to take the lock implies                 \
+         * another thread holds it and we're attempting concurrent access of the             \
+         * session.                                                                          \
+         *                                                                                   \
+         * The default session (ID == 0) is an exception where concurrent access             \
+         * is allowed. We can also skip taking the lock if we're re-entrant and              \
+         * already hold it.                                                                  \
+         */                                                                                  \
+        if (!WT_SESSION_IS_DEFAULT(s) && (s)->thread_check.owning_thread != __tmp_api_tid) { \
+            bool lock_success = __wt_spin_trylock((s), &(s)->thread_check.lock);             \
+            WT_ASSERT((s), lock_success == 0);                                               \
+            (s)->thread_check.owning_thread = __tmp_api_tid;                                 \
+        }                                                                                    \
+                                                                                             \
+        ++(s)->thread_check.entry_count;                                                     \
     }
 
 #define WT_SINGLE_THREAD_CHECK_STOP(s)                          \

@@ -71,7 +71,7 @@ typedef enum { WT_OPCTX_TRANSACTION, WT_OPCTX_RECONCILATION } WT_OP_CONTEXT;
                                                   &S2C(s)->txn_global.txn_shared_list[(s)->id])
 
 #define WT_SESSION_IS_CHECKPOINT(s) \
-    ((s)->id != 0 && (s)->id == __wt_atomic_loadv32(&S2C(s)->txn_global.checkpoint_id))
+    (!WT_SESSION_IS_DEFAULT(s) && (s)->id == __wt_atomic_loadv32(&S2C(s)->txn_global.checkpoint_id))
 
 /*
  * Perform an operation at the specified isolation level.
