@@ -121,7 +121,7 @@ void SortStageDefault::spool(WorkingSetID wsid) {
     auto sortKey = _sortKeyGen.computeSortKey(*extractedMember);
     uint64_t prevMemBytes = _sortExecutor.stats().memoryUsageBytes;
     _sortExecutor.add(sortKey, extractedMember);
-    _memoryTracker.add(_sortExecutor.stats().maxMemoryUsageBytes - prevMemBytes);
+    _memoryTracker.add(_sortExecutor.stats().memoryUsageBytes - prevMemBytes);
 }
 
 PlanStage::StageState SortStageDefault::unspool(WorkingSetID* out) {
