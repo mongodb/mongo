@@ -2,7 +2,7 @@
  * Tests that the 'representativeQueries' are migrated to the dedicated collection on FCV upgrade
  * and back to 'querySettings' cluster parameter on FCV downgrade.
  *
- * @tags: [requires_fcv_83]
+ * @tags: [featureFlagPQSBackfill]
  **/
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

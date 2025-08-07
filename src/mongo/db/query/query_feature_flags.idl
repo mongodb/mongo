@@ -246,8 +246,7 @@ feature_flags:
     featureFlagPQSBackfill:
         description: "Enables PQS representative query backfilling"
         cpp_varname: gFeatureFlagPQSBackfill
-        default: true
-        version: 8.3
+        default: false
         fcv_gated: true
 
     featureFlagVectorSimilarityExpressions:

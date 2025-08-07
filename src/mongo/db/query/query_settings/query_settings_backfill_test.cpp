@@ -181,7 +181,14 @@ private:
 };
 
 TEST_F(BackfillCoordinatorTest, ShouldmarkForBackfillAndScheduleIfNeeded) {
+    // First ensure that BackfillCoordinator::shouldBackfill() always returns false if
+    // "featureFlagPQSBackfill" is not enabled.
     auto expCtx = expressionContext();
+    ASSERT_FALSE(BackfillCoordinator::shouldBackfill(expCtx,
+                                                     /* hasRepresentativeQuery*/ false));
+
+    // Enable "featureFlagPQSBackfill" for the rest of the scope.
+    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagPQSBackfill", true};
 
     // It should backfill queries with missing representative queries.
     ASSERT_TRUE(BackfillCoordinator::shouldBackfill(expCtx, /* hasRepresentativeQuery*/ false));
