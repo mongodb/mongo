@@ -707,6 +707,25 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
+  # TODO(SERVER-108818): remove this temporary suite and all its usages.
+  - <<: *task_template
+    name: jsCore_ese_primary_driven_index_builds
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "primary_driven_index_builds",
+        "jscore",
+        "encrypt",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: core_ese_primary_driven_index_builds
+
   - <<: *task_template
     name: audit
     tags:
@@ -2393,6 +2412,19 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
 
+  # TODO(SERVER-108818): Remove this temporary suite.
+  - <<: *gen_task_template
+    name: replica_sets_jscore_passthrough_primary_driven_index_builds_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "default",
+        "jscore",
+        "primary_driven_index_builds",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
   - <<: *gen_task_template
     name: replica_sets_jscore_passthrough_viewless_timeseries_gen
     # TODO (SERVER-101590): Remove this temporary suite.
@@ -2472,6 +2504,21 @@ tasks:
         "sharding",
         "requires_all_feature_flags",
         "viewless_timeseries",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  # TODO(SERVER-108818): Remove this temporary suite.
+  - <<: *gen_task_template
+    name: sharding_primary_driven_index_builds_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "default",
+        "sharding",
+        "primary_driven_index_builds",
       ]
     commands:
       - func: "generate resmoke tasks"

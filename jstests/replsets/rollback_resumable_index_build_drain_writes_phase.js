@@ -3,6 +3,8 @@
  * the drain writes phase.
  *
  * @tags: [
+ *   # Primary-driven index builds aren't resumable.
+ *   primary_driven_index_builds_incompatible,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   # The rollback can be slow on certain build variants (such as macOS and code coverage), which

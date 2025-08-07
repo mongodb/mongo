@@ -1,0 +1,11 @@
+# Temporary suites to assists the development of new primary-driven index builds.
+# Run all tests in the replica sets suite with PrimaryDrivenIndexBuilds feature flag enabled.
+#
+# TODO(SERVER-108818): remove this temporary suite and all its usages.
+base_suite: replica_sets
+overrides:
+  - "primary_driven_index_builds.enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongod"
+  - "primary_driven_index_builds.all_replica_sets_index_builds_tests_selector"
+
+excludes:
+  - "primary_driven_index_builds.exclude_primary_driven_index_builds_incompatible_tag"

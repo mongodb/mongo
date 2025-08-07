@@ -5,6 +5,8 @@
  * should contain a buildUUID.
  *
  * @tags: [
+ *     # Primary-driven index builds aren't resumable.
+ *     primary_driven_index_builds_incompatible,
  *     # Persistent storage engine needed for resumable index builds.
  *     requires_persistence,
  *     requires_replication,

@@ -1,0 +1,11 @@
+# Temporary suites to assists the development of new primary-driven index builds.
+# Run all tests in the concurrency_replication suite with PrimaryDrivenIndexBuilds feature flag enabled.
+#
+# TODO(SERVER-108818): remove this temporary suite and all its usages.
+base_suite: concurrency_replication
+overrides:
+  - "primary_driven_index_builds.enable_primary_driven_index_builds_feature_flag_mongod"
+  - "primary_driven_index_builds.all_concurrency_index_builds_tests_selector"
+
+excludes:
+  - "primary_driven_index_builds.exclude_primary_driven_index_builds_incompatible_tag"

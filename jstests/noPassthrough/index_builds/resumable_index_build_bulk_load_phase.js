@@ -3,6 +3,8 @@
  * shutdown and are resumed from the same phase to completion when the node is started back up.
  *
  * @tags: [
+ *   # Primary-driven index builds aren't resumable.
+ *   primary_driven_index_builds_incompatible,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,

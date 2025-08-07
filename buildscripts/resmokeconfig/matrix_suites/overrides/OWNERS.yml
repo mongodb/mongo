@@ -39,3 +39,6 @@ filters:
   - "fcv_upgrade_downgrade_primary_step_down_overrides.yml":
     approvers:
       - 10gen/server-replication
+  - "primary_driven_index_builds.yml":
+    approvers:
+      - 10gen/server-storage-execution

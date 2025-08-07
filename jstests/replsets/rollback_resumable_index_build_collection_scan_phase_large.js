@@ -3,6 +3,8 @@
  * phase completes properly after being interrupted for rollback during the collection scan phase.
  *
  * @tags: [
+ *   # Primary-driven index builds aren't resumable.
+ *   primary_driven_index_builds_incompatible,
  *   # The rollback can be slow on certain build variants (such as macOS and code coverage), which
  *   # can cause the targeted log messages to fall off the log buffer before we search for them.
  *   incompatible_with_macos,
