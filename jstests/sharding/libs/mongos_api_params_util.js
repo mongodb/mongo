@@ -101,6 +101,9 @@ export let MongosAPIParametersUtil = (function() {
     // database is dropped and recreated between test cases, so most tests don't need custom setUp
     // or cleanUp. Test cases are not 1-1 with commands, e.g. "count" has two cases.
     let testCasesFirstHalf = [
+        {commandName: "_clusterQueryWithoutShardKey", skip: "internal API"},
+        {commandName: "_clusterWriteWithoutShardKey", skip: "internal API"},
+        {commandName: "_dropConnectionsToMongot", skip: "internal API"},
         {
             commandName: "_hashBSONElement",
             skip: "executes locally on mongos (not sent to any remote node)"
@@ -111,6 +114,327 @@ export let MongosAPIParametersUtil = (function() {
             skip: "executes locally on mongos (not sent to any remote node)"
         },
         {commandName: "_mergeAuthzCollections", skip: "internal API"},
+        {commandName: "_mongotConnPoolStats", skip: "internal API"},
+        {commandName: "abortMoveCollection", skip: "TODO(SERVER-108802)"},
+        {commandName: "abortReshardCollection", skip: "TODO(SERVER-108802)"},
+        {commandName: "abortUnshardCollection", skip: "TODO(SERVER-108802)"},
+        {commandName: "analyze", skip: "TODO(SERVER-108802)"},
+        {
+            commandName: "analyzeShardKey",
+            skip: "TODO(SERVER-108802) Unclear how this is supposed to be replicated",
+            /* run: {
+                inAPIVersion1: false,
+                configServerCommandName: "_configsvrCheckClusterMetadataConsistency",
+                shardCommandName: "_shardsvrCheckMetadataConsistency",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                setUp: () => {
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
+                    assert.commandWorked(
+                        st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
+                    for (let i = 1000; i < 10000; i++) {
+                        assert.commandWorked(st.s.getDB("db")["collection"].insertOne({_id: i}));
+                    }
+                },
+                command: () => ({analyzeShardKey: "db.collection", key: {_id: 1}}),
+                cleanUp: () => assert.commandWorked(st.s.getDB("db")["collection"].deleteMany({}))
+            } */
+        },
+        {commandName: "appendOplogNote", skip: "TODO(SERVER-108802)"},
+        {commandName: "autoSplitVector", skip: "TODO(SERVER-108802)"},
+        {
+            commandName: "bulkWrite",
+            run: {
+                inAPIVersion1: true,
+                shardCommandName: "bulkWrite",
+
+                runsAgainstAdminDb: true,
+
+                command: () => ({
+                    bulkWrite: 1,
+                    ops: [{insert: 0, document: {_id: 1}}],
+                    nsInfo: [{ns: "db.collection"}]
+                }),
+            }
+        },
+        {commandName: "commitShardRemoval", skip: "TODO(SERVER-108802)"},
+        {
+            commandName: "releaseMemory",
+            run: {
+                inAPIVersion1: false,
+                shardCommandName: "releaseMemory",
+                permittedInTxn: true,
+                setUp: (context) => {
+                    assert.commandWorked(st.s0.getDB("db").runCommand({
+                        insert: "collection",
+                        documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 11}, {_id: 12}, {_id: 13}]
+                    }));
+                    const findCmd =
+                        Object.assign({find: "collection", batchSize: 1}, context.apiParameters);
+                    const res = assert.commandWorked(context.db.runCommand(findCmd));
+                    context.cursorId = res.cursor.id;
+                },
+                command: (context) => {
+                    return {releaseMemory: [context.cursorId]};
+                }
+            }
+        },
+        {commandName: "replicateSearchIndexCommand", skip: "TODO(SERVER-108802)"},
+        {commandName: "shardDrainingStatus", skip: "TODO(SERVER-108802)"},
+        {commandName: "startShardDraining", skip: "TODO(SERVER-108802)"},
+        {commandName: "stopShardDraining", skip: "TODO(SERVER-108802)"},
+        {commandName: "untrackUnshardedCollection", skip: "TODO(SERVER-108802)"},
+        {
+            commandName: "changePrimary",
+            skip:
+                "TODO: Cannot run changePrimary with featureFlagBalanceUnshardedCollections disabled",
+        },
+        {
+            commandName: "checkMetadataConsistency",
+            run: {
+                inAPIVersion1: false,
+                configServerCommandName: "_configsvrCheckClusterMetadataConsistency",
+                shardCommandName: "_shardsvrCheckMetadataConsistency",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                setUp: () => {
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
+                    assert.commandWorked(
+                        st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
+                },
+                command: () => ({checkMetadataConsistency: 1})
+            }
+        },
+        {
+            commandName: "cleanupReshardCollection",
+            run: {
+                inAPIVersion1: false,
+                configServerCommandName: "_configsvrCleanupReshardCollection",
+                // _shardsvrCleanupReshardCollection exists in the code but is not sent to the shard
+                // server
+                // TODO(SERVER-108802) shardCommandName: "_shardsvrCleanupReshardCollection",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                setUp: () => {
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
+                    assert.commandWorked(
+                        st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
+                },
+                command: () => ({cleanupReshardCollection: "db.collection"})
+            },
+        },
+        {commandName: "cleanupStructuredEncryptionData", skip: "TODO(SERVER-108802)"},
+        {
+            commandName: "commitReshardCollection",
+            skip: "TODO requires failpoints and concurrency",
+        },
+        {commandName: "compactStructuredEncryptionData", skip: "TODO(SERVER-108802)"},
+        {
+            commandName: "configureCollectionBalancing",
+            run: {
+                inAPIVersion1: false,
+                configServerCommandName: "_configsvrConfigureCollectionBalancing",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                setUp: () => {
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
+                    assert.commandWorked(
+                        st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
+                },
+                command: () => ({
+                    configureCollectionBalancing: "db.collection",
+                    chunkSize: 256,
+                    defragmentCollection: true,
+                    enableAutoMerger: true
+                })
+            }
+        },
+        {commandName: "configureQueryAnalyzer", skip: "TODO(SERVER-108802)"},
+        {commandName: "coordinateCommitTransaction", skip: "TODO(SERVER-108802)"},
+        {commandName: "cpuload", skip: "executes locally on mongos (not sent to any remote node)"},
+        {commandName: "createSearchIndexes", skip: "executes locally on mongos"},
+        {commandName: "createUnsplittableCollection", skip: "test only and temporary"},
+        {commandName: "dropSearchIndex", skip: "executes locally on mongos"},
+        {commandName: "fsyncUnlock", skip: "TODO(SERVER-108802)"},
+        {commandName: "getClusterParameter", skip: "executes locally on mongos"},
+        {
+            commandName: "getDatabaseVersion",
+            skip: "executes locally on mongos (not sent to any remote node)"
+        },
+        {
+            commandName: "getQueryableEncryptionCountInfo",
+            run: {
+                inAPIVersion1: false,
+                configServerCommandName: "getQueryableEncryptionCountInfo",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                command: () => ({
+                    getQueryableEncryptionCountInfo: "db.collection",
+                    tokens: [
+                        {
+                            tokens:
+                                [{"s": BinData(0, "lUBO7Mov5Sb+c/D4cJ9whhhw/+PZFLCk/AQU2+BpumQ=")}]
+                        },
+                    ],
+                    "queryType": "insert"
+                })
+            }
+        },
+        {commandName: "listSearchIndexes", skip: "executes locally on mongos"},
+        {commandName: "lockInfo", skip: "Internal command available on mongod instances only."},
+        {
+            commandName: "mergeAllChunksOnShard",
+            run: {
+                inAPIVersion1: false,
+                configServerCommandName: "_configsvrCommitMergeAllChunksOnShard",
+                shardCommandName: "_shardsvrMergeAllChunksOnShard",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                setUp: () => {
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
+                    assert.commandWorked(
+                        st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
+                },
+                command: () =>
+                    ({mergeAllChunksOnShard: "db.collection", shard: st.shard0.shardName})
+            }
+        },
+        {
+            commandName: "moveCollection",
+            skip:
+                'TODO(SERVER-108802) Primary didn\'t log _configsvrReshardCollection with API parameters { "apiVersion" : "1" }',
+            /* run: {
+                inAPIVersion1: false,
+                configServerCommandName: "_configsvrReshardCollection",
+                shardCommandName: "_shardsvrReshardCollection",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                setUp: () => {
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
+                },
+                command: () => ({moveCollection: "db.collection", toShard: st.shard0.shardName})
+            }*/
+        },
+        {
+            commandName: "moveRange",
+            run: {
+                inAPIVersion1: false,
+                configServerCommandName: "_configsvrMoveRange",
+                shardCommandName: "_shardsvrMoveRange",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                setUp: () => {
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
+                    assert.commandWorked(
+                        st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
+                },
+                command: () =>
+                    ({moveRange: "db.collection", toShard: st.shard0.shardName, min: {_id: 1}})
+            }
+        },
+        {commandName: "oidcListKeys", skip: "TODO(SERVER-108802)"},
+        {commandName: "oidcRefreshKeys", skip: "TODO(SERVER-108802)"},
+        {commandName: "removeQuerySettings", skip: "TODO(SERVER-108802)"},
+        {
+            commandName: "repairShardedCollectionChunksHistory",
+            run: {
+                inAPIVersion1: false,
+                configServerCommandName: "_configsvrRepairShardedCollectionChunksHistory",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                setUp: () => {
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
+                    assert.commandWorked(
+                        st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
+                },
+                command: () => ({repairShardedCollectionChunksHistory: "db.collection"})
+            }
+        },
+        {
+            commandName: "resetPlacementHistory",
+            run: {
+                inAPIVersion1: false,
+                configServerCommandName: "_configsvrResetPlacementHistory",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                command: () => ({resetPlacementHistory: 1})
+            }
+        },
+        {
+            commandName: "setAuditConfig",
+            skip: "TODO(SERVER-108802) Auditing is not enabled by default",
+            /* run: {
+                inAPIVersion1: true,
+                configServerCommandName: "setAuditConfig",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                command: () => ({setAuditConfig: 1, filter: {}, auditAuthorizationSuccess: false})
+            } */
+        },
+        {
+            commandName: "setClusterParameter",
+            skip:
+                "TODO(SERVER-108802): Primary didn't log _shardsvrSetClusterParameter with API parameters { \"apiVersion\" : \"1\" }",
+            /* run: {
+                inAPIVersion1: false,
+                configServerCommandName: "_configsvrSetClusterParameter",
+                shardCommandName: "_shardsvrSetClusterParameter",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                command: () => ({setClusterParameter: {defaultMaxTimeMS: {readOperations: 1}}}),
+                cleanUp: () => assert.commandWorked(st.s.adminCommand(
+                    {setClusterParameter: {defaultMaxTimeMS: {readOperations: 0}}}))
+            } */
+        },
+        {
+            commandName: "setQuerySettings",
+            skip: "executes locally on mongos",
+        },
+        {
+            commandName: "setUserWriteBlockMode",
+            skip: "executes locally on mongos (not sent to any remote node)"
+        },
+        {commandName: "testInternalTransactions", skip: "Internal API."},
+        {
+            commandName: "unshardCollection",
+            skip: "TODO(SERVER-108802) Unclear how this is supposed to be replicated",
+            /*run: {
+                inAPIVersion1: false,
+                shardCommandName: "_shardsvrReshardCollection",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                permittedOnShardedCollection: true,
+                setUp: () => {
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
+                    assert.commandWorked(
+                        st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
+                },
+                command: () => ({unshardCollection: "db.collection", toShard: st.shard0.shardName})
+            }*/
+        },
+        {commandName: "updateSearchIndex", skip: "executes locally on mongos"},
+        {commandName: "validateDBMetadata", skip: "executes locally on mongos"},
         {
             commandName: "abortTransaction",
             run: {
@@ -1481,10 +1805,7 @@ export let MongosAPIParametersUtil = (function() {
                 ...testCasesFirstHalf.filter(elem => elem.commandName === command),
                 ...testCasesSecondHalf.filter(elem => elem.commandName === command)
             ];
-            // TODO(SERVER-100573): Fix invariant, this currently is never going to be hit even if
-            // length is zero.
-            // eslint-disable-next-line
-            assert(matchingCases.length !== [],
+            assert(matchingCases.length > 0,
                    "coverage failure: must define a test case for " + command);
             for (const testCase of matchingCases) {
                 validateTestCase(testCase);
