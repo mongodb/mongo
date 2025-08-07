@@ -34,7 +34,7 @@
 #include "rdkafka_cert.h"
 
 #if WITH_SSL && OPENSSL_VERSION_NUMBER >= 0x10100000 &&                        \
-    !defined(OPENSSL_IS_BORINGSSL)
+    !defined(OPENSSL_NO_ENGINE)
 #define WITH_SSL_ENGINE 1
 /* Deprecated in OpenSSL 3 */
 #include <openssl/engine.h>
