@@ -291,7 +291,8 @@ public:
      * Returns a future with the result of running the given request.
      */
     virtual Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                             const Message& request) const = 0;
+                                             const Message& request,
+                                             Date_t started) const = 0;
 
     /**
      * Returns if the client is eligible to run cluster operations.
@@ -310,7 +311,8 @@ public:
     }
 
     Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) const override;
+                                     const Message& request,
+                                     Date_t started) const override;
 
     bool runsClusterOperations() const override {
         return false;

@@ -89,7 +89,8 @@ void ClientObserverCryptD::onClientConnect(Client*) {
 }
 
 Future<DbResponse> ServiceEntryPointCryptD::handleRequest(OperationContext* opCtx,
-                                                          const Message& message) noexcept try {
+                                                          const Message& message,
+                                                          Date_t started) noexcept try {
     auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(message));
 
     OpMsgRequest request;

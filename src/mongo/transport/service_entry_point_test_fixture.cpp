@@ -122,7 +122,9 @@ Message ServiceEntryPointTestFixture::constructMessage(BSONObj cmdBSON,
 StatusWith<DbResponse> ServiceEntryPointTestFixture::handleRequest(Message msg,
                                                                    OperationContext* opCtx) {
     startCapturingLogMessages();
-    auto swDbResponse = getServiceEntryPoint()->handleRequest(opCtx, msg).getNoThrow();
+    auto swDbResponse = getServiceEntryPoint()
+                            ->handleRequest(opCtx, msg, opCtx->fastClockSource().now())
+                            .getNoThrow();
     stopCapturingLogMessages();
     return swDbResponse;
 }

@@ -88,7 +88,7 @@
 namespace mongo {
 
 Future<DbResponse> ServiceEntryPointRSEndpoint::_replicaSetEndpointHandleRequest(
-    OperationContext* opCtx, const Message& m) try {
+    OperationContext* opCtx, const Message& m, Date_t started) try {
     // TODO (SERVER-81551): Move the OpMsgRequest parsing above ServiceEntryPoint::handleRequest().
     auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(m, opCtx->getClient());
     if (m.operation() == dbQuery) {
@@ -107,9 +107,9 @@ Future<DbResponse> ServiceEntryPointRSEndpoint::_replicaSetEndpointHandleRequest
     if (shouldRoute) {
         replica_set_endpoint::ScopedSetRouterService service(opCtx);
         auto routerService = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
-        return routerService->getServiceEntryPoint()->handleRequest(opCtx, m);
+        return routerService->getServiceEntryPoint()->handleRequest(opCtx, m, started);
     }
-    return _shardSep->handleRequest(opCtx, m);
+    return _shardSep->handleRequest(opCtx, m, started);
 } catch (const DBException& ex) {
     if (OpMsg::isFlagSet(m, OpMsg::kMoreToCome)) {
         return DbResponse{};  // Don't reply.
@@ -128,12 +128,13 @@ Future<DbResponse> ServiceEntryPointRSEndpoint::_replicaSetEndpointHandleRequest
     return ex.toStatus();
 }
 Future<DbResponse> ServiceEntryPointRSEndpoint::handleRequest(OperationContext* opCtx,
-                                                              const Message& m) {
+                                                              const Message& m,
+                                                              Date_t started) {
     if (replica_set_endpoint::isReplicaSetEndpointClient(VersionContext::getDecoration(opCtx),
                                                          opCtx->getClient())) {
-        return _replicaSetEndpointHandleRequest(opCtx, m);
+        return _replicaSetEndpointHandleRequest(opCtx, m, started);
     }
-    return _shardSep->handleRequest(opCtx, m);
+    return _shardSep->handleRequest(opCtx, m, started);
 }
 
 }  // namespace mongo

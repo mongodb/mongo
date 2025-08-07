@@ -162,15 +162,18 @@ void primeInternalClient(Client* client) {
     }
 }
 
-Future<DbResponse> DefaultSEPTransactionClientBehaviors::handleRequest(
-    OperationContext* opCtx, const Message& request) const {
+Future<DbResponse> DefaultSEPTransactionClientBehaviors::handleRequest(OperationContext* opCtx,
+                                                                       const Message& request,
+                                                                       Date_t started) const {
     auto serviceEntryPoint = opCtx->getService()->getServiceEntryPoint();
-    return serviceEntryPoint->handleRequest(opCtx, request);
+    return serviceEntryPoint->handleRequest(opCtx, request, started);
 }
 
 ExecutorFuture<BSONObj> SEPTransactionClient::_runCommand(const DatabaseName& dbName,
                                                           BSONObj cmdObj) const {
     invariant(_hooks, "Transaction metadata hooks must be injected before a command can be run");
+
+    Date_t started = _serviceContext->getFastClockSource()->now();
 
     BSONObjBuilder cmdBuilder(_behaviors->maybeModifyCommand(std::move(cmdObj)));
     _hooks->runRequestHook(&cmdBuilder);
@@ -198,7 +201,7 @@ ExecutorFuture<BSONObj> SEPTransactionClient::_runCommand(const DatabaseName& db
     }();
     auto opMsgRequest = OpMsgRequestBuilder::create(vts, dbName, cmdBuilder.obj());
     auto requestMessage = opMsgRequest.serialize();
-    return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage)
+    return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage, started)
         .thenRunOn(_executor)
         .then([this](DbResponse dbResponse) {
             // NOTE: The API uses this method to run commit and abort, so be careful about adding

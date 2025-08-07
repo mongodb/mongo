@@ -71,7 +71,8 @@ MultiUpdateCoordinatorExternalStateImpl::MultiUpdateCoordinatorExternalStateImpl
 Future<DbResponse> MultiUpdateCoordinatorExternalStateImpl::sendClusterUpdateCommandToShards(
     OperationContext* opCtx, const Message& message) const {
     opCtx->setCommandForwardedFromRouter();
-    return ServiceEntryPointRouterRole::handleRequestImpl(opCtx, message);
+    return ServiceEntryPointRouterRole::handleRequestImpl(
+        opCtx, message, opCtx->fastClockSource().now());
 }
 
 void MultiUpdateCoordinatorExternalStateImpl::startBlockingMigrations(OperationContext* opCtx,

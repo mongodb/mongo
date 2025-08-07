@@ -50,9 +50,10 @@ BSONObj ClusterSEPTransactionClientBehaviors::maybeModifyCommand(BSONObj cmdObj)
     return cluster::cmd::translations::replaceCommandNameWithClusterCommandName(cmdObj);
 }
 
-Future<DbResponse> ClusterSEPTransactionClientBehaviors::handleRequest(
-    OperationContext* opCtx, const Message& request) const {
-    return ServiceEntryPointRouterRole::handleRequestImpl(opCtx, request);
+Future<DbResponse> ClusterSEPTransactionClientBehaviors::handleRequest(OperationContext* opCtx,
+                                                                       const Message& request,
+                                                                       Date_t started) const {
+    return ServiceEntryPointRouterRole::handleRequestImpl(opCtx, request, started);
 }
 
 }  // namespace mongo::txn_api::details

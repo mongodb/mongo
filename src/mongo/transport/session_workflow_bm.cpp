@@ -173,7 +173,9 @@ public:
     public:
         explicit Sep(MockCoordinator* mc) : MockServiceEntryPoint(), _mc{mc} {}
 
-        Future<DbResponse> handleRequest(OperationContext* opCtx, const Message& request) override {
+        Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                         const Message& request,
+                                         Date_t started) override {
             DbResponse response;
             response.response = request;
 

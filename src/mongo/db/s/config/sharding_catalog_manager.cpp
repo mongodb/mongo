@@ -150,7 +150,8 @@ OpMsg runCommandInLocalTxn(OperationContext* opCtx,
             ->handleRequest(
                 opCtx,
                 OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx), db, bob.obj())
-                    .serialize())
+                    .serialize(),
+                opCtx->fastClockSource().now())
             .get()
             .response);
 }
@@ -221,7 +222,8 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
                             OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
                                                         DatabaseName::kAdmin,
                                                         cmdObj)
-                                .serialize())
+                                .serialize(),
+                            newOpCtx->fastClockSource().now())
             .get()
             .response);
     return replyOpMsg.body;

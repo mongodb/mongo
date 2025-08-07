@@ -85,7 +85,8 @@ struct AsyncCommandExecutionTest::TestState {
         };
 
         // Setup the execution context
-        rec = std::make_shared<RequestExecutionContext>(opCtx.get(), mockMessage());
+        rec = std::make_shared<RequestExecutionContext>(
+            opCtx.get(), mockMessage(), opCtx.get()->fastClockSource().now());
         rec->setReplyBuilder(makeReplyBuilder(rpc::protocolForMessage(rec->getMessage())));
         rec->setRequest(rpc::opMsgRequestFromAnyProtocol(rec->getMessage(), opCtx->getClient()));
         rec->setCommand(CommandHelpers::findCommand(&*opCtx, rec->getRequest().getCommandName()));

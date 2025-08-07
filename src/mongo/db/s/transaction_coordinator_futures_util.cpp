@@ -184,11 +184,12 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                 OpMsgRequestBuilder::create(
                     auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, commandObj)
                     .serialize();
-            const auto replyOpMsg = OpMsg::parseOwned(service->getService(ClusterRole::ShardServer)
-                                                          ->getServiceEntryPoint()
-                                                          ->handleRequest(opCtx, requestOpMsg)
-                                                          .get()
-                                                          .response);
+            const auto replyOpMsg =
+                OpMsg::parseOwned(service->getService(ClusterRole::ShardServer)
+                                      ->getServiceEntryPoint()
+                                      ->handleRequest(opCtx, requestOpMsg, start)
+                                      .get()
+                                      .response);
 
             // Document sequences are not yet being used for responses.
             invariant(replyOpMsg.sequences.empty());

@@ -113,7 +113,9 @@ public:
 
 class MockServiceEntryPoint : public ServiceEntryPoint {
 public:
-    Future<DbResponse> handleRequest(OperationContext* opCtx, const Message& request) override {
+    Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                     const Message& request,
+                                     Date_t started) override {
         return handleRequestCb(opCtx, request);
     }
 

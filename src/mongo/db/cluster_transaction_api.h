@@ -50,7 +50,8 @@ public:
     BSONObj maybeModifyCommand(BSONObj cmdObj) const override;
 
     Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) const override;
+                                     const Message& request,
+                                     Date_t started) const override;
 
     bool runsClusterOperations() const override {
         // Cluster commands will attach appropriate shard versions for any targeted namespaces, so

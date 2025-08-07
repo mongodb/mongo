@@ -106,7 +106,7 @@ int OpMsgFuzzerRouterFixture::testOneInput(const char* Data, size_t Size) {
     try {
         _serviceContext->getService()
             ->getServiceEntryPoint()
-            ->handleRequest(opCtx.get(), msg)
+            ->handleRequest(opCtx.get(), msg, _serviceContext->getFastClockSource()->now())
             .get();
     } catch (const AssertionException&) {
         // We need to catch exceptions caused by invalid inputs

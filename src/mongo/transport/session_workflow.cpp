@@ -381,7 +381,8 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
                                                              dbName, body["collection"].String()),
                                                          {CursorId{firstElement.Long()}})
                                    .toBSON())
-                               .serialize())
+                               .serialize(),
+                           client->getServiceContext()->getFastClockSource()->now())
             .get();
         return true;
     } catch (const DBException& e) {
@@ -567,7 +568,10 @@ private:
 
 class SessionWorkflow::Impl::WorkItem {
 public:
-    WorkItem(Impl* swf, Message in) : _swf{swf}, _in{std::move(in)} {}
+    WorkItem(Impl* swf, Message in)
+        : _swf{swf},
+          _in{std::move(in)},
+          _started(_swf->_serviceContext->getFastClockSource()->now()) {}
 
     bool isExhaust() const {
         return _isExhaust;
@@ -588,6 +592,10 @@ public:
 
     const Message& in() const {
         return _in;
+    }
+
+    Date_t started() const {
+        return _started;
     }
 
     void decompressRequest() {
@@ -649,6 +657,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     boost::optional<MessageCompressorId> _compressorId;
     boost::optional<Message> _out;
+    Date_t _started;
 };
 
 std::unique_ptr<SessionWorkflow::Impl::WorkItem> SessionWorkflow::Impl::_receiveRequest() {
@@ -781,7 +790,7 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
     // Pass sourced Message to handler to generate response.
     _work->initOperation();
 
-    return _sep->handleRequest(_work->opCtx(), _work->in());
+    return _sep->handleRequest(_work->opCtx(), _work->in(), _work->started());
 }
 
 void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {

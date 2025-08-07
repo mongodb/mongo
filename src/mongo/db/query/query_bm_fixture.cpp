@@ -67,10 +67,11 @@ void QueryBenchmarkFixture::runBenchmark(BSONObj filter,
         [&]() {
             Client& client = cc();
             auto opCtx = client.makeOperationContext();
-            auto statusWithResponse = client.getService()
-                                          ->getServiceEntryPoint()
-                                          ->handleRequest(opCtx.get(), msg)
-                                          .getNoThrow();
+            auto statusWithResponse =
+                client.getService()
+                    ->getServiceEntryPoint()
+                    ->handleRequest(opCtx.get(), msg, opCtx->fastClockSource().now())
+                    .getNoThrow();
             iassert(statusWithResponse);
             LOGV2_DEBUG(9278700,
                         1,

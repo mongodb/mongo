@@ -287,11 +287,13 @@ ProxiedConnection& ProxiedConnection::get(const std::shared_ptr<transport::Sessi
 class ServiceEntryPointBridge final : public ServiceEntryPoint {
 public:
     Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept final;
+                                     const Message& request,
+                                     Date_t started) noexcept final;
 };
 
 Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCtx,
-                                                          const Message& request) noexcept try {
+                                                          const Message& request,
+                                                          Date_t started) noexcept try {
     if (request.operation() == dbQuery) {
         DbMessage d(request);
         QueryMessage q(d);

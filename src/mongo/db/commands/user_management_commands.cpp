@@ -742,8 +742,12 @@ private:
             AlternativeClientRegion altClientRegion(_client);
             auto subOpCtx = serviceContext->makeOperationContext(Client::getCurrent());
             auth::ValidatedTenancyScope::set(subOpCtx.get(), _vts);
-            auto responseMessage =
-                serviceEntryPoint->handleRequest(subOpCtx.get(), requestMessage).get().response;
+            auto responseMessage = serviceEntryPoint
+                                       ->handleRequest(subOpCtx.get(),
+                                                       requestMessage,
+                                                       subOpCtx.get()->fastClockSource().now())
+                                       .get()
+                                       .response;
 
             auto replyObj = rpc::makeReply(&responseMessage)->getCommandReply().getOwned();
             uassertStatusOK(getStatusFromWriteCommandReply(replyObj));

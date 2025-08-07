@@ -236,7 +236,9 @@ class ServiceEntryPointUnimplemented : public ServiceEntryPoint {
 public:
     ServiceEntryPointUnimplemented() = default;
 
-    Future<DbResponse> handleRequest(OperationContext* opCtx, const Message& request) override {
+    Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                     const Message& request,
+                                     Date_t started) override {
         MONGO_UNREACHABLE;
     }
 };

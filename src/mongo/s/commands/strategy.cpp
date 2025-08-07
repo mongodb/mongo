@@ -617,7 +617,8 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
             opCtx, genericArgs.getMaxTimeMS(), invocation->isReadOperation());
         if (auto maxTimeMS = requestOrDefaultMaxTimeMS.value_or(Milliseconds{0});
             requestOrDefaultMaxTimeMS > Milliseconds::zero()) {
-            opCtx->setDeadlineAfterNowBy(maxTimeMS, ErrorCodes::MaxTimeMSExpired);
+            opCtx->setDeadlineByDate(_parc->_rec->getStarted() + maxTimeMS,
+                                     ErrorCodes::MaxTimeMSExpired);
         }
         opCtx->setUsesDefaultMaxTimeMS(usesDefaultMaxTimeMS);
     }

@@ -59,14 +59,19 @@ public:
     RequestExecutionContext(RequestExecutionContext&&) = delete;
     RequestExecutionContext& operator=(RequestExecutionContext&&) = delete;
 
-    RequestExecutionContext(OperationContext* opCtx, Message message)
+    RequestExecutionContext(OperationContext* opCtx, Message message, Date_t started)
         : _opCtx(opCtx),
           _message(std::move(message)),
-          _dbmsg(std::make_unique<DbMessage>(_message.get())) {}
+          _dbmsg(std::make_unique<DbMessage>(_message.get())),
+          _started(started) {}
 
     auto getOpCtx() const {
         dassert(_isOnClientThread());
         return _opCtx;
+    }
+
+    Date_t getStarted() const {
+        return _started;
     }
 
     const Message& getMessage() const {
@@ -114,6 +119,7 @@ private:
     OperationContext* const _opCtx;
     boost::optional<Message> _message;
     std::unique_ptr<DbMessage> _dbmsg;
+    const Date_t _started;
     boost::optional<OpMsgRequest> _request;
     Command* _command = nullptr;
     std::unique_ptr<rpc::ReplyBuilderInterface> _replyBuilder;

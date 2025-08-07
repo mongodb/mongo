@@ -223,10 +223,9 @@ void runCommandInvocation(const RequestExecutionContext& rec, CommandInvocation*
  */
 struct HandleRequest {
     // Maintains the context (e.g., opCtx and replyBuilder) required for command execution.
-    class ExecutionContext final : public RequestExecutionContext {
-    public:
-        ExecutionContext(OperationContext* opCtx, Message msg)
-            : RequestExecutionContext(opCtx, std::move(msg)) {}
+    struct ExecutionContext final : public RequestExecutionContext {
+        ExecutionContext(OperationContext* opCtx, Message msg, Date_t started)
+            : RequestExecutionContext(opCtx, std::move(msg), started) {}
         ~ExecutionContext() = default;
 
         Client& client() const {
@@ -273,8 +272,8 @@ struct HandleRequest {
         bool forceLog = false;
     };
 
-    HandleRequest(OperationContext* opCtx, const Message& msg)
-        : executionContext(opCtx, const_cast<Message&>(msg)) {}
+    HandleRequest(OperationContext* opCtx, const Message& msg, Date_t started)
+        : executionContext(opCtx, const_cast<Message&>(msg), started) {}
 
     void startOperation();
     DbResponse runOperation();
@@ -1566,10 +1565,6 @@ void ExecCommandDatabase::_initiateCommand() {
     auto replyBuilder = _execContext.getReplyBuilder();
     auto& genericArgs = _invocation->getGenericArguments();
 
-    // Record the time here to ensure that maxTimeMS, if set by the command, considers the time
-    // spent before the deadline is set on `opCtx`.
-    const auto startedCommandExecAt = opCtx->fastClockSource().now();
-
     Client* client = opCtx->getClient();
 
     // Start authz contract tracking before we evaluate failpoints
@@ -1755,10 +1750,10 @@ void ExecCommandDatabase::_initiateCommand() {
             if (!ignoreMaxTimeMSOpOnly && maxTimeMSOpOnly > Milliseconds::zero() &&
                 (maxTimeMS == Milliseconds::zero() || maxTimeMSOpOnly < maxTimeMS)) {
                 opCtx->storeMaxTimeMS(maxTimeMS);
-                opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMSOpOnly,
+                opCtx->setDeadlineByDate(_execContext.getStarted() + maxTimeMSOpOnly,
                                          ErrorCodes::MaxTimeMSExpired);
             } else if (maxTimeMS > Milliseconds::zero()) {
-                opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMS,
+                opCtx->setDeadlineByDate(_execContext.getStarted() + maxTimeMS,
                                          ErrorCodes::MaxTimeMSExpired);
             }
             opCtx->setUsesDefaultMaxTimeMS(genericArgs.getUsesDefaultMaxTimeMS().value_or(false) ||
@@ -2452,11 +2447,12 @@ void onHandleRequestException(const HandleRequest::ExecutionContext& context,
 }
 
 Future<DbResponse> ServiceEntryPointShardRole::handleRequest(OperationContext* opCtx,
-                                                             const Message& m) try {
+                                                             const Message& m,
+                                                             Date_t started) try {
     tassert(9391501,
             "Invalid ClusterRole in ServiceEntryPointShardRole",
             opCtx->getService()->role().hasExclusively(ClusterRole::ShardServer));
-    HandleRequest hr(opCtx, m);
+    HandleRequest hr(opCtx, m, started);
     hr.startOperation();
 
     try {

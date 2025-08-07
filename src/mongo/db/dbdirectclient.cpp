@@ -167,7 +167,10 @@ DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend)
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
-    return opCtx->getService()->getServiceEntryPoint()->handleRequest(opCtx, toSend).get();
+    return opCtx->getService()
+        ->getServiceEntryPoint()
+        ->handleRequest(opCtx, toSend, opCtx->fastClockSource().now())
+        .get();
 }
 }  // namespace
 

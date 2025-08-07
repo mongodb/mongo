@@ -82,8 +82,8 @@ namespace mongo {
 
 // Allows for decomposing `handleRequest` into parts and simplifies its execution.
 struct HandleRequest {
-    HandleRequest(OperationContext* opCtx, const Message& message)
-        : rec(opCtx, message),
+    HandleRequest(OperationContext* opCtx, const Message& message, Date_t started)
+        : rec(opCtx, message, started),
           op(message.operation()),
           msgId(message.header().getId()),
           nsString(getNamespaceString(rec.getDbMessage())) {}
@@ -189,8 +189,9 @@ DbResponse HandleRequest::run() {
 }
 
 Future<DbResponse> ServiceEntryPointRouterRole::handleRequestImpl(OperationContext* opCtx,
-                                                                  const Message& message) try {
-    auto hr = HandleRequest(opCtx, message);
+                                                                  const Message& message,
+                                                                  Date_t started) try {
+    auto hr = HandleRequest(opCtx, message, started);
     return hr.run();
 } catch (const DBException& ex) {
     auto status = ex.toStatus();
@@ -203,11 +204,12 @@ Future<DbResponse> ServiceEntryPointRouterRole::handleRequestImpl(OperationConte
 }
 
 Future<DbResponse> ServiceEntryPointRouterRole::handleRequest(OperationContext* opCtx,
-                                                              const Message& message) {
+                                                              const Message& message,
+                                                              Date_t started) {
     tassert(9391502,
             "Invalid ClusterRole in ServiceEntryPointRouterRole",
             opCtx->getService()->role().hasExclusively(ClusterRole::RouterServer));
-    return handleRequestImpl(opCtx, message);
+    return handleRequestImpl(opCtx, message, started);
 }
 
 }  // namespace mongo

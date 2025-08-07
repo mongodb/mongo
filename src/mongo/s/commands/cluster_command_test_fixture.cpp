@@ -166,7 +166,8 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
     }
 
     AlternativeClientRegion acr(client);
-    auto rec = RequestExecutionContext(opCtx.get(), opMsgRequest.serialize());
+    auto rec = RequestExecutionContext(
+        opCtx.get(), opMsgRequest.serialize(), opCtx.get()->fastClockSource().now());
     return Strategy::clientCommand(&rec);
 }
 

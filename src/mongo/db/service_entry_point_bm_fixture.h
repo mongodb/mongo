@@ -79,7 +79,8 @@ public:
 
     void doRequest(ServiceEntryPoint* sep, Client* client, Message& msg) {
         auto newOpCtx = client->makeOperationContext();
-        iassert(sep->handleRequest(newOpCtx.get(), msg).getNoThrow());
+        iassert(sep->handleRequest(newOpCtx.get(), msg, newOpCtx.get()->fastClockSource().now())
+                    .getNoThrow());
     }
 
     void runBenchmark(benchmark::State& state, BSONObj obj) {
