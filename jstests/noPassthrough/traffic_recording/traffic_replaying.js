@@ -92,6 +92,19 @@ assert.throwsWithCode(() => replayWorkloadRecordingFile("asdf"), ErrorCodes.Fail
 assert.throwsWithCode(() => replayWorkloadRecordingFile("foo", "bar", "baz"),
                       ErrorCodes.FailedToParse);
 
+// Invalid argument types
+const invalidValues = [1.1, {}, [], null, undefined, MinKey, MaxKey];
+for (let dirName of invalidValues) {
+    for (let clusterSpec of invalidValues) {
+        assert.throwsWithCode(() => replayWorkloadRecordingFile(dirName, clusterSpec),
+                              ErrorCodes.FailedToParse,
+                              [],
+                              {dirName, clusterSpec});
+    }
+}
+assert.throwsWithCode(() => replayWorkloadRecordingFile("foo", "bar", "baz"),
+                      ErrorCodes.FailedToParse);
+
 // Invalid directory
 assert.throwsWithCode(() => replayWorkloadRecordingFile("asdf", "asdf"), ErrorCodes.FileOpenFailed);
 
