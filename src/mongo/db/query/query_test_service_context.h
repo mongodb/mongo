@@ -31,6 +31,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
@@ -54,6 +55,32 @@ public:
 
 private:
     ServiceContext::UniqueServiceContext _serviceContext;
+    ServiceContext::UniqueClient _client;
+};
+
+/**
+ * QueryTestScopedGlobalServiceContext is a helper class for tests that require only a single Client
+ * under a single ScopedGlobalServiceContext for their execution context. The owned
+ * ScopedGlobalServiceContext is decorated with a CollatorFactoryMock.
+ */
+class QueryTestScopedGlobalServiceContext {
+public:
+    QueryTestScopedGlobalServiceContext();
+
+    ServiceContext* getServiceContext() const {
+        return _scopedGlobalServiceContext->getServiceContext();
+    }
+
+    Client* getClient() const {
+        return _client.get();
+    }
+
+    ServiceContext::UniqueOperationContext makeOperationContext() {
+        return getClient()->makeOperationContext();
+    }
+
+private:
+    std::unique_ptr<ScopedGlobalServiceContextForTest> _scopedGlobalServiceContext;
     ServiceContext::UniqueClient _client;
 };
 

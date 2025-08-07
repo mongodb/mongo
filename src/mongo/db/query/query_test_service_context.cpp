@@ -60,4 +60,11 @@ ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationCon
     return getClient()->makeOperationContext();
 }
 
+QueryTestScopedGlobalServiceContext::QueryTestScopedGlobalServiceContext()
+    : _scopedGlobalServiceContext(std::make_unique<ScopedGlobalServiceContextForTest>()),
+      _client(getServiceContext()->getService()->makeClient("query_test")) {
+    ShardingState::create(getServiceContext());
+    CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());
+}
+
 }  // namespace mongo

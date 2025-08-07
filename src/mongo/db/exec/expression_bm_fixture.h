@@ -32,7 +32,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
+#include "mongo/db/query/query_test_service_context.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_domain_global.h"
 #include "mongo/platform/random.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -47,13 +51,27 @@ namespace mongo {
 class ExpressionBenchmarkFixture : public benchmark::Fixture {
 private:
     static constexpr int32_t kSeed = 1;
+    static constexpr StringData _kLongHTMLString =
+        "<div class='sidenav'> <a href='#about'>About</a> <a href='#services'>Services</a> <a "
+        "href='#clients'>Clients</a> <a href='#contact'>Contact</a> <button "
+        "class='dropdown-btn'>Dropdown <i class='fa fa-caret-down'></i> </button> <div "
+        "class='dropdown-container'> <a href='#'>Link 1</a> <a href='#'>Link 2</a> <a "
+        "href='#'>Link 3</a> </div> <a href='#contact'>Search</a> </div>";
+    // Having the service context as a member of the benchmark fixture is needed to manage the
+    // lifetime of the JS engine. Not having a global service context would result in address
+    // sanitizer failures when cleaning up the test.
+    std::unique_ptr<QueryTestScopedGlobalServiceContext> _scopedGlobalServiceContext;
+
+protected:
+    QueryTestScopedGlobalServiceContext* getServiceContext() {
+        return _scopedGlobalServiceContext.get();
+    }
 
 public:
     ExpressionBenchmarkFixture() : random(kSeed) {}
 
-    void SetUp(benchmark::State& state) final {
-        QueryFCVEnvironmentForTest::setUp();
-    }
+    void SetUp(benchmark::State& state) final;
+    void TearDown(benchmark::State& state) final;
 
     void benchmarkExpression(BSONObj expressionSpec, benchmark::State& benchmarkState);
 
@@ -289,6 +307,18 @@ public:
     void benchmarkReduceCreatingNestedObject2(benchmark::State& state);
     void benchmarkReduceCreatingNestedObject4(benchmark::State& state);
     void benchmarkReduceCreatingNestedObject8(benchmark::State& state);
+
+    void benchmarkMQLReplaceOneRegex(benchmark::State& state);
+    void benchmarkJSReplaceOneRegex(benchmark::State& state);
+    void benchmarkMQLReplaceAllRegex(benchmark::State& state);
+    void benchmarkJSReplaceAllRegex(benchmark::State& state);
+    void benchmarkMQLSplitRegex(benchmark::State& state);
+    void benchmarkJSSplitRegex(benchmark::State& state);
+
+    void benchmarkMQLConvertToString(int32_t base, int32_t input, benchmark::State& state);
+    void benchmarkMQLConvertToInt(int32_t base, StringData input, benchmark::State& state);
+    void benchmarkJSConvertToString(int32_t base, int32_t input, benchmark::State& state);
+    void benchmarkJSConvertToInt(int32_t base, StringData input, benchmark::State& state);
 
 private:
     void testDateDiffExpression(long long startDate,
@@ -1066,6 +1096,94 @@ private:
                                                                                                 \
     BENCHMARK_F(Fixture, AddWithDottedFieldPath)(benchmark::State & state) {                    \
         benchmarkAddWithDottedFieldPath(state);                                                 \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLReplaceOneRegex)(benchmark::State & state) {                        \
+        benchmarkMQLReplaceOneRegex(state);                                                     \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSReplaceOneRegex)(benchmark::State & state) {                         \
+        benchmarkJSReplaceOneRegex(state);                                                      \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLReplaceAllRegex)(benchmark::State & state) {                        \
+        benchmarkMQLReplaceAllRegex(state);                                                     \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSReplaceAllRegex)(benchmark::State & state) {                         \
+        benchmarkJSReplaceAllRegex(state);                                                      \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLSplitRegex)(benchmark::State & state) {                             \
+        benchmarkMQLSplitRegex(state);                                                          \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSSplitRegex)(benchmark::State & state) {                              \
+        benchmarkJSSplitRegex(state);                                                           \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLConvertToStringBase2)(benchmark::State & state) {                   \
+        benchmarkMQLConvertToString(2, 2147483647, state);                                      \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLConvertToStringBase8)(benchmark::State & state) {                   \
+        benchmarkMQLConvertToString(8, 2147483647, state);                                      \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLConvertToStringBase10)(benchmark::State & state) {                  \
+        benchmarkMQLConvertToString(10, 2147483647, state);                                     \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLConvertToStringBase16)(benchmark::State & state) {                  \
+        benchmarkMQLConvertToString(16, 2147483647, state);                                     \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLConvertToIntBase2)(benchmark::State & state) {                      \
+        benchmarkMQLConvertToInt(2, "1111111111111111111111111111111"_sd, state);               \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLConvertToIntBase8)(benchmark::State & state) {                      \
+        benchmarkMQLConvertToInt(8, "17777777777"_sd, state);                                   \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLConvertToIntBase10)(benchmark::State & state) {                     \
+        benchmarkMQLConvertToInt(10, "2147483647"_sd, state);                                   \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLConvertToIntBase16)(benchmark::State & state) {                     \
+        benchmarkMQLConvertToInt(16, "7FFFFFFF"_sd, state);                                     \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSConvertToStringBase2)(benchmark::State & state) {                    \
+        benchmarkJSConvertToString(2, 2147483647, state);                                       \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSConvertToStringBase8)(benchmark::State & state) {                    \
+        benchmarkJSConvertToString(8, 2147483647, state);                                       \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSConvertToStringBase10)(benchmark::State & state) {                   \
+        benchmarkJSConvertToString(10, 2147483647, state);                                      \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSConvertToStringBase16)(benchmark::State & state) {                   \
+        benchmarkJSConvertToString(16, 2147483647, state);                                      \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSConvertToIntBase2)(benchmark::State & state) {                       \
+        benchmarkJSConvertToInt(2, "1111111111111111111111111111111"_sd, state);                \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSConvertToIntBase8)(benchmark::State & state) {                       \
+        benchmarkJSConvertToInt(8, "17777777777"_sd, state);                                    \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSConvertToIntBase10)(benchmark::State & state) {                      \
+        benchmarkJSConvertToInt(10, "2147483647"_sd, state);                                    \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSConvertToIntBase16)(benchmark::State & state) {                      \
+        benchmarkJSConvertToInt(16, "7FFFFFFF"_sd, state);                                      \
     }
 
 

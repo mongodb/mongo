@@ -34,7 +34,6 @@
 #include "mongo/db/exec/expression_bm_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/util/intrusive_counter.h"
 
 #include <memory>
@@ -50,8 +49,7 @@ class ClassicExpressionBenchmarkFixture : public ExpressionBenchmarkFixture {
     void benchmarkExpression(BSONObj expressionSpec,
                              benchmark::State& state,
                              const std::vector<Document>& documents) final {
-        QueryTestServiceContext testServiceContext;
-        auto opContext = testServiceContext.makeOperationContext();
+        auto opContext = getServiceContext()->makeOperationContext();
         NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.bm");
         auto exprContext = make_intrusive<ExpressionContextForTest>(opContext.get(), nss);
 

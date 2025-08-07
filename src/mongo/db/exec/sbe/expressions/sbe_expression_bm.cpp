@@ -98,8 +98,7 @@ public:
         RAIIServerParameterControllerForTest sbeUpgradeBinaryTreesFeatureFlag{
             "featureFlagSbeUpgradeBinaryTrees", true};
 
-        QueryTestServiceContext serviceContext;
-        auto opCtx = serviceContext.makeOperationContext();
+        auto opCtx = getServiceContext()->makeOperationContext();
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), kNss);
         auto expression =
             Expression::parseExpression(expCtx.get(), expressionSpec, expCtx->variablesParseState);
