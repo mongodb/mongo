@@ -3863,6 +3863,17 @@ TEST(IDLChainedStruct, TestInline) {
 
         ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
     }
+
+    // Positive: Test that comparison operators work with inline chained structs
+    {
+        auto testStruct2 = Chained_struct_inline::parse(ctxt, testDoc);
+        ASSERT_EQUALS(testStruct, testStruct2);
+        auto testDoc3 = BSON("stringField" << "axe"
+                                           << "field3"
+                                           << "foo");
+        auto testStruct3 = Chained_struct_inline::parse(ctxt, testDoc3);
+        ASSERT_GT(testStruct, testStruct3);
+    }
 }
 
 TEST(IDLChainedStruct, TestInlinedGettersAndSetters) {

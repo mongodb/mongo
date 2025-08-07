@@ -257,6 +257,7 @@ class Field(common.SourceLocation):
         self.cpp_name = None  # type: str
         self.optional = False  # type: bool
         self.ignore = False  # type: bool
+        # True if this field is a chained struct.
         self.chained = False  # type: bool
         self.comparison_order = -1  # type: int
         self.non_const_getter = False  # type: bool

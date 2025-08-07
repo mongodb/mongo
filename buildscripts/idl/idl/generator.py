@@ -972,6 +972,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     for field in struct.fields
                     if (not field.ignore and not (field.type and field.type.internal_only))
                     and field.comparison_order != -1
+                    and not field.chained_struct_field
                 ],
                 key=lambda f: f.comparison_order,
             )
