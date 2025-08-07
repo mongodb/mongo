@@ -30,24 +30,41 @@ describe("listShards correct functionality test", function() {
         this.st = new ShardingTest(
             {name: 'listShardsTest', shards: 1, mongos: 1, other: {useHostname: true}});
 
-        // add replica set named 'repl'
+        // add replica set named 'repl1'
         this.rs1 = new ReplSetTest(
-            {name: 'repl', nodes: 1, useHostName: true, nodeOptions: {shardsvr: ""}});
-        this.rs1.startSet();
-        this.rs1.initiate();
+            {name: 'repl1', nodes: 1, useHostName: true, nodeOptions: {shardsvr: ""}});
+
+        // add replica set named 'repl2'
+        this.rs2 = new ReplSetTest(
+            {name: 'repl2', nodes: 1, useHostName: true, nodeOptions: {shardsvr: ""}});
 
         this.mongos = this.st.s0;
     });
 
-    afterEach(() => {
-        /// Restart the replica set
-        this.rs1.stopSet();
-        this.rs1.startSet({shardsvr: ""});
+    beforeEach(() => {
+        this.rs1.startSet();
         this.rs1.initiate();
+
+        this.rs2.startSet();
+        this.rs2.initiate();
+
+        // Add the replica set to the cluster
+        assert.commandWorked(this.st.admin.runCommand({addShard: this.rs1.getURL()}));
+    });
+
+    afterEach(() => {
+        removeShard(this.st, 'repl1');
+        removeShard(this.st, 'repl2');
+
+        /// Stop the replica sets
+        this.rs1.stopSet();
+        this.rs2.stopSet();
+
+        // Check that the number of shards remains the same after each test case
+        assert.eq(1, this.st.s.getDB("config").shards.count());
     });
 
     after(() => {
-        this.rs1.stopSet();
         this.st.stop();
     });
 
@@ -55,34 +72,29 @@ describe("listShards correct functionality test", function() {
         const res = this.mongos.adminCommand('listShards');
         assert.commandWorked(res, 'listShards command failed');
         const shardsArray = res.shards;
-        assert.eq(shardsArray.length, 1);
+        assert.eq(shardsArray.length, 2);
     });
 
     it("listShards returns correct shards after adding new shard", () => {
         // Add the replica set to the cluster
-        let res = this.st.admin.runCommand({addShard: this.rs1.getURL()});
+        let res = this.st.admin.runCommand({addShard: this.rs2.getURL()});
         assert.commandWorked(res, 'addShard command failed');
         res = this.mongos.adminCommand('listShards');
         assert.commandWorked(res, 'listShards command failed');
         const shardsArray = res.shards;
-        assert.eq(shardsArray.length, 2);
-        assert(this.checkShardName('repl', shardsArray),
+        assert.eq(shardsArray.length, 3);
+        assert(this.checkShardName('repl2', shardsArray),
                'listShards command didn\'t return replica set shard: ' + tojson(shardsArray));
-        // remove 'repl' shard
-        removeShard(this.st, 'repl');
     });
 
     it("listShards returns correct shards after removing a shard", () => {
-        // Add the replica set to the cluster
-        let res = this.st.admin.runCommand({addShard: this.rs1.getURL()});
-        assert.commandWorked(res, 'addShard command failed');
-        // remove 'repl' shard
-        removeShard(this.st, 'repl');
-        res = this.mongos.adminCommand('listShards');
+        // remove 'repl1' shard
+        removeShard(this.st, 'repl1');
+        const res = this.mongos.adminCommand('listShards');
         assert.commandWorked(res, 'listShards command failed');
         const shardsArray = res.shards;
         assert.eq(shardsArray.length, 1);
-        assert(!this.checkShardName('repl', shardsArray),
+        assert(!this.checkShardName('repl1', shardsArray),
                'listShards command returned removed replica set shard: ' + tojson(shardsArray));
     });
 
@@ -90,58 +102,36 @@ describe("listShards correct functionality test", function() {
         if (this.isMultiversion) {
             return;
         }
-        // Add the replica set to the cluster
-        const res = this.st.admin.runCommand({addShard: this.rs1.getURL()});
-        assert.commandWorked(res, 'addShard command failed');
-        // Start draining the 'repl' shard
-        const start_draining = this.st.admin.runCommand({startShardDraining: 'repl'});
-        assert.commandWorked(start_draining, 'startShardDraining command failed');
+        assert.commandWorked(this.st.admin.runCommand({startShardDraining: 'repl1'}));
         // Check that filter only returns draining shards
         const draining = this.st.admin.runCommand({listShards: 1, filter: {draining: true}});
         assert.commandWorked(draining, 'listShards command failed');
         const shardsArray = draining.shards;
         assert.eq(shardsArray.length, 1);
-        assert(this.checkShardName('repl', shardsArray),
+        assert(this.checkShardName('repl1', shardsArray),
                'listShards command didn\'t return the draining shard: ' + tojson(shardsArray));
-        // remove 'repl' shard
-        removeShard(this.st, 'repl');
     });
 
     it("listShards 'draining : false' filter returns only the non-draining shards", () => {
         if (this.isMultiversion) {
             return;
         }
-        // Add the replica set to the cluster
-        const res = this.st.admin.runCommand({addShard: this.rs1.getURL()});
-        assert.commandWorked(res, 'addShard command failed');
-        // Start draining the 'repl' shard
-        const start_draining = this.st.admin.runCommand({startShardDraining: 'repl'});
-        assert.commandWorked(start_draining, 'startShardDraining command failed');
+        assert.commandWorked(this.st.admin.runCommand({startShardDraining: 'repl1'}));
         const non_draining = this.st.admin.runCommand({listShards: 1, filter: {draining: false}});
         assert.commandWorked(non_draining);
         const shardsArray = non_draining.shards;
         assert.eq(shardsArray.length, 1);
         assert(this.checkShardName(this.st.shard0.shardName, shardsArray),
                'listShards command didn\'t return the non-draining shard: ' + tojson(shardsArray));
-        // remove 'repl' shard
-        removeShard(this.st, 'repl');
     });
 
     it("listShards wrong draining filter value throws error", () => {
         if (this.isMultiversion) {
             return;
         }
-        // Add the replica set to the cluster
-        const res = this.st.admin.runCommand({addShard: this.rs1.getURL()});
-        assert.commandWorked(res, 'addShard command failed');
-        // Start draining the 'repl' shard
-        const start_draining = this.st.admin.runCommand({startShardDraining: 'repl'});
-        assert.commandWorked(start_draining, 'startShardDraining command failed');
         assert.commandFailedWithCode(
             this.st.admin.runCommand({listShards: 1, filter: {draining: 1}}),
             ErrorCodes.TypeMismatch);
-        // remove 'repl' shard
-        removeShard(this.st, 'repl');
     });
 
     it("listShards unknown filter throws error", () => {
@@ -150,7 +140,7 @@ describe("listShards correct functionality test", function() {
         }
         // Call listShards with unknown filter
         assert.commandFailedWithCode(
-            this.st.admin.runCommand({listShards: 1, filter: {_id: this.st.shard0.shardName}}),
+            this.st.admin.runCommand({listShards: 1, filter: {droining: true}}),
             ErrorCodes.IDLUnknownField);
     });
 
@@ -158,22 +148,15 @@ describe("listShards correct functionality test", function() {
         if (this.isMultiversion) {
             return;
         }
-        // Add the replica set to the cluster
-        let res = this.st.admin.runCommand({addShard: this.rs1.getURL()});
-        assert.commandWorked(res, 'addShard command failed');
-        // Start draining the 'repl' shard
-        const start_draining = this.st.admin.runCommand({startShardDraining: 'repl'});
-        assert.commandWorked(start_draining, 'startShardDraining command failed');
-        // Stop draining the 'repl' shard
-        const stop_draining = this.st.admin.runCommand({stopShardDraining: 'repl'});
+        assert.commandWorked(this.st.admin.runCommand({startShardDraining: 'repl1'}));
+        // Stop draining the 'repl1' shard
+        const stop_draining = this.st.admin.runCommand({stopShardDraining: 'repl1'});
         assert.commandWorked(stop_draining);
-        // Check that filter doesn't return any shards
-        res = this.st.admin.runCommand({listShards: 1, filter: {draining: true}});
+        // Check that filter doesn't return the 'repl1' shard
+        const res = this.st.admin.runCommand({listShards: 1, filter: {draining: true}});
         assert.commandWorked(res, 'listShards command failed');
         const shardsArray = res.shards;
         assert.eq(shardsArray.length, 0);
-        // remove 'repl' shard
-        removeShard(this.st, 'repl');
     });
 
     it("listShards with draining filter and unknown filters throws error", () => {
@@ -181,8 +164,7 @@ describe("listShards correct functionality test", function() {
             return;
         }
         assert.commandFailedWithCode(
-            this.st.admin.runCommand(
-                {listShards: 1, filter: {draining: true, _id: this.st.shard0.shardName}}),
+            this.st.admin.runCommand({listShards: 1, filter: {draining: true, droining: true}}),
             ErrorCodes.IDLUnknownField);
     });
 });
