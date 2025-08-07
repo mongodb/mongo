@@ -1,0 +1,259 @@
+#!/usr/bin/env python
+#
+# Public Domain 2014-present MongoDB, Inc.
+# Public Domain 2008-2014 WiredTiger, Inc.
+#
+# This is free and unencumbered software released into the public domain.
+#
+# Anyone is free to copy, modify, publish, use, compile, sell, or
+# distribute this software, either in source code form or as a compiled
+# binary, for any purpose, commercial or non-commercial, and by any
+# means.
+#
+# In jurisdictions that recognize copyright laws, the author or authors
+# of this software dedicate any and all copyright interest in the
+# software to the public domain. We make this dedication for the benefit
+# of the public at large and to the detriment of our heirs and
+# successors. We intend this dedication to be an overt act of
+# relinquishment in perpetuity of all present and future rights to this
+# software under copyright law.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
+import wiredtiger, wttest
+
+# Tests checkpoint behavior for prepared modify operations:
+# - Stable prepares written as prepared
+# - Committed/rolled back properly handled
+# FIXME: Verify that prepared modifies are reconstructed properly when loaded from disk
+
+class test_prepare34(wttest.WiredTigerTestCase):
+    conn_config = 'checkpoint=(precise=true),preserve_prepared=true,statistics=(all)'
+    uri = 'table:test_prepare34'
+
+    def get_stats(self, stats):
+        """Get the current values of multiple statistics."""
+        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
+        results = {}
+        for stat in stats:
+            results[stat] = stat_cursor[stat][2]
+        stat_cursor.close()
+        return results
+
+    def checkpoint_and_verify_stats(self, expected_changes):
+        """
+        Perform a checkpoint and verify the expected changes in multiple statistics.
+
+        Args:
+            expected_changes: Dict mapping stat -> bool
+                             where True means expect increase, False means expect no change
+        """
+        stats_to_check = list(expected_changes.keys())
+        old_stats = self.get_stats(stats_to_check)
+
+        self.session.checkpoint()
+
+        new_stats = self.get_stats(stats_to_check)
+
+        for stat, expect_increase in expected_changes.items():
+            diff = new_stats[stat] - old_stats[stat]
+            if expect_increase:
+                self.assertGreater(diff, 0,
+                    f"Stat {stat}: expected increase, got diff {diff}")
+            else:
+                self.assertEqual(diff, 0,
+                    f"Stat {stat}: expected no change, got diff {diff}")
+
+        return new_stats
+
+    def test_rollback_prepare_modify(self):
+        """
+        Test that prepared transactions containing modify operations that are rolled back
+        do not affect checkpoint behavior or data reconstruction.
+        """
+        value = 'aaaaa'
+        # Set initial timestamps
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
+
+        if 'disagg' in self.hook_names:
+            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
+
+        uri = 'table:test_prepare34'
+        create_params = 'key_format=i,value_format=S'
+        self.session.create(self.uri, create_params)
+
+        # Insert baseline data that will remain unaffected
+        cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
+        for i in range(1, 21):  # Keys 1-20
+            cursor.set_key(i)
+            cursor.set_value(value)
+            cursor.insert()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
+        # cursor.close()
+
+        # Advance stable timestamp after baseline commit
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
+
+        # Initial checkpoint should write baseline data, no prepared content
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_prepared: False,
+        })
+
+        # Create a prepared transaction with modify operations
+        session_prepare = self.conn.open_session()
+        cursor_prepare = session_prepare.open_cursor(self.uri)
+        session_prepare.begin_transaction()
+
+        for i in range(1, 21):
+            cursor_prepare.set_key(i)
+            modifications = [wiredtiger.Modify('b', 0, 1)]  # Modify 'aaaaa' to `baaaaa`
+            self.assertEqual(cursor_prepare.modify(modifications), 0)
+
+        for i in range(1, 21):
+            cursor_prepare.set_key(i)
+            modifications = [wiredtiger.Modify('d', 0, 1)]  # Modify 'baaaaa' to `dbaaaaa`
+            self.assertEqual(cursor_prepare.modify(modifications), 0)
+        # Prepare the transaction at timestamp 70
+        session_prepare.prepare_transaction('prepare_timestamp=' + self.timestamp_str(70)+',prepared_id=' + self.prepared_id_str(1))
+
+        # Checkpoint while transaction is prepared but stable timestamp is before prepare timestamp
+        # Should not write any prepared content since stable timestamp (40) < prepare timestamp (70)
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_prepared: False,
+        })
+
+        # Now rollback the prepared transaction at timestamp 80
+        session_prepare.rollback_transaction('rollback_timestamp='+ self.timestamp_str(80))
+
+        # Move stable timestamp to after prepare timestamp but before committing
+        # Should write prepared modifies to disk
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(75))
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_prepared: True,
+        })
+
+        self.session.begin_transaction('read_timestamp='+ self.timestamp_str(75)+ ',isolation=read-uncommitted')
+        for i in range(1, 21):
+            self.assertEqual(value, cursor[i])
+        self.session.rollback_transaction()
+
+        # Write aborted update to disk when rollback ts is stable
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(80))
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_prepared: False,
+            wiredtiger.stat.dsrc.rec_time_window_stop_ts: False,
+            wiredtiger.stat.dsrc.rec_time_window_start_ts: True,
+        })
+
+        self.session.begin_transaction('read_timestamp='+ self.timestamp_str(75))
+        for i in range(1, 21):
+            self.assertEqual(value, cursor[i])
+        self.session.rollback_transaction()
+
+
+    def test_commit_prepare_modify(self):
+        """
+        Test that prepared transactions containing modify operations that are rolled back
+        do not affect checkpoint behavior or data reconstruction.
+        """
+        value = 'aaaaa'
+        # Set initial timestamps
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
+        if 'disagg' in self.hook_names:
+            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
+
+        create_params = 'key_format=i,value_format=S'
+        self.session.create(self.uri, create_params)
+
+        # Insert baseline data that will remain unaffected
+        cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
+        for i in range(1, 21):  # Keys 1-20
+            cursor.set_key(i)
+            self.session.breakpoint()
+            cursor.set_value(value)
+            cursor.insert()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
+
+        # Advance stable timestamp after baseline commit
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
+
+        # Initial checkpoint should write baseline data, no prepared content
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_prepared: False,
+        })
+
+        # Create a prepared transaction with modify operations
+        session_prepare = self.conn.open_session()
+        cursor_prepare = session_prepare.open_cursor(self.uri)
+        session_prepare.begin_transaction()
+
+        for i in range(1, 21):
+            cursor_prepare.set_key(i)
+
+            modifications = [wiredtiger.Modify('b', 0, 0)]  # Modify 'aaaaa' to `baaaaa`
+            self.assertEqual(cursor_prepare.modify(modifications), 0)
+
+        for i in range(1, 21):
+            cursor_prepare.set_key(i)
+
+            modifications = [wiredtiger.Modify('d', 0, 0)]  # Modify `baaaaa` to 'dbaaaaa'
+            self.assertEqual(cursor_prepare.modify(modifications), 0)
+
+        # Prepare the transaction at timestamp 70
+        session_prepare.prepare_transaction('prepare_timestamp=' + self.timestamp_str(70)+',prepared_id=' + self.prepared_id_str(1))
+
+        # Checkpoint while transaction is prepared but stable timestamp is before prepare timestamp
+        # Should not write any prepared content since stable timestamp (40) < prepare timestamp (70)
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_prepared: False,
+        })
+
+        # Now rollback the prepared transaction at timestamp 80
+        session_prepare.commit_transaction('commit_timestamp='+ self.timestamp_str(80)+',durable_timestamp='+self.timestamp_str(90))
+
+        # Move stable timestamp to after prepare timestamp but before committing
+        # Should write prepared modifies to disk
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(75))
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_prepared: True,
+        })
+
+        # Write prepare update to disk when prepare ts is stable but durable timestamp is not stable
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(80))
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_prepared: True,
+        })
+
+        # Write committed update to disk when prepare ts is stable but durable timestamp is not stable
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(95))
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_durable_start_ts: True,
+            wiredtiger.stat.dsrc.rec_time_window_start_ts: True,
+            wiredtiger.stat.dsrc.rec_time_window_start_txn: True,
+            wiredtiger.stat.dsrc.rec_time_window_durable_stop_ts: False,
+            wiredtiger.stat.dsrc.rec_time_window_stop_ts: False,
+            wiredtiger.stat.dsrc.rec_time_window_stop_txn: False,
+            wiredtiger.stat.dsrc.rec_time_window_prepared: False,
+        })
+
+        self.session.begin_transaction('read_timestamp='+ self.timestamp_str(75))
+        for i in range(1, 21):
+            self.assertEqual(value, cursor[i])
+        self.session.rollback_transaction()
+
+        self.session.begin_transaction('read_timestamp='+ self.timestamp_str(81))
+        for i in range(1, 21):
+            self.assertEqual('dbaaaaa', cursor[i])
+        self.session.rollback_transaction()
+
+

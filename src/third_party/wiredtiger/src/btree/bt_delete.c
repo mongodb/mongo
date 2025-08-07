@@ -308,10 +308,9 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
              */
             for (; *updp != NULL; ++updp) {
                 /* The ref is locked, no need to pay attention to memory ordering here. */
-                if (F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK)) {
+                if (F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK))
                     (*updp)->upd_rollback_ts = txn->rollback_timestamp;
-                    (*updp)->upd_saved_txnid = (*updp)->txnid;
-                }
+                (*updp)->upd_saved_txnid = (*updp)->txnid;
                 (*updp)->txnid = WT_TXN_ABORTED;
             }
             /* Now discard the updates. */

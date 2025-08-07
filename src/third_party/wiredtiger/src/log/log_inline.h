@@ -45,7 +45,7 @@ __wti_log_record_byteswap(WT_LOG_RECORD *record)
 
 /*
  * __wt_log_cmp --
- *     Compare 2 LSNs, return -1 if lsn1 < lsn2, 0if lsn1 == lsn2 and 1 if lsn1 > lsn2.
+ *     Compare 2 LSNs, return -1 if lsn1 < lsn2, 0 if lsn1 == lsn2 and 1 if lsn1 > lsn2.
  */
 static WT_INLINE int
 __wt_log_cmp(WT_LSN *lsn1, WT_LSN *lsn2)

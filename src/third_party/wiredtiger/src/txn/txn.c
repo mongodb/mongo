@@ -1081,11 +1081,12 @@ __txn_search_prepared_op(
 }
 
 /*
- * __txn_append_tombstone --
- *     Append a tombstone to the end of a keys update chain.
+ * __txn_prepare_rollback_delete_key --
+ *     Prepend a global visible tombstone to the head of the update chain to delete the key for
+ *     prepare rollback.
  */
 static int
-__txn_append_tombstone(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_CURSOR_BTREE *cbt)
+__txn_prepare_rollback_delete_key(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_CURSOR_BTREE *cbt)
 {
     WT_BTREE *btree;
     WT_DECL_RET;
@@ -1096,6 +1097,7 @@ __txn_append_tombstone(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_CURSOR_BTREE 
     btree = S2BT(session);
 
     WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, &not_used));
+    F_SET(tombstone, WT_UPDATE_PREPARE_ROLLBACK);
     WT_WITH_BTREE(session, op->btree,
       ret = btree->type == BTREE_ROW ?
         __wt_row_modify(cbt, &cbt->iface.key, NULL, &tombstone, WT_UPDATE_INVALID, false, false) :
@@ -1184,7 +1186,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     WT_PAGE *page;
     WT_TIME_WINDOW tw;
     WT_TXN *txn;
-    WT_UPDATE *first_committed_upd, *upd, *upd_followed_tombstone;
+    WT_UPDATE *first_committed_upd, *upd;
     WT_UPDATE *head_upd;
     uint8_t hs_recno_key_buf[WT_INTPACK64_MAXSIZE], *p, resolve_case;
     char ts_string[3][WT_TS_INT_STRING_SIZE];
@@ -1334,6 +1336,25 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         resolve_case = RESOLVE_UPDATE_CHAIN;
 
     switch (resolve_case) {
+    case RESOLVE_UPDATE_CHAIN:
+        /*
+         * If checkpoint writes a prepared update to disk, we may end up here with the first
+         * committed update already in the history store. Mark it to be deleted from the history
+         * store.
+         */
+        if (first_committed_upd != NULL && F_ISSET(first_committed_upd, WT_UPDATE_HS) &&
+          !F_ISSET(first_committed_upd, WT_UPDATE_TO_DELETE_FROM_HS)) {
+            WT_ASSERT(session, F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED));
+            if (!commit) {
+                __wt_txn_mark_upd_to_delete_from_hs(session, first_committed_upd);
+                break;
+            }
+
+            goto fix_hs;
+        }
+
+        break;
+
     case RESOLVE_PREPARE_EVICTION_FAILURE:
         /*
          * If we see the first committed update has been moved to the history store, we must have
@@ -1353,23 +1374,13 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
          * be deleted from the history store.
          */
         if (!commit) {
-            if (first_committed_upd->type == WT_UPDATE_TOMBSTONE) {
-                for (upd_followed_tombstone = first_committed_upd->next;
-                     upd_followed_tombstone != NULL;
-                     upd_followed_tombstone = upd_followed_tombstone->next)
-                    if (upd_followed_tombstone->txnid != WT_TXN_ABORTED)
-                        break;
-                /* We may not find a full update following the tombstone if it is obsolete. */
-                if (upd_followed_tombstone != NULL) {
-                    WT_ASSERT(session, F_ISSET(upd_followed_tombstone, WT_UPDATE_HS));
-                    F_SET(first_committed_upd, WT_UPDATE_TO_DELETE_FROM_HS);
-                    F_SET(upd_followed_tombstone, WT_UPDATE_TO_DELETE_FROM_HS);
-                }
-            } else
-                F_SET(first_committed_upd, WT_UPDATE_TO_DELETE_FROM_HS);
+            __wt_txn_mark_upd_to_delete_from_hs(session, first_committed_upd);
+            break;
         }
+
         /* Fall through. */
     case RESOLVE_PREPARE_ON_DISK:
+fix_hs:
         /*
          * Open a history store table cursor and scan the history store for the given btree and key
          * with maximum start timestamp to let the search point to the last version of the key.
@@ -1417,28 +1428,28 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
              * and instead write nothing.
              */
             if (!commit)
-                WT_ERR(__txn_append_tombstone(session, op, cbt));
+                WT_ERR(__txn_prepare_rollback_delete_key(session, op, cbt));
         }
         break;
     case RESOLVE_IN_MEMORY:
         /*
          * For in-memory configurations of WiredTiger if a prepared update is reconciled and then
-         * rolled back the on-page value will not be marked as aborted until the next eviction. In
-         * the special case where this rollback results in the update chain being entirely comprised
-         * of aborted updates other transactions attempting to write to the same key will look at
-         * the on-page value, think the prepared transaction is still active, and falsely report a
-         * write conflict. To prevent this scenario append a tombstone to the update chain when
-         * rolling back a prepared reconciled update would result in only aborted updates on the
-         * update chain.
+         * rolled back, the on-page value will not be marked as aborted until the next eviction. In
+         * the special case where this rollback operation results in the update chain being entirely
+         * comprised of aborted updates, other transactions attempting to write to the same key will
+         * look at the on-page value, think the prepared transaction is still active, and falsely
+         * report a write conflict. To prevent this scenario, prepend a tombstone to the update
+         * chain.
          */
         if (!commit && first_committed_upd == NULL) {
             tw_found = __wt_read_cell_time_window(cbt, &tw);
             if (tw_found && WT_TIME_WINDOW_HAS_PREPARE(&tw))
-                WT_ERR(__txn_append_tombstone(session, op, cbt));
+                WT_ERR(__txn_prepare_rollback_delete_key(session, op, cbt));
         }
         break;
     default:
-        WT_ASSERT(session, resolve_case == RESOLVE_UPDATE_CHAIN);
+        WT_ERR_PANIC(
+          session, WT_PANIC, "invalid prepared operation resolve case: %d", resolve_case);
         break;
     }
 

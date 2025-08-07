@@ -68,30 +68,46 @@
       (tw1)->stop_txn == (tw2)->stop_txn && (tw1)->stop_prepared_id == (tw2)->stop_prepared_id && \
       (tw1)->stop_prepare_ts == (tw2)->stop_prepare_ts)
 
-/* Set the start values of a time window from those in an update structure. */
-#define WT_TIME_WINDOW_SET_START(tw, upd, prepare_state)                                    \
-    do {                                                                                    \
-        (tw)->start_txn = (upd)->txnid;                                                     \
-        if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) { \
-            (tw)->start_prepare_ts = (upd)->prepare_ts;                                     \
-            (tw)->start_prepared_id = (upd)->prepared_id;                                   \
-        } else {                                                                            \
-            (tw)->start_ts = (upd)->upd_start_ts;                                           \
-            (tw)->durable_start_ts = (upd)->upd_durable_ts;                                 \
-        }                                                                                   \
+/*
+ * Set the start values of a time window from those in an update structure. We can race with
+ * prepared rollback. If we read an aborted transaction id in the first attempt, get the transaction
+ * id from the saved transaction id.
+ */
+#define WT_TIME_WINDOW_SET_START(tw, upd, write_prepare)    \
+    do {                                                    \
+        (tw)->start_txn = (upd)->txnid;                     \
+        if (write_prepare) {                                \
+            (tw)->start_prepare_ts = (upd)->prepare_ts;     \
+            (tw)->start_prepared_id = (upd)->prepared_id;   \
+            if ((tw)->start_txn == WT_TXN_ABORTED) {        \
+                WT_ACQUIRE_BARRIER();                       \
+                (tw)->start_txn = (upd)->upd_saved_txnid;   \
+            }                                               \
+        } else {                                            \
+            (tw)->start_ts = (upd)->upd_start_ts;           \
+            (tw)->durable_start_ts = (upd)->upd_durable_ts; \
+        }                                                   \
     } while (0)
 
-/* Set the stop values of a time window from those in an update structure. */
-#define WT_TIME_WINDOW_SET_STOP(tw, upd, prepare_state)                                     \
-    do {                                                                                    \
-        (tw)->stop_txn = (upd)->txnid;                                                      \
-        if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) { \
-            (tw)->stop_prepare_ts = (upd)->prepare_ts;                                      \
-            (tw)->stop_prepared_id = (upd)->prepared_id;                                    \
-        } else {                                                                            \
-            (tw)->stop_ts = (upd)->upd_start_ts;                                            \
-            (tw)->durable_stop_ts = (upd)->upd_durable_ts;                                  \
-        }                                                                                   \
+/*
+ * Set the stop values of a time window from those in an update structure. We can race with prepared
+ * rollback. If we read an aborted transaction id in the first attempt, get the transaction id from
+ * the saved transaction id.
+ */
+#define WT_TIME_WINDOW_SET_STOP(tw, upd, write_prepare)    \
+    do {                                                   \
+        (tw)->stop_txn = (upd)->txnid;                     \
+        if (write_prepare) {                               \
+            (tw)->stop_prepare_ts = (upd)->prepare_ts;     \
+            (tw)->stop_prepared_id = (upd)->prepared_id;   \
+            if ((tw)->stop_txn == WT_TXN_ABORTED) {        \
+                WT_ACQUIRE_BARRIER();                      \
+                (tw)->stop_txn = (upd)->upd_saved_txnid;   \
+            }                                              \
+        } else {                                           \
+            (tw)->stop_ts = (upd)->upd_start_ts;           \
+            (tw)->durable_stop_ts = (upd)->upd_durable_ts; \
+        }                                                  \
     } while (0)
 
 /* Copy the start values of a time window from another time window. */

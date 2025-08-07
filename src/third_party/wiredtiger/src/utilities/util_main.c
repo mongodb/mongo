@@ -84,8 +84,8 @@ main(int argc, char *argv[])
     size_t len;
     int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
     char *p, *secretkey;
-    const char *cmd_config, *conn_config, *live_restore_path, *metadata_config, *p1, *p2, *p3,
-      *readonly_config, *rec_config, *salvage_config, *session_config;
+    const char *cmd_config, *conn_config, *live_restore_path, *p1, *p2, *p3, *rec_config,
+      *session_config;
     bool backward_compatible, disable_prefetch, logoff, meta_verify, readonly, recover, salvage;
 
     conn = NULL;
@@ -107,8 +107,7 @@ main(int argc, char *argv[])
         return (EXIT_FAILURE);
     }
 
-    cmd_config = conn_config = live_restore_path = metadata_config = readonly_config =
-      salvage_config = session_config = secretkey = NULL;
+    cmd_config = conn_config = live_restore_path = session_config = secretkey = NULL;
     /*
      * We default to returning an error if recovery needs to be run. Generally we expect this to be
      * run after a clean shutdown. The printlog command disables logging entirely. If recovery is
@@ -148,7 +147,6 @@ main(int argc, char *argv[])
             live_restore_path = __wt_optarg;
             break;
         case 'm': /* verify metadata on connection open */
-            metadata_config = VERIFY_METADATA;
             meta_verify = true;
             break;
         case 'p':
@@ -159,11 +157,9 @@ main(int argc, char *argv[])
             recover = true;
             break;
         case 'r':
-            readonly_config = READONLY;
             readonly = true;
             break;
         case 'S': /* salvage */
-            salvage_config = SALVAGE;
             salvage = true;
             break;
         case 'V': /* version */
@@ -300,12 +296,12 @@ open:
         len += strlen(live_restore_path) + strlen("true");
     else
         len += strlen("false");
-    if (metadata_config != NULL)
-        len += strlen(metadata_config);
-    if (readonly_config != NULL)
-        len += strlen(readonly_config);
-    if (salvage_config != NULL)
-        len += strlen(salvage_config);
+    if (meta_verify)
+        len += strlen(VERIFY_METADATA);
+    if (readonly)
+        len += strlen(READONLY);
+    if (salvage)
+        len += strlen(SALVAGE);
     if (secretkey != NULL) {
         len += strlen(secretkey) + 30;
         p1 = ",encryption=(secretkey=";
@@ -322,10 +318,8 @@ open:
            "s",
            conn_config == NULL ? "" : conn_config, cmd_config == NULL ? "" : cmd_config,
            live_restore_path == NULL ? "false" : "true",
-           live_restore_path == NULL ? "" : live_restore_path,
-           metadata_config == NULL ? "" : metadata_config,
-           readonly_config == NULL ? "" : readonly_config, rec_config,
-           salvage_config == NULL ? "" : salvage_config, p1, p2, p3)) != 0) {
+           live_restore_path == NULL ? "" : live_restore_path, meta_verify ? VERIFY_METADATA : "",
+           readonly ? READONLY : "", rec_config, salvage ? SALVAGE : "", p1, p2, p3)) != 0) {
         (void)util_err(NULL, ret, NULL);
         goto err;
     }

@@ -412,7 +412,9 @@ __wt_modify_reconstruct_from_upd_list(WT_SESSION_IMPL *session, WT_CURSOR_BTREE 
     WT_UPDATE *upd;
     WT_UPDATE_VECTOR modifies;
     size_t base_value_size, item_offset, max_memsize;
-    bool onpage_retry;
+    uint64_t txnid;
+    uint8_t prepare_state;
+    bool onpage_retry, check_prepare;
 
     WT_ASSERT(session, modify->type == WT_UPDATE_MODIFY);
 
@@ -421,6 +423,7 @@ __wt_modify_reconstruct_from_upd_list(WT_SESSION_IMPL *session, WT_CURSOR_BTREE 
     upd_value->tw.durable_start_ts = modify->upd_durable_ts;
     upd_value->tw.start_txn = modify->txnid;
     onpage_retry = true;
+    txnid = WT_TS_NONE;
 
     /*
      * It is possible that a read-uncommitted reader can not reconstruct a full value. This is
@@ -440,10 +443,25 @@ retry:
     /* When retrying, the vector might already contain allocated memory that should be released. */
     __wt_update_vector_free(&modifies);
 
+    check_prepare = false;
+    /*
+     * Handle the case that modify is a prepared update and we race with prepared rollback. This can
+     * happen in reconciliation with the preserve prepared config.
+     */
+    WT_ACQUIRE_READ(prepare_state, modify->prepare_state);
+    if (prepare_state == WT_PREPARE_INPROGRESS) {
+        WT_ACQUIRE_READ(txnid, modify->txnid);
+        /* The update may be already aborted. Get the saved transaction id. */
+        if (txnid == WT_TXN_ABORTED)
+            txnid = modify->upd_saved_txnid;
+
+        check_prepare = true;
+    }
+
     /* Find a complete update. */
     for (upd = modify; upd != NULL; upd = upd->next) {
-        if (upd->txnid == WT_TXN_ABORTED)
-            continue;
+        uint64_t temp_txnid;
+        WT_SKIP_ABORTED_AND_SET_CHECK_PREPARED(temp_txnid, txnid, check_prepare, upd);
 
         if (WT_UPDATE_DATA_VALUE(upd))
             break;

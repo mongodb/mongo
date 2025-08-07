@@ -784,17 +784,31 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
          * 6) We have a single tombstone on the chain, it is simply ignored.
          */
         squashed = false;
-        WT_GET_CHECK_PREPARED_AND_PREPARE_TXNID(check_prepared,
-          WT_TIME_WINDOW_HAS_START_PREPARE(&list->tw), txnid_prepared, list->onpage_upd);
-        for (upd = list->onpage_upd->next, prev_upd = list->onpage_upd; upd != NULL;
-             upd = upd->next) {
+        check_prepared =
+          F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) && WT_TIME_WINDOW_HAS_START_PREPARE(&list->tw);
+        if (check_prepared) {
+            WT_ACQUIRE_READ(txnid_prepared, list->onpage_upd->txnid);
+            /*
+             * No need to check the following updates as prepared because they must have all been
+             * rolled back.
+             */
+            if (txnid_prepared == WT_TXN_ABORTED)
+                check_prepared = false;
+        } else
+            txnid_prepared = WT_TXN_NONE;
+        for (upd = list->onpage_upd->next,
+            prev_upd = WT_TIME_WINDOW_HAS_START_PREPARE(&list->tw) ? NULL : list->onpage_upd;
+             upd != NULL; upd = upd->next) {
             WT_SKIP_ABORTED_AND_SET_CHECK_PREPARED(txnid, txnid_prepared, check_prepared, upd);
+
+            if (txnid == WT_TXN_ABORTED)
+                continue;
 
             /* We must have deleted any update left in the history store. */
             WT_ASSERT(session, !F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS));
 
             /* Detect any update without a timestamp. */
-            if (prev_upd->upd_start_ts < upd->upd_start_ts) {
+            if (prev_upd != NULL && prev_upd->upd_start_ts < upd->upd_start_ts) {
                 WT_ASSERT_ALWAYS(session, prev_upd->upd_start_ts == WT_TS_NONE,
                   "out-of-order timestamp update detected");
                 /*
@@ -852,7 +866,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
             WT_ASSERT(session, upd->type == WT_UPDATE_TOMBSTONE || newest_hs != NULL);
 
             /* Insert full update to the history store if we need to squash the updates. */
-            if (newest_hs != NULL && prev_upd->txnid == upd->txnid &&
+            if (newest_hs != NULL && prev_upd != NULL && prev_upd->txnid == upd->txnid &&
               prev_upd->upd_start_ts == upd->upd_start_ts)
                 enable_reverse_modify = false;
 

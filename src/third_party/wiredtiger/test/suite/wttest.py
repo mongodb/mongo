@@ -736,6 +736,9 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
     def timestamp_str(self, t):
         return '%x' % t
 
+    def prepared_id_str(self, id):
+        return '%x' % id
+
     # Some tests do table drops as a means to perform some test repeatedly in a loop.
     # These tests require that a name be completely removed before the next iteration
     # can begin.  However, tiered storage does not always provide a way to remove objects

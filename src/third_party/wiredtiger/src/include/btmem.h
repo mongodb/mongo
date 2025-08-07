@@ -1575,19 +1575,20 @@ struct __wt_update {
 
 /* When introducing a new flag, consider adding it to WT_UPDATE_SELECT_FOR_DS. */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_UPDATE_DELETE_DURABLE 0x001u           /* Key has been removed from disk image */
-#define WT_UPDATE_DS 0x002u                       /* Update has been chosen to the data store. */
-#define WT_UPDATE_DURABLE 0x004u                  /* Update has been durable. */
-#define WT_UPDATE_HS 0x008u                       /* Update has been written to history store. */
-#define WT_UPDATE_PREPARE_DURABLE 0x010u          /* Prepared update has been durable. */
-#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x020u /* Prepared update restored from data store. */
-#define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x040u   /* Fast truncate instantiation */
-#define WT_UPDATE_RESTORED_FROM_DELTA 0x080u      /* Update restored from delta. */
-#define WT_UPDATE_RESTORED_FROM_DS 0x100u         /* Update restored from data store. */
-#define WT_UPDATE_RESTORED_FROM_HS 0x200u         /* Update restored from history store. */
-#define WT_UPDATE_RTS_DRYRUN_ABORT 0x400u         /* Used by dry run to mark a would-be abort. */
-#define WT_UPDATE_TO_DELETE_FROM_HS 0x800u /* Update needs to be deleted from history store */
-                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+#define WT_UPDATE_DELETE_DURABLE 0x0001u           /* Key has been removed from disk image. */
+#define WT_UPDATE_DS 0x0002u                       /* Update has been chosen to the data store. */
+#define WT_UPDATE_DURABLE 0x0004u                  /* Update has been durable. */
+#define WT_UPDATE_HS 0x0008u                       /* Update has been written to history store. */
+#define WT_UPDATE_PREPARE_DURABLE 0x0010u          /* Prepared update has been durable. */
+#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x0020u /* Prepared update restored from data store. */
+#define WT_UPDATE_PREPARE_ROLLBACK 0x0040u /* Tombstone that rolled back by a prepared update.*/
+#define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x0080u /* Fast truncate instantiation. */
+#define WT_UPDATE_RESTORED_FROM_DELTA 0x0100u    /* Update restored from delta. */
+#define WT_UPDATE_RESTORED_FROM_DS 0x0200u       /* Update restored from data store. */
+#define WT_UPDATE_RESTORED_FROM_HS 0x0400u       /* Update restored from history store. */
+#define WT_UPDATE_RTS_DRYRUN_ABORT 0x0800u       /* Used by dry run to mark a would-be abort. */
+#define WT_UPDATE_TO_DELETE_FROM_HS 0x1000u /* Update needs to be deleted from history store. */
+                                            /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
     uint16_t flags;
 
 /* There are several cases we should select the update irrespective of visibility to write to the

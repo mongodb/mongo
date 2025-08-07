@@ -84,7 +84,12 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
+        # We should build a delta
         self.session.checkpoint()
+
+        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
+        stat_cursor.close()
 
         session2 = self.conn.open_session()
         # Do an uncommitted update
@@ -95,8 +100,8 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # We should build an empty delta
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:')
-        self.assertEqual(stat_cursor[stat.conn.rec_page_delta_leaf][2], 1)
+        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
         stat_cursor.close()
 
     def test_delete(self):
@@ -121,7 +126,11 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
+        # We should build a delta
         self.session.checkpoint()
+        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
+        stat_cursor.close()
 
         session2 = self.conn.open_session()
         # Do an uncommitted update
@@ -132,8 +141,8 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # We should build an empty delta
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:')
-        self.assertEqual(stat_cursor[stat.conn.rec_page_delta_leaf][2], 1)
+        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
         stat_cursor.close()
 
         session2.rollback_transaction()
@@ -143,6 +152,10 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # We should build a delta with delete
         self.session.checkpoint()
 
+        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
+        stat_cursor.close()
+
         session2 = self.conn.open_session()
         # Do an uncommitted update
         session2.begin_transaction()
@@ -152,17 +165,12 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # We should build an empty delta
         self.session.checkpoint()
 
-        stat_cursor = self.session.open_cursor('statistics:')
-        self.assertEqual(stat_cursor[stat.conn.rec_page_delta_leaf][2], 2)
+        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
     def test_prepare_update(self):
-        # Currently this test will fail because we haven't added support for
-        # packing/unpacking prepare_ts and prepared_id on checkpoint yet, so it
-        # will fail cell validation when trying to read prepared_id from disk. Re-enable this test
-        # when the feature is supported.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
-        self.skipTest('FIXME-WT-14941 Enable when packing/unpacking prepare_ts and prepared_id on checkpoint is supported')
         self.session.create(self.uri, self.session_create_config())
 
         cursor = self.session.open_cursor(self.uri, None, None)
@@ -180,21 +188,19 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
         self.session.begin_transaction()
         cursor[str(5)] = value2
-        self.session.prepare_transaction(f'prepare_timestamp={self.timestamp_str(10)}')
+        self.session.prepare_transaction(f'prepare_timestamp={self.timestamp_str(10)},prepared_id=' + self.prepared_id_str(1))
         cursor.reset()
 
         session2 = self.conn.open_session()
-        # TODO: this is not needed when checkpoint starts to write prepared update
-        session2.begin_transaction("ignore_prepare=true")
-        evict_cursor = session2.open_cursor("file:test_layered45.wt_stable", None, "debug=(release_evict)")
-        self.assertEqual(evict_cursor[str(5)], value1)
-        evict_cursor.reset()
-        evict_cursor.close()
-        session2.rollback_transaction()
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
+        # We should build a delta
         session2.checkpoint()
+
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
+        stat_cursor.close()
 
         session3 = self.conn.open_session()
         # Do an uncommitted update
@@ -206,29 +212,29 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # We should build an empty delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:')
-        self.assertEqual(stat_cursor[stat.conn.rec_page_delta_leaf][2], 1)
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
         stat_cursor.close()
 
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(20)},durable_timestamp={self.timestamp_str(30)}')
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
 
         # We should build a delta
         session2.checkpoint()
 
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
+        stat_cursor.close()
+
         # We should build an empty delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:')
-        self.assertEqual(stat_cursor[stat.conn.rec_page_delta_leaf][2], 2)
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
     def test_prepare_delete(self):
-        # Currently this test will fail because we haven't added support for
-        # packing/unpacking prepare_ts and prepared_id on checkpoint yet, so it
-        # will fail cell validation when trying to read prepared_id from disk. Re-enable this test
-        # when the feature is supported.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
-        self.skipTest('FIXME-WT-14941 Enable when packing/unpacking prepare_ts and prepared_id on checkpoint is supported')
         self.session.create(self.uri, self.session_create_config())
 
         cursor = self.session.open_cursor(self.uri, None, None)
@@ -247,21 +253,19 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.session.begin_transaction()
         cursor.set_key(str(5))
         cursor.remove()
-        self.session.prepare_transaction(f'prepare_timestamp={self.timestamp_str(10)}')
+        self.session.prepare_transaction(f'prepare_timestamp={self.timestamp_str(10)},prepared_id=' + self.prepared_id_str(1))
         cursor.reset()
 
         session2 = self.conn.open_session()
-        # TODO: this is not needed when checkpoint starts to write prepared update
-        session2.begin_transaction("ignore_prepare=true")
-        evict_cursor = session2.open_cursor("file:test_layered45.wt_stable", None, "debug=(release_evict)")
-        self.assertEqual(evict_cursor[str(5)], value1)
-        evict_cursor.reset()
-        evict_cursor.close()
-        session2.rollback_transaction()
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
+        # We should build a delta
         session2.checkpoint()
+
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
+        stat_cursor.close()
 
         session3 = self.conn.open_session()
         # Do an uncommitted update
@@ -273,29 +277,29 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # We should build an empty delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:')
-        self.assertEqual(stat_cursor[stat.conn.rec_page_delta_leaf][2], 1)
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
         stat_cursor.close()
 
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(20)},durable_timestamp={self.timestamp_str(30)}')
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
 
         # We should build a delta
         session2.checkpoint()
 
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
+        stat_cursor.close()
+
         # We should build an empty delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:')
-        self.assertEqual(stat_cursor[stat.conn.rec_page_delta_leaf][2], 2)
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
     def test_prepare_update_delete(self):
-        # Currently this test will fail because we haven't added support for
-        # packing/unpacking prepare_ts and prepared_id on checkpoint yet, so it
-        # will fail cell validation when trying to read prepared_id from disk. Re-enable this test
-        # when the feature is supported.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
-        self.skipTest('FIXME-WT-14941 Enable when packing/unpacking prepare_ts and prepared_id on checkpoint is supported')
         self.session.create(self.uri, self.session_create_config())
 
         cursor = self.session.open_cursor(self.uri, None, None)
@@ -315,21 +319,19 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         cursor[str(5)] = value2
         cursor.set_key(str(5))
         cursor.remove()
-        self.session.prepare_transaction(f'prepare_timestamp={self.timestamp_str(10)}')
+        self.session.prepare_transaction(f'prepare_timestamp={self.timestamp_str(10)},prepared_id=' + self.prepared_id_str(1))
         cursor.reset()
 
         session2 = self.conn.open_session()
-        # TODO: this is not needed when checkpoint starts to write prepared update
-        session2.begin_transaction("ignore_prepare=true")
-        evict_cursor = session2.open_cursor("file:test_layered45.wt_stable", None, "debug=(release_evict)")
-        self.assertEqual(evict_cursor[str(5)], value1)
-        evict_cursor.reset()
-        evict_cursor.close()
-        session2.rollback_transaction()
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
+        # We should build a delta
         session2.checkpoint()
+
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
+        stat_cursor.close()
 
         session3 = self.conn.open_session()
         # Do an uncommitted update
@@ -341,18 +343,23 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # We should build an empty delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:')
-        self.assertEqual(stat_cursor[stat.conn.rec_page_delta_leaf][2], 1)
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
         stat_cursor.close()
 
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(20)},durable_timestamp={self.timestamp_str(30)}')
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
 
         # We should build a delta
         session2.checkpoint()
 
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
+        stat_cursor.close()
+
         # We should build an empty delta
         session2.checkpoint()
 
-        stat_cursor = session2.open_cursor('statistics:')
-        self.assertEqual(stat_cursor[stat.conn.rec_page_delta_leaf][2], 2)
+        stat_cursor = session2.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
