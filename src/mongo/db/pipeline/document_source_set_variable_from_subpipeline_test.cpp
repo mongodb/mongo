@@ -32,6 +32,8 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -143,11 +145,12 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoGetNext) {
         Variables::kSearchMetaId);
 
     setVariableFromSubPipeline->addSubPipelineInitialSource(mockSourceForSubPipeline);
-    setVariableFromSubPipeline->setSource(mockSourceForSetVarStage.get());
+    auto stage = exec::agg::buildStage(setVariableFromSubPipeline);
+    stage->setSource(mockSourceForSetVarStage.get());
 
     auto comparator = DocumentComparator();
     auto results = comparator.makeUnorderedDocumentSet();
-    auto next = setVariableFromSubPipeline->getNext();
+    auto next = stage->getNext();
     ASSERT_TRUE(next.isAdvanced());
 
     ASSERT_TRUE(Value::compare(expCtx->variables.getValue(Variables::kSearchMetaId),
@@ -170,7 +173,8 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, QueryShape) {
         Variables::kSearchMetaId);
 
     setVariableFromSubPipeline->addSubPipelineInitialSource(mockSourceForSubPipeline);
-    setVariableFromSubPipeline->setSource(mockSourceForSetVarStage.get());
+    auto stage = exec::agg::buildStage(setVariableFromSubPipeline);
+    stage->setSource(mockSourceForSetVarStage.get());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$setVariableFromSubPipeline": {
@@ -206,11 +210,12 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, ShouldPropagateDisposeThrou
         Pipeline::create({mockSourceForSubPipeline}, ctxForSubPipeline),
         Variables::kSearchMetaId);
 
-    setVariableFromSubPipeline->setSource(mockSourceForSetVarStage.get());
+    auto stage = exec::agg::buildStage(setVariableFromSubPipeline);
+    stage->setSource(mockSourceForSetVarStage.get());
 
     // Make sure that if we call dispose on the outer pipeline, which includes
     // $setVariableFromSubPipeline, the subpipeline will also be properly disposed.
-    setVariableFromSubPipeline->dispose();
+    stage->dispose();
     ASSERT_TRUE(mockSourceForSetVarStage->isDisposed);
 }
 }  // namespace

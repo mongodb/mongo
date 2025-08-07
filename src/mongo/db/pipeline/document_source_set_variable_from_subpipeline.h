@@ -58,9 +58,10 @@
 
 namespace mongo {
 
-
-class DocumentSourceSetVariableFromSubPipeline final : public DocumentSource,
-                                                       public exec::agg::Stage {
+struct SetVariableFromSubPipelineSharedState {
+    std::unique_ptr<exec::agg::Pipeline> _subExecPipeline;
+};
+class DocumentSourceSetVariableFromSubPipeline final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$setVariableFromSubPipeline"_sd;
 
@@ -131,11 +132,8 @@ public:
      */
     void addSubPipelineInitialSource(boost::intrusive_ptr<DocumentSource> source);
 
-    void detachFromOperationContext() final;
     void detachSourceFromOperationContext() final;
-    void reattachToOperationContext(OperationContext* opCtx) final;
     void reattachSourceToOperationContext(OperationContext* opCtx) final;
-    bool validateOperationContext(const OperationContext* opCtx) const final;
     bool validateSourceOperationContext(const OperationContext* opCtx) const final;
 
 protected:
@@ -143,21 +141,17 @@ protected:
                                              std::unique_ptr<Pipeline> subpipeline,
                                              Variables::Id varID)
         : DocumentSource(kStageName, expCtx),
-          exec::agg::Stage(kStageName, expCtx),
+          _sharedState(std::make_shared<SetVariableFromSubPipelineSharedState>()),
           _subPipeline(std::move(subpipeline)),
           _variableID(varID) {}
 
-    void doDispose() final;
-
-
 private:
-    GetNextResult doGetNext() final;
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceSetVariableFromSubPipelineToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
-    std::unique_ptr<Pipeline> _subPipeline;
-    std::unique_ptr<exec::agg::Pipeline> _subExecPipeline;
+
+    const std::shared_ptr<SetVariableFromSubPipelineSharedState> _sharedState;
+    std::shared_ptr<Pipeline> _subPipeline;
     Variables::Id _variableID;
-    // $setVariableFromSubPipeline sets the value of $$SEARCH_META only on the first call to
-    // doGetNext().
-    bool _firstCallForInput = true;
 };
 }  // namespace mongo

@@ -121,69 +121,17 @@ DocumentSourceSetVariableFromSubPipeline::create(
         new DocumentSourceSetVariableFromSubPipeline(expCtx, std::move(subpipeline), varID));
 };
 
-void DocumentSourceSetVariableFromSubPipeline::doDispose() {
-    // TODO SERVER-102417: Remove the following if-block when all sources are split into
-    // QO and QE parts and the QO stage auto-disposes resources in destructor.
-    if (_subPipeline && !_subExecPipeline) {
-        // Create an execution pipeline to make sure the resources are correctly disposed.
-        _subExecPipeline = exec::agg::buildPipeline(_subPipeline->freeze());
-    }
-    if (_subExecPipeline) {
-        _subExecPipeline->dismissDisposal();
-        _subExecPipeline->dispose(pExpCtx->getOperationContext());
-        _subExecPipeline.reset();
-    }
-    _subPipeline.reset();
-}
-
-DocumentSource::GetNextResult DocumentSourceSetVariableFromSubPipeline::doGetNext() {
-    if (_firstCallForInput) {
-        tassert(6448002,
-                "Expected to have already attached a cursor source to the pipeline",
-                !_subPipeline->peekFront()->constraints().requiresInputDocSource);
-        tassert(10713600,
-                "Cannot create an execution pipeline when it already exists",
-                !_subExecPipeline);
-        _subExecPipeline = exec::agg::buildPipeline(_subPipeline->freeze());
-        auto nextSubPipelineInput = _subExecPipeline->getNext();
-        uassert(625296,
-                "No document returned from $SetVariableFromSubPipeline subpipeline",
-                nextSubPipelineInput);
-        uassert(625297,
-                "Multiple documents returned from $SetVariableFromSubPipeline subpipeline when "
-                "only one expected",
-                !_subExecPipeline->getNext());
-        pExpCtx->variables.setReservedValue(_variableID, Value(*nextSubPipelineInput), true);
-    }
-    _firstCallForInput = false;
-    return pSource->getNext();
-}
-
 void DocumentSourceSetVariableFromSubPipeline::addSubPipelineInitialSource(
     boost::intrusive_ptr<DocumentSource> source) {
     _subPipeline->addInitialSource(std::move(source));
 }
 
-void DocumentSourceSetVariableFromSubPipeline::detachFromOperationContext() {
-    // We have an execution pipeline we're going to execute across multiple commands, so we need to
-    // detach it from the operation context when it goes out of scope.
-    if (_subExecPipeline) {
-        _subExecPipeline->detachFromOperationContext();
-    }
-    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
-    // corresponding execution pipeline share the same expression context containing a pointer to
-    // the operation context, but it might not be the case anymore when a pipeline is cloned with
-    // another expression context.
-    if (_subPipeline) {
-        _subPipeline->detachFromOperationContext();
-    }
-}
 
 void DocumentSourceSetVariableFromSubPipeline::detachSourceFromOperationContext() {
     // We have an execution pipeline we're going to execute across multiple commands, so we need to
     // detach it from the operation context when it goes out of scope.
-    if (_subExecPipeline) {
-        _subExecPipeline->detachFromOperationContext();
+    if (_sharedState->_subExecPipeline) {
+        _sharedState->_subExecPipeline->detachFromOperationContext();
     }
     // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
     // corresponding execution pipeline share the same expression context containing a pointer to
@@ -191,21 +139,6 @@ void DocumentSourceSetVariableFromSubPipeline::detachSourceFromOperationContext(
     // another expression context.
     if (_subPipeline) {
         _subPipeline->detachFromOperationContext();
-    }
-}
-
-void DocumentSourceSetVariableFromSubPipeline::reattachToOperationContext(OperationContext* opCtx) {
-    // We have an execution pipeline we're going to execute across multiple commands, so we need to
-    // propagate the new operation context to the pipeline stages.
-    if (_subExecPipeline) {
-        _subExecPipeline->reattachToOperationContext(opCtx);
-    }
-    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
-    // corresponding execution pipeline share the same expression context containing a pointer to
-    // the operation context, but it might not be the case anymore when a pipeline is cloned with
-    // another expression context.
-    if (_subPipeline) {
-        _subPipeline->reattachToOperationContext(opCtx);
     }
 }
 
@@ -213,8 +146,8 @@ void DocumentSourceSetVariableFromSubPipeline::reattachSourceToOperationContext(
     OperationContext* opCtx) {
     // We have an execution pipeline we're going to execute across multiple commands, so we need to
     // propagate the new operation context to the pipeline stages.
-    if (_subExecPipeline) {
-        _subExecPipeline->reattachToOperationContext(opCtx);
+    if (_sharedState->_subExecPipeline) {
+        _sharedState->_subExecPipeline->reattachToOperationContext(opCtx);
     }
     // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
     // corresponding execution pipeline share the same expression context containing a pointer to
@@ -223,12 +156,6 @@ void DocumentSourceSetVariableFromSubPipeline::reattachSourceToOperationContext(
     if (_subPipeline) {
         _subPipeline->reattachToOperationContext(opCtx);
     }
-}
-
-bool DocumentSourceSetVariableFromSubPipeline::validateOperationContext(
-    const OperationContext* opCtx) const {
-    return getContext()->getOperationContext() == opCtx &&
-        (!_subExecPipeline || _subExecPipeline->validateOperationContext(opCtx));
 }
 
 bool DocumentSourceSetVariableFromSubPipeline::validateSourceOperationContext(
