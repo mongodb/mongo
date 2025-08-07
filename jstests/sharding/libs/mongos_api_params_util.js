@@ -160,6 +160,7 @@ export let MongosAPIParametersUtil = (function() {
             }
         },
         {commandName: "commitShardRemoval", skip: "TODO(SERVER-108802)"},
+        {commandName: "getAuditConfig", skip: "TODO(SERVER-108802)", conditional: true},
         {
             commandName: "releaseMemory",
             run: {
@@ -347,8 +348,8 @@ export let MongosAPIParametersUtil = (function() {
                     ({moveRange: "db.collection", toShard: st.shard0.shardName, min: {_id: 1}})
             }
         },
-        {commandName: "oidcListKeys", skip: "TODO(SERVER-108802)"},
-        {commandName: "oidcRefreshKeys", skip: "TODO(SERVER-108802)"},
+        {commandName: "oidcListKeys", skip: "TODO(SERVER-108802)", conditional: true},
+        {commandName: "oidcRefreshKeys", skip: "TODO(SERVER-108802)", conditional: true},
         {commandName: "removeQuerySettings", skip: "TODO(SERVER-108802)"},
         {
             commandName: "repairShardedCollectionChunksHistory",
@@ -381,6 +382,7 @@ export let MongosAPIParametersUtil = (function() {
         {
             commandName: "setAuditConfig",
             skip: "TODO(SERVER-108802) Auditing is not enabled by default",
+            conditional: true,
             /* run: {
                 inAPIVersion1: true,
                 configServerCommandName: "setAuditConfig",
