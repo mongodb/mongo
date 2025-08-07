@@ -286,6 +286,11 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     ):
         subprocess.run([bazel_bin, "run", "//buildscripts:errorcodes", "--", "--quiet"], check=True)
 
+    if lint_all:
+        subprocess.run([bazel_bin, "run", "//buildscripts:pyrightlint", "--", "lint-all"], check=True)
+    elif any(file.endswith(".py") for file in files_to_lint):
+        subprocess.run([bazel_bin, "run", "//buildscripts:pyrightlint", "--", "lints"] + files_to_lint, check=True)
+
     if lint_all or "poetry.lock" in files_to_lint or "pyproject.toml" in files_to_lint:
         subprocess.run([bazel_bin, "run", "//buildscripts:poetry_lock_check"], check=True)
 

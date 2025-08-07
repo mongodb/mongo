@@ -11,11 +11,12 @@ from typing import List
 import structlog
 
 # Configure the base directory for the MongoDB source.
-MONGO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
+RELATIVE_MONGO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
+REPO_ROOT = os.environ.get("BUILD_WORKSPACE_DIRECTORY", RELATIVE_MONGO_DIR)
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
-    sys.path.append(MONGO_DIR)
+    sys.path.append(REPO_ROOT)
 
 from buildscripts.linter import pyrightlinter, runner
 from buildscripts.linter.filediff import gather_changed_files_for_lint
@@ -28,6 +29,21 @@ def is_interesting_file(filename: str) -> bool:
 
 def lint(paths: List[str]):
     """Lint specified paths (files or directories) using Pyright."""
+    if "BUILD_WORKSPACE_DIRECTORY" in os.environ:
+        subprocess.run(
+            [
+                "python",
+                "-m",
+                "pyright",
+                "-p",
+                "pyproject.toml"
+            ] + paths,
+            env=os.environ,
+            check=True,
+            cwd=REPO_ROOT,
+        )
+        return
+
     lint_runner = runner.LintRunner()
     pyright = pyrightlinter.PyrightLinter()
 
@@ -55,7 +71,7 @@ def lint_git_diff():
 
 def lint_all():
     """Lint all Python files in the repository."""
-    lint([MONGO_DIR])
+    lint([])
 
 
 def main():
@@ -68,7 +84,7 @@ def main():
     sub = parser.add_subparsers(title="Linter subcommands", help="sub-command help")
 
     parser_lint = sub.add_parser(
-        "lint",
+        "lints",
         help="Lint paths (files or directories) and exit with nonzero status if any violations are found",
     )
     parser_lint.add_argument("paths", nargs="*", help="Paths (files or directories) to check")
@@ -104,6 +120,7 @@ def main():
         ],
         env=os.environ,
         check=True,
+        cwd=REPO_ROOT,
     )
     os.environ["PATH"] = (
         "bazel-bin/eslint_/eslint.runfiles/nodejs_linux_arm64/bin/nodejs/bin/" + os.pathsep

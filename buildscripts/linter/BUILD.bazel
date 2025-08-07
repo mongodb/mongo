@@ -19,6 +19,10 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         dependency(
+            "pyright",
+        ),
+        "//buildscripts/patch_builds",
+        dependency(
             "structlog",
             group = "evergreen",
         ),
