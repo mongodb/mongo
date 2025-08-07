@@ -280,7 +280,6 @@ buildvariants:
   - name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
     display_name: "! AL2023.3 arm64 Enterprise (SEP Benchmark)"
     tags: ["required"]
-    cron: "0 1,5,9,13,17,21 * * *"
     run_on:
       - amazon2023.3-arm64-large
     expansions:
