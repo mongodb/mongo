@@ -121,7 +121,7 @@ single_version_override(
 bazel_dep(name = "rules_poetry", version = "")
 git_override(
     module_name = "rules_poetry",
-    commit = "917630033c736c188605cf0f558c34afc1eca540",
+    commit = "092d43107d13e711ac4ac92050d8b570bcc8ef43",
     patches = ["//bazel/rules_poetry:rules_poetry.patch"],
     remote = "https://github.com/mongodb-forks/rules_poetry",
 )

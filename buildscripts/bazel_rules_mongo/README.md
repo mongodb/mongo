@@ -16,10 +16,10 @@ This directory is a bazel rule we use to ship common code between bazel repos
 # Poetry rules for managing Python dependencies
 http_archive(
     name = "rules_poetry",
-    sha256 = "48001b928488e78f03a47bcc712c56432a471fc6cdd90fe57c884efbfcd13696",
-    strip_prefix = "rules_poetry-917630033c736c188605cf0f558c34afc1eca540",
+    sha256 = "533a0178767be4d79a67ae43890970485217f031adf090ef28c5c18e8fd337d8",
+    strip_prefix = "rules_poetry-092d43107d13e711ac4ac92050d8b570bcc8ef43",
     urls = [
-        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/092d43107d13e711ac4ac92050d8b570bcc8ef43.tar.gz",
     ],
 )
 
