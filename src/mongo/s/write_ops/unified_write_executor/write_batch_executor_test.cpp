@@ -185,7 +185,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
              2, BSON("a" << 1), write_ops::UpdateModification(BSON("$set" << BSON("b" << 1)))),
          BulkWriteDeleteOp(1, BSON("a" << 2))},
         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
-    WriteOpContext context(bulkRequest);
+    WriteCommandRef cmdRef(bulkRequest);
 
     auto batch = SimpleWriteBatch{{
         {shardId1,
@@ -212,7 +212,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
 
     auto future = launchAsync([&]() {
         MockRoutingContext rtx;
-        WriteBatchExecutor executor(context);
+        WriteBatchExecutor executor(cmdRef);
         auto resps = executor.execute(operationContext(), rtx, {batch});
 
         ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
@@ -290,18 +290,18 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
     auto txnNumber = 0;
     operationContext()->setTxnNumber(txnNumber);
 
-    // Create a WriteOpContext with write options that WriteBatchExecutor should attach to the
+    // Create a WriteCommandRef with write options that WriteBatchExecutor should attach to the
     // request.
     bulkRequest.setBypassDocumentValidation(true);
     bulkRequest.setLet(BSON("key" << "value"));
     bulkRequest.setErrorsOnly(true);
     bulkRequest.setComment(IDLAnyTypeOwned(BSON("key" << "value")["key"]));
     bulkRequest.setMaxTimeMS(25);
-    WriteOpContext context(bulkRequest);
+    WriteCommandRef cmdRef(bulkRequest);
 
     auto future = launchAsync([&]() {
         MockRoutingContext rtx;
-        WriteBatchExecutor executor(context);
+        WriteBatchExecutor executor(cmdRef);
         auto resps = executor.execute(operationContext(), rtx, {batch});
 
         ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
@@ -355,7 +355,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
     updateOp.setHint(hintBSON);
     BulkWriteCommandRequest bulkRequest({updateOp},
                                         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    WriteOpContext context(bulkRequest);
+    WriteCommandRef cmdRef(bulkRequest);
 
     auto batch = SimpleWriteBatch{{{shardId1,
                                     {
@@ -369,7 +369,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
 
     auto future = launchAsync([&]() {
         MockRoutingContext rtx;
-        WriteBatchExecutor executor(context);
+        WriteBatchExecutor executor(cmdRef);
         auto resps = executor.execute(operationContext(), rtx, {batch});
 
         ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
@@ -417,7 +417,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
                                         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     std::vector<StmtId> stmtIds{0, 1};
     bulkRequest.setStmtIds(std::move(stmtIds));
-    WriteOpContext context(bulkRequest);
+    WriteCommandRef cmdRef(bulkRequest);
 
     auto batch = SimpleWriteBatch{{{shardId1,
                                     {
@@ -430,7 +430,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
     operationContext()->setTxnNumber(txnNumber);
 
     auto future = launchAsync([&]() {
-        WriteBatchExecutor executor(context);
+        WriteBatchExecutor executor(cmdRef);
         MockRoutingContext rtx;
         auto resps = executor.execute(operationContext(), rtx, {batch});
 

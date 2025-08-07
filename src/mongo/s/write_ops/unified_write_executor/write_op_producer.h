@@ -81,7 +81,7 @@ protected:
         }
     }
 
-    WriteCommandRef _cmdRef;
+    const WriteCommandRef _cmdRef;
     absl::btree_set<size_t> _activeIndices;
 };
 

@@ -56,7 +56,6 @@ using WriteCommandResponse = std::variant<BatchedCommandResponse, BulkWriteComma
  */
 class WriteBatchResponseProcessor {
 public:
-    WriteBatchResponseProcessor(const WriteOpContext& context) : _context(context) {}
     using CollectionsToCreate =
         stdx::unordered_map<NamespaceString,
                             std::shared_ptr<const mongo::CannotImplicitlyCreateCollectionInfo>>;
@@ -81,6 +80,14 @@ public:
         std::vector<WriteOp> opsToRetry{};      // Ops to be retried due to recoverable errors
         CollectionsToCreate collsToCreate{};    // Collections to be explicitly created
     };
+
+    WriteBatchResponseProcessor(WriteCommandRef cmdRef) : _cmdRef(cmdRef) {}
+
+    WriteBatchResponseProcessor(const BatchedCommandRequest& request)
+        : WriteBatchResponseProcessor(WriteCommandRef{request}) {}
+
+    WriteBatchResponseProcessor(const BulkWriteCommandRequest& request)
+        : WriteBatchResponseProcessor(WriteCommandRef{request}) {}
 
     /**
      * Process a response from each shard, handle errors, and collect statistics. Returns an
@@ -147,7 +154,7 @@ private:
         return retriedStmtIds;
     };
 
-    const WriteOpContext& _context;
+    const WriteCommandRef _cmdRef;
     size_t _nErrors{0};
     size_t _nInserted{0};
     size_t _nMatched{0};

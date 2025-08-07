@@ -89,14 +89,14 @@ std::vector<AsyncRequestsSender::Request> WriteBatchExecutor::buildBulkWriteRequ
         }
 
         auto bulkRequest = BulkWriteCommandRequest(std::move(bulkOps), std::move(nsInfos));
-        bulkRequest.setOrdered(_context.getOrdered());
-        bulkRequest.setBypassDocumentValidation(_context.getBypassDocumentValidation());
-        bulkRequest.setBypassEmptyTsReplacement(_context.getBypassEmptyTsReplacement());
-        bulkRequest.setLet(_context.getLet());
-        if (_context.isBulkWriteCommand()) {
-            bulkRequest.setErrorsOnly(_context.getErrorsOnly().value_or(false));
-            bulkRequest.setComment(_context.getComment());
-            bulkRequest.setMaxTimeMS(_context.getMaxTimeMS());
+        bulkRequest.setOrdered(_cmdRef.getOrdered());
+        bulkRequest.setBypassDocumentValidation(_cmdRef.getBypassDocumentValidation());
+        bulkRequest.setBypassEmptyTsReplacement(_cmdRef.getBypassEmptyTsReplacement());
+        bulkRequest.setLet(_cmdRef.getLet());
+        if (_cmdRef.isBulkWriteCommand()) {
+            bulkRequest.setErrorsOnly(_cmdRef.getErrorsOnly().value_or(false));
+            bulkRequest.setComment(_cmdRef.getComment());
+            bulkRequest.setMaxTimeMS(_cmdRef.getMaxTimeMS());
         }
 
         if (isRetryableWrite) {

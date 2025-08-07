@@ -47,8 +47,6 @@ enum WriteType {
 
 using WriteOpId = size_t;
 
-using WriteOpContext = WriteCommandRef;
-
 class WriteOp {
 public:
     WriteOp(WriteOpRef ref) : _ref(std::move(ref)) {}

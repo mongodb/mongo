@@ -358,7 +358,7 @@ std::vector<WriteOp> WriteBatchResponseProcessor::processOpsNotInReplyItems(
 }
 
 WriteCommandResponse WriteBatchResponseProcessor::generateClientResponse() {
-    return _context.visitRequest(OverloadedVisitor{
+    return _cmdRef.visitRequest(OverloadedVisitor{
         [&](const BatchedCommandRequest&) {
             return WriteCommandResponse{generateClientResponseForBatchedCommand()};
         },

@@ -101,8 +101,8 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
 
     processor.onWriteBatchResponse(
         opCtx,
@@ -137,8 +137,8 @@ TEST_F(WriteBatchResponseProcessorTest, AllStatisticsCopied) {
         1);
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
 
 
     processor.onWriteBatchResponse(
@@ -204,8 +204,8 @@ TEST_F(WriteBatchResponseProcessorTest, MixedErrorsAndOk) {
         BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
     RemoteCommandResponse rcr3(host3, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
 
     processor.onWriteBatchResponse(
         opCtx,
@@ -250,8 +250,8 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
         nss1));
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -328,8 +328,8 @@ TEST_F(WriteBatchResponseProcessorTest, SingleReplyItemForBatchOfThree) {
         0, {BulkWriteReplyItem{0, Status(CannotImplicitlyCreateCollectionInfo(nss1), "")}}, nss1));
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -400,8 +400,8 @@ TEST_F(WriteBatchResponseProcessorTest, TwoShardMixedNamespaceExistence) {
         nss1));
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -477,8 +477,8 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
                                        nss1));
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{
@@ -552,8 +552,8 @@ TEST_F(WriteBatchResponseProcessorTest, RetryStalenessErrors) {
                                                    nss1));
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -616,8 +616,8 @@ TEST_F(WriteBatchResponseProcessorTest, MixedStalenessErrorsAndOk) {
                                                     nss2));
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
@@ -659,8 +659,8 @@ TEST_F(WriteBatchResponseProcessorTest, RetryShardsCannotRefreshDueToLocksHeldEr
                                        nss1));
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -716,8 +716,8 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesSingleWriteConcernError) {
         BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -782,8 +782,8 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
         BulkWriteWriteConcernError(ErrorCodes::NotWritablePrimary, "NotWritablePrimary"));
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{
@@ -848,8 +848,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, OKReplies) {
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,
@@ -885,8 +885,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, TransientTransactionErrorInARSAsserts
     StatusWith<executor::RemoteCommandResponse> rcr1 =
         StatusWith<executor::RemoteCommandResponse>(Status(errorCode, "CustomError"));
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
 
     ASSERT_THROWS_CODE(
         processor.onWriteBatchResponse(
@@ -911,8 +911,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest,
     StatusWith<executor::RemoteCommandResponse> rcr1 =
         StatusWith<executor::RemoteCommandResponse>(Status(errorCode, "CustomError"));
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
 
     auto reply = makeReply();
     reply.setNInserted(1);
@@ -958,8 +958,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInARSHalt
     // Third response we shouldn't see the results from.
     RemoteCommandResponse rcr3(host2, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,
@@ -1016,8 +1016,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, TransientTransactionErrorInShardRespo
         Microseconds{0},
         false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
 
     ASSERT_THROWS_CODE(
         processor.onWriteBatchResponse(
@@ -1061,8 +1061,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest,
     // Third response we shouldn't see the results from.
     RemoteCommandResponse rcr3(host2, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,
@@ -1121,8 +1121,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInReplyIt
 
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,
@@ -1184,8 +1184,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, ProcessorSetsRetriedStmtIdsInClientRe
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply1.toBSON()), Microseconds{0}, false);
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteOpContext ctx(request);
-    WriteBatchResponseProcessor processor(ctx);
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,

@@ -59,7 +59,13 @@ using WriteBatchResponse = std::variant<SimpleWriteBatchResponse, NonTargetedWri
 
 class WriteBatchExecutor {
 public:
-    WriteBatchExecutor(const WriteOpContext& context) : _context(context) {}
+    WriteBatchExecutor(WriteCommandRef cmdRef) : _cmdRef(cmdRef) {}
+
+    WriteBatchExecutor(const BatchedCommandRequest& request)
+        : WriteBatchExecutor(WriteCommandRef{request}) {}
+
+    WriteBatchExecutor(const BulkWriteCommandRequest& request)
+        : WriteBatchExecutor(WriteCommandRef{request}) {}
 
     WriteBatchResponse execute(OperationContext* opCtx,
                                RoutingContext& routingCtx,
@@ -77,7 +83,7 @@ private:
     std::vector<AsyncRequestsSender::Request> buildBulkWriteRequests(
         OperationContext* opCtx, const SimpleWriteBatch& batch) const;
 
-    const WriteOpContext& _context;
+    const WriteCommandRef _cmdRef;
 };
 
 }  // namespace unified_write_executor
