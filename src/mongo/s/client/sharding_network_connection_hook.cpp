@@ -49,6 +49,8 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 namespace mongo {
 
 Status ShardingNetworkConnectionHook::validateHost(
@@ -74,6 +76,16 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
         case ErrorCodes::OK: {
             // The hello response indicates remoteHost is a config server.
             if (!shard->isConfig()) {
+                // If we are in the process of demoting to a replica set, the secondary may simply
+                // have not been restarted with the new options yet.
+                if (serverGlobalParams.replicaSetConfigShardMaintenanceMode) {
+                    LOGV2_INFO(10848801,
+                               "Replica set member is a config server and this node is "
+                               "not, but ignoring this since reconfiguration is in process",
+                               "host"_attr = remoteHost.toString());
+                    return Status::OK();
+                }
+
                 return {ErrorCodes::InvalidOptions,
                         str::stream() << "Surprised to discover that " << remoteHost.toString()
                                       << " believes it is a config server"};
@@ -84,6 +96,16 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
             // The hello response indicates that remoteHost is not a config server, or that
             // the config server is running a version prior to the 3.1 development series.
             if (!shard->isConfig()) {
+                return Status::OK();
+            }
+
+            // If we are in the process of promoting to a sharded cluster, the secondary may simply
+            // not have been restarted with the new options yet.
+            if (serverGlobalParams.replicaSetConfigShardMaintenanceMode) {
+                LOGV2_INFO(10848802,
+                           "Replica set member is not a config server, but ignoring this since "
+                           "reconfiguration is in process",
+                           "host"_attr = remoteHost.toString());
                 return Status::OK();
             }
 
