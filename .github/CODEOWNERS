@@ -976,7 +976,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/default_startup_FCV_parameter.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/do_upgrade_downgrade.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/downgrade_replset.js @10gen/server-fcv @svc-auto-approve-bot
-/jstests/multiVersion/genericSetFCVUsage/**/fcv_upgrade_fails_during_is_cleaning_server_metadata.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/feature_compatibility_version_lagging_secondary.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/initial_sync* @10gen/server-fcv @10gen/server-initial-sync @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/major_version_upgrade.js @10gen/server-fcv @svc-auto-approve-bot
@@ -992,6 +991,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/test_sharding_startup_in_downgrading_state.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/set_fcv_dry_run_mode.js @10gen/server-catalog-and-routing @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/set_fcv_automatic_dryRun.js @10gen/server-catalog-and-routing @10gen/server-fcv @svc-auto-approve-bot
+/jstests/multiVersion/genericSetFCVUsage/**/fcv_transition_fails_during_is_cleaning_server_metadata.js @10gen/server-fcv @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/genericSetFCVUsage/collection_write_path/OWNERS.yml
 /jstests/multiVersion/genericSetFCVUsage/collection_write_path/**/* @10gen/server-collection-write-path @svc-auto-approve-bot

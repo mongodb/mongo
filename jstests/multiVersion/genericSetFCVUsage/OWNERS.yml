@@ -48,9 +48,6 @@ filters:
   - "downgrade_replset.js":
     approvers:
       - 10gen/server-fcv
-  - "fcv_upgrade_fails_during_is_cleaning_server_metadata.js":
-    approvers:
-      - 10gen/server-fcv
   - "feature_compatibility_version_lagging_secondary.js":
     approvers:
       - 10gen/server-fcv
@@ -100,3 +97,6 @@ filters:
     approvers:
       - 10gen/server-fcv
       - 10gen/server-catalog-and-routing
+  - "fcv_transition_fails_during_is_cleaning_server_metadata.js":
+    approvers:
+      - 10gen/server-fcv

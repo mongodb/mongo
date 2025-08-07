@@ -40,7 +40,7 @@ removeShard(cluster, "newShard");
 jsTest.log("Running addShard during an fcv change should fail");
 
 const setFcvFP = configureFailPoint(cluster.configRS.getPrimary(),
-                                    "hangDowngradingBeforeIsCleaningServerMetadata");
+                                    "hangTransitionBeforeIsCleaningServerMetadata");
 const setFcvParallelShell = startParallelShell(
     funWithArgs(function(fcv) {
         assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: fcv, confirm: true}));

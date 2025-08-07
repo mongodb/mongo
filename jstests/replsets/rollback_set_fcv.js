@@ -10,6 +10,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
@@ -131,7 +132,8 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     }, "Failed waiting for server to unset the targetVersion or to set the FCV to " + fromFCV);
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     // The secondary should never have received the update to unset the targetVersion.
-    if (fromFCV == lastLTSFCV) {
+    if (fromFCV == lastLTSFCV ||
+        FeatureFlagUtil.isPresentAndEnabled(primary, "UpgradingToDowngrading")) {
         // When downgrading, the secondary should still be in isCleaningServerMetadata.
         checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
     } else {
@@ -153,7 +155,8 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     assert.eq(topologyVersionBeforeRollback.counter + topologyVersionDiff,
               topologyVersionAfterRollback.counter);
     // The primary should have rolled back their FCV to contain the targetVersion.
-    if (fromFCV == lastLTSFCV) {
+    if (fromFCV == lastLTSFCV ||
+        FeatureFlagUtil.isPresentAndEnabled(primary, "UpgradingToDowngrading")) {
         // Rolling back from downgraded to isCleaningServerMetadata state.
         checkFCV(primaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
         checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
@@ -318,14 +321,14 @@ function rollbackFCVFromIsCleaningServerMetadataToDowngrading() {
     jsTestLog("Testing rolling back FCV from isCleaningServerMetadata state to Downgrading state");
 
     // A failpoint to hang right before setting isCleaningServerMetadata.
-    const hangDowngradingBeforeIsCleaningServerMetadata =
-        configureFailPoint(primary, "hangDowngradingBeforeIsCleaningServerMetadata");
+    const hangTransitionBeforeIsCleaningServerMetadata =
+        configureFailPoint(primary, "hangTransitionBeforeIsCleaningServerMetadata");
     let setFCVInParallel = startParallelShell(funWithArgs(setFCV, lastLTSFCV), primary.port);
-    hangDowngradingBeforeIsCleaningServerMetadata.wait();
+    hangTransitionBeforeIsCleaningServerMetadata.wait();
     rollbackTest.transitionToRollbackOperations();
     // Turn off the failpoint so the primary will proceed to set isCleaningServerMetadata. This
     // update should never make it to the secondary.
-    hangDowngradingBeforeIsCleaningServerMetadata.off();
+    hangTransitionBeforeIsCleaningServerMetadata.off();
     assert.soon(function() {
         let featureCompatibilityVersion = getFCVFromDocument(primary);
         return featureCompatibilityVersion.hasOwnProperty('targetVersion') &&

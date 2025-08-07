@@ -4,6 +4,8 @@
  * the isCleaningServerMetadata state, where we must complete the downgrade before upgrading).
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 // We skip doing the data consistency checks while terminating the cluster because they conflict
 // with the counts of the number of times the "validate" command is run.
 TestData.skipCollectionAndIndexValidation = true;
@@ -149,14 +151,15 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
                              lastLTSFCV,
                              targetVersion,
                              true /*isCleaningServerMetadata*/);
-                    // If the setFCV command was interrupted while in the isCleaningServerMetadata
-                    // state, we must complete the FCV downgrade successfully.
-                    assert.commandWorked(conn.adminCommand(
-                        {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
+                    // If the setFCV command was interrupted during the isCleaningServerMetadata
+                    // state, complete the FCV transition successfully (downgrade or upgrade).
+                    assert.commandWorked(conn.adminCommand(
+                        {setFeatureCompatibilityVersion: targetVersion, confirm: true}));
                 } else {
                     checkFCV(conn.getDB("admin"), lastLTSFCV, targetVersion);
-                    jsTest.log(`Reached partially downgraded state after ${attempts} attempts`);
+                    jsTest.log(`Reached partial transition to ${targetVersion} after ${
+                        attempts} attempts`);
                     return true;
                 }
             }

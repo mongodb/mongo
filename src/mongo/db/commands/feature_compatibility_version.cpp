@@ -330,12 +330,23 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
         IDLParserContext("featureCompatibilityVersionDocument"), fcvObj.getValue());
 
     auto isCleaningServerMetadata = fcvDoc.getIsCleaningServerMetadata();
-    uassert(7428200,
+    auto downgradeInProgress = fcvDoc.getPreviousVersion().has_value();
+
+    if (isCleaningServerMetadata.is_initialized() && *isCleaningServerMetadata) {
+        uassert(
+            10778001,
+            "Cannot downgrade featureCompatibilityVersion if a previous FCV upgrade stopped in the "
+            "middle of cleaning up internal server metadata. Retry the FCV upgrade until it "
+            "succeeds before attempting to downgrade the FCV.",
+            newVersion > fromVersion || downgradeInProgress);
+        uassert(
+            7428200,
             "Cannot upgrade featureCompatibilityVersion if a previous FCV downgrade stopped in the "
             "middle of cleaning up internal server metadata. Retry the FCV downgrade until it "
             "succeeds before attempting to upgrade the FCV.",
-            !(newVersion > fromVersion &&
-              (isCleaningServerMetadata.is_initialized() && *isCleaningServerMetadata)));
+            newVersion < fromVersion || !downgradeInProgress);
+    }
+
 
     bool hasOngoingLiveRestore =
         opCtx->getServiceContext()->getStorageEngine()->hasOngoingLiveRestore();
