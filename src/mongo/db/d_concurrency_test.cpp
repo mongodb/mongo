@@ -1769,7 +1769,7 @@ TEST_F(DConcurrencyTestFixture,
         boost::optional<Lock::DBLock> dbIX = Lock::DBLock{opCtx1, dbName, LockMode::MODE_IX};
         shard_role_details::getLocker(opCtx1)->releaseTicket();
 
-        stdx::packaged_task<void()> task{[opCtx2, &dbName] {
+        std::packaged_task<void()> task{[opCtx2, &dbName] {  // NOLINT
             Lock::GlobalLock globalIX{opCtx2, LockMode::MODE_IX};
             Lock::DBLock dbX{opCtx2, dbName, LockMode::MODE_X};
         }};

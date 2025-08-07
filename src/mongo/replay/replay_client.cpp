@@ -157,6 +157,7 @@ private:
     std::exception_ptr exception = nullptr;
 };
 
+// NOLINTNEXTLINE needs audit
 static std::unordered_set<std::string> forbiddenKeywords{
     "legacy", "cursor", "endSessions", "ok", "isWritablePrimary", "n"};
 

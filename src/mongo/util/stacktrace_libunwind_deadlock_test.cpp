@@ -53,13 +53,13 @@ public:
         return _f.wait();
     }
 
-    bool waitFor(stdx::chrono::milliseconds dur) const {
-        return _f.wait_for(dur) == stdx::future_status::ready;
+    bool waitFor(std::chrono::milliseconds dur) const {
+        return _f.wait_for(dur) == std::future_status::ready;  // NOLINT
     }
 
 private:
-    stdx::promise<void> _p;
-    stdx::future<void> _f{_p.get_future()};
+    std::promise<void> _p;                  // NOLINT
+    std::future<void> _f{_p.get_future()};  // NOLINT
 };
 
 using OnPhdrFunc = std::function<int(dl_phdr_info*, size_t)>;

@@ -102,7 +102,7 @@ TEST(BasicLockableAdapter, TestWithMutexTypes) {
     }
 
     {
-        stdx::timed_mutex mut;
+        std::timed_mutex mut;  // NOLINT
         callUnderLock(mut);
     }
 

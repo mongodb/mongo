@@ -28,6 +28,7 @@
  */
 
 #include "MongoAssertCheck.h"
+#include "MongoBannedNamesCheck.h"
 #include "MongoCctypeCheck.h"
 #include "MongoCollectionShardingRuntimeCheck.h"
 #include "MongoConfigHeaderCheck.h"
@@ -39,11 +40,8 @@
 #include "MongoInvariantStatusIsOKCheck.h"
 #include "MongoMacroDefinitionLeaksCheck.h"
 #include "MongoNoUniqueAddressCheck.h"
-#include "MongoPolyFillCheck.h"
 #include "MongoRWMutexCheck.h"
 #include "MongoRandCheck.h"
-#include "MongoStdAtomicCheck.h"
-#include "MongoStdOptionalCheck.h"
 #include "MongoStringDataConstRefCheck.h"
 #include "MongoStringDataStringViewApi.h"
 #include "MongoTraceCheck.h"
@@ -70,10 +68,8 @@ public:
         CheckFactories.registerCheck<MongoCxx20BannedIncludesCheck>(
             "mongo-cxx20-banned-includes-check");
         CheckFactories.registerCheck<MongoCxx20StdChronoCheck>("mongo-cxx20-std-chrono-check");
-        CheckFactories.registerCheck<MongoStdOptionalCheck>("mongo-std-optional-check");
         CheckFactories.registerCheck<MongoVolatileCheck>("mongo-volatile-check");
         CheckFactories.registerCheck<MongoTraceCheck>("mongo-trace-check");
-        CheckFactories.registerCheck<MongoStdAtomicCheck>("mongo-std-atomic-check");
         CheckFactories.registerCheck<MongoAssertCheck>("mongo-assert-check");
         CheckFactories.registerCheck<MongoFCVConstantCheck>("mongo-fcv-constant-check");
         CheckFactories.registerCheck<MongoUnstructuredLogCheck>("mongo-unstructured-log-check");
@@ -82,7 +78,7 @@ public:
         CheckFactories.registerCheck<MongoMacroDefinitionLeaksCheck>(
             "mongo-macro-definition-leaks-check");
         CheckFactories.registerCheck<MongoRandCheck>("mongo-rand-check");
-        CheckFactories.registerCheck<MongoPolyFillCheck>("mongo-polyfill-check");
+        CheckFactories.registerCheck<MongoBannedNamesCheck>("mongo-banned-names-check");
         CheckFactories.registerCheck<MongoNoUniqueAddressCheck>("mongo-no-unique-address-check");
         CheckFactories.registerCheck<MongoStringDataConstRefCheck>(
             "mongo-stringdata-const-ref-check");

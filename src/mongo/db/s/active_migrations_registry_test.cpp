@@ -50,6 +50,9 @@
 namespace mongo {
 namespace {
 
+template <typename T>
+using nolint_promise = std::promise<T>;  // NOLINT
+
 using unittest::assertGet;
 
 class MoveChunkRegistration : public ShardServerTestFixture {
@@ -177,9 +180,9 @@ TEST_F(MoveChunkRegistration, TestReceiveChunkIsRejectedWhenRegistryIsLocked) {
 
 TEST_F(MoveChunkRegistration,
        TestReceiveChunkWithWaitForConflictingOpsIsBlockedWhenRegistryIsLocked) {
-    stdx::promise<void> blockReceive;
-    stdx::promise<void> readyToLock;
-    stdx::promise<void> inLock;
+    nolint_promise<void> blockReceive;
+    nolint_promise<void> readyToLock;
+    nolint_promise<void> inLock;
 
     // Registry thread.
     auto result = stdx::async(stdx::launch::async, [&] {
@@ -245,9 +248,9 @@ TEST_F(MoveChunkRegistration,
 // in progress. The test will fail if any of the futures are not signalled indicating that some part
 // of the sequence is not working correctly.
 TEST_F(MoveChunkRegistration, TestBlockingWhileDonateInProgress) {
-    stdx::promise<void> blockDonate;
-    stdx::promise<void> readyToLock;
-    stdx::promise<void> inLock;
+    nolint_promise<void> blockDonate;
+    nolint_promise<void> readyToLock;
+    nolint_promise<void> inLock;
 
     // Migration thread.
     auto result = stdx::async(stdx::launch::async, [&] {
@@ -309,9 +312,9 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileDonateInProgress) {
 // in progress. The test will fail if any of the futures are not signalled indicating that some part
 // of the sequence is not working correctly.
 TEST_F(MoveChunkRegistration, TestBlockingWhileReceiveInProgress) {
-    stdx::promise<void> blockReceive;
-    stdx::promise<void> readyToLock;
-    stdx::promise<void> inLock;
+    nolint_promise<void> blockReceive;
+    nolint_promise<void> readyToLock;
+    nolint_promise<void> inLock;
 
     // Migration thread.
     auto result = stdx::async(stdx::launch::async, [&] {

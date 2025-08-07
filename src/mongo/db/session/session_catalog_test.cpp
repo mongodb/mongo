@@ -1484,7 +1484,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
         return {lsid0, lsid1, lsid2};
     }();
 
-    std::vector<stdx::future<void>> futures;
+    std::vector<std::future<void>> futures;  // NOLINT
     unittest::Barrier firstUseOfTheSessionReachedBarrier(lsids.size() + 1);
 
     for (const auto& lsid : lsids) {
@@ -1563,7 +1563,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
         auto opCtx = cc().makeOperationContext();
         opCtx->setLogicalSessionId(lsid);
 
-        stdx::future<void> normalCheckOutFinish, killCheckOutFinish;
+        std::future<void> normalCheckOutFinish, killCheckOutFinish;  // NOLINT
 
         // This variable is protected by the session check-out.
         std::string lastSessionCheckOut = "first session";
@@ -1633,7 +1633,7 @@ TEST_F(SessionCatalogTest, CheckOutForKillTimeout) {
         // Check out the session to block checkOutForKill.
         OperationContextSession firstCheckOut(opCtx.get());
 
-        stdx::future<void> killCheckOutTimeout = stdx::async(stdx::launch::async, [&] {
+        std::future<void> killCheckOutTimeout = std::async(std::launch::async, [&] {  // NOLINT
             ThreadClient tc(getServiceContext()->getService());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(lsid);

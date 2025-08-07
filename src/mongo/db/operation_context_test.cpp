@@ -770,7 +770,7 @@ public:
                                  boost::optional<Date_t> maxTime,
                                  WaitFn waitFn) {
             auto barrier = std::make_shared<unittest::Barrier>(2);
-            task = stdx::packaged_task<bool()>([=, this] {
+            task = std::packaged_task<bool()>([=, this] {  // NOLINT
                 if (maxTime)
                     opCtx->setDeadlineByDate(*maxTime, ErrorCodes::ExceededTimeLimit);
                 stdx::unique_lock<stdx::mutex> lk(mutex);
@@ -795,7 +795,7 @@ public:
         stdx::mutex mutex;
         stdx::condition_variable cv;
         bool isSignaled = false;
-        stdx::packaged_task<bool()> task;
+        std::packaged_task<bool()> task;  // NOLINT
         JoinThread waiter;
     };
 

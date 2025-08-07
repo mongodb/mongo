@@ -819,8 +819,8 @@ private:
         }
 
     private:
-        stdx::promise<void> _promise;
-        stdx::shared_future<void> _future;
+        std::promise<void> _promise;  // NOLINT needs audit
+        std::shared_future<void> _future;
     };
 
     boost::optional<CompletePromiseFuture> _killCompleteInfo;

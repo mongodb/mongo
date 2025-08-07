@@ -114,24 +114,6 @@ class MongoTidyTests(unittest.TestCase):
         ]
         self.run_clang_tidy()
 
-    def test_MongoStdOptionalCheck(self):
-        msg = "Use of std::optional, use boost::optional instead."
-        opt = "mongo-std-optional-check,-warnings-as-errors"
-        self.expected_output = [
-            f"{msg}  [{opt}]\n{n:5} | {src}"
-            for n, src in [
-                (36, "void f(std::optional<std::string> parameterDeclTest) {"),
-                (37, "    std::optional<std::string> variableDeclTest;"),
-                (42, "    std::optional<int> fieldDeclTest = 5;"),
-                (46, "void functionName(const std::optional<int>& referenceDeclTest) {"),
-                (52, "std::optional<std::string> functionReturnTypeDeclTest(StringData name);"),
-                (55, "std::optional<T> templateDeclTest;"),
-                (57, "using std::optional;"),
-            ]
-        ]
-
-        self.run_clang_tidy()
-
     def test_MongoVolatileCheck(self):
         msg = 'Illegal use of the volatile storage keyword, use Atomic instead from "mongo/platform/atomic.h"'
         opt = "mongo-volatile-check,-warnings-as-errors"
@@ -154,19 +136,6 @@ class MongoTidyTests(unittest.TestCase):
             for n, src in [
                 (12, "    TracerProvider::initialize();"),
                 (13, "    TracerProvider provider = TracerProvider::get();"),
-            ]
-        ]
-
-        self.run_clang_tidy()
-
-    def test_MongoStdAtomicCheck(self):
-        msg = 'Illegal use of prohibited std::atomic<T>, use Atomic<T> or other types from "mongo/platform/atomic.h"'
-        opt = "mongo-std-atomic-check,-warnings-as-errors"
-        self.expected_output = [
-            f"{msg} [{opt}]\n{n:5} | {src}"
-            for n, src in [
-                (6, "std::atomic<int> atomic_var;"),
-                (10, "    std::atomic<int> field_decl;"),
             ]
         ]
 
@@ -244,26 +213,29 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
-    def test_MongoPolyFillCheck(self):
+    def test_MongoBannedNamesCheck(self):
+        stdx_replacement_str = "Consider using alternatives such as the polyfills from the mongo::stdx:: namespace."
+
         test_names = [
-            "std::cv_status wait_result{std::cv_status::timeout}",
-            "std::cv_status::timeout",
-            "std::cv_status::timeout",
-            "std::this_thread::get_id",
-            "std::get_terminate()",
-            "std::chrono::seconds(1)",
-            "std::future<int> myFuture",
-            "std::condition_variable cv",
-            "std::unordered_map<int, int> myMap",
-            "boost::unordered_map<int, int> boostMap",
-            "std::regex_search(std::string(\"\"), std::regex(\"\"))",
+            ("std::get_terminate()", stdx_replacement_str),
+            ("std::future<int> myFuture", "Consider using mongo::Future instead."),
+            ("std::recursive_mutex recursiveMut", "Do not use. A recursive mutex is often an indication of a design problem and is prone to deadlocks because you don't know what code you are calling while holding the lock."),
+            ("const std::condition_variable cv", stdx_replacement_str),
+            ("static std::unordered_map<int, int> myMap", stdx_replacement_str),
+            ("boost::unordered_map<int, int> boostMap", stdx_replacement_str),
+            ("std::regex_search(std::string(\"\"), std::regex(\"\"))", "Consider using mongo::pcre::Regex instead."),
+            ("std::atomic<int> atomicVar", "Consider using mongo::Atomic<T> instead."),
+            ("std::optional<std::string> strOpt", "Consider using boost::optional instead."),
+            ("std::atomic<int> fieldDecl", "Consider using mongo::Atomic<T> instead."),
+            ("std::optional<T> templateDecl", "Consider using boost::optional instead."),
+            ("using std::optional", "Consider using boost::optional instead."),
         ]
 
         self.expected_output = [
-            "error: Illegal use of banned name from std::/boost:: for "
-            + name
-            + ". Consider using alternatives such as the polyfills from the mongo::stdx:: namespace."
-            for name in test_names
+            "error: Forbidden use of banned name in "
+            + name + ". " + msg
+            + " Use '//  NOLINT' if usage is absolutely necessary. Be especially careful doing so outside of test code."
+            for (name, msg) in test_names
         ]
 
         self.run_clang_tidy()

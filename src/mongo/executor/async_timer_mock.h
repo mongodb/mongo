@@ -148,7 +148,7 @@ public:
     int jobs();
 
 private:
-    stdx::recursive_mutex _timersMutex;
+    std::recursive_mutex _timersMutex;  // NOLINT
     stdx::unordered_set<std::shared_ptr<AsyncTimerMockImpl>> _timers;
     Milliseconds _curTime;
 };

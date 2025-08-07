@@ -186,6 +186,7 @@ public:
                         // Do not destroy the cursor if the error is any of the errors in
                         // 'safeErrorCodes' since for those errors we can guarantee that the data
                         // has not been corrupted and it is safe to continue the execution.
+                        // NOLINTNEXTLINE needs audit
                         static const std::unordered_set<ErrorCodes::Error> safeErrorCodes{
                             ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                             ErrorCodes::CursorInUse,

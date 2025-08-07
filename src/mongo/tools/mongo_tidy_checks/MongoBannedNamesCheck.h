@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,34 +26,23 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include <optional>
-#include <string>
+#include <clang-tidy/ClangTidy.h>
+#include <clang-tidy/ClangTidyCheck.h>
 
-namespace mongo {
+namespace mongo::tidy {
 
-// Variable Decl and Parameter Decl
-void f(std::optional<std::string> parameterDeclTest) {
-    std::optional<std::string> variableDeclTest;
-}
-
-// Field Decl
-struct CertInformationToLog {
-    std::optional<int> fieldDeclTest = 5;
+/**
+ * MongoBannedNamesCheck is a custom clang-tidy check for detecting
+ * the usage of listed names from the std or boost libraries (std,
+ * boost, or global namespace) in the source code.
+ */
+class MongoBannedNamesCheck : public clang::tidy::ClangTidyCheck {
+public:
+    using clang::tidy::ClangTidyCheck::ClangTidyCheck;
+    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
+    void checkNamespace(clang::SourceLocation loc, llvm::StringRef name);
 };
-
-// Reference Decl
-void functionName(const std::optional<int>& referenceDeclTest) {
-    return;
-}
-
-class StringData {};
-// Function Return type Decl
-std::optional<std::string> functionReturnTypeDeclTest(StringData name);
-
-template <typename T>
-std::optional<T> templateDeclTest;
-
-using std::optional;
-
-}  // namespace mongo
+}  // namespace mongo::tidy

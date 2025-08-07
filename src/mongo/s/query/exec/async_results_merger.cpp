@@ -806,6 +806,7 @@ Status AsyncResultsMerger::releaseMemory() {
         // 'safeErrorCodes' since for those errors we can guarantee that the data has not been
         // corrupted and it is safe to continue the execution. We must wait for the other shards
         // to be sure that none returned a fatal error.
+        // NOLINTNEXTLINE needs audit
         static const std::unordered_set<ErrorCodes::Error> safeErrorCodes{
             ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
             ErrorCodes::CursorInUse,

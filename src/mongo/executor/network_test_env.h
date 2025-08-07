@@ -95,7 +95,7 @@ public:
     template <class T>
     class FutureHandle {
     public:
-        FutureHandle(stdx::future<T> future,
+        FutureHandle(std::future<T> future,  // NOLINT
                      executor::TaskExecutor* executor,
                      executor::NetworkInterfaceMock* network)
             : _future(std::move(future)), _executor(executor), _network(network) {}
@@ -140,7 +140,7 @@ public:
         }
 
     private:
-        stdx::future<T> _future;
+        std::future<T> _future;  // NOLINT
         executor::TaskExecutor* _executor;
         executor::NetworkInterfaceMock* _network;
     };

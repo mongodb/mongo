@@ -93,6 +93,7 @@ static const StringMap<MetaType> kMetaNameToMetaType = {
     {changeStreamControlEventName, MetaType::kChangeStreamControlEvent},
 };
 
+// NOLINTNEXTLINE needs audit
 static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
     {MetaType::kScore, scoreName},
     {MetaType::kVectorSearchScore, vectorSearchScoreName},

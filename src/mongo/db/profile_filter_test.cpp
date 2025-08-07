@@ -54,6 +54,7 @@ public:
 };
 
 TEST_F(ProfileFilterTest, FilterOnAllOpDebugFields) {
+    // NOLINTNEXTLINE
     const std::unordered_set<std::string> allowedOpDebugFields = {"ts",
                                                                   "client",
                                                                   "appName",
