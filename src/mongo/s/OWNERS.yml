@@ -174,3 +174,6 @@ filters:
   - "list_shards.idl":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "README_router_role_api.md":
+    approvers:
+      - 10gen/server-catalog-and-routing

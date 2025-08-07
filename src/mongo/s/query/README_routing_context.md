@@ -43,7 +43,7 @@ withValidatedRoutingContext(opCtx, {"test.foo"}, [&](RoutingContext& routingCont
 });
 ```
 
-- Use this to handle the entire routing operation, from `RoutingContext` construction prior to running the callback function to validation at the end. This is the preferred usage. A similar helper, `withValidatedRoutingContextForTxnCmd`, does the same but checks whether locks are allowed if we're running in a transaction. [Example](https://github.com/mongodb/mongo/blob/e5c9c5f963e60334beed8162190364858130721b/src/mongo/db/pipeline/sharded_agg_helpers.cpp#L664-L695)
+- Use this to handle the entire routing operation, from `RoutingContext` construction prior to running the callback function to validation at the end. This is the preferred usage for non-idempotent operations. A similar helper, `withValidatedRoutingContextForTxnCmd`, does the same but checks whether locks are allowed if we're running in a transaction. [Example](https://github.com/mongodb/mongo/blob/e5c9c5f963e60334beed8162190364858130721b/src/mongo/db/pipeline/sharded_agg_helpers.cpp#L664-L695)
 
 ```
 template <class Fn>
@@ -76,7 +76,7 @@ router.routeWithRoutingContext(opCtx, "dispatch shard pipeline",
 });
 ```
 
-- This handles constructing, executing, and retrying routing operations upon receiving stale routing metadata exceptions by advancing the placement version in the cache and retrying with a new `RoutingContext` with the latest routing tables. [Example](https://github.com/mongodb/mongo/blob/e5c9c5f963e60334beed8162190364858130721b/src/mongo/db/pipeline/sharded_agg_helpers.cpp#L1754-L1800)
+- This handles constructing, executing, and retrying routing operations upon receiving stale routing metadata exceptions by advancing the placement version in the cache and retrying with a new `RoutingContext` with the latest routing tables. Internally, the `CollectionRouter::routeWithRoutingContext()` implicitly invokes `withValidatedRoutingContext`. This is the preferred option for dispatching read and idempotent operations (for more details on the `CollectionRouter`, refer to the architecture guide [here](../README_router_role_api.md)). [Example](https://github.com/mongodb/mongo/blob/e5c9c5f963e60334beed8162190364858130721b/src/mongo/db/pipeline/sharded_agg_helpers.cpp#L1754-L1800).
 
 ## High-Level Diagram
 
