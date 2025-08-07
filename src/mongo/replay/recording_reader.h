@@ -35,20 +35,16 @@
 #include <string>
 #include <vector>
 
-#include <boost/iostreams/device/mapped_file.hpp>
-
 namespace mongo {
-
 class RecordingReader {
 public:
-    RecordingReader() = default;
-    RecordingReader(std::filesystem::path file);
-    RecordingReader(boost::iostreams::mapped_file_source mappedFile);
-    boost::optional<TrafficReaderPacket> readPacket();
+    RecordingReader(std::string filename) : filename(std::move(filename)) {}
+    std::vector<TrafficReaderPacket> processRecording();
 
 private:
-    boost::iostreams::mapped_file_source _mappedFile;
-    ConstDataRangeCursor _cdr;
+    std::string filename;
+    // Buffer containing data read from disk.
+    // TODO: SERVER-107823 removed when mmapped instead.
+    std::unique_ptr<char[]> buffer;
 };
-
 }  // namespace mongo

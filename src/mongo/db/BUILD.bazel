@@ -1733,7 +1733,6 @@ mongo_cc_library(
         "traffic_reader.h",
     ],
     deps = [
-        ":traffic_recorder",
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc",
         "//src/mongo/rpc:message",  # TODO(SERVER-93876): Remove.

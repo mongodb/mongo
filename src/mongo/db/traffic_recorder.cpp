@@ -96,20 +96,6 @@ MONGO_INITIALIZER(ShouldAlwaysRecordTraffic)(InitializerContext*) {
 
 }  // namespace
 
-void appendPacketHeader(DataBuilder& db, const TrafficRecordingPacket& packet) {
-    db.clear();
-    Message toWrite = packet.message;
-
-    uassertStatusOK(db.writeAndAdvance<LittleEndian<uint32_t>>(0));
-    uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.id));
-    uassertStatusOK(db.writeAndAdvance<Terminated<'\0', StringData>>(StringData(packet.session)));
-    uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.now.toMillisSinceEpoch()));
-    uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.order));
-
-    auto fullSize = db.size() + packet.message.size();
-    db.getCursor().write<LittleEndian<uint32_t>>(fullSize);
-}
-
 /**
  * The Recording class represents a single recording that the recorder is exposing.  It's made up of
  * a background thread which flushes records to disk, and helper methods to push to that thread,
@@ -193,10 +179,19 @@ public:
                     invariant(bytes);
 
                     for (const auto& packet : storage) {
-                        appendPacketHeader(db, packet);
+                        db.clear();
                         Message toWrite = packet.message;
 
+                        uassertStatusOK(db.writeAndAdvance<LittleEndian<uint32_t>>(0));
+                        uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.id));
+                        uassertStatusOK(db.writeAndAdvance<Terminated<'\0', StringData>>(
+                            StringData(packet.session)));
+                        uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(
+                            packet.now.toMillisSinceEpoch()));
+                        uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.order));
+
                         auto size = db.size() + toWrite.size();
+                        db.getCursor().write<LittleEndian<uint32_t>>(size);
 
                         bool maxSizeExceeded = false;
 
@@ -295,6 +290,14 @@ public:
     AtomicWord<uint64_t> order{0};
 
 private:
+    struct TrafficRecordingPacket {
+        const uint64_t id;
+        const std::string session;
+        const Date_t now;
+        const uint64_t order;
+        const Message message;
+    };
+
     struct CostFunction {
         size_t operator()(const TrafficRecordingPacket& packet) const {
             return packet.message.size();

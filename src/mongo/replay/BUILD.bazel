@@ -16,7 +16,6 @@ mongo_cc_library(
         "session_handler.cpp",
         "session_scheduler.cpp",
         "session_simulator.cpp",
-        "traffic_recording_iterator.cpp",
     ],
     hdrs = [
         "config_handler.h",
@@ -29,7 +28,6 @@ mongo_cc_library(
         "session_handler.h",
         "session_scheduler.h",
         "session_simulator.h",
-        "traffic_recording_iterator.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -70,12 +68,10 @@ mongo_cc_unit_test(
         "session_simulator_test.cpp",
         "test_packet.cpp",
         "test_packet.h",
-        "traffic_reader_test.cpp",
     ],
     tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":mongor_lib",
         "//src/mongo/dbtests:mocklib",
-        "//src/mongo/util:clock_source_mock",
     ],
 )
