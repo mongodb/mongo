@@ -138,6 +138,7 @@ public:
         kTrim,
         kTrunc,
         kType,
+        kSubtype,
         kZip,
         kConvert,
         kRegexFind,
@@ -610,6 +611,10 @@ public:
 
     void visit(const ExpressionType* expr) final {
         combine(OpType::kType);
+    }
+
+    void visit(const ExpressionSubtype* expr) final {
+        combine(OpType::kSubtype);
     }
 
     void visit(const ExpressionZip* expr) final {

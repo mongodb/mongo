@@ -1442,6 +1442,7 @@ mongo_cc_unit_test(
         "expression_object_test.cpp",
         "expression_or_test.cpp",
         "expression_replace_test.cpp",
+        "expression_subtype_test.cpp",
         "expression_test.cpp",
         "expression_test_api_version_test.cpp",
         "expression_test_feature_flags_test.cpp",

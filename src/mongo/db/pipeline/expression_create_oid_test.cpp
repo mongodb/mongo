@@ -65,7 +65,7 @@ public:
                                            AllowedWithClientType::kAny,
                                            nullptr /* featureFlag */);
         } catch (const DBException& e) {
-            // Allow this exception, to allow multiple ExpressionCreateUUIDTest instances
+            // Allow this exception, to allow multiple ExpressionCreateObjectIdTest instances
             // to be created in this process.
             ASSERT(e.reason() == "Duplicate expression ($createObjectId) registered.");
         }

@@ -3540,6 +3540,21 @@ const char* ExpressionType::getOpName() const {
     return "$type";
 }
 
+/* ------------------------- ExpressionSubtype ----------------------------- */
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(subtype,
+                                      ExpressionSubtype::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      &feature_flags::gFeatureFlagMqlJsEngineGap);
+
+Value ExpressionSubtype::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+const char* ExpressionSubtype::getOpName() const {
+    return "$subtype";
+}
+
 /* ------------------------ ExpressionIsNumber --------------------------- */
 
 Value ExpressionIsNumber::evaluate(const Document& root, Variables* variables) const {

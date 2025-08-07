@@ -352,6 +352,7 @@ public:
     void visit(const ExpressionTrim* expr) final {}
     void visit(const ExpressionTrunc* expr) final {}
     void visit(const ExpressionType* expr) final {}
+    void visit(const ExpressionSubtype* expr) final {}
     void visit(const ExpressionZip* expr) final {}
     void visit(const ExpressionConvert* expr) final {}
     void visit(const ExpressionRegexFind* expr) final {}
@@ -541,6 +542,7 @@ public:
     void visit(const ExpressionTrim* expr) final {}
     void visit(const ExpressionTrunc* expr) final {}
     void visit(const ExpressionType* expr) final {}
+    void visit(const ExpressionSubtype* expr) final {}
     void visit(const ExpressionZip* expr) final {}
     void visit(const ExpressionConvert* expr) final {}
     void visit(const ExpressionRegexFind* expr) final {}
@@ -3049,6 +3051,9 @@ public:
         visitRoundTruncExpression(expr);
     }
     void visit(const ExpressionType* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+    void visit(const ExpressionSubtype* expr) final {
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionZip* expr) final {

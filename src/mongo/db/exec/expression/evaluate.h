@@ -466,6 +466,7 @@ Value evaluate(const ExpressionInternalFindAllValuesAtPath& expr,
 
 Value evaluate(const ExpressionMeta& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionType& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSubtype& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionTestApiVersion& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionLet& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionInternalRawSortKey& expr,

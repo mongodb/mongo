@@ -114,6 +114,20 @@ Value evaluate(const ExpressionType& expr, const Document& root, Variables* vari
     return Value(StringData(typeName(val.getType())));
 }
 
+Value evaluate(const ExpressionSubtype& expr, const Document& root, Variables* variables) {
+    Value val(expr.getChildren()[0]->evaluate(root, variables));
+    if (val.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(10389300,
+            str::stream() << "Provided value: " << val.toString()
+                          << ", does not have a subtype, but $subtype was used.",
+            val.getType() == BSONType::binData);
+
+    return Value(static_cast<int>(val.getBinData().type));
+}
+
 Value evaluate(const ExpressionTestApiVersion& expr, const Document& root, Variables* variables) {
     return Value(1);
 }

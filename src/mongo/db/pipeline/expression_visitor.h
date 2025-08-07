@@ -122,6 +122,7 @@ class ExpressionStrLenBytes;
 class ExpressionBinarySize;
 class ExpressionStrLenCP;
 class ExpressionSubtract;
+class ExpressionSubtype;
 class ExpressionSwitch;
 class ExpressionTestApiVersion;
 class ExpressionToLower;
@@ -320,6 +321,7 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBinarySize>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionStrLenCP>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSubtract>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSubtype>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSwitch>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionToLower>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionToUpper>) = 0;
@@ -527,6 +529,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionBinarySize*) override {}
     void visit(const ExpressionStrLenCP*) override {}
     void visit(const ExpressionSubtract*) override {}
+    void visit(const ExpressionSubtype*) override {}
     void visit(const ExpressionSwitch*) override {}
     void visit(const ExpressionTestApiVersion*) override {}
     void visit(const ExpressionToLower*) override {}

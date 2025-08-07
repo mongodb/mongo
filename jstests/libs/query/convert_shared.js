@@ -30,7 +30,7 @@ class ConvertTest {
     }
 
     getBaseField() {
-        // The "base" field is not supported in FCVs prior to 8.2. Hence the we must not use it in
+        // The "base" field is not supported in FCVs prior to 8.3. Hence the we must not use it in
         // the pipelines unless the workload is guaranteed to not run on older FCVs.
         return this.requiresFCV83 ? {base: "$base"} : {};
     }

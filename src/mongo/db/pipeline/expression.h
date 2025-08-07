@@ -3792,6 +3792,30 @@ public:
     }
 };
 
+class ExpressionSubtype final : public ExpressionFixedArity<ExpressionSubtype, 1> {
+public:
+    explicit ExpressionSubtype(ExpressionContext* const expCtx)
+        : ExpressionFixedArity<ExpressionSubtype, 1>(expCtx) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    ExpressionSubtype(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionSubtype, 1>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+};
+
 class ExpressionIsNumber final : public ExpressionFixedArity<ExpressionIsNumber, 1> {
 public:
     explicit ExpressionIsNumber(ExpressionContext* const expCtx)

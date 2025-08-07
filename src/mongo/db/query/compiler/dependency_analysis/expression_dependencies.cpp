@@ -143,6 +143,7 @@ public:
     void visit(const ExpressionTrim*) override {}
     void visit(const ExpressionTrunc*) override {}
     void visit(const ExpressionType*) override {}
+    void visit(const ExpressionSubtype*) override {}
     void visit(const ExpressionZip*) override {}
     void visit(const ExpressionConvert*) override {}
     void visit(const ExpressionRegexFind*) override {}
