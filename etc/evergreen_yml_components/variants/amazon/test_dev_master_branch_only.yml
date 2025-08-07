@@ -280,6 +280,7 @@ buildvariants:
   - name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
     display_name: "! AL2023.3 arm64 Enterprise (SEP Benchmark)"
     tags: ["required"]
+    activate: true
     run_on:
       - amazon2023.3-arm64-large
     expansions:
