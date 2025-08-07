@@ -27,53 +27,51 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/agg/match_stage.h"
+#include "mongo/db/exec/agg/unwind_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_unwind.h"
 
 namespace mongo {
 
-boost::intrusive_ptr<exec::agg::Stage> documentSourceMatchToStageFn(
+boost::intrusive_ptr<exec::agg::Stage> documentSourceUnwindToStageFn(
     const boost::intrusive_ptr<DocumentSource>& documentSource) {
-    auto matchDS = boost::dynamic_pointer_cast<DocumentSourceMatch>(documentSource);
+    auto unwindDS = boost::dynamic_pointer_cast<DocumentSourceUnwind>(documentSource);
 
-    tassert(10422700, "expected 'DocumentSourceMatch' type", matchDS);
+    tassert(10423200, "expected 'DocumentSourceUnwind' type", unwindDS);
 
-    return make_intrusive<exec::agg::MatchStage>(
-        matchDS->kStageName, matchDS->getExpCtx(), matchDS->_matchProcessor, matchDS->_isTextQuery);
+    return make_intrusive<exec::agg::UnwindStage>(
+        unwindDS->kStageName,
+        unwindDS->getExpCtx(),
+        createUnwindProcessorFromDocumentSource(unwindDS));
 }
 
 namespace exec {
 namespace agg {
 
-REGISTER_AGG_STAGE_MAPPING(match, DocumentSourceMatch::id, documentSourceMatchToStageFn)
+REGISTER_AGG_STAGE_MAPPING(unwind, DocumentSourceUnwind::id, documentSourceUnwindToStageFn);
 
-MatchStage::MatchStage(StringData stageName,
-                       const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                       const std::shared_ptr<MatchProcessor>& matchProcessor,
-                       bool isTextQuery)
-    : Stage(stageName, pExpCtx), _matchProcessor(matchProcessor), _isTextQuery(isTextQuery) {}
+UnwindStage::UnwindStage(StringData stageName,
+                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                         std::unique_ptr<UnwindProcessor> unwindProcessor)
+    : Stage(stageName, pExpCtx), _unwindProcessor(std::move(unwindProcessor)) {};
 
-GetNextResult MatchStage::doGetNext() {
-    // The user facing error should have been generated earlier.
-    massert(17309, "Should never call getNext on a $match stage with $text clause", !_isTextQuery);
-
-    auto nextInput = pSource->getNext();
-    for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-        if (_matchProcessor->process(nextInput.getDocument())) {
+GetNextResult UnwindStage::doGetNext() {
+    auto nextOut = _unwindProcessor->getNext();
+    while (!nextOut) {
+        // No more elements in array currently being unwound. This will loop if the input
+        // document is missing the unwind field or has an empty array.
+        auto nextInput = pSource->getNext();
+        if (!nextInput.isAdvanced()) {
             return nextInput;
         }
 
-        // For performance reasons, a streaming stage must not keep references to documents
-        // across calls to getNext(). Such stages must retrieve a result from their child and
-        // then release it (or return it) before asking for another result. Failing to do so can
-        // result in extra work, since the Document/Value library must copy data on write when
-        // that data has a refcount above one.
-        nextInput.releaseDocument();
+        // Try to extract an output document from the new input document.
+        _unwindProcessor->process(nextInput.releaseDocument());
+        nextOut = _unwindProcessor->getNext();
     }
 
-    return nextInput;
+    return DocumentSource::GetNextResult(std::move(*nextOut));
 }
 
 }  // namespace agg

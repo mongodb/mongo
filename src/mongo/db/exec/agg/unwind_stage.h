@@ -29,26 +29,35 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
-#include "mongo/db/pipeline/match_processor.h"
+#include "mongo/db/exec/agg/unwind_processor.h"
+#include "mongo/db/pipeline/expression_context.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace exec {
 namespace agg {
 
-class MatchStage final : public Stage {
-
+/**
+ * This class handles the execution part of the unwind aggregation stage and is part of the
+ * execution pipeline. Its construction is based on DocumentSourceUnwind, which handles the
+ * optimization part.
+ */
+class UnwindStage final : public Stage {
 public:
-    MatchStage(StringData stageName,
-               const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-               const std::shared_ptr<MatchProcessor>& matchProcessor,
-               bool isTextQuery);
+    UnwindStage(StringData stageName,
+                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                std::unique_ptr<UnwindProcessor> unwindProcessor);
 
 private:
-    GetNextResult doGetNext() override;
+    GetNextResult doGetNext() final;
 
-    std::shared_ptr<MatchProcessor> _matchProcessor;
-    bool _isTextQuery;
+    std::unique_ptr<UnwindProcessor> _unwindProcessor;
 };
 
 }  // namespace agg

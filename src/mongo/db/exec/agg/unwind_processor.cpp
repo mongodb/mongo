@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/unwind_processor.h"
+#include "mongo/db/exec/agg/unwind_processor.h"
 
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/document_source_unwind.h"
+
+#include <memory>
 
 namespace mongo {
+namespace exec::agg {
 
 using std::string;
 
@@ -111,6 +115,14 @@ boost::optional<Document> UnwindProcessor::getNext() {
     }
 
     return _haveNext ? _output.peek() : _output.freeze();
+}
+
+}  // namespace exec::agg
+
+std::unique_ptr<exec::agg::UnwindProcessor> createUnwindProcessorFromDocumentSource(
+    const boost::intrusive_ptr<DocumentSourceUnwind>& ds) {
+    return std::make_unique<exec::agg::UnwindProcessor>(
+        ds->_unwindPath, ds->_preserveNullAndEmptyArrays, ds->_indexPath, ds->_strict);
 }
 
 }  // namespace mongo

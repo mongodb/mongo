@@ -33,6 +33,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/unwind_stage.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/namespace_string.h"
@@ -164,6 +166,8 @@ private:
         auto specObj = BSON("$unwind" << unwindFieldPath());
         _unwind = static_cast<DocumentSourceUnwind*>(
             DocumentSourceUnwind::createFromBson(specObj.firstElement(), ctx()).get());
+        _unwindStage =
+            boost::static_pointer_cast<exec::agg::UnwindStage>(exec::agg::buildStage(_unwind));
         checkBsonRepresentation(false, false);
     }
 
@@ -177,6 +181,8 @@ private:
                                         << (includeArrayIndex ? Value(indexPath()) : Value())));
         _unwind = static_cast<DocumentSourceUnwind*>(
             DocumentSourceUnwind::createFromBson(specObj.toBson().firstElement(), ctx()).get());
+        _unwindStage =
+            boost::static_pointer_cast<exec::agg::UnwindStage>(exec::agg::buildStage(_unwind));
         checkBsonRepresentation(preserveNullAndEmptyArrays, includeArrayIndex);
     }
 
@@ -188,10 +194,11 @@ private:
      */
     void assertResultsMatch(BSONObj expectedResults) {
         auto source = DocumentSourceMock::createForTest(inputData(), ctx());
-        _unwind->setSource(source.get());
+        _unwindStage->setSource(source.get());
         // Load the results from the DocumentSourceUnwind.
         vector<Document> resultSet;
-        for (auto output = _unwind->getNext(); output.isAdvanced(); output = _unwind->getNext()) {
+        for (auto output = _unwindStage->getNext(); output.isAdvanced();
+             output = _unwindStage->getNext()) {
             // Get the current result.
             resultSet.push_back(output.releaseDocument());
         }
@@ -231,9 +238,9 @@ private:
 
     /** Assert that iterator state accessors consistently report the source is exhausted. */
     void assertEOF() const {
-        ASSERT(_unwind->getNext().isEOF());
-        ASSERT(_unwind->getNext().isEOF());
-        ASSERT(_unwind->getNext().isEOF());
+        ASSERT(_unwindStage->getNext().isEOF());
+        ASSERT(_unwindStage->getNext().isEOF());
+        ASSERT(_unwindStage->getNext().isEOF());
     }
 
     BSONObj expectedResultSet(bool preserveNullAndEmptyArrays, bool includeArrayIndex) const {
@@ -260,6 +267,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     intrusive_ptr<ExpressionContextForTest> _ctx;
     intrusive_ptr<DocumentSourceUnwind> _unwind;
+    intrusive_ptr<exec::agg::UnwindStage> _unwindStage;
 };
 
 /** An empty collection produces no results. */
@@ -701,19 +709,20 @@ TEST_F(UnwindStageTest, ShouldPropagatePauses) {
                                            DocumentSource::GetNextResult::makePauseExecution(),
                                            Document{{"array", vector<Value>{Value(1), Value(2)}}}},
                                           getExpCtx());
+    auto unwindStage = exec::agg::buildStage(unwind);
 
-    unwind->setSource(source.get());
+    unwindStage->setSource(source.get());
 
-    ASSERT_TRUE(unwind->getNext().isAdvanced());
-    ASSERT_TRUE(unwind->getNext().isAdvanced());
+    ASSERT_TRUE(unwindStage->getNext().isAdvanced());
+    ASSERT_TRUE(unwindStage->getNext().isAdvanced());
 
-    ASSERT_TRUE(unwind->getNext().isPaused());
+    ASSERT_TRUE(unwindStage->getNext().isPaused());
 
-    ASSERT_TRUE(unwind->getNext().isAdvanced());
-    ASSERT_TRUE(unwind->getNext().isAdvanced());
+    ASSERT_TRUE(unwindStage->getNext().isAdvanced());
+    ASSERT_TRUE(unwindStage->getNext().isAdvanced());
 
-    ASSERT_TRUE(unwind->getNext().isEOF());
-    ASSERT_TRUE(unwind->getNext().isEOF());
+    ASSERT_TRUE(unwindStage->getNext().isEOF());
+    ASSERT_TRUE(unwindStage->getNext().isEOF());
 }
 
 TEST_F(UnwindStageTest, UnwindOnlyModifiesUnwoundPathWhenNotIncludingIndex) {
@@ -770,13 +779,14 @@ TEST_F(UnwindStageTest, UnwindIndexPathIsSamePathAsArrayPath) {
         {Document{{"array", vector<Value>{Value(10), Value(20)}}},
          Document{{"array", vector<Value>{Value(30), Value(40)}}}},
         getExpCtx());
+    auto unwindStage = exec::agg::buildStage(unwind);
 
-    unwind->setSource(source.get());
+    unwindStage->setSource(source.get());
 
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(0));
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(1));
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(0));
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(1));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(0));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(1));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(0));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(1));
 }
 
 TEST_F(UnwindStageTest, UnwindIndexPathIsParentOfArrayPath) {
@@ -788,14 +798,15 @@ TEST_F(UnwindStageTest, UnwindIndexPathIsParentOfArrayPath) {
         {Document{{"obj", Document{{"array", vector<Value>{Value(10), Value(20)}}}}},
          Document{{"obj", Document{{"array", vector<Value>{Value(30), Value(40)}}}}}},
         getExpCtx());
+    auto unwindStage = exec::agg::buildStage(unwind);
 
-    unwind->setSource(source.get());
+    unwindStage->setSource(source.get());
 
     Document res;
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(0));
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(1));
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(0));
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(1));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["obj"], Value(0));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["obj"], Value(1));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["obj"], Value(0));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["obj"], Value(1));
 }
 
 TEST_F(UnwindStageTest, UnwindIndexPathIsChildOfArrayPath) {
@@ -807,13 +818,14 @@ TEST_F(UnwindStageTest, UnwindIndexPathIsChildOfArrayPath) {
         {Document{{"array", vector<Value>{Value(10), Value(20)}}},
          Document{{"array", vector<Value>{Value(30), Value(40)}}}},
         getExpCtx());
+    auto unwindStage = exec::agg::buildStage(unwind);
 
-    unwind->setSource(source.get());
+    unwindStage->setSource(source.get());
 
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 0)));
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 1)));
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 0)));
-    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 1)));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 0)));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 1)));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 0)));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 1)));
 }
 
 //

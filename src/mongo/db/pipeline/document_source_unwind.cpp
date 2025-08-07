@@ -29,12 +29,9 @@
 
 #include "mongo/db/pipeline/document_source_unwind.h"
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
@@ -42,7 +39,6 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -53,7 +49,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <boost/utility/in_place_factory.hpp>
 
 namespace mongo {
 
@@ -66,8 +61,10 @@ DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext
                                            const boost::optional<FieldPath>& indexPath,
                                            bool strict)
     : DocumentSource(kStageName, pExpCtx),
-      exec::agg::Stage(kStageName, pExpCtx),
-      _unwindProcessor(boost::in_place(fieldPath, preserveNullAndEmptyArrays, indexPath, strict)) {}
+      _unwindPath(fieldPath),
+      _preserveNullAndEmptyArrays(preserveNullAndEmptyArrays),
+      _indexPath(indexPath),
+      _strict(strict) {}
 
 REGISTER_DOCUMENT_SOURCE(unwind,
                          LiteParsedDocumentSourceDefault::parse,
@@ -94,28 +91,10 @@ intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
     return source;
 }
 
-DocumentSource::GetNextResult DocumentSourceUnwind::doGetNext() {
-    auto nextOut = _unwindProcessor->getNext();
-    while (!nextOut) {
-        // No more elements in array currently being unwound. This will loop if the input
-        // document is missing the unwind field or has an empty array.
-        auto nextInput = pSource->getNext();
-        if (!nextInput.isAdvanced()) {
-            return nextInput;
-        }
-
-        // Try to extract an output document from the new input document.
-        _unwindProcessor->process(nextInput.releaseDocument());
-        nextOut = _unwindProcessor->getNext();
-    }
-
-    return DocumentSource::GetNextResult(std::move(*nextOut));
-}
-
 DocumentSource::GetModPathsReturn DocumentSourceUnwind::getModifiedPaths() const {
-    OrderedPathSet modifiedFields{_unwindProcessor->getUnwindFullPath()};
-    if (_unwindProcessor->getIndexPath()) {
-        modifiedFields.insert(_unwindProcessor->getIndexPath()->fullPath());
+    OrderedPathSet modifiedFields{getUnwindPath()};
+    if (indexPath()) {
+        modifiedFields.insert(indexPath()->fullPath());
     }
     return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedFields), {}};
 }
@@ -124,7 +103,7 @@ bool DocumentSourceUnwind::canPushSortBack(const DocumentSourceSort* sort) const
     // If the sort has a limit, we should also check that _preserveNullAndEmptyArrays is true,
     // otherwise when we swap the limit and unwind, we could end up providing fewer results to the
     // user than expected.
-    if (!sort->hasLimit() || _unwindProcessor->getPreserveNullAndEmptyArrays()) {
+    if (!sort->hasLimit() || preserveNullAndEmptyArrays()) {
         auto modifiedPaths = getModifiedPaths();
 
         // Checks if any of the $sort's paths depend on the unwind path (or vice versa).
@@ -173,8 +152,7 @@ DocumentSourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
     // duplicate limit before the unwind to prevent sources further down the pipeline from giving us
     // more than we need.
     auto nextLimit = dynamic_cast<DocumentSourceLimit*>(next->get());
-    if (nextLimit && _unwindProcessor->getPreserveNullAndEmptyArrays() &&
-        canPushLimitBack(nextLimit)) {
+    if (nextLimit && preserveNullAndEmptyArrays() && canPushLimitBack(nextLimit)) {
         _smallestLimitPushedDown = nextLimit->getLimit();
         auto newStageItr = container->insert(
             itr, DocumentSourceLimit::create(nextLimit->getContext(), nextLimit->getLimit()));
@@ -187,19 +165,15 @@ DocumentSourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
 Value DocumentSourceUnwind::serialize(const SerializationOptions& opts) const {
     return Value(
         DOC(getSourceName() << DOC(
-                "path" << opts.serializeFieldPathWithPrefix(_unwindProcessor->getUnwindPath())
+                "path" << opts.serializeFieldPathWithPrefix(getUnwindPath())
                        << "preserveNullAndEmptyArrays"
-                       << (_unwindProcessor->getPreserveNullAndEmptyArrays()
-                               ? opts.serializeLiteral(true)
-                               : Value())
+                       << (preserveNullAndEmptyArrays() ? opts.serializeLiteral(true) : Value())
                        << "includeArrayIndex"
-                       << (_unwindProcessor->getIndexPath()
-                               ? Value(opts.serializeFieldPath(*_unwindProcessor->getIndexPath()))
-                               : Value()))));
+                       << (indexPath() ? Value(opts.serializeFieldPath(*indexPath())) : Value()))));
 }
 
 DepsTracker::State DocumentSourceUnwind::getDependencies(DepsTracker* deps) const {
-    deps->fields.insert(_unwindProcessor->getUnwindFullPath());
+    deps->fields.insert(getUnwindPath());
     return DepsTracker::State::SEE_NEXT;
 }
 

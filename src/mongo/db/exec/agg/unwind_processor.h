@@ -34,15 +34,15 @@
 
 #include <boost/optional.hpp>
 
-namespace mongo {
+namespace mongo::exec::agg {
 
 // This class is used by the aggregation framework and streams enterprise module
 // to perform the document processing needed for $unwind.
 class UnwindProcessor {
 public:
-    UnwindProcessor(const FieldPath& fieldPath,
-                    bool includeNullIfEmptyOrMissing,
-                    const boost::optional<FieldPath>& includeArrayIndex,
+    UnwindProcessor(const FieldPath& unwindPath,
+                    bool preserveNullAndEmptyArrays,
+                    const boost::optional<FieldPath>& indexPath,
                     bool strict);
 
     // Reset the processor to unwind a new document.
@@ -51,22 +51,6 @@ public:
     // Returns the next document unwound from the document provided to process().
     // Returns boost::none if the array is exhausted.
     boost::optional<Document> getNext();
-
-    const FieldPath& getUnwindPath() const {
-        return _unwindPath;
-    }
-
-    const std::string& getUnwindFullPath() const {
-        return _unwindPath.fullPath();
-    }
-
-    bool getPreserveNullAndEmptyArrays() const {
-        return _preserveNullAndEmptyArrays;
-    }
-
-    const boost::optional<FieldPath>& getIndexPath() const {
-        return _indexPath;
-    }
 
 private:
     const FieldPath _unwindPath;
@@ -99,4 +83,4 @@ private:
     const bool _conflictingPaths;
 };
 
-}  // namespace mongo
+}  // namespace mongo::exec::agg

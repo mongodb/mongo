@@ -247,7 +247,7 @@ protected:
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceMatchToStageFn(
-        const boost::intrusive_ptr<const DocumentSource>& documentSource);
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
 
     void rebuild(BSONObj predicate, std::unique_ptr<MatchExpression> expr);
 
