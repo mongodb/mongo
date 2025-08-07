@@ -1412,7 +1412,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     WT_PAGE *page;
     WT_PAGE_MODIFY *mod;
     WT_SAVE_UPD *supd;
-    WT_UPDATE *prev_onpage, *tmp, *upd;
+    WT_UPDATE *last_upd, *prev_onpage, *tmp, *upd;
     uint64_t recno;
     uint32_t i, slot;
     bool instantiate_upd;
@@ -1537,6 +1537,8 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
             prev_onpage->next = NULL;
         }
 
+        last_upd = NULL;
+
         switch (orig->type) {
         case WT_PAGE_COL_FIX:
         case WT_PAGE_COL_VAR:
@@ -1561,8 +1563,30 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
             /* Search the page. */
             WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
 
+            /*
+             * If we write a prepared update to disk and we need to restore the update chain, we
+             * will find we have already instantiated a prepared update (possibly with a prepared
+             * tombstone) by the page in-memory code. Discard the re-instantiated prepared updates.
+             *
+             * If we have instantiated a tombstone when we read the page back into memory, discard
+             * it as well. FIXME-WT-14885: no need to consider the delta case after we have
+             * implemented delta consolidation
+             */
+            if (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) || WT_DELTA_LEAF_ENABLED(session))
+                for (last_upd = upd; last_upd->next != NULL; last_upd = last_upd->next)
+                    ;
+
             /* Apply the modification. */
             WT_ERR(__wt_row_modify(&cbt, key, NULL, &upd, WT_UPDATE_INVALID, true, true));
+
+            if (last_upd != NULL && last_upd->next != NULL) {
+                WT_ASSERT(session,
+                  F_ISSET(last_upd->next,
+                    WT_UPDATE_PREPARE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_DS));
+                tmp = last_upd->next;
+                last_upd->next = NULL;
+                __wt_free(session, tmp);
+            }
             break;
         default:
             WT_ERR(__wt_illegal_value(session, orig->type));

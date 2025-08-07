@@ -876,7 +876,7 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_DECL_RET;
     WT_PAGE *page;
     WT_ROW *rip;
-    WT_UPDATE *upd;
+    WT_UPDATE *first_upd, *upd;
     size_t size, total_size;
     uint64_t recno, rle;
     uint32_t i, numtws, tw;
@@ -961,13 +961,20 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
             WT_ERR(__wt_page_cell_data_ref_kv(session, page, &unpack, value));
             WT_ASSERT_ALWAYS(session, __wt_cell_type_raw(unpack.cell) != WT_CELL_VALUE_OVFL_RM,
               "Should never read an overflow removed value for a prepared update");
-            WT_ERR(__page_inmem_update(session, value, &unpack, &upd, &size));
-            total_size += size;
+            first_upd = WT_ROW_UPDATE(page, rip);
+            /*
+             * FIXME-WT-14885: This key must have been overwritten by a delta. Don't instantiate it.
+             */
+            if (first_upd == NULL) {
+                WT_ERR(__page_inmem_update(session, value, &unpack, &upd, &size));
+                total_size += size;
 
-            /* Search the page and apply the modification. */
-            WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
-            WT_ERR(__wt_row_modify(&cbt, key, NULL, &upd, WT_UPDATE_INVALID, true, true));
-            upd = NULL;
+                /* Search the page and apply the modification. */
+                WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
+                WT_ERR(__wt_row_modify(&cbt, key, NULL, &upd, WT_UPDATE_INVALID, true, true));
+                upd = NULL;
+            } else
+                WT_ASSERT(session, F_ISSET(first_upd, WT_UPDATE_RESTORED_FROM_DELTA));
         }
     }
 
