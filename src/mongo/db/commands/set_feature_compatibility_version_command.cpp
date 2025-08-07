@@ -519,6 +519,9 @@ public:
         // TODO SERVER-25778: replace this with the general mechanism for specifying a default
         // writeConcern.
         ON_BLOCK_EXIT([&] {
+            if (isDryRun) {
+                return;
+            }
             WriteConcernResult res;
             auto waitForWCStatus = waitForWriteConcern(
                 opCtx,
