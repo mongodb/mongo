@@ -38,10 +38,22 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <string>
 
 #include <boost/optional.hpp>
 
 namespace mongo {
+
+struct TrafficRecordingPacket {
+    uint64_t id;
+    std::string session;
+    Date_t now;
+    uint64_t order;
+    Message message;
+};
+
+class DataBuilder;
+void appendPacketHeader(DataBuilder& builder, const TrafficRecordingPacket& packet);
 
 /**
  * A service context level global which captures packet capture through the transport layer if it is

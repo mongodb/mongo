@@ -1009,32 +1009,11 @@ BSONObj ReplayWorkloadRecordingFile(const BSONObj& a, void*) {
     std::string input = elems[0].String();
     std::string cluster = elems[1].String();
 
-    auto files = [&input]() {
-        std::vector<std::string> files;
-        if (std::filesystem::is_directory(input)) {
-            for (const auto& entry : std::filesystem::directory_iterator{input}) {
-                if (!entry.is_regular_file()) {
-                    continue;
-                }
-                if (entry.path().extension() != ".bin") {
-                    continue;
-                }
-                files.push_back(entry.path().string());
-            }
-            std::sort(files.begin(), files.end());
-        } else {
-            files.push_back(input);
-        }
-        return files;
-    }();
-
     // if the recording directory is passed by param, then we reply all the recordings found in
     // there.
 
     mongo::ReplayClient replayClient;
-    for (const auto& f : files) {
-        replayClient.replayRecording(f, cluster);
-    }
+    replayClient.replayRecording(input, cluster);
     return BSONObj{};
 }
 
