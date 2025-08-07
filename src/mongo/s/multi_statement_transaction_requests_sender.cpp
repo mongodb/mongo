@@ -128,7 +128,9 @@ MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender
           transaction_request_sender_details::attachTxnDetails(opCtx, requests),
           readPreference,
           retryPolicy,
-          ResourceYielderFactory::get(*opCtx->getService()).make(opCtx, "request-sender"),
+          ResourceYielderFactory::get(*opCtx->getService())
+              ? ResourceYielderFactory::get(*opCtx->getService())->make(opCtx, "request-sender")
+              : nullptr,
           designatedHostsMap)) {}
 
 MultiStatementTransactionRequestsSender::~MultiStatementTransactionRequestsSender() {

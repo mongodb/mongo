@@ -94,6 +94,7 @@ std::shared_ptr<BlockingResultsMerger>& DocumentSourceMergeCursors::populateMerg
     tassert(9535002, "_armParams must be set", _armParams);
 
     auto* opCtx = getExpCtx()->getOperationContext();
+    const auto& resourceYielder = ResourceYielderFactory::get(*opCtx->getService());
     _blockingResultsMerger = std::make_shared<BlockingResultsMerger>(
         opCtx,
         std::move(*_armParams),
@@ -101,7 +102,7 @@ std::shared_ptr<BlockingResultsMerger>& DocumentSourceMergeCursors::populateMerg
         // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code which
         // relies on this parameter does not distinguish/care about the difference so we simply
         // always pass 'aggregate'.
-        ResourceYielderFactory::get(*opCtx->getService()).make(opCtx, "aggregate"_sd));
+        resourceYielder ? resourceYielder->make(opCtx, "aggregate"_sd) : nullptr);
     _armParams = boost::none;
 
     // '_blockingResultsMerger' now owns the cursors.

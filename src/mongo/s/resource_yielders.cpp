@@ -35,8 +35,9 @@ namespace {
 const auto getFactory = Service::declareDecoration<std::unique_ptr<ResourceYielderFactory>>();
 }  // namespace
 
-const ResourceYielderFactory& ResourceYielderFactory::get(const Service& svc) {
-    return *svc[getFactory];
+const std::unique_ptr<mongo::ResourceYielderFactory>& ResourceYielderFactory::get(
+    const Service& svc) {
+    return svc[getFactory];
 }
 
 void ResourceYielderFactory::set(Service& svc,

@@ -43,7 +43,7 @@ class ResourceYielderFactory {
 public:
     virtual ~ResourceYielderFactory() = default;
 
-    static const ResourceYielderFactory& get(const Service& svc);
+    static const std::unique_ptr<mongo::ResourceYielderFactory>& get(const Service& svc);
     static void set(Service& svc, std::unique_ptr<ResourceYielderFactory> implementation);
 
     static void initialize(ServiceContext* svcCtx);

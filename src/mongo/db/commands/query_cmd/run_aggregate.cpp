@@ -613,6 +613,7 @@ std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
                          .build();
             // Create a new pipeline for the consumer consisting of a single
             // DocumentSourceExchange.
+            const auto& resourceYielder = ResourceYielderFactory::get(*opCtx->getService());
             auto consumer = make_intrusive<DocumentSourceExchange>(
                 expCtx,
                 exchange,
@@ -620,7 +621,7 @@ std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
                 // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code
                 // which relies on this parameter does not distinguish/care about the difference so
                 // we simply always pass 'aggregate'.
-                ResourceYielderFactory::get(*opCtx->getService()).make(opCtx, "aggregate"_sd));
+                resourceYielder ? resourceYielder->make(opCtx, "aggregate"_sd) : nullptr);
             pipelines.emplace_back(Pipeline::create({consumer}, expCtx));
         }
     } else {
