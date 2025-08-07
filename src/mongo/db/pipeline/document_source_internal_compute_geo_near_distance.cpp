@@ -116,46 +116,11 @@ DocumentSourceInternalGeoNearDistance::DocumentSourceInternalGeoNearDistance(
     std::string distanceField,
     double distanceMultiplier)
     : DocumentSource(kStageName, pExpCtx),
-      exec::agg::Stage(kStageName, pExpCtx),
       _key(std::move(key)),
       _centroid(std::move(centroid)),
       _coords(coords),
       _distanceField(std::move(distanceField)),
       _distanceMultiplier(distanceMultiplier) {}
-
-DocumentSource::GetNextResult DocumentSourceInternalGeoNearDistance::doGetNext() {
-    auto next = pSource->getNext();
-
-    if (next.isAdvanced()) {
-        // Extract all the geometries out of this document for the near query
-        std::vector<std::unique_ptr<StoredGeometry>> geometries;
-        StoredGeometry::extractGeometries(next.getDocument().toBson(), _key, &geometries, false);
-
-        // Compute the minimum distance of all the geometries in the document
-        double minDistance = -1;
-        for (auto it = geometries.begin(); it != geometries.end(); ++it) {
-            StoredGeometry& stored = **it;
-
-            if (!stored.geometry.supportsProject(_centroid->crs))
-                continue;
-            stored.geometry.projectInto(_centroid->crs);
-
-            double nextDistance = stored.geometry.minDistance(*_centroid);
-
-            if (minDistance < 0 || nextDistance < minDistance) {
-                minDistance = nextDistance;
-            }
-        }
-        minDistance *= _distanceMultiplier;
-
-        MutableDocument doc(next.releaseDocument());
-        doc.setNestedField(_distanceField, Value{minDistance});
-
-        return doc.freeze();
-    }
-
-    return next;
-}
 
 Value DocumentSourceInternalGeoNearDistance::serialize(const SerializationOptions& opts) const {
     MutableDocument out;

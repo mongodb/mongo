@@ -241,7 +241,7 @@ DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
                  << BSON("$geoWithin"
                          << BSON("$centerSphere" << BSON_ARRAY(
                                      BSON_ARRAY(x << y) << radiusRadians(nearExpr.maxDistance))))),
-            pExpCtx));
+            getExpCtx()));
 
         if (minDistance) {
             // Also include an inside-out $geoWithin. This query is imprecise due to rounding error,
@@ -255,7 +255,7 @@ DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
                          << BSON("$geoWithin" << BSON("$centerSphere" << BSON_ARRAY(
                                                           BSON_ARRAY(antipodalX << antipodalY)
                                                           << insideOutRadiusRadians)))),
-                    pExpCtx));
+                    getExpCtx()));
             }
         }
     } else if (nearExpr.centroid->crs == FLAT) {
@@ -269,7 +269,7 @@ DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
             BSON(keyFieldPath->fullPath()
                  << BSON("$geoWithin" << BSON(
                              "$center" << BSON_ARRAY(BSON_ARRAY(x << y) << nearExpr.maxDistance)))),
-            pExpCtx));
+            getExpCtx()));
 
         if (std::isnormal(nearExpr.minDistance)) {
             // $geoWithin includes its boundary, so a negated $geoWithin excludes the boundary.
@@ -286,7 +286,7 @@ DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
                 BSON(keyFieldPath->fullPath() << BSON(
                          "$not" << BSON("$geoWithin" << BSON("$center" << BSON_ARRAY(
                                                                  BSON_ARRAY(x << y) << radius))))),
-                pExpCtx));
+                getExpCtx()));
         }
     } else {
         tasserted(5860203, "Expected coordinate system to be either SPHERE or FLAT.");
@@ -315,7 +315,7 @@ DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
                     .withContext("parsing centroid for $geoNear time-series rewrite"));
 
         replacement.push_back(make_intrusive<DocumentSourceInternalGeoNearDistance>(
-            pExpCtx,
+            getExpCtx(),
             keyFieldPath->fullPath(),
             std::move(centroid),
             coords.firstElement().Obj().getOwned(),
@@ -330,7 +330,7 @@ DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
             BSON(distanceField->fullPath()
                  << BSON("$gte" << nearExpr.minDistance *
                              (distanceMultiplier ? *distanceMultiplier : 1.0))),
-            pExpCtx));
+            getExpCtx()));
     }
     if (maxDistance) {
         // 'maxDistance' does not take 'distanceMultiplier' into account.
@@ -338,13 +338,13 @@ DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
             BSON(distanceField->fullPath()
                  << BSON("$lte" << nearExpr.maxDistance *
                              (distanceMultiplier ? *distanceMultiplier : 1.0))),
-            pExpCtx));
+            getExpCtx()));
     }
 
     // 4. $sort by geo distance.
     {
         // {$sort: {dist: 1}}
-        replacement.push_back(DocumentSourceSort::create(pExpCtx,
+        replacement.push_back(DocumentSourceSort::create(getExpCtx(),
                                                          SortPattern({
                                                              {true, *distanceField, nullptr},
                                                          })));
@@ -432,7 +432,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
                     argument.type() == BSONType::object);
             auto queryObj = argument.embeddedObject();
             if (!queryObj.isEmpty()) {
-                query = std::make_unique<Matcher>(queryObj.getOwned(), pExpCtx);
+                query = std::make_unique<Matcher>(queryObj.getOwned(), getExpCtx());
             }
         } else if (argName == "spherical") {
             spherical = argument.trueValue();
@@ -556,9 +556,7 @@ void DocumentSourceGeoNear::addVariableRefs(std::set<Variables::Id>* refs) const
 }
 
 DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageName, pExpCtx),
-      exec::agg::Stage(kStageName, pExpCtx),
-      spherical(false) {}
+    : DocumentSource(kStageName, pExpCtx), spherical(false) {}
 
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceGeoNear::distributedPlanLogic() {

@@ -44,7 +44,6 @@
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 #include <list>
@@ -57,7 +56,7 @@
 
 namespace mongo {
 
-class DocumentSourceGeoNear : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceGeoNear : public DocumentSource {
 public:
     static constexpr StringData kKeyFieldName = "key"_sd;
     static constexpr StringData kStageName = "$geoNear"_sd;
@@ -105,14 +104,6 @@ public:
                 !alreadyOptimized || pos == container.cbegin());
     }
 
-    /**
-     * DocumentSourceGeoNear should always be replaced by a DocumentSourceGeoNearCursor before
-     * executing a pipeline, so this method should never be called.
-     */
-    GetNextResult doGetNext() final {
-        MONGO_UNREACHABLE_TASSERT(9911962);
-    }
-
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     boost::intrusive_ptr<DocumentSource> optimize() final;
@@ -134,7 +125,7 @@ public:
      * Set the query predicate to apply to the documents in addition to the "near" predicate.
      */
     void setQuery(BSONObj newQuery) {
-        query = std::make_unique<Matcher>(newQuery.getOwned(), pExpCtx);
+        query = std::make_unique<Matcher>(newQuery.getOwned(), getExpCtx());
     };
 
     /**
