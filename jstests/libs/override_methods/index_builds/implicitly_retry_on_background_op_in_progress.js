@@ -22,6 +22,7 @@ const commandAllowlist = new Set([
 // Allowlisted errors commands may encounter when retried on a sharded cluster. Shards may
 // return different responses, so errors associated with repeated executions of a command may be
 // ignored.
+// TODO SERVER-107420: Remove IndexNotFound from acceptable dropIndexes errors once 9.0 becomes LTS
 const acceptableCommandErrors = {
     "drop": [ErrorCodes.NamespaceNotFound],
     "dropIndexes": [ErrorCodes.IndexNotFound],

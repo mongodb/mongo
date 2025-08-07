@@ -194,7 +194,8 @@ bool containsClusteredIndex(const CollectionPtr& collection, const IndexArgument
 
 /**
  * Returns a list of index names that the caller requested to abort/drop. Requires a collection lock
- * to be held to look up the index name from the key pattern.
+ * to be held to look up the index name from the key pattern. Returns an empty vector if an index
+ * key pattern is not found (instead of IndexNotFound error).
  */
 StatusWith<std::vector<std::string>> getIndexNames(OperationContext* opCtx,
                                                    const CollectionPtr& collection,
@@ -211,6 +212,9 @@ StatusWith<std::vector<std::string>> getIndexNames(OperationContext* opCtx,
             [&](const BSONObj& arg) -> StatusWith<std::vector<std::string>> {
                 auto swDescriptor =
                     getDescriptorByKeyPattern(opCtx, collection->getIndexCatalog(), arg);
+                if (swDescriptor.getStatus() == ErrorCodes::IndexNotFound) {
+                    return std::vector<std::string>{};
+                }
                 if (!swDescriptor.isOK()) {
                     return swDescriptor.getStatus();
                 }
@@ -380,8 +384,11 @@ void dropReadyIndexes(OperationContext* opCtx,
         auto writableEntry = indexCatalog->getWritableEntryByName(
             opCtx, indexName, IndexCatalog::InclusionPolicy::kAll);
         if (!writableEntry) {
-            uasserted(ErrorCodes::IndexNotFound,
-                      str::stream() << "index not found with name [" << indexName << "]");
+            LOGV2_WARNING(9015201,
+                          "Index not found during dropIndexes, skipping",
+                          "indexName"_attr = indexName,
+                          "namespace"_attr = collection->ns());
+            continue;
         }
         uassertStatusOK(dropIndexByDescriptor(opCtx, collection, indexCatalog, writableEntry));
     }
@@ -449,9 +456,8 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                              const boost::optional<UUID>& expectedUUID,
                              const IndexArgument& origIndexArgument,
                              const bool forceRawDataMode) {
-
-    // We only need to hold an intent lock to send abort signals to the active index builder(s) we
-    // intend to abort.
+    // We only need to hold an intent lock to send abort signals to the active index builder(s)
+    // we intend to abort.
     auto collAcq = boost::make_optional<CollectionAcquisition>(
         timeseries::acquireCollectionWithBucketsLookup(
             opCtx,
@@ -513,6 +519,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         // Send the abort signal to any index builders that match the users request. Waits until
         // all aborted builders complete.
         auto justAborted = abortActiveIndexBuilders(opCtx, collNs, collectionUUID, indexNames);
+
         abortedIndexBuilders.insert(
             abortedIndexBuilders.end(), justAborted.begin(), justAborted.end());
 

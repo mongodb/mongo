@@ -381,9 +381,16 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(coll.hideIndex({not_metadata: 1}));
     assert.commandWorked(coll.dropIndex({not_metadata: 1}));
 
-    // Index names are not transformed. dropIndexes checks the name over the raw indexes over
-    // buckets, which in this case does not possess the index by that name.
-    assert.commandFailedWithCode(coll.dropIndex('mm_1'), ErrorCodes.IndexNotFound);
+    // This test uses a multiversion check because under SERVER-90152,
+    // dropIndexes becomes idempotent and no longer throws IndexNotFound errors when attempting
+    // to drop non-existent indexes. Older versions still throw the error, causing test
+    // inconsistency in multiversion environments.
+    // TODO: SERVER-108814 Remove this multiversion check once v9.0 branches out
+    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+    if (!isMultiversion) {
+        const indexList = coll.getIndexes();
+        assert.eq(undefined, indexList.find((idx) => idx.name === "mm_1"), indexList);
+    }
 
     const testCreateIndexFailed = function(spec, options = {}) {
         const indexName = 'testCreateIndex';

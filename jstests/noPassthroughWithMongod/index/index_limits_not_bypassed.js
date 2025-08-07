@@ -20,8 +20,9 @@ assert.eq(63, indexes.cursor.firstBatch.length);
 // Creating multiple indexes via 'createIndexes()' shouldn't bypass index limits.
 assert.commandFailedWithCode(coll.createIndexes([{x: 1}, {y: 1}]), ErrorCodes.CannotCreateIndex);
 
-assert.commandFailedWithCode(coll.dropIndex("x"), ErrorCodes.IndexNotFound);
-assert.commandFailedWithCode(coll.dropIndex("y"), ErrorCodes.IndexNotFound);
+let indexNames = indexes.cursor.firstBatch.map(idx => idx.name);
+assert(!indexNames.includes("x_1"), "Index 'x_1' should not exist");
+assert(!indexNames.includes("y_1"), "Index 'y_1' should not exist");
 
 // Try to create two text indexes at the same time using 'createIndexes()'. The limit for text
 // indexes is one per collection.
@@ -29,5 +30,6 @@ assert.commandFailedWithCode(
     coll.createIndexes([{x: "text", weights: {x: 5}}, {y: "text", weights: {y: 10}}]),
     ErrorCodes.CannotCreateIndex);
 
-assert.commandFailedWithCode(coll.dropIndex("x"), ErrorCodes.IndexNotFound);
-assert.commandFailedWithCode(coll.dropIndex("y"), ErrorCodes.IndexNotFound);
+indexNames = indexes.cursor.firstBatch.map(idx => idx.name);
+assert(!indexNames.includes("x_1"), "Index 'x_1' should not exist");
+assert(!indexNames.includes("y_1"), "Index 'y_1' should not exist");
