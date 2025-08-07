@@ -116,6 +116,7 @@ DEFAULTS = {
     "shard_count": None,
     "shard_index": None,
     "shell_conn_string": None,
+    "historic_test_runtimes": None,
     "shell_port": None,
     "shuffle": None,
     "stagger_jobs": None,
@@ -701,6 +702,9 @@ SHARD_COUNT = None
 
 # The shard index of the shard to run.
 SHARD_INDEX = None
+
+# JSON containing historic test runtimes
+HISTORIC_TEST_RUNTIMES = None
 
 ##
 # Internally used configuration options that aren't exposed to the user

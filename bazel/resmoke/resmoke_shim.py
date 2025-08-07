@@ -84,6 +84,13 @@ if __name__ == "__main__":
     lock, base_port = acquire_local_resource("port_block")
     resmoke_args.append(f"--basePort={base_port}")
 
+    if (
+        os.path.isfile("bazel/resmoke/test_runtimes.json")
+        and os.path.getsize("bazel/resmoke/test_runtimes.json") != 0
+    ):
+        resmoke_args.append("--historicTestRuntimes=bazel/resmoke/test_runtimes.json")
+
+
     cli.main(resmoke_args)
 
     lock.release()

@@ -61,6 +61,21 @@ genrule(
     visibility = ["//visibility:public"],
 )
 
+genrule(
+    name = "test_runtimes",
+    srcs = [],
+    outs = ["test_runtimes.json"],
+    cmd = """
+    awk '/^STABLE_TEST_RUNTIMES/ { for (i=2; i<=NF; i++) print $$i }' bazel-out/stable-status.txt > $@
+    """,
+    stamp = True,
+    tags = [
+        "external",
+        "local",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 bool_flag(
     name = "in_evergreen",
     build_setting_default = False,
@@ -90,4 +105,34 @@ py_binary(
     ],
 )
 
-exports_files(["resmoke_shim.py"])
+py_binary(
+    name = "get_historic_runtimes",
+    srcs = ["get_historic_runtimes.py"],
+    main = "get_historic_runtimes.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "boto3",
+            group = "aws",
+        ),
+        dependency(
+            "botocore",
+            group = "aws",
+        ),
+    ],
+)
+
+py_binary(
+    name = "resmoke_shim",
+    srcs = ["resmoke_shim.py"],
+    main = "resmoke_shim.py",
+    visibility = ["//visibility:public"],
+)
+
+exports_files([
+    "resmoke_shim.py",
+])

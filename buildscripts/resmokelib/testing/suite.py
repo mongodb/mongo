@@ -1,9 +1,11 @@
 """Holder for the (test kind, list of tests) pair with additional metadata their execution."""
 
 import itertools
+import json
 import logging
 import threading
 import time
+from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Any, Dict, List, Optional
 
@@ -590,4 +592,85 @@ class Suite(object):
         if shard_index is None or shard_count is None:
             return tests
 
+        if _config.HISTORIC_TEST_RUNTIMES:
+            with open(_config.HISTORIC_TEST_RUNTIMES, "rt") as f:
+                runtimes = json.load(f)
+            strategy = EqualRuntime(runtimes=runtimes)
+        else:
+            strategy = EqualTestCount()
+        tests = strategy.get_tests_for_shard(tests, shard_count, shard_index)
+
+        test_str = "\n   ".join(tests)
+        loggers.ROOT_EXECUTOR_LOGGER.info(f"{len(tests)} test(s) in this shard:\n   {test_str}")
+
+        return tests
+
+
+class ShardingStrategy(ABC):
+    @abstractmethod
+    def get_tests_for_shard(
+        self, tests: List[str], shard_count: int, shard_index: int
+    ) -> List[str]:
+        pass
+
+
+class EqualTestCount(ShardingStrategy):
+    def get_tests_for_shard(
+        self, tests: List[str], shard_count: int, shard_index: int
+    ) -> List[str]:
         return [test_case for i, test_case in enumerate(tests) if i % shard_count == shard_index]
+
+
+class EqualRuntime(ShardingStrategy):
+    def __init__(self, runtimes):
+        self.runtimes = {}
+        for runtime in runtimes:
+            self.runtimes[runtime["test_name"]] = runtime["avg_duration_pass"]
+
+    def get_tests_for_shard(
+        self, tests: List[str], shard_count: int, shard_index: int
+    ) -> List[str]:
+        shards = [[] for _ in range(shard_count)]
+        shard_runtimes = [0] * shard_count
+
+        tests_with_runtime = {}
+        tests_without_runtime = []
+        for test in tests:
+            if test in self.runtimes:
+                tests_with_runtime[test] = self.runtimes[test]
+            else:
+                tests_without_runtime.append(test)
+        tests_with_runtime = sorted(
+            tests_with_runtime.items(), key=lambda test: test[1], reverse=True
+        )
+
+        # Distribute tests with known runtimes
+        total_runtime = 0
+        for test, runtime in tests_with_runtime:
+            smallest_shard = shard_runtimes.index(min(shard_runtimes))
+            shards[smallest_shard].append(test)
+            shard_runtimes[smallest_shard] += runtime
+            total_runtime += runtime
+
+        # Distribute the rest of tests without history, treating them all equally.
+        avg_runtime = total_runtime / len(tests)
+        if avg_runtime:
+            loggers.ROOT_EXECUTOR_LOGGER.info(
+                f"Using average test runtime of {avg_runtime:.1f}s for tests without historic runtime info."
+            )
+            runtime = avg_runtime
+        else:
+            loggers.ROOT_EXECUTOR_LOGGER.info(
+                "Using default test runtime of 1s for tests without historic runtime info, since no test has historic info."
+            )
+            runtime = 1
+
+        for test in tests_without_runtime:
+            smallest_shard = shard_runtimes.index(min(shard_runtimes))
+            shards[smallest_shard].append(test)
+            shard_runtimes[smallest_shard] += runtime
+
+        loggers.ROOT_EXECUTOR_LOGGER.info(
+            f"Test shard balanced to {shard_runtimes[shard_index]:.1f} seconds of runtime."
+        )
+        return shards[shard_index]

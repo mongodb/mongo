@@ -512,6 +512,8 @@ flags in common: {common_set}
     _config.SHARD_INDEX = int(shard_index) if shard_index is not None else None
     _config.SHARD_COUNT = int(shard_count) if shard_count is not None else None
 
+    _config.HISTORIC_TEST_RUNTIMES = config.pop("historic_test_runtimes")
+
     mongo_version_file = config.pop("mongo_version_file")
     if mongo_version_file is not None:
         _config.MONGO_VERSION_FILE = mongo_version_file

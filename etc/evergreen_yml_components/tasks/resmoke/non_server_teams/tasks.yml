@@ -354,7 +354,7 @@ tasks:
           bazel_args: >-
             --config=no-remote-exec
             --test_output=all
-            --workspace_status_command="bazel/resmoke/volatile_status.sh"
+            --workspace_status_command="bazel/resmoke/workspace_status.sh"
             --//bazel/resmoke:in_evergreen
 
   # Experimental task running the jstestfuzz suite bazel target. To be removed with SERVER-103537.
@@ -373,7 +373,7 @@ tasks:
           bazel_args: >-
             --config=no-remote-exec
             --test_output=all
-            --workspace_status_command="bazel/resmoke/volatile_status.sh"
+            --workspace_status_command="bazel/resmoke/workspace_status.sh"
             --//bazel/resmoke:in_evergreen
 
   # Experimental task running the multiversion sanity check bazel targets. To be removed with SERVER-103537.
@@ -392,7 +392,7 @@ tasks:
           bazel_args: >-
             --config=no-remote-exec
             --test_output=all
-            --workspace_status_command="bazel/resmoke/volatile_status.sh"
+            --workspace_status_command="bazel/resmoke/workspace_status.sh"
             --//bazel/resmoke:in_evergreen
       - func: "initialize multiversion tasks"
         vars:

@@ -109,6 +109,7 @@ def resmoke_suite_test(
             "//bazel/resmoke:off_feature_flags",
             "//bazel/resmoke:unreleased_ifr_flags",
             "//bazel/resmoke:volatile_status",
+            "//bazel/resmoke:test_runtimes",
             "//buildscripts/resmokeconfig:all_files",  # This needs to be reduced, SERVER-103610
             "//src/mongo/util/version:releases.yml",
             "//:generated_resmoke_config",

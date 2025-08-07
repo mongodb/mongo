@@ -1,7 +1,7 @@
 #! /bin/sh
 
 # This script is used as a workspace status command
-#    bazel test --workspace_status_command=bazel/resmoke/volatile_status.sh
+#    bazel test --workspace_status_command=bazel/resmoke/workspace_status.sh
 # to populate key-value pairs in bazel-out/volatile-status.txt.
 # This file and the key-values can be consumed by bazel rules, but bazel
 # pretends this file never changes when deciding what to rebuild.
@@ -24,3 +24,5 @@ echo requester ${requester}
 # volatile-status.txt. Changes to feature flag state should invalidate actions
 # that consume this. SERVER-103590
 python buildscripts/idl/gen_all_feature_flag_list.py feature-flag-status
+
+python bazel/resmoke/get_historic_runtimes.py --project ${project:-""} --build-variant ${build_variant:-""} --task ${task_name:-""}

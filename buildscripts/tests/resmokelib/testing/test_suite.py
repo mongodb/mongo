@@ -1,10 +1,13 @@
 """Unit tests for the resmokelib.testing.suite module."""
 
+import logging
 import unittest
 
 from mock import MagicMock
 
+from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing import suite as under_test
+from buildscripts.resmokelib.testing.suite import EqualRuntime
 from buildscripts.resmokelib.testing.testcases.interface import TestCase
 
 
@@ -52,6 +55,7 @@ class TestNumJobsToStart(unittest.TestCase):
 
 class TestGetTestsForKind(unittest.TestCase):
     def setUp(self):
+        loggers.ROOT_EXECUTOR_LOGGER = logging
         self.suite = under_test.Suite("suite_name", {"test_kind": "js_test"})
         self.suite._tests = ["t/test1.js", "t/test2.js", "t/test3.js"]
         self.suite._suite_config = {
@@ -143,8 +147,46 @@ class TestGetTestsForKind(unittest.TestCase):
         shard_count = 2
         shard1 = self.suite.filter_tests_for_shard(tests, shard_count, 0)
         shard2 = self.suite.filter_tests_for_shard(tests, shard_count, 1)
-        self.assertEqual(shard1, ["1.js", "3.js"])
+        self.assertEqual(set(shard1), set(["1.js", "3.js"]))
         self.assertEqual(shard2, ["2.js"])
+
+        actual = shard1 + shard2
+        actual.sort()
+        self.assertEqual(actual, tests)
+
+    def test_runtime_sharding(self):
+        tests = ["1.js", "2.js", "3.js", "4.js"]
+        runtimes = [
+            {
+                "test_name": "1.js",
+                "avg_duration_pass": 5,
+            },
+            {
+                "test_name": "2.js",
+                "avg_duration_pass": 1,
+            },
+            {
+                "test_name": "3.js",
+                "avg_duration_pass": 2,
+            },
+            {
+                "test_name": "4.js",
+                "avg_duration_pass": 2,
+            },
+        ]
+        shard_count = 2
+
+        strategy = EqualRuntime(runtimes=runtimes)
+        shard1 = strategy.get_tests_for_shard(tests, shard_count, 0)
+        shard2 = strategy.get_tests_for_shard(tests, shard_count, 1)
+
+        self.assertEqual(
+            shard1,
+            [
+                "1.js",
+            ],
+        )
+        self.assertEqual(set(shard2), set(["2.js", "3.js", "4.js"]))
 
         actual = shard1 + shard2
         actual.sort()
