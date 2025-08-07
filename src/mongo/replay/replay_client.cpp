@@ -43,7 +43,7 @@
 
 namespace mongo {
 /**
- * Helper class for for applying a callable to a container of N elements,
+ * Helper class for applying a callable to a container of N elements,
  * spawning a new thread for each element.
  *
  * e.g.,
