@@ -79,6 +79,3 @@ filters:
   - "commit_shard_removal_test.js":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "maxTimeMS_sharded_test.js":
-    approvers:
-      - 10gen/query-execution

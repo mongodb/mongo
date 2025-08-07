@@ -789,14 +789,12 @@ public:
     decltype(auto) runWithoutInterruptionExceptAtGlobalShutdown(Callback&& cb) {
         try {
             bool prevIgnoringInterrupts = _ignoreInterrupts;
-            DeadlineState prevDeadlineState{
-                _deadline, _maxTime, _timeoutError, _hasArtificialDeadline};
+            DeadlineState prevDeadlineState{_deadline, _timeoutError, _hasArtificialDeadline};
             ScopeGuard guard([&] {
                 // Restore the original interruption and deadline state.
                 stdx::lock_guard lg(*_client);
                 _ignoreInterrupts = prevIgnoringInterrupts;
-                setDeadlineAndMaxTime(
-                    prevDeadlineState.deadline, prevDeadlineState.maxTime, prevDeadlineState.error);
+                setDeadlineByDate(prevDeadlineState.deadline, prevDeadlineState.error);
                 _hasArtificialDeadline = prevDeadlineState.hasArtificialDeadline;
                 _markKilledIfDeadlineRequires();
             });
@@ -833,7 +831,7 @@ private:
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;
 
     DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
-        DeadlineState ds{_deadline, _maxTime, _timeoutError, _hasArtificialDeadline};
+        DeadlineState ds{_deadline, _timeoutError, _hasArtificialDeadline};
 
         _hasArtificialDeadline = true;
         setDeadlineByDate(std::min(_deadline, deadline), error);
@@ -842,7 +840,7 @@ private:
     }
 
     void popArtificialDeadline(DeadlineState ds) override {
-        setDeadlineAndMaxTime(ds.deadline, ds.maxTime, ds.error);
+        setDeadlineByDate(ds.deadline, ds.error);
         _hasArtificialDeadline = ds.hasArtificialDeadline;
 
         _markKilledIfDeadlineRequires();
