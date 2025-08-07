@@ -121,7 +121,7 @@ public:
     }
 
     ExecState getNext(BSONObj* objOut, RecordId* recordIdOut) override;
-    ExecState getNextDocument(Document* docOut, RecordId* recordIdOut) override;
+    ExecState getNextDocument(Document& docOut) override;
 
     bool isEOF() const override;
 

@@ -388,7 +388,7 @@ public:
      * PlanExecutor use Document/Value as their runtime value format. These implementations will
      * typically just convert the BSON to Document on behalf of the caller.
      */
-    virtual ExecState getNextDocument(Document* objOut, RecordId* dlOut) = 0;
+    virtual ExecState getNextDocument(Document& objOut) = 0;
 
     /**
      * Returns 'true' if the plan is done producing results (or writing), 'false' otherwise.

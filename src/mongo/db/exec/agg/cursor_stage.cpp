@@ -289,8 +289,7 @@ bool CursorStage::pullDataFromExecutor(OperationContext* opCtx) {
     PlanExecutor::ExecState state;
     Document resultObj;
 
-    while ((state = _sharedState->exec->getNextDocument(&resultObj, nullptr)) ==
-           PlanExecutor::ADVANCED) {
+    while ((state = _sharedState->exec->getNextDocument(resultObj)) == PlanExecutor::ADVANCED) {
         boost::optional<BSONObj> resumeToken;
         if (_resumeTrackingType == ResumeTrackingType::kNonOplog)
             resumeToken = _sharedState->exec->getPostBatchResumeToken();

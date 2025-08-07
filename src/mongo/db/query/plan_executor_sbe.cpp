@@ -238,17 +238,12 @@ void PlanExecutorSBE::stashResult(const BSONObj& obj) {
     _stash.push_front({obj.getOwned(), boost::none});
 }
 
-PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document* objOut, RecordId* dlOut) {
+PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document& objOut) {
     invariant(!_isDisposed);
 
     checkFailPointPlanExecAlwaysFails();
 
-    Document obj;
-    auto result = getNextImpl(&obj, dlOut);
-    if (objOut && result == PlanExecutor::ExecState::ADVANCED) {
-        *objOut = std::move(obj);
-    }
-    return result;
+    return getNextImpl(&objOut, nullptr);
 }
 
 PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) {

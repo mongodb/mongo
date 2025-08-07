@@ -153,11 +153,10 @@ public:
         return ExecState::ADVANCED;
     }
 
-    ExecState getNextDocument(Document* objOut, RecordId* dlOut) override {
+    ExecState getNextDocument(Document& objOut) override {
         BSONObj bson;
         auto ret = getNext(&bson, nullptr);
-        Document outDoc = Document(bson).getOwned();
-        *objOut = std::move(outDoc);
+        objOut = Document(bson).getOwned();
 
         return ret;
     }

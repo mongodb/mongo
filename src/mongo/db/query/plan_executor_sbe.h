@@ -117,7 +117,7 @@ public:
     void reattachToOperationContext(OperationContext* opCtx) override;
 
     ExecState getNext(BSONObj* out, RecordId* dlOut) override;
-    ExecState getNextDocument(Document* objOut, RecordId* dlOut) override;
+    ExecState getNextDocument(Document& objOut) override;
 
     bool isEOF() const override {
         return isMarkedAsKilled() || (_stash.empty() && _root->getCommonStats()->isEOF);

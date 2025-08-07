@@ -343,7 +343,8 @@ void PlanExecutorImpl::_waitForAllEarlierOplogWritesToBeVisible() {
 }
 
 PlanExecutor::ExecState PlanExecutorImpl::getNext(BSONObj* objOut, RecordId* dlOut) {
-    const auto state = getNextDocument(&_docOutput, dlOut);
+    ExecState state = _getNextImpl(&_docOutput, dlOut);
+
     if (objOut && state == ExecState::ADVANCED) {
         const bool includeMetadata = _expCtx && _expCtx->getNeedsMerge();
         *objOut = includeMetadata ? _docOutput.toBsonWithMetaData() : _docOutput.toBson();
@@ -351,22 +352,11 @@ PlanExecutor::ExecState PlanExecutorImpl::getNext(BSONObj* objOut, RecordId* dlO
     return state;
 }
 
-PlanExecutor::ExecState PlanExecutorImpl::getNextDocument(Document* objOut, RecordId* dlOut) {
-    Snapshotted<Document> snapshotted;
-    if (objOut) {
-        snapshotted.value() = std::move(*objOut);
-    }
-    ExecState state = _getNextImpl(objOut ? &snapshotted : nullptr, dlOut);
-
-    if (objOut) {
-        *objOut = std::move(snapshotted.value());
-    }
-
-    return state;
+PlanExecutor::ExecState PlanExecutorImpl::getNextDocument(Document& objOut) {
+    return _getNextImpl(&objOut, nullptr);
 }
 
-PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* objOut,
-                                                       RecordId* dlOut) {
+PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordId* dlOut) {
     checkFailPointPlanExecAlwaysFails();
 
     invariant(_currentState == kUsable);
@@ -376,7 +366,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
 
     if (!_stash.empty()) {
         invariant(objOut && !dlOut);
-        *objOut = {SnapshotId(), std::move(_stash.front())};
+        *objOut = std::move(_stash.front());
         _stash.pop_front();
         return PlanExecutor::ADVANCED;
     }
@@ -427,13 +417,10 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                         _workingSet->free(id);
                         hasRequestedData = false;
                     } else {
-                        // TODO: currently snapshot ids are only associated with documents, and
-                        // not with index keys.
-                        *objOut = Snapshotted<Document>(SnapshotId(),
-                                                        Document{member->keyData[0].keyData});
+                        *objOut = Document{member->keyData[0].keyData};
                     }
                 } else if (member->hasObj()) {
-                    std::swap(*objOut, member->doc);
+                    std::swap(*objOut, member->doc.value());
                 } else {
                     _workingSet->free(id);
                     hasRequestedData = false;
@@ -449,13 +436,13 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                 // transfer the metadata from the WSM to Document.
                 if (objOut) {
                     if (_mustReturnOwnedBson) {
-                        objOut->value() = objOut->value().getOwned();
+                        *objOut = objOut->getOwned();
                     }
 
                     if (member->metadata()) {
-                        MutableDocument md(std::move(objOut->value()));
+                        MutableDocument md(std::move(*objOut));
                         md.setMetadata(member->releaseMetadata());
-                        objOut->setValue(md.freeze());
+                        *objOut = md.freeze();
                     }
                 }
                 _workingSet->free(id);

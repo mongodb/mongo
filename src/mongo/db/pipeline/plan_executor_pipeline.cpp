@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <utility>
@@ -106,28 +107,23 @@ PlanExecutor::ExecState PlanExecutorPipeline::getNext(BSONObj* objOut, RecordId*
         return PlanExecutor::ADVANCED;
     }
 
-    Document docOut;
-    auto execState = getNextDocument(objOut ? &docOut : nullptr, nullptr);
-    if (objOut && execState == PlanExecutor::ADVANCED) {
-        *objOut = _trySerializeToBson(docOut);
+    if (auto next = _getNext()) {
+        if (objOut) {
+            *objOut = _trySerializeToBson(*next);
+        }
+        _planExplainer.incrementNReturned();
+        return PlanExecutor::ADVANCED;
     }
-    return execState;
+    return PlanExecutor::IS_EOF;
 }
 
-PlanExecutor::ExecState PlanExecutorPipeline::getNextDocument(Document* docOut,
-                                                              RecordId* recordIdOut) {
-    // The pipeline-based execution engine does not track the record ids associated with documents,
-    // so it is an error for the caller to ask for one.
-    invariant(!recordIdOut);
-
+PlanExecutor::ExecState PlanExecutorPipeline::getNextDocument(Document& docOut) {
     // Callers which use 'stashResult()' are not allowed to use 'getNextDocument()', and must
     // instead use 'getNext()'.
-    invariant(_stash.empty());
+    tassert(10842100, "expecting stash to be empty in getNextDocument", _stash.empty());
 
     if (auto next = _getNext()) {
-        if (docOut) {
-            *docOut = std::move(*next);
-        }
+        docOut = std::move(*next);
         _planExplainer.incrementNReturned();
         return PlanExecutor::ADVANCED;
     }

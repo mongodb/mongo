@@ -54,7 +54,6 @@
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
@@ -169,7 +168,7 @@ public:
     void detachFromOperationContext() final;
     void reattachToOperationContext(OperationContext* opCtx) final;
 
-    ExecState getNextDocument(Document* objOut, RecordId* dlOut) final;
+    ExecState getNextDocument(Document& objOut) final;
     ExecState getNext(BSONObj* out, RecordId* dlOut) final;
     size_t getNextBatch(size_t batchSize, AppendBSONObjFn append) final;
 
@@ -241,7 +240,7 @@ private:
         return nullptr;
     }
 
-    ExecState _getNextImpl(Snapshotted<Document>* objOut, RecordId* dlOut);
+    ExecState _getNextImpl(Document* objOut, RecordId* dlOut);
 
     // Helper for handling the NEED_YIELD stage state.
     void _handleNeedYield(size_t& writeConflictsInARow, size_t& tempUnavailErrorsInARow);

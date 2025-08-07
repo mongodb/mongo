@@ -208,12 +208,10 @@ public:
 
     ExecState getNext(BSONObj* out, RecordId* dlOut) override;
 
-    ExecState getNextDocument(Document* objOut, RecordId* dlOut) override {
+    ExecState getNextDocument(Document& objOut) override {
         BSONObj bsonDoc;
-        auto state = getNext(objOut ? &bsonDoc : nullptr, dlOut);
-        if (objOut) {
-            *objOut = Document(bsonDoc);
-        }
+        auto state = getNext(&bsonDoc, nullptr);
+        objOut = Document(bsonDoc);
         return state;
     }
 

@@ -132,7 +132,8 @@ protected:
             ASSERT_EQ(PlanExecutor::ExecState::ADVANCED, state);
             result.push_back(out.getOwned());
         }
-        ASSERT_EQ(PlanExecutor::ExecState::IS_EOF, exec->getNextDocument(nullptr, nullptr));
+        Document doc;
+        ASSERT_EQ(PlanExecutor::ExecState::IS_EOF, exec->getNextDocument(doc));
         return result;
     }
 
