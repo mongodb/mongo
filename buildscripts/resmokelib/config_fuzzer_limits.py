@@ -81,6 +81,30 @@ config_fuzzer_params = {
             "period": 5,
             "fuzz_at": ["runtime"],
         },
+        "ingressConnectionEstablishmentRateLimiterEnabled": {
+            "choices": [True, False],
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "ingressConnectionEstablishmentRatePerSec": {
+            "min": 20,
+            "max": 100_000,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "ingressConnectionEstablishmentBurstCapacitySecs": {
+            "min": 0.1,
+            "max": 100_000,
+            "isUniform": True,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "ingressConnectionEstablishmentMaxQueueDepth": {
+            "min": 100,
+            "max": 100_000,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "enableTemporarilyUnavailableExceptions": {
             "choices": [True, False],
             "period": 5,
@@ -526,7 +550,7 @@ config_fuzzer_params = {
             "min": 0,
             "max": 30,
             "period": 10,
-            "fuzz_at": ["startup", "runtime"], 
+            "fuzz_at": ["startup", "runtime"],
         },
     },
     "mongos": {
@@ -572,6 +596,30 @@ config_fuzzer_params = {
             "choices": [{"mode": "off"}],
             "fuzz_at": ["startup"],
         },
+        "ingressConnectionEstablishmentRateLimiterEnabled": {
+            "choices": [True, False],
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "ingressConnectionEstablishmentRatePerSec": {
+            "min": 20,
+            "max": 100_000,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "ingressConnectionEstablishmentBurstCapacitySecs": {
+            "min": 0.1,
+            "max": 100_000,
+            "isUniform": True,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "ingressConnectionEstablishmentMaxQueueDepth": {
+            "min": 100,
+            "max": 100_000,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "internalQueryStatsRateLimit": {
             "min": -1,
             "max": 1,
@@ -594,7 +642,7 @@ config_fuzzer_params = {
         "internalQueryStatsErrorsAreCommandFatal": {
             "default": True,
             "fuzz_at": ["startup"],
-        }
+        },
     },
 }
 
