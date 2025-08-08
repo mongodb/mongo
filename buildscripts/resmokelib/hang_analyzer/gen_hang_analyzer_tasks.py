@@ -43,14 +43,20 @@ def get_generated_task_name(current_task_name: str, execution: str) -> str:
 def should_activate_core_analysis_task(task: Task) -> bool:
     core_dump_pids = set()
     for artifact in task.artifacts:
+        # Matches "Core Dump 2 (dump_mongo.670872.core.gz)", capturing "dump_mongo.670872.core"
         regex = re.search(r"Core Dump [0-9]+ \((.*)\.gz\)", artifact.name)
         if not regex:
             continue
 
         core_file = regex.group(1)
         core_file_parts = core_file.split(".")
-        assert len(core_file_parts) == 3, "Unknown core dump file name format"
-        pid = core_file_parts[1]
+
+        # Expected format is like dump_mongod.429814.core or dump_mongod-8.2.429814.core, where 429814 is the PID.
+        assert len(core_file_parts) >= 3, "Unknown core dump file name format"
+        assert str.isdigit(core_file_parts[-2]), (
+            "PID not in expected location of core dump file name"
+        )
+        pid = core_file_parts[-2]
         core_dump_pids.add(pid)
 
     boring_core_dump_pids = set()
