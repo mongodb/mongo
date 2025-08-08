@@ -279,3 +279,82 @@ This subclass of `random.Random` makes two important changes:
 
 1. Replaces modulus-based arithmetic with multiplication-based arithmetic.
 2. Maintains a cache of states so that random number generations are deterministically repeatable.
+
+# Example field specifications
+
+## Generating completely uncorrelated data
+
+Completely uncorrelated data is generated if a given specification does not have a `correlation` argument:
+
+```python
+@dataclasses.dataclass
+class Uncorrelated:
+    field1: Specification(str)
+    field2: Specification(str)
+
+    @staticmethod
+    def make_field1(fkr: faker.proxy.Faker) -> int:
+        return fkr.random.choice(['a','b'])
+
+    @staticmethod
+    def make_field2(fkr: faker.proxy.Faker) -> int:
+        return fkr.random.choice(['a','b'])
+```
+
+The configuration above produces a collection where `field1` and `field2` are completely uncorrelated
+so that all combinations of values are equally likely:
+
+```
+Enterprise test> db.Uncorrelated.aggregate([{ $group: { _id: {field1: "$field1", field2:"$field2"}, count: { $count: {} }}}, {$sort: {"_id.field1":1, "_id.field2":1}}] ) ;
+[
+  { _id: { field1: 'a', field2: 'a' }, count: 223 },
+  { _id: { field1: 'a', field2: 'b' }, count: 271 },
+  { _id: { field1: 'b', field2: 'a' }, count: 271 },
+  { _id: { field1: 'b', field2: 'b' }, count: 235 }
+]
+```
+
+## Generating partially correlated data
+
+By default, if a field specification is configured to use a particular correlation, all data generated
+for it will be 100% correlated. To mix in some uncorrelated data, take it from the global uncorrelated faker:
+
+```python
+from datagen.util import uncorrelated_faker
+
+@dataclasses.dataclass
+class PartiallyCorrelated:
+    field1: Specification(str, correlation="correlation1")
+    field2: Specification(str, correlation="correlation1")
+
+    @staticmethod
+    def make_field1(fkr: faker.proxy.Faker) -> int:
+        return fkr.random.choice(['a','b'])
+
+    @staticmethod
+    def make_field2(fkr: faker.proxy.Faker) -> str:
+        return fkr.random_element(
+            collections.OrderedDict([
+                (uncorrelated_faker().random.choice(['c','d']), 0.1),
+                (fkr.random.choice(['a','b']), 0.9)
+            ])
+        )
+```
+
+For `field2`, 90% of the values will be either `a` or `b`, correlated to the value of `field1` and
+10% of the values will be either `c` or `d`, not correlated to anything:
+
+```
+Enterprise test> db.Uncorrelated.aggregate([{ $group: { _id: {field1: "$field1", field2:"$field2"}, count: { $count: {} }}}, {$sort: {"_id.field1":1, "_id.field2":1}}] ) ;
+[
+  { _id: { field1: 'a', field2: 'a' }, count: 423 },
+  { _id: { field1: 'a', field2: 'c' }, count: 25 },
+  { _id: { field1: 'a', field2: 'd' }, count: 25 },
+  { _id: { field1: 'b', field2: 'b' }, count: 469 },
+  { _id: { field1: 'b', field2: 'c' }, count: 33 },
+  { _id: { field1: 'b', field2: 'd' }, count: 25 }
+]
+```
+
+> [!WARNING]
+> Do not instantiate `Faker` objects manually as they will not be seeded with a fixed seed if one was provided on the command line.

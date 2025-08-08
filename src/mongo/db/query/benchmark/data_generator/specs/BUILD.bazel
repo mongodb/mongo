@@ -14,3 +14,13 @@ py_library(
     name = "test",
     srcs = ["test.py"],
 )
+
+py_library(
+    name = "uncorrelated",
+    srcs = ["uncorrelated.py"],
+)
+
+py_library(
+    name = "partially_correlated",
+    srcs = ["partially_correlated.py"],
+)

@@ -54,6 +54,11 @@ class CorrelatedGeneratorFactory:
         self.fkr.add_provider(provider)
         self.factory = datagen.util.CorrelatedDataFactory(provider, self.fkr)
 
+        # Faker and random do not allow the seed to be retrieved after instantiation,
+        # so the spec files can not create uncorrelated Faker objects after the fact that
+        # use the same seed. So, we instantiate a global uncorrelated Faker here.
+        datagen.util.set_uncorrelated_faker(faker.Faker(seed = seed))
+
     def make_generator(self) -> typing.Generator:
         """Generates the dictated objects as a generator."""
 

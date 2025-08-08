@@ -44,6 +44,23 @@ import pymongo
 
 ####################################################################################################
 #
+# A global Faker object used to generate uncorrelated data
+#
+####################################################################################################
+
+UNCORRELATED_FAKER = None
+
+def set_uncorrelated_faker(faker):
+    global UNCORRELATED_FAKER
+    if UNCORRELATED_FAKER is None:
+        UNCORRELATED_FAKER = faker
+
+def uncorrelated_faker():
+    assert UNCORRELATED_FAKER is not None
+    return UNCORRELATED_FAKER
+
+####################################################################################################
+#
 # Correlated data generator definitions begin here.
 #
 ####################################################################################################
