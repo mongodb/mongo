@@ -440,7 +440,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, const PrepMemoContext& cont
             assign->assignment = std::move(orAssignment);
         }
         return true;
-    } else if (Indexability::arrayUsesIndexOnChildren(node)) {
+    } else if (Indexability::isBoundsGeneratingElemMatchObject(node)) {
         // Add each of our children as a subnode.  We enumerate through each subnode one at a
         // time until it's exhausted then we move on.
         ArrayAssignment aa;

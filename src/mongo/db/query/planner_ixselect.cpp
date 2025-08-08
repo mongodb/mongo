@@ -810,7 +810,7 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
             childRt->path = rt->path;
             node->getChild(0)->setTag(childRt);
         }
-    } else if (Indexability::arrayUsesIndexOnChildren(node) && !node->path().empty()) {
+    } else if (Indexability::isBoundsGeneratingElemMatchObject(node)) {
         // Note we skip empty path components since they are not allowed in index key patterns.
         const auto newPath = prefix + std::string{node->path()};
         ElemMatchContext newEMContext;
