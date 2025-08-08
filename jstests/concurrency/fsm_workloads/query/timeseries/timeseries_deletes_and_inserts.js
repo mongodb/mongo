@@ -108,16 +108,22 @@ export const $config = (function() {
         // which added splitting to chunk migrations, and made it so that multi-updates such as
         // those coming from the deletes across readingNo can no longer guarantee complete success.
         // The flag here was added in SPM-3209 to protect against this.
-        assert.commandWorked(db.adminCommand(
-            {setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}));
-        cluster.executeOnMongosNodes((db) => {
-            // Ensure all mongoses have refreshed cluster parameter after being set.
-            assert.soon(() => {
-                const response = assert.commandWorked(
-                    db.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
-                return response.clusterParameters[0].enabled;
+        const preCheckResponse = assert.commandWorked(
+            db.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
+        let migrationsWerentPaused = !preCheckResponse.clusterParameters[0].enabled;
+        if (migrationsWerentPaused) {
+            assert.commandWorked(db.adminCommand(
+                {setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}));
+            cluster.executeOnMongosNodes((db) => {
+                // Ensure all mongoses have refreshed cluster parameter after being set.
+                assert.soon(() => {
+                    const response = assert.commandWorked(db.adminCommand(
+                        {getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
+                    return response.clusterParameters[0].enabled;
+                });
             });
-        });
+            assert.commandWorked(db[this.logColl].insert({migrationsNeedReset: true}));
+        }
 
         db[collName].drop();
         db.createCollection(
@@ -212,6 +218,23 @@ export const $config = (function() {
             assert(minReading.length == 0 || minReading[0].min >= data.nReadingsPerSensor,
                    `Expected all of the original readings to be deleted: sensorId: ${
                        deletedSensor.sensorId}, minReading: ${tojson(minReading)}`);
+        }
+
+        // Revert any migration pausing that was done
+        const migrationsNeedReset = retryUntilWorked((options) => {
+            return logColl.count({migrationsNeedReset: true}, options) > 0;
+        });
+        if (migrationsNeedReset) {
+            assert.commandWorked(db.adminCommand(
+                {setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: false}}}));
+            cluster.executeOnMongosNodes((db) => {
+                // Ensure all mongoses have refreshed cluster parameter after being set.
+                assert.soon(() => {
+                    const response = assert.commandWorked(db.adminCommand(
+                        {getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
+                    return !response.clusterParameters[0].enabled;
+                });
+            });
         }
     }
 
