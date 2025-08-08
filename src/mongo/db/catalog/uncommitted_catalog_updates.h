@@ -107,10 +107,6 @@ public:
         // New set of view information for a database.
         // Set for action kReplacedViewsForDatabase, boost::none otherwise.
         boost::optional<ViewsForDatabase> viewsForDb;
-
-        // Whether the collection entry is drop pending.
-        // Set for actions kDroppedCollection, boost::none otherwise.
-        boost::optional<bool> isDropPending;
     };
 
     struct CollectionLookupResult {
@@ -196,7 +192,7 @@ public:
     /**
      * Manage an uncommitted collection drop.
      */
-    void dropCollection(const Collection* collection, bool isDropPending);
+    void dropCollection(const Collection* collection);
 
     /**
      * Replace the ViewsForDatabase instance assocated with database `dbName` with `vfdb`. This is

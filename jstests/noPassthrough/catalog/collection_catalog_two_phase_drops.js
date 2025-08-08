@@ -96,13 +96,6 @@ checkLog.containsJson(primary, 6776600, {
     }
 });
 
-// Deregistering drop pending ident.
-checkLog.containsJson(primary, 6825302, {
-    ident: function(ident) {
-        return ident == xIndexUri;
-    }
-});
-
 jsTestLog("Starting a two-phase collection drop");
 coll.drop();
 
@@ -115,13 +108,6 @@ checkLog.containsJson(primary, 22206, {
 
 // Deferring table drop for collection.
 checkLog.containsJson(primary, 22214, {
-    ident: function(ident) {
-        return ident == collUri;
-    }
-});
-
-// Registering drop pending collection ident.
-checkLog.containsJson(primary, 6825300, {
     ident: function(ident) {
         return ident == collUri;
     }
@@ -149,18 +135,6 @@ checkLog.containsJson(primary, 6776600, {
     }
 });
 checkLog.containsJson(primary, 6776600, {
-    ident: function(ident) {
-        return ident == idIndexUri;
-    }
-});
-
-// Deregistering drop pending ident.
-checkLog.containsJson(primary, 6825302, {
-    ident: function(ident) {
-        return ident == collUri;
-    }
-});
-checkLog.containsJson(primary, 6825302, {
     ident: function(ident) {
         return ident == idIndexUri;
     }

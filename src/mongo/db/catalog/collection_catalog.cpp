@@ -563,12 +563,10 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kDroppedCollection: {
-                    writeJobs.push_back([opCtx,
-                                         uuid = *entry.uuid(),
-                                         isDropPending = *entry.isDropPending,
-                                         commitTime](CollectionCatalog& catalog) {
-                        catalog.deregisterCollection(opCtx, uuid, isDropPending, commitTime);
-                    });
+                    writeJobs.push_back(
+                        [opCtx, uuid = *entry.uuid(), commitTime](CollectionCatalog& catalog) {
+                            catalog.deregisterCollection(opCtx, uuid, commitTime);
+                        });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRecreatedCollection: {
@@ -1365,64 +1363,45 @@ std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
     const std::shared_ptr<const Collection>& latestCollection,
     boost::optional<Timestamp> readTimestamp,
     const durable_catalog::CatalogEntry& catalogEntry) const {
-    // Check if the collection is drop pending, not expired, and compatible with the read timestamp.
-    std::shared_ptr<Collection> dropPendingColl = [&]() -> std::shared_ptr<Collection> {
-        const std::weak_ptr<Collection>* dropPending =
-            _dropPendingCollection.find(catalogEntry.ident);
-        if (!dropPending) {
-            return nullptr;
-        }
-        return dropPending->lock();
-    }();
-
-    if (isExistingCollectionCompatible(dropPendingColl, readTimestamp)) {
-        return dropPendingColl;
-    }
-
-    // Protect against an edge case where the same namespace / UUID combination is used to create a
-    // collection after a drop. In this case, using the shared state in the latest instance would be
-    // an error, because the collection at the requested timestamp is not actually the same as the
-    // latest, it just happens to have the same namespace and UUID. Even if it were the same
-    // "logical" collection, this would still be incorrect because the 'ident' would be different,
-    // and the PIT read would be accessing an incorrect ident. The 'ident' is guaranteed to be
-    // unique across collection re-creation, and can be used to determine if the shared state is
-    // incompatible.
-    if (latestCollection && latestCollection->getRecordStore()->getIdent() != catalogEntry.ident) {
+    if (!latestCollection) {
         return nullptr;
     }
 
-    // If either the latest or drop pending collection exists, instantiate a new collection using
-    // the shared state.
-    if (latestCollection || dropPendingColl) {
-        LOGV2_DEBUG(6825400,
-                    1,
-                    "Instantiating a collection using shared state",
-                    logAttrs(catalogEntry.metadata->nss),
-                    "ident"_attr = catalogEntry.ident,
-                    "md"_attr = catalogEntry.metadata->toBSON(),
-                    "timestamp"_attr = readTimestamp);
-
-        std::shared_ptr<Collection> collToReturn =
-            Collection::Factory::get(opCtx)->make(opCtx,
-                                                  catalogEntry.metadata->nss,
-                                                  catalogEntry.catalogId,
-                                                  catalogEntry.metadata,
-                                                  /*rs=*/nullptr);
-        Status status =
-            collToReturn->initFromExisting(opCtx,
-                                           latestCollection ? latestCollection : dropPendingColl,
-                                           catalogEntry,
-                                           readTimestamp);
-        if (!status.isOK()) {
-            LOGV2_DEBUG(
-                6857100, 1, "Failed to instantiate collection", "reason"_attr = status.reason());
-            return nullptr;
-        }
-
-        return collToReturn;
+    if (latestCollection->getRecordStore()->getIdent() != catalogEntry.ident) {
+        // Protect against an edge case where the same namespace / UUID combination is used to
+        // create a collection after a drop. In this case, using the shared state in the latest
+        // instance would be an error, because the collection at the requested timestamp is not
+        // actually the same as the latest, it just happens to have the same namespace and UUID.
+        // Even if it were the same "logical" collection, this would still be incorrect because the
+        // 'ident' would be different, and the PIT read would be accessing an incorrect ident. The
+        // 'ident' is guaranteed to be unique across collection re-creation, and can be used to
+        // determine if the shared state is incompatible.
+        return nullptr;
     }
 
-    return nullptr;
+    LOGV2_DEBUG(6825400,
+                1,
+                "Instantiating a collection using shared state",
+                logAttrs(catalogEntry.metadata->nss),
+                "ident"_attr = catalogEntry.ident,
+                "md"_attr = catalogEntry.metadata->toBSON(),
+                "timestamp"_attr = readTimestamp);
+
+    std::shared_ptr<Collection> collToReturn =
+        Collection::Factory::get(opCtx)->make(opCtx,
+                                              catalogEntry.metadata->nss,
+                                              catalogEntry.catalogId,
+                                              catalogEntry.metadata,
+                                              /*rs=*/nullptr);
+    Status status =
+        collToReturn->initFromExisting(opCtx, latestCollection, catalogEntry, readTimestamp);
+    if (!status.isOK()) {
+        LOGV2_DEBUG(
+            6857100, 1, "Failed to instantiate collection", "reason"_attr = status.reason());
+        return nullptr;
+    }
+
+    return collToReturn;
 }
 
 std::shared_ptr<Collection> CollectionCatalog::_createNewPITCollection(
@@ -1514,13 +1493,11 @@ void CollectionCatalog::onCollectionRename(OperationContext* opCtx,
     uncommittedCatalogUpdates.renameCollection(coll, fromCollection);
 }
 
-void CollectionCatalog::dropCollection(OperationContext* opCtx,
-                                       Collection* coll,
-                                       bool isDropPending) const {
+void CollectionCatalog::dropCollection(OperationContext* opCtx, Collection* coll) const {
     invariant(coll);
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    uncommittedCatalogUpdates.dropCollection(coll, isDropPending);
+    uncommittedCatalogUpdates.dropCollection(coll);
 
     // Requesting a writable collection normally ensures we have registered PublishCatalogUpdates
     // with the recovery unit. However, when the writable Collection was requested in Inplace mode
@@ -2263,10 +2240,7 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
 }
 
 std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
-    OperationContext* opCtx,
-    const UUID& uuid,
-    bool isDropPending,
-    boost::optional<Timestamp> commitTime) {
+    OperationContext* opCtx, const UUID& uuid, boost::optional<Timestamp> commitTime) {
     invariant(_catalog.find(uuid));
 
     auto coll = std::move(_catalog[uuid]);
@@ -2278,17 +2252,6 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     // Make sure collection object exists.
     invariant(_collections.find(ns));
     invariant(_orderedCollections.find(dbIdPair) != _orderedCollections.end());
-
-    if (isDropPending) {
-        if (auto sharedIdent = coll->getSharedIdent(); sharedIdent) {
-            auto ident = sharedIdent->getIdent();
-            LOGV2_DEBUG(
-                6825300, 1, "Registering drop pending collection ident", "ident"_attr = ident);
-
-            invariant(!_dropPendingCollection.find(ident));
-            _dropPendingCollection = _dropPendingCollection.set(ident, coll);
-        }
-    }
 
     _orderedCollections = _orderedCollections.erase(dbIdPair);
     _collections = _collections.erase(ns);
@@ -2417,7 +2380,6 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
     _orderedCollections = {};
     _catalog = {};
     _viewsForDatabase = {};
-    _dropPendingCollection = {};
     _stats = {};
 
     ResourceCatalog::get().clear();
@@ -2436,20 +2398,6 @@ void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
         catalog._replaceViewsForDatabase(dbName, std::move(viewsForDb));
     });
-}
-
-void CollectionCatalog::notifyIdentDropped(const std::string& ident) {
-    // It's possible that the ident doesn't exist in either map when the collection catalog is
-    // re-opened, the _dropPendingIdent map is cleared. During rollback-to-stable we re-open the
-    // collection catalog. The TimestampMonitor is a background thread that continues to run during
-    // rollback-to-stable and maintains its own drop pending ident information. It generates a set
-    // of drop pending idents outside of the global lock. However, during rollback-to-stable, we
-    // clear the TimestampMonitors drop pending state. But it's possible that the TimestampMonitor
-    // already generated a set of idents to drop for its next iteration, which would call into this
-    // function, for idents we've already cleared from the collection catalogs in-memory state.
-    LOGV2_DEBUG(6825302, 1, "Deregistering drop pending ident", "ident"_attr = ident);
-
-    _dropPendingCollection = _dropPendingCollection.erase(ident);
 }
 
 void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext* opCtx,

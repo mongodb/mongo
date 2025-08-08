@@ -198,8 +198,7 @@ Status RandomizedIdempotencyTest::resetState() {
             // before creating it.
             auto uuid = catalog.lookupUUIDByNSS(_opCtx.get(), _nss);
             if (uuid) {
-                catalog.deregisterCollection(
-                    _opCtx.get(), *uuid, /*isDropPending=*/false, /*commitTime=*/boost::none);
+                catalog.deregisterCollection(_opCtx.get(), *uuid, /*commitTime=*/boost::none);
             }
         });
     }

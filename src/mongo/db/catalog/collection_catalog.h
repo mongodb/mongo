@@ -297,12 +297,9 @@ public:
      * to appear dropped for this OperationContext. The drop will be committed into the catalog on
      * commit.
      *
-     * Maintains the collection in a drop pending state in the catalog until the underlying data
-     * files are deleted.
-     *
      * Must be called within a WriteUnitOfWork.
      */
-    void dropCollection(OperationContext* opCtx, Collection* coll, bool isDropPending) const;
+    void dropCollection(OperationContext* opCtx, Collection* coll) const;
 
     /**
      * Removes the view records associated with 'dbName', if any, from the in-memory
@@ -322,12 +319,9 @@ public:
 
     /**
      * Deregister the collection.
-     *
-     * Adds the collection to the drop pending state in the catalog when isDropPending=true.
      */
     std::shared_ptr<Collection> deregisterCollection(OperationContext* opCtx,
                                                      const UUID& uuid,
-                                                     bool isDropPending,
                                                      boost::optional<Timestamp> commitTime);
 
     /**
@@ -352,12 +346,6 @@ public:
      * Callers must re-fetch the catalog to observe changes.
      */
     void clearViews(OperationContext* opCtx, const DatabaseName& dbName) const;
-
-    /**
-     * Notifies the collection catalog that the data files for the drop pending ident have been
-     * removed from disk.
-     */
-    void notifyIdentDropped(const std::string& ident);
 
     /**
      * Returns a Collection pointer that corresponds to the provided
@@ -888,11 +876,6 @@ private:
 
     // Map of database names to their corresponding views and other associated state.
     ViewsForDatabaseMap _viewsForDatabase;
-
-    // Map of drop pending idents to their instance of Collection. To avoid affecting the lifetime
-    // and delay of the ident drop from the ident reaper, these need to be a weak_ptr.
-    immutable::unordered_map<std::string, std::weak_ptr<Collection>, StringMapHasher, StringMapEq>
-        _dropPendingCollection;
 
     // Set of databases which are currently in the process of being dropped.
     immutable::unordered_set<DatabaseName> _dropPendingDatabases;

@@ -171,8 +171,7 @@ public:
     void tearDown() override {
         for (auto& it : dbMap) {
             for (auto& kv : it.second) {
-                catalog.deregisterCollection(
-                    opCtx.get(), kv.first, /*isDropPending=*/false, boost::none);
+                catalog.deregisterCollection(opCtx.get(), kv.first, boost::none);
             }
         }
         globalLock.reset();
@@ -261,7 +260,7 @@ public:
         }
 
         for (auto&& uuid : collectionsToDeregister) {
-            catalog.deregisterCollection(opCtx.get(), uuid, /*isDropPending=*/false, boost::none);
+            catalog.deregisterCollection(opCtx.get(), uuid, boost::none);
         }
 
         int numEntries = 0;
@@ -330,7 +329,7 @@ TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
     const NamespaceString collNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "resourceDb.coll1");
     auto coll = catalog.lookupCollectionByNamespace(opCtx.get(), NamespaceString(collNs));
-    catalog.deregisterCollection(opCtx.get(), coll->uuid(), /*isDropPending=*/false, boost::none);
+    catalog.deregisterCollection(opCtx.get(), coll->uuid(), boost::none);
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
     ASSERT(!ResourceCatalog::get().name(rid));
 }
@@ -353,7 +352,7 @@ TEST_F(CollectionCatalogIterationTest, GetUUIDWontRepositionEvenIfEntryIsDropped
     auto it = range.begin();
     auto collsIt = collsIterator("bar");
     auto uuid = collsIt->first;
-    catalog.deregisterCollection(opCtx.get(), uuid, /*isDropPending=*/false, boost::none);
+    catalog.deregisterCollection(opCtx.get(), uuid, boost::none);
     dropColl("bar", uuid);
 
     ASSERT_EQUALS(uuid, (*it)->uuid());
@@ -424,7 +423,7 @@ TEST_F(CollectionCatalogTest, OnDropCollection) {
     yieldableColl.yield();
     ASSERT_FALSE(yieldableColl);
 
-    catalog.deregisterCollection(opCtx.get(), colUUID, /*isDropPending=*/false, boost::none);
+    catalog.deregisterCollection(opCtx.get(), colUUID, boost::none);
     // Ensure the lookup returns a null pointer upon removing the colUUID entry.
     ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), colUUID) == nullptr);
 
@@ -485,7 +484,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDrop
         catalog.onCloseCatalog();
     }
 
-    catalog.deregisterCollection(opCtx.get(), colUUID, /*isDropPending=*/false, boost::none);
+    catalog.deregisterCollection(opCtx.get(), colUUID, boost::none);
     ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), colUUID) == nullptr);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), nss);
 
@@ -535,7 +534,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS)
         catalog.onCloseCatalog();
     }
 
-    catalog.deregisterCollection(opCtx.get(), colUUID, /*isDropPending=*/false, boost::none);
+    catalog.deregisterCollection(opCtx.get(), colUUID, boost::none);
     ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), colUUID) == nullptr);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), nss);
     {
@@ -1259,8 +1258,7 @@ private:
             opCtx, writableCollection->getCatalogId(), storageEngine->getMDBCatalog()));
 
         // Drops the collection from the in-memory catalog.
-        CollectionCatalog::get(opCtx)->dropCollection(
-            opCtx, writableCollection, /*isDropPending=*/true);
+        CollectionCatalog::get(opCtx)->dropCollection(opCtx, writableCollection);
     }
 
     void _renameCollection(OperationContext* opCtx,

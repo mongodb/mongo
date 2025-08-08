@@ -566,8 +566,7 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
             return status;
     }
 
-    CollectionCatalog::get(opCtx)->dropCollection(opCtx, collection, true /*isDropPending*/);
-
+    CollectionCatalog::get(opCtx)->dropCollection(opCtx, collection);
 
     return Status::OK();
 }

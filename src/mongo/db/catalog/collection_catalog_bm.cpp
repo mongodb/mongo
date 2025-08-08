@@ -110,7 +110,7 @@ void BM_CollectionCatalogCreateDropCollection(benchmark::State& state) {
             const UUID uuid = UUID::gen();
             catalog.registerCollection(
                 opCtx.get(), std::make_shared<CollectionMock>(uuid, nss), boost::none);
-            catalog.deregisterCollection(opCtx.get(), uuid, false, boost::none);
+            catalog.deregisterCollection(opCtx.get(), uuid, boost::none);
         });
     }
 }

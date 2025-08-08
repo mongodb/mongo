@@ -207,7 +207,7 @@ Status dropCollections(OperationContext* opCtx,
                 }
             }
 
-            CollectionCatalog::get(opCtx)->dropCollection(opCtx, coll, true /*isDropPending*/);
+            CollectionCatalog::get(opCtx)->dropCollection(opCtx, coll);
         }
     }
 
@@ -261,15 +261,6 @@ void removeIndex(OperationContext* opCtx,
          indexNameStr = std::string{indexName},
          ident,
          isTwoPhaseDrop](OperationContext*, boost::optional<Timestamp> commitTimestamp) {
-            StorageEngine::DropIdentCallback onDrop =
-                [svcCtx, storageEngine, nss, ident = ident->getIdent(), isTwoPhaseDrop] {
-                    if (isTwoPhaseDrop) {
-                        CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
-                            catalog.notifyIdentDropped(ident);
-                        });
-                    }
-                };
-
             if (isTwoPhaseDrop) {
                 std::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
                 if (!commitTimestamp) {
@@ -286,7 +277,7 @@ void removeIndex(OperationContext* opCtx,
                                 "uuid"_attr = uuid,
                                 "ident"_attr = ident->getIdent(),
                                 "dropTime"_attr = toBSON(dropTime));
-                storageEngine->addDropPendingIdent(dropTime, ident, std::move(onDrop));
+                storageEngine->addDropPendingIdent(dropTime, ident);
             } else {
                 LOGV2(6361201,
                       "Completing drop for index table immediately",
@@ -298,8 +289,7 @@ void removeIndex(OperationContext* opCtx,
                 storageEngine->getEngine()
                     ->dropIdent(*recoveryUnit,
                                 ident->getIdent(),
-                                /*identHasSizeInfo=*/false,
-                                std::move(onDrop))
+                                /*identHasSizeInfo=*/false)
                     .ignore();
             }
         });
@@ -333,13 +323,6 @@ Status dropCollection(OperationContext* opCtx,
     shard_role_details::getRecoveryUnit(opCtx)->onCommitForTwoPhaseDrop(
         [svcCtx = opCtx->getServiceContext(), recoveryUnit, storageEngine, nss, ident](
             OperationContext*, boost::optional<Timestamp> commitTimestamp) {
-            StorageEngine::DropIdentCallback onDrop =
-                [svcCtx, storageEngine, nss, ident = ident->getIdent()] {
-                    CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
-                        catalog.notifyIdentDropped(ident);
-                    });
-                };
-
             std::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
             if (!commitTimestamp) {
                 // Standalone mode and unreplicated drops will not provide a timestamp. Use the
@@ -353,7 +336,7 @@ Status dropCollection(OperationContext* opCtx,
                             logAttrs(nss),
                             "ident"_attr = ident->getIdent(),
                             "dropTime"_attr = toBSON(dropTime));
-            storageEngine->addDropPendingIdent(dropTime, ident, std::move(onDrop));
+            storageEngine->addDropPendingIdent(dropTime, ident);
         });
 
     return Status::OK();

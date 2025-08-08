@@ -137,7 +137,7 @@ void UncommittedCatalogUpdates::renameCollection(const Collection* collection,
     _entries.push_back({Entry::Action::kRenamedCollection, nullptr, from, boost::none, it->nss});
 }
 
-void UncommittedCatalogUpdates::dropCollection(const Collection* collection, bool isDropPending) {
+void UncommittedCatalogUpdates::dropCollection(const Collection* collection) {
     auto it =
         std::find_if(_entries.rbegin(), _entries.rend(), [uuid = collection->uuid()](auto&& entry) {
             return entry.uuid() == uuid;
@@ -148,7 +148,6 @@ void UncommittedCatalogUpdates::dropCollection(const Collection* collection, boo
         entry.action = Entry::Action::kDroppedCollection;
         entry.nss = collection->ns();
         entry.externalUUID = collection->uuid();
-        entry.isDropPending = isDropPending;
         _entries.push_back(std::move(entry));
         return;
     }
@@ -172,7 +171,6 @@ void UncommittedCatalogUpdates::dropCollection(const Collection* collection, boo
     it->action = Entry::Action::kDroppedCollection;
     it->externalUUID = it->collection->uuid();
     it->collection = nullptr;
-    it->isDropPending = isDropPending;
 }
 
 void UncommittedCatalogUpdates::replaceViewsForDatabase(const DatabaseName& dbName,
