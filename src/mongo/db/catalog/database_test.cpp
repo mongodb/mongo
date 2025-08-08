@@ -401,7 +401,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
                      << "a_1");
 
         IndexBuildBlock indexBuildBlock(
-            collection->ns(), indexInfoObj, IndexBuildMethod::kHybrid, UUID::gen());
+            collection->ns(), indexInfoObj, IndexBuildMethodEnum::kHybrid, UUID::gen());
         {
             WriteUnitOfWork wuow(opCtx);
             ASSERT_OK(indexBuildBlock.init(opCtx, collection, "ident", /*forRecovery=*/false));

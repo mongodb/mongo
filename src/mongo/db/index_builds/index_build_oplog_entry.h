@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/index_builds_common.h"
+#include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/util/uuid.h"
 
@@ -50,12 +51,14 @@ public:
     /**
      * Parses an oplog entry for "startIndexBuild", "commitIndexBuild", or "abortIndexBuild".
      */
-    static StatusWith<IndexBuildOplogEntry> parse(const repl::OplogEntry& entry,
+    static StatusWith<IndexBuildOplogEntry> parse(OperationContext* opCtx,
+                                                  const repl::OplogEntry& entry,
                                                   bool parseO2 = true);
 
     UUID collUUID;
     repl::OplogEntry::CommandType commandType;
     std::string commandName;
+    IndexBuildMethodEnum indexBuildMethod{IndexBuildMethodEnum::kHybrid};
     UUID buildUUID;
     std::vector<IndexBuildInfo> indexes;
     boost::optional<Status> cause;

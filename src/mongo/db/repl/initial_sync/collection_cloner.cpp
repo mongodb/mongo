@@ -390,6 +390,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
                                        {getSourceUuid(),
                                         repl::OplogEntry::CommandType::kStartIndexBuild,
                                         "createIndexes",
+                                        IndexBuildMethodEnum::kHybrid,
                                         groupedIndexSpec.first,
                                         std::move(indexes),
                                         boost::none});

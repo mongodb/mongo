@@ -208,8 +208,8 @@ StringData getInvalidatingReason(const OplogApplication::Mode mode, const bool i
 
 boost::optional<CreateCollCatalogIdentifier> extractReplicatedCatalogIdentifier(
     OperationContext* opCtx, const OplogEntry& oplogEntry) {
-    if (auto& o2 = oplogEntry.getObject2();
-        o2.has_value() && shouldReplicateLocalCatalogIdentifers(opCtx)) {
+    if (auto& o2 = oplogEntry.getObject2(); o2.has_value() &&
+        shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
         // TODO SERVER-106459: Utilize IDL parsing and input validation.
         boost::optional<std::string> idIndexIdent;
         if (auto idIdentElem = o2->getField("idIndexIdent"); idIdentElem) {
@@ -339,7 +339,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
     auto collUUID = indexCollection->uuid();
 
     std::string indexIdent = [&] {
-        if (!indexMetadata || !shouldReplicateLocalCatalogIdentifers(opCtx)) {
+        if (!indexMetadata ||
+            !shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
             return opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(
                 indexCollection->ns().dbName());
         }
@@ -934,8 +935,10 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           }
 
           const auto& entry = *op;
-          auto swOplogEntry =
-              IndexBuildOplogEntry::parse(entry, shouldReplicateLocalCatalogIdentifers(opCtx));
+          auto swOplogEntry = IndexBuildOplogEntry::parse(
+              opCtx,
+              entry,
+              shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx)));
           if (!swOplogEntry.isOK()) {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'startIndexBuild' oplog entry");
@@ -980,7 +983,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           }
 
           const auto& entry = *op;
-          auto swOplogEntry = IndexBuildOplogEntry::parse(entry);
+          auto swOplogEntry = IndexBuildOplogEntry::parse(opCtx, entry);
           if (!swOplogEntry.isOK()) {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'commitIndexBuild' oplog entry");
@@ -1001,7 +1004,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                       "The abortIndexBuild operation is not supported in applyOps mode"};
           }
 
-          auto swOplogEntry = IndexBuildOplogEntry::parse(*op);
+          auto swOplogEntry = IndexBuildOplogEntry::parse(opCtx, *op);
           if (!swOplogEntry.isOK()) {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'abortIndexBuild' oplog entry");

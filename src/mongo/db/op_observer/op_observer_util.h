@@ -54,7 +54,12 @@ extern FailPoint sleepBetweenInsertOpTimeGenerationAndLogOp;
 /**
  * Returns true when local catalog identifiers should be replicated through the oplog.
  */
-bool shouldReplicateLocalCatalogIdentifers(OperationContext* opCtx);
+bool shouldReplicateLocalCatalogIdentifers(const VersionContext& vCtx);
+
+/**
+ * Returns true if gFeatureFlagPrimaryDrivenIndexBuilds is enabled.
+ */
+bool isPrimaryDrivenIndexBuildEnabled(const VersionContext& vCtx);
 
 BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
                           const CollectionOptions& oldCollOptions,

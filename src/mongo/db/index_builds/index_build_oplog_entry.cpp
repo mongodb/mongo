@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -46,7 +47,8 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEntry& entry,
+StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* opCtx,
+                                                             const repl::OplogEntry& entry,
                                                              bool parseO2) {
     // Example 'o' field which takes the same form for all three oplog entries.
     // {
@@ -86,6 +88,11 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
     if (first.type() != BSONType::string) {
         return {ErrorCodes::InvalidNamespace,
                 str::stream() << commandName << " value must be a string"};
+    }
+
+    IndexBuildMethodEnum indexBuildMethod{IndexBuildMethodEnum::kHybrid};
+    if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
+        indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven;
     }
 
     auto buildUUIDElem = obj.getField("indexBuildUUID");
@@ -182,6 +189,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
     return IndexBuildOplogEntry{*collUUID,
                                 commandType,
                                 std::string{commandName},
+                                indexBuildMethod,
                                 swBuildUUID.getValue(),
                                 std::move(indexesVec),
                                 cause,

@@ -92,7 +92,7 @@ public:
         SetupOptions();
         IndexConstraints indexConstraints = IndexConstraints::kEnforce;
         IndexBuildProtocol protocol = IndexBuildProtocol::kSinglePhase;
-        IndexBuildMethod method = IndexBuildMethod::kHybrid;
+        IndexBuildMethodEnum method = IndexBuildMethodEnum::kHybrid;
         bool forRecovery = false;
     };
 
