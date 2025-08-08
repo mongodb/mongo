@@ -61,14 +61,70 @@ try {
     throw new Error(`Failed to create regex from '${GREP}': ${e.message}`);
 }
 
-class Printer {
-    static printPass(title) {
-        jsTest.log.info(`✔ ${title}`);
+const redText = msg => `\x1b[31m${msg}\x1b[0m`;
+const stdout = msg => jsTest.log.info(msg);
+const stderr = msg => jsTest.log.error(redText(msg));
+
+/**
+ * Reporter class for logging test results.
+ * It logs passing and failing tests without throwing exceptions until the final "report" call.
+ */
+class Reporter {
+    #passed;
+    #failed;
+    constructor() {
+        this.reset();
     }
 
-    static printFailure(title, error) {
-        const red = msg => `\x1b[31m${msg}\x1b[0m`;
-        jsTest.log.error(red(`✘ ${title}`), {error});
+    /**
+     * Reset the reporter state for a new test run.
+     */
+    reset() {
+        this.#passed = [];
+        this.#failed = [];
+    }
+
+    /**
+     * Log a passing test/message
+     * @param {string} headline
+     */
+    pass(headline) {
+        stdout(`✔ ${headline}`);
+        this.#passed.push(headline);
+    }
+
+    /**
+     * Log a failing test/message
+     * @param {string} headline
+     * @param {Error} error
+     */
+    fail(headline, error) {
+        stderr(`✘ ${headline}`);
+        this.#failed.push({headline, error});
+    }
+
+    /**
+     * Report the final test results.
+     *
+     * Prints a summary of passing and failing tests.
+     * If there are any failures, it throws an error to signal the shell.
+     * @throws {Error} if there are any failing tests
+     */
+    report() {
+        let msg = ['Test Report Summary:', `  ${this.#passed.length} passing`];
+        if (this.#failed.length > 0) {
+            msg.push(redText(`  ${this.#failed.length} failing`));
+            msg.push('Failures and stacks are reprinted below.');
+        }
+        stdout(msg.join('\n'));
+
+        if (this.#failed.length > 0) {
+            this.#failed.forEach(({headline, error}) => {
+                stderr(`✘ ${headline}\n${error.message}\n${error.stack}`);
+            });
+            // finally throw to signal failure to the shell
+            throw new Error(`${this.#failed.length} failing tests detected`);
+        }
     }
 }
 
@@ -125,7 +181,11 @@ class Scope {
         }
 
         for (const child of children) {
-            await child.run();
+            let bail = await child.run();
+            if (bail) {
+                // If any child scope bailed out, we stop running further tests
+                return;
+            }
         }
     }
 }
@@ -204,9 +264,27 @@ class DescribeScope extends Scope {
             // no tests in this scope or nested scopes, skip running any hooks
             return;
         }
-        await this.runHook("before");
-        await super.run();
-        await this.runHook("after");
+
+        let bail = false;
+        try {
+            await this.runHook("before");
+        } catch (error) {
+            bail = true;
+            reporter.fail(`"before all" hook for "${this.title}"`, error);
+        }
+
+        if (!bail) {
+            await super.run();
+        }
+
+        try {
+            await this.runHook("after");
+        } catch (error) {
+            reporter.fail(`"after all" hook for "${this.title}"`, error);
+            // no explicit need to bail here, this is the end of the scope
+        }
+
+        return bail;
     }
 }
 
@@ -259,22 +337,39 @@ class TestScope extends Scope {
      * @async
      */
     async run() {
-        const title = this.fullTitle();
+        const title = this.title;
+        const fullTitle = this.fullTitle();
+
+        let bail = false;
         try {
             await this.runHook("beforeEach");
-            await this.fn.call(this.ctx);
-            Printer.printPass(title);
         } catch (error) {
-            Printer.printFailure(title, error);
-            // Re-throw the error to ensure the test suite fails
-            throw error;
-        } finally {
-            await this.runHook("afterEach");
+            bail = true;
+            reporter.fail(`"before each" hook for "${title}"`, error);
         }
+
+        if (!bail) {
+            try {
+                await this.fn.call(this.ctx);
+                reporter.pass(fullTitle);
+            } catch (error) {
+                reporter.fail(fullTitle, error);
+            }
+        }
+
+        try {
+            await this.runHook("afterEach");
+        } catch (error) {
+            bail = true;
+            reporter.fail(`"after each" hook for "${title}"`, error);
+        }
+
+        return bail;
     }
 }
 
 let currScope = new DescribeScope();
+let reporter = new Reporter();
 
 /**
  * Define a test case.
@@ -446,10 +541,13 @@ function after(fn) {
  */
 async function runTests() {
     const rootScope = currScope;
+    await currScope.run();
     try {
-        await currScope.run();
+        reporter.report();
     } finally {
+        // reset
         rootScope.reset();
+        reporter.reset();
         currScope = rootScope;
     }
 }

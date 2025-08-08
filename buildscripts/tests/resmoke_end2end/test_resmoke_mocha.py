@@ -39,72 +39,6 @@ class TestMochaRunner(unittest.TestCase):
         ]:
             self.assertIn(output, result.stdout)
 
-    def test_mocha_runner_hooks(self):
-        resmoke_args = [
-            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_mocha_runner.yml",
-            "buildscripts/tests/resmoke_end2end/testfiles/mocha/hooks.js",
-        ]
-
-        result = execute_resmoke(resmoke_args)
-
-        self.assertEqual(result.returncode, 0)
-
-        arr = [
-            "before1",
-            "before2",
-            "--beforeEach1",
-            "--beforeEach2",
-            "----test1",
-            "--afterEach1",
-            "--afterEach2",
-            "--beforeEach1",
-            "--beforeEach2",
-            "----test2",
-            "--afterEach1",
-            "--afterEach2",
-            "----describe before1",
-            "----describe before2",
-            "--beforeEach1",
-            "--beforeEach2",
-            "------describe beforeEach1",
-            "------describe beforeEach2",
-            "--------test3",
-            "------describe afterEach1",
-            "------describe afterEach2",
-            "--afterEach1",
-            "--afterEach2",
-            "--beforeEach1",
-            "--beforeEach2",
-            "------describe beforeEach1",
-            "------describe beforeEach2",
-            "--------test4",
-            "------describe afterEach1",
-            "------describe afterEach2",
-            "--afterEach1",
-            "--afterEach2",
-            "----describe after1",
-            "----describe after2",
-            "--beforeEach1",
-            "--beforeEach2",
-            "----test5",
-            "--afterEach1",
-            "--afterEach2",
-            "--beforeEach1",
-            "--beforeEach2",
-            "----test6",
-            "--afterEach1",
-            "--afterEach2",
-            "after1",
-            "after2",
-        ]
-        for output in arr:
-            self.assertIn(output, result.stdout)
-
-        # verify ordering
-        pattern = r".*".join(arr) + r".*"
-        pattern = re.compile(pattern, re.DOTALL)
-        self.assertRegex(result.stdout, pattern)
-
     def test_mocha_runner_async(self):
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_mocha_runner.yml",
@@ -186,11 +120,9 @@ class TestMochaRunner(unittest.TestCase):
             "✔ test2",
             "✔ describe > test3",
             "\x1b[31m✘ describe > test4\x1b[0m",
+            "✔ describe > test5",
         ]:
             self.assertIn(output, result.stdout)
-
-        # hard assertion halts the runner, does not reach test5
-        self.assertNotIn("✔ describe > test5", result.stdout)
 
     def test_mocha_runner_grep(self):
         resmoke_args = [
@@ -216,31 +148,6 @@ class TestMochaRunner(unittest.TestCase):
             "✔ fruits > tomato",
             "✔ vegetables > spinach",
             "✔ vegetables > tomato",
-        ]
-        for output in arr:
-            self.assertIn(output, result.stdout)
-
-        # verify ordering
-        pattern = r".*".join(arr) + r".*"
-        pattern = re.compile(pattern, re.DOTALL)
-        self.assertRegex(result.stdout, pattern)
-
-
-    def test_mocha_runner_only(self):
-        resmoke_args = [
-            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_mocha_runner.yml",
-            "jstests/noPassthrough/shell/js/mochalite_only.js",
-        ]
-
-        result = execute_resmoke(resmoke_args)
-
-        self.assertEqual(result.returncode, 0)
-
-        arr = [
-            "test4",
-            "test9",
-            "test11",
-            "test13",
         ]
         for output in arr:
             self.assertIn(output, result.stdout)

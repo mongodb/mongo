@@ -38,10 +38,7 @@ describe('describe', () => {
     });
 });
 
-it('verify', () => {
-    // final check on sequencing from prior testpoints
-    assert.eq(log, [
-        "test1",
-        "test3",
-    ]);
-});
+await globalThis.__mochalite_closer();
+
+// final check on sequencing from prior testpoints
+assert.eq(log, ["test1", "test3"]);

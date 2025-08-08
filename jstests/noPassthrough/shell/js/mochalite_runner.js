@@ -9,9 +9,7 @@ import {describe, it} from "jstests/libs/mochalite.js";
  */
 
 const log = [];
-const logfn = (msg) => {
-    return () => log.push(msg);
-};
+const logfn = msg => (() => log.push(msg));
 
 describe("first", function() {
     it("test1", logfn(1));
