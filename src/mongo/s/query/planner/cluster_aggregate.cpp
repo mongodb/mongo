@@ -85,6 +85,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
@@ -620,8 +621,8 @@ Status _parseQueryStatsAndReturnEmptyResult(
 }
 
 Status runAggregateImpl(OperationContext* opCtx,
-                        RoutingContext& routingCtx,
-                        const ClusterAggregate::Namespaces& namespaces,
+                        RoutingContext& originalRoutingCtx,
+                        ClusterAggregate::Namespaces namespaces,
                         AggregateCommandRequest& req,
                         const LiteParsedPipeline& liteParsedPipeline,
                         const PrivilegeVector& privileges,
@@ -630,7 +631,7 @@ Status runAggregateImpl(OperationContext* opCtx,
                         boost::optional<ExplainOptions::Verbosity> verbosity,
                         BSONObjBuilder* res) {
     const auto pipelineDataSource = sharded_agg_helpers::getPipelineDataSource(liteParsedPipeline);
-    if (!routingCtx.hasNss(namespaces.executionNss) &&
+    if (!originalRoutingCtx.hasNss(namespaces.executionNss) &&
         sharded_agg_helpers::checkIfMustRunOnAllShards(namespaces.executionNss,
                                                        pipelineDataSource)) {
         // Verify that there are shards present in the cluster. We must do this whenever we haven't
@@ -652,6 +653,22 @@ Status runAggregateImpl(OperationContext* opCtx,
                 res);
         }
     }
+
+    boost::optional<CollectionRoutingInfoTargeter> collectionTargeter;
+    auto& routingCtx = std::invoke([&]() -> RoutingContext& {
+        if (originalRoutingCtx.hasNss(namespaces.executionNss)) {
+            collectionTargeter = CollectionRoutingInfoTargeter(opCtx, namespaces.executionNss);
+            return translateNssForRawDataAccordingToRoutingInfo(
+                opCtx,
+                namespaces.executionNss,
+                *collectionTargeter,
+                originalRoutingCtx,
+                [&](const NamespaceString& tranlatedNss) {
+                    namespaces.executionNss = tranlatedNss;
+                });
+        }
+        return originalRoutingCtx;
+    });
 
     // Given that in single shard/sharded cluster unsharded collection scenarios the query doesn't
     // go through retryOnViewError mongos doesn't know it's running against a view, and then it
@@ -1027,11 +1044,31 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return Status::OK();
     };
 
+    const size_t kMaxDatabaseCreationAttempts = 3;
+    size_t attempts = 1;
     Status status{Status::OK()};
-    try {
-        status = router.routeWithRoutingContext(opCtx, comment, bodyFn);
-    } catch (const DBException& ex) {
-        status = ex.toStatus();
+    bool isExplain = verbosity.has_value();
+    while (true) {
+        if (isExplain) {
+            // Implicitly create the database for explain commands since, right now, there is no way
+            // to respond properly when the database doesn't exist. Before the database was
+            // implicitly created by CollectionRoutingInfoTargeter, now that we are not using this
+            // class anymore still need to create a database.
+            // TODO (SERVER-108882) Stop creating the db once explain can be executed when th db
+            // doesn't exist.
+            cluster::createDatabase(opCtx, namespaces.executionNss.dbName());
+        }
+        try {
+            status = router.routeWithRoutingContext(opCtx, comment, bodyFn);
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+            if (isExplain && ++attempts < kMaxDatabaseCreationAttempts) {
+                continue;
+            }
+            status = ex.toStatus();
+        } catch (const DBException& ex) {
+            status = ex.toStatus();
+        }
+        break;
     }
 
     if (!status.isOK() && !routerBodyStarted) {

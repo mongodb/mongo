@@ -746,51 +746,73 @@ void Balancer::joinCurrentRound(OperationContext* opCtx) {
     });
 }
 
-Status Balancer::moveRange(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           const ConfigsvrMoveRange& request,
-                           bool issuedByRemoteUser) {
+void Balancer::moveRange(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         const ConfigsvrMoveRange& request,
+                         bool issuedByRemoteUser) {
     const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
     auto coll =
         catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
 
-    if (coll.getUnsplittable())
-        return {ErrorCodes::NamespaceNotSharded,
-                str::stream() << "Can't execute moveRange on unsharded collection "
-                              << nss.toStringForErrorMsg()};
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Can't execute moveRange on unsharded collection "
+                          << nss.toStringForErrorMsg(),
+            !coll.getUnsplittable());
 
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
-    const auto fromShardId = [&]() {
-        const auto cm = uassertStatusOK(getPlacementInfoForShardedCollection(opCtx, nss));
-        if (request.getMin()) {
-            const auto& chunk = cm.findIntersectingChunkWithSimpleCollation(*request.getMin());
-            return chunk.getShardId();
-        } else {
-            return getChunkForMaxBound(cm, *request.getMax()).getShardId();
-        }
-    }();
+    sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+    router.routeWithRoutingContext(
+        opCtx, "moveRange"_sd, [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
+            unusedRoutingCtx.skipValidation();
 
-    ShardsvrMoveRange shardSvrRequest(nss);
-    shardSvrRequest.setDbName(DatabaseName::kAdmin);
-    shardSvrRequest.setMoveRangeRequestBase(request.getMoveRangeRequestBase());
-    shardSvrRequest.setMaxChunkSizeBytes(maxChunkSize);
-    shardSvrRequest.setFromShard(fromShardId);
-    shardSvrRequest.setCollectionTimestamp(coll.getTimestamp());
-    const auto [secondaryThrottle, wc] =
-        getSecondaryThrottleAndWriteConcern(request.getSecondaryThrottle());
-    shardSvrRequest.setSecondaryThrottle(secondaryThrottle);
-    shardSvrRequest.setForceJumbo(request.getForceJumbo());
+            const auto cm = uassertStatusOK(getPlacementInfoForShardedCollection(opCtx, nss));
 
-    auto response =
-        _commandScheduler->requestMoveRange(opCtx, shardSvrRequest, wc, issuedByRemoteUser)
-            .getNoThrow(opCtx);
-    return processManualMigrationOutcome(opCtx,
-                                         request.getMin(),
-                                         request.getMax(),
-                                         nss,
-                                         shardSvrRequest.getToShard(),
-                                         std::move(response));
+            // Check if the 'min' and 'max' parameters match the shardKey pattern.
+            const boost::optional<BSONObj>& minBound = request.getMin();
+            const boost::optional<BSONObj>& maxBound = request.getMax();
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "The 'min' bound " << *minBound
+                                  << " is not valid for shard key pattern "
+                                  << cm.getShardKeyPattern().toBSON(),
+                    !minBound.has_value() || cm.getShardKeyPattern().isShardKey(*minBound));
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "The 'max' bound " << *maxBound
+                                  << " is not valid for shard key pattern "
+                                  << cm.getShardKeyPattern().toBSON(),
+                    !maxBound.has_value() || cm.getShardKeyPattern().isShardKey(*maxBound));
+
+            // Get the donor shard.
+            const auto fromShardId = [&]() {
+                if (minBound.has_value()) {
+                    const auto& chunk = cm.findIntersectingChunkWithSimpleCollation(*minBound);
+                    return chunk.getShardId();
+                } else {
+                    return getChunkForMaxBound(cm, *maxBound).getShardId();
+                }
+            }();
+
+            ShardsvrMoveRange shardSvrRequest(nss);
+            shardSvrRequest.setDbName(DatabaseName::kAdmin);
+            shardSvrRequest.setMoveRangeRequestBase(request.getMoveRangeRequestBase());
+            shardSvrRequest.setMaxChunkSizeBytes(maxChunkSize);
+            shardSvrRequest.setFromShard(fromShardId);
+            shardSvrRequest.setCollectionTimestamp(cm.getVersion().getTimestamp());
+            const auto [secondaryThrottle, wc] =
+                getSecondaryThrottleAndWriteConcern(request.getSecondaryThrottle());
+            shardSvrRequest.setSecondaryThrottle(secondaryThrottle);
+            shardSvrRequest.setForceJumbo(request.getForceJumbo());
+
+            auto response =
+                _commandScheduler->requestMoveRange(opCtx, shardSvrRequest, wc, issuedByRemoteUser)
+                    .getNoThrow(opCtx);
+            uassertStatusOK(processManualMigrationOutcome(opCtx,
+                                                          request.getMin(),
+                                                          request.getMax(),
+                                                          nss,
+                                                          shardSvrRequest.getToShard(),
+                                                          std::move(response)));
+        });
 }
 
 void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {

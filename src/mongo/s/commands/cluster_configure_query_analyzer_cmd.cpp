@@ -85,26 +85,30 @@ public:
             const auto& nss = ns();
             uassertStatusOK(validateNamespace(nss));
 
-            const auto cri = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-            const auto primaryShardId = cri.getDbPrimaryShardId();
-
-            auto shard =
-                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
-            auto versionedCmdObj = makeVersionedCmdObj(
-                cri, CommandHelpers::filterCommandRequestForPassthrough(request().toBSON()));
-            auto swResponse = shard->runCommandWithFixedRetryAttempts(
+            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+            return router.route(
                 opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                versionedCmdObj,
-                Shard::RetryPolicy::kIdempotent);
+                Request::kCommandName,
+                [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                    auto cmdObj =
+                        CommandHelpers::filterCommandRequestForPassthrough(request().toBSON());
 
-            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swResponse));
+                    const auto swResponse =
+                        executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                            opCtx,
+                            DatabaseName::kAdmin,
+                            dbInfo,
+                            cmdObj,
+                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                            Shard::RetryPolicy::kIdempotent);
 
-            auto response = ConfigureQueryAnalyzerResponse::parse(
-                IDLParserContext("clusterConfigureQueryAnalyzer"), swResponse.getValue().response);
-            return response;
+                    uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(swResponse));
+
+                    auto remoteResponse = uassertStatusOK(swResponse.swResponse).data;
+                    auto response = ConfigureQueryAnalyzerResponse::parse(
+                        IDLParserContext("clusterConfigureQueryAnalyzer"), remoteResponse);
+                    return response;
+                });
         }
 
     private:
