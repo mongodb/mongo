@@ -71,12 +71,14 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
     if (!uuid) {
         return;
     }
-
+    // TODO SERVER-101784 Remove the code below once 9.0 becomes LTS and legacy time-series
+    // collection are no more.
+    auto nsForLogging = (ns.isTimeseriesBucketsCollection()) ? ns.getTimeseriesViewNamespace() : ns;
     auto actualNamespace = catalog.lookupNSSByUUID(opCtx, *uuid);
     uassert(
         (CollectionUUIDMismatchInfo{ns.dbName(),
                                     *uuid,
-                                    std::string{ns.coll()},
+                                    std::string{nsForLogging.coll()},
                                     actualNamespace && actualNamespace->isEqualDb(ns)
                                         ? boost::make_optional(std::string{actualNamespace->coll()})
                                         : boost::none}),

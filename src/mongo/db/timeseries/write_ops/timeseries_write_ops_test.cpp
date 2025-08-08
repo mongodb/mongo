@@ -36,7 +36,6 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_compression.h"
-#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/unittest/unittest.h"
@@ -199,11 +198,8 @@ TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesDeletesNoCollection) {
     request.setDeletes(
         {write_ops::DeleteOpEntry(BSON("_id" << 0), false /* multi */, boost::none)});
     auto source = OperationSource::kTimeseriesDelete;
-    const auto preConditions =
-        timeseries::CollectionPreConditions::getCollectionPreConditions(_opCtx,
-                                                                        nss,
-                                                                        /*isRawDataRequest=*/true);
-    auto writeResult = write_ops_exec::performDeletes(_opCtx, request, preConditions, source);
+    auto writeResult =
+        write_ops_exec::performDeletes(_opCtx, request, /*preConditions=*/boost::none, source);
     ASSERT_FALSE(writeResult.canContinue);
     ASSERT_EQ(1, writeResult.results.size());
     ASSERT_EQ(8555700, writeResult.results[0].getStatus().code());

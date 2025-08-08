@@ -51,7 +51,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, NoCollectionNotFound) {
     auto collThatDoesntExist =
         NamespaceString::createNamespaceString_forTest("test.nonexistentColl");
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-        _opCtx, collThatDoesntExist, /*isRawDataRequest=*/false);
+        _opCtx, collThatDoesntExist, /*expectedUUID=*/boost::none);
     ASSERT(!preConditions.exists());
 }
 
@@ -59,7 +59,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, NonTimeseriesCollection) {
     CreateCommand cmd = CreateCommand(nonTsNss);
     uassertStatusOK(createCollection(_opCtx, cmd));
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-        _opCtx, nonTsNss, /*isRawDataRequest=*/false);
+        _opCtx, nonTsNss, /*expectedUUID=*/boost::none);
     ASSERT(preConditions.exists());
     ASSERT(!preConditions.isTimeseriesCollection());
     ASSERT(!preConditions.isViewlessTimeseriesCollection());
@@ -72,7 +72,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, LegacyTimeseriesCollection) {
     uassertStatusOK(createCollection(_opCtx, cmd));
 
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-        _opCtx, viewfulTsNss, /*isRawDataRequest=*/false);
+        _opCtx, viewfulTsNss, /*expectedUUID=*/boost::none);
 
     ASSERT(preConditions.exists());
     ASSERT(preConditions.isTimeseriesCollection());
@@ -91,7 +91,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, ViewlessTimeseriesCollection) 
     uassertStatusOK(createCollection(_opCtx, cmd));
 
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-        _opCtx, viewlessTsNss, /*isRawDataRequest=*/false);
+        _opCtx, viewlessTsNss, /*expectedUUID=*/boost::none);
 
     ASSERT(preConditions.exists());
     ASSERT(preConditions.isTimeseriesCollection());
@@ -103,7 +103,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, CollectionCreatedAfterPreCondi
     RAIIServerParameterControllerForTest queryKnobController{
         "featureFlagCreateViewlessTimeseriesCollections", true};
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-        _opCtx, viewlessTsNss, /*isRawDataRequest=*/false);
+        _opCtx, viewlessTsNss, /*expectedUUID=*/boost::none);
 
     CreateCommand cmd = CreateCommand(viewlessTsNss);
     auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
@@ -131,7 +131,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, DetectWhenCollectionIsDroppedA
     uassertStatusOK(createCollection(_opCtx, cmd));
 
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-        _opCtx, viewlessTsNss, /*isRawDataRequest=*/false);
+        _opCtx, viewlessTsNss, /*expectedUUID=*/boost::none);
 
     {
         repl::UnreplicatedWritesBlock uwb(_opCtx);  // Do not use oplog.

@@ -807,6 +807,7 @@ public:
                                           isTimeseriesLogicalRequest,
                                           request().getSerializationContext(),
                                           _commandObj,
+                                          preConditions,
                                           verbosity,
                                           result);
         }

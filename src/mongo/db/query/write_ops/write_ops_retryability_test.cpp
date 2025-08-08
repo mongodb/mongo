@@ -53,7 +53,6 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -303,10 +302,8 @@ TEST_F(WriteOpsRetryability, OpCountersUpdateSuccess) {
         entry.setUpsert(true);
         return entry;
     }()});
-    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-        opCtxRaii.get(), nss, /*isRawDataRequest=*/false, updateOp.getCollectionUUID());
     write_ops_exec::WriteResult result =
-        write_ops_exec::performUpdates(opCtxRaii.get(), updateOp, preConditions);
+        write_ops_exec::performUpdates(opCtxRaii.get(), updateOp, /*preConditions=*/boost::none);
     auto globalCommandsCountAfterUpdate = opCounters().getCommand()->load();
     auto globalDeletesCountAfterUpdate = opCounters().getDelete()->load();
     auto globalInsertsCountAfterUpdate = opCounters().getInsert()->load();
@@ -342,11 +339,8 @@ TEST_F(WriteOpsRetryability, OpCountersDeleteSuccess) {
         entry.setMulti(false);
         return entry;
     }()});
-    const auto preConditions =
-        timeseries::CollectionPreConditions::getCollectionPreConditions(opCtxRaii.get(),
-                                                                        nss,
-                                                                        /*isRawDataRequest=*/true);
-    result = write_ops_exec::performDeletes(opCtxRaii.get(), deleteOp, preConditions);
+    result =
+        write_ops_exec::performDeletes(opCtxRaii.get(), deleteOp, /*preConditions=*/boost::none);
     auto globalCommandsCountAfterDelete = opCounters().getCommand()->load();
     auto globalDeletesCountAfterDelete = opCounters().getDelete()->load();
     auto globalInsertsCountAfterDelete = opCounters().getInsert()->load();

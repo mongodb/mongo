@@ -31,9 +31,7 @@
 
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/timeseries/catalog_helper.h"
-#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
 
 
 namespace mongo::timeseries {
@@ -45,6 +43,10 @@ bool CollectionPreConditions::exists() const {
 UUID CollectionPreConditions::uuid() const {
     tassert(10664100, "Attemped to get the uuid for a collection that doesn't exist", exists());
     return _uuid.get();
+}
+
+boost::optional<UUID> CollectionPreConditions::expectedUUID() const {
+    return _expectedUUID;
 }
 
 bool CollectionPreConditions::isTimeseriesCollection() const {
@@ -67,35 +69,21 @@ NamespaceString CollectionPreConditions::getTargetNs(const NamespaceString& ns) 
     return wasNssTranslated() ? _translatedNss.get() : ns;
 }
 
+void CollectionPreConditions::setIsTimeseriesLogicalRequest(bool isTimeseriesLogicalRequest) {
+    _isTimeseriesLogicalRequest = isTimeseriesLogicalRequest;
+}
+
+bool CollectionPreConditions::getIsTimeseriesLogicalRequest() const {
+    return _isTimeseriesLogicalRequest;
+}
+
 CollectionPreConditions CollectionPreConditions::getCollectionPreConditions(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    bool isRawDataRequest,
-    boost::optional<UUID> expectedUUID) {
-    // Hold reference to the catalog for collection lookup without locks to be safe.
-    auto catalog = CollectionCatalog::get(opCtx);
+    OperationContext* opCtx, const NamespaceString& nss, boost::optional<UUID> expectedUUID) {
+
     auto lookupInfo = lookupTimeseriesCollection(opCtx, nss, /*skipSystemBucketLookup=*/false);
 
-    // We pass a nullptr into the checkCollectionUUIDMismatch machinery so that we always throw
-    // CollectionUUIDMismatch if an expectedUUID is specified for an operation on the user-facing
-    // view namespace of a legacy time-series collection.
-    if (expectedUUID && lookupInfo.isTimeseries && !lookupInfo.isViewlessTimeseries &&
-        !isRawDataRequest) {
-        checkCollectionUUIDMismatch(
-            opCtx,
-            (nss.isTimeseriesBucketsCollection()) ? nss.getTimeseriesViewNamespace() : nss,
-            nullptr,
-            expectedUUID);
-    } else if (lookupInfo.uuid || expectedUUID) {
-        checkCollectionUUIDMismatch(
-            opCtx,
-            (nss.isTimeseriesBucketsCollection()) ? nss.getTimeseriesViewNamespace() : nss,
-            catalog->lookupCollectionByNamespace(opCtx, lookupInfo.targetNss),
-            expectedUUID);
-    }
-
     if (!lookupInfo.uuid) {
-        return CollectionPreConditions();
+        return CollectionPreConditions(expectedUUID);
     }
 
     boost::optional<NamespaceString> translatedNss = boost::none;
@@ -106,13 +94,33 @@ CollectionPreConditions CollectionPreConditions::getCollectionPreConditions(
     return CollectionPreConditions(lookupInfo.uuid.get(),
                                    lookupInfo.isTimeseries,
                                    lookupInfo.isViewlessTimeseries,
-                                   translatedNss);
+                                   translatedNss,
+                                   expectedUUID);
 }
 
 void CollectionPreConditions::checkAcquisitionAgainstPreConditions(
     OperationContext* opCtx,
     const CollectionPreConditions& preConditions,
     const CollectionAcquisition& acquisition) {
+
+    const auto& nss = acquisition.nss();
+
+    // If we are operating on a legacy time-series collection view namespace, we pass a nullptr into
+    // the checkCollectionUUIDMismatch machinery so that we always throw CollectionUUIDMismatch if
+    // an expectedUUID is specified.
+    if (preConditions.getIsTimeseriesLogicalRequest() &&
+        preConditions.isLegacyTimeseriesCollection()) {
+        checkCollectionUUIDMismatch(opCtx, nss, nullptr, preConditions.expectedUUID());
+    } else if (preConditions.expectedUUID()) {
+        // This should have been caught when we went to acquire the collection. This provides some
+        // guardrails around the case where this check was missed.
+        tassert(10811400,
+                str::stream() << "Collection UUID does not match that specified for collection "
+                              << nss.toStringForErrorMsg() << ", expected "
+                              << *preConditions.expectedUUID(),
+                !preConditions.expectedUUID() ||
+                    (acquisition.exists() && preConditions.expectedUUID() == acquisition.uuid()));
+    }
 
     if (!preConditions.exists()) {
         uassert(10685100,
@@ -125,16 +133,13 @@ void CollectionPreConditions::checkAcquisitionAgainstPreConditions(
                 if (preConditions.isViewlessTimeseriesCollection()) {
                     uasserted(ErrorCodes::NamespaceNotFound,
                               str::stream()
-                                  << "Timeseries collection "
-                                  << acquisition.nss().toStringForErrorMsg()
+                                  << "Timeseries collection " << nss.toStringForErrorMsg()
                                   << " got dropped during the executing of the operation.");
                 } else {
                     uasserted(ErrorCodes::NamespaceNotFound,
                               str::stream()
                                   << "Buckets collection not found for time-series collection "
-                                  << acquisition.nss()
-                                         .getTimeseriesViewNamespace()
-                                         .toStringForErrorMsg());
+                                  << nss.getTimeseriesViewNamespace().toStringForErrorMsg());
                 }
             }
             return;
@@ -143,7 +148,7 @@ void CollectionPreConditions::checkAcquisitionAgainstPreConditions(
                 fmt::format("Collection with ns {} has been dropped and "
                             "recreated since the "
                             "beginning of the operation",
-                            acquisition.nss().toStringForErrorMsg()),
+                            nss.toStringForErrorMsg()),
                 preConditions.uuid() == acquisition.uuid() ||
                     (preConditions.isTimeseriesCollection() ==
                          acquisition.getCollectionPtr()->isTimeseriesCollection() &&

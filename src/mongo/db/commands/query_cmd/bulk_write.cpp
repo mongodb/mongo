@@ -1204,11 +1204,13 @@ void explainDeleteOp(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) {
     invariant(op);
-    auto [isTimeseriesViewRequest, nss] = timeseries::isTimeseriesViewRequest(opCtx, nsEntry);
+    const auto [preConditions, isTimeseriesLogicalRequest] =
+        timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+            opCtx, nsEntry.getNs(), nsEntry, nsEntry.getCollectionUUID());
 
     auto deleteRequest = DeleteRequest();
 
-    deleteRequest.setNsString(nss);
+    deleteRequest.setNsString(preConditions.getTargetNs(nsEntry.getNs()));
     deleteRequest.setQuery(getQueryForExplain(opCtx, req, op, nsEntry));
     deleteRequest.setProj(BSONObj());
     deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
@@ -1221,9 +1223,10 @@ void explainDeleteOp(OperationContext* opCtx,
 
     write_ops_exec::explainDelete(opCtx,
                                   deleteRequest,
-                                  isTimeseriesViewRequest,
+                                  isTimeseriesLogicalRequest,
                                   req.getSerializationContext(),
                                   command,
+                                  preConditions,
                                   verbosity,
                                   result);
 }

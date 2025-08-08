@@ -188,21 +188,25 @@ void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp);
  * Note: performInserts() gets called for both user and internal (like initial sync oplog buffer)
  * inserts.
  *
- * Note: performUpdates does not itself handle any logic dealing with recognizing whether an
+ * Note: these functions do not by themselves handle any logic dealing with recognizing whether an
  * operation is a logical time-series operation or not. This has to be handled at the layer above
- * it, and passed in through the CollectionPreConditions parameter.
+ * it, and passed in through the CollectionPreConditions parameter. If the CollectionPreCondition
+ * object is not passed in, a CollectionPreCondition object will still be constructed, but it will
+ * be assumed that we are not performing a logical time-series operation.
  */
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& op,
                            OperationSource source = OperationSource::kStandard);
-WriteResult performUpdates(OperationContext* opCtx,
-                           const write_ops::UpdateCommandRequest& op,
-                           const timeseries::CollectionPreConditions& preConditions,
-                           OperationSource source = OperationSource::kStandard);
-WriteResult performDeletes(OperationContext* opCtx,
-                           const write_ops::DeleteCommandRequest& op,
-                           const timeseries::CollectionPreConditions& preConditions,
-                           OperationSource source = OperationSource::kStandard);
+WriteResult performUpdates(
+    OperationContext* opCtx,
+    const write_ops::UpdateCommandRequest& op,
+    boost::optional<const timeseries::CollectionPreConditions&> preConditions = boost::none,
+    OperationSource source = OperationSource::kStandard);
+WriteResult performDeletes(
+    OperationContext* opCtx,
+    const write_ops::DeleteCommandRequest& op,
+    boost::optional<const timeseries::CollectionPreConditions&> preConditions = boost::none,
+    OperationSource source = OperationSource::kStandard);
 
 void runTimeseriesRetryableUpdates(OperationContext* opCtx,
                                    const NamespaceString& nss,
@@ -243,6 +247,7 @@ void explainDelete(OperationContext* opCtx,
                    bool isTimeseriesViewRequest,
                    const SerializationContext& serializationContext,
                    const BSONObj& command,
+                   const timeseries::CollectionPreConditions& preConditions,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result);
 

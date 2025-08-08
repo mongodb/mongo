@@ -1405,10 +1405,9 @@ static SingleWriteResult performSingleUpdateOp(
                   logAttrs(ns));
         },
         ns);
-
     const CollectionAcquisition collection = [&]() {
-        const auto acquisitionRequest =
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite);
+        const auto acquisitionRequest = CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, ns, AcquisitionPrerequisites::kWrite, preConditions.expectedUUID());
         while (true) {
             {
                 auto acquisition = acquireCollection(
@@ -1602,6 +1601,15 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
                           retryAttempts,
                           "Caught DuplicateKey exception during upsert",
                           logAttrs(ns));
+        } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>&) {
+            // In a time-series context, this particular CollectionUUIDMismatch is re-thrown
+            // differently because there is already a check for this error higher up, which means
+            // this error must come from the guards installed to enforce that time-series operations
+            // are prepared and committed on the same collection.
+            uassert(9748802,
+                    "Collection was changed during insert",
+                    source != OperationSource::kTimeseriesInsert);
+            throw;
         }
     }
 
@@ -1614,7 +1622,12 @@ void runTimeseriesRetryableUpdates(OperationContext* opCtx,
                                    const timeseries::CollectionPreConditions& preConditions,
                                    std::shared_ptr<executor::TaskExecutor> executor,
                                    write_ops_exec::WriteResult* reply) {
-
+    if (preConditions.isLegacyTimeseriesCollection()) {
+        checkCollectionUUIDMismatch(opCtx,
+                                    preConditions.getTargetNs(nss).getTimeseriesViewNamespace(),
+                                    nullptr,
+                                    preConditions.expectedUUID());
+    }
     size_t nextOpIndex = 0;
     for (auto&& singleOp : wholeOp.getUpdates()) {
         auto singleUpdateOp = timeseries::write_ops::buildSingleUpdateOp(wholeOp, nextOpIndex);
@@ -1666,10 +1679,17 @@ void runTimeseriesRetryableUpdates(OperationContext* opCtx,
     }
 }
 
-WriteResult performUpdates(OperationContext* opCtx,
-                           const write_ops::UpdateCommandRequest& wholeOp,
-                           const timeseries::CollectionPreConditions& preConditions,
-                           OperationSource source) {
+WriteResult performUpdates(
+    OperationContext* opCtx,
+    const write_ops::UpdateCommandRequest& wholeOp,
+    boost::optional<const timeseries::CollectionPreConditions&> preConditionsOptional,
+    OperationSource source) {
+
+    timeseries::CollectionPreConditions preConditions = preConditionsOptional
+        ? *preConditionsOptional
+        : timeseries::CollectionPreConditions::getCollectionPreConditions(
+              opCtx, wholeOp.getNamespace(), wholeOp.getCollectionUUID());
+
     auto ns = preConditions.getTargetNs(wholeOp.getNamespace());
 
     // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run in a
@@ -1865,7 +1885,6 @@ WriteResult performUpdates(OperationContext* opCtx,
 static SingleWriteResult performSingleDeleteOp(
     OperationContext* opCtx,
     const NamespaceString& ns,
-    const boost::optional<mongo::UUID>& opCollectionUUID,
     StmtId stmtId,
     const write_ops::DeleteOpEntry& op,
     const LegacyRuntimeConstants& runtimeConstants,
@@ -1912,7 +1931,7 @@ static SingleWriteResult performSingleDeleteOp(
         });
 
     auto acquisitionRequest = CollectionAcquisitionRequest::fromOpCtx(
-        opCtx, ns, AcquisitionPrerequisites::kWrite, opCollectionUUID);
+        opCtx, ns, AcquisitionPrerequisites::kWrite, preConditions.expectedUUID());
     const auto collection = acquireCollection(
         opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
     timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
@@ -2000,10 +2019,17 @@ static SingleWriteResult performSingleDeleteOp(
     return result;
 }
 
-WriteResult performDeletes(OperationContext* opCtx,
-                           const write_ops::DeleteCommandRequest& wholeOp,
-                           const timeseries::CollectionPreConditions& preConditions,
-                           OperationSource source) {
+WriteResult performDeletes(
+    OperationContext* opCtx,
+    const write_ops::DeleteCommandRequest& wholeOp,
+    boost::optional<const timeseries::CollectionPreConditions&> preConditionsOptional,
+    OperationSource source) {
+
+    timeseries::CollectionPreConditions preConditions = preConditionsOptional
+        ? *preConditionsOptional
+        : timeseries::CollectionPreConditions::getCollectionPreConditions(
+              opCtx, wholeOp.getNamespace(), wholeOp.getCollectionUUID());
+
     auto ns = preConditions.getTargetNs(wholeOp.getNamespace());
     // Delete performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
     // transaction.
@@ -2092,7 +2118,6 @@ WriteResult performDeletes(OperationContext* opCtx,
 
             const SingleWriteResult&& reply = performSingleDeleteOp(opCtx,
                                                                     ns,
-                                                                    wholeOp.getCollectionUUID(),
                                                                     stmtId,
                                                                     singleOp,
                                                                     runtimeConstants,
@@ -2282,8 +2307,10 @@ void explainUpdate(OperationContext* opCtx,
     // info is more accurate.
     const auto collection = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, updateRequest.getNamespaceString(), AcquisitionPrerequisites::kWrite),
+        CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                updateRequest.getNamespaceString(),
+                                                AcquisitionPrerequisites::kWrite,
+                                                preConditions.expectedUUID()),
         MODE_IX);
 
     timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
@@ -2326,14 +2353,17 @@ void explainDelete(OperationContext* opCtx,
                    bool isTimeseriesViewRequest,
                    const SerializationContext& serializationContext,
                    const BSONObj& command,
+                   const timeseries::CollectionPreConditions& preConditions,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) {
     // Explains of write commands are read-only, but we take write locks so that timing
     // info is more accurate.
     const auto collection =
         acquireCollection(opCtx,
-                          CollectionAcquisitionRequest::fromOpCtx(
-                              opCtx, deleteRequest.getNsString(), AcquisitionPrerequisites::kWrite),
+                          CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                                  deleteRequest.getNsString(),
+                                                                  AcquisitionPrerequisites::kWrite,
+                                                                  preConditions.expectedUUID()),
                           MODE_IX);
 
     if (isTimeseriesViewRequest) {

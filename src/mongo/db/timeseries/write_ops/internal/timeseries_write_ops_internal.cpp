@@ -41,7 +41,6 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/catalog_helper.h"
-#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
@@ -223,21 +222,10 @@ TimeseriesSingleWriteResult performTimeseriesUpdate(
     if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(metadata)) {
         return {status->first, status->second};
     }
-    timeseries::CollectionPreConditions preConditions;
-    try {
-        preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-            opCtx, op.getNamespace(), /*isRawDataRequest=*/true, op.getCollectionUUID());
-    } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>&) {
-        // In a time-series context, this particular CollectionUUIDMismatch is re-thrown
-        // differently because there is already a check for this error higher up, which means
-        // this error must come from the guards installed to enforce that time-series operations
-        // are prepared and committed on the same collection.
-        uasserted(9748802, "Collection was changed during insert");
-        throw;
-    }
+
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performUpdates(
-            opCtx, op, preConditions, OperationSource::kTimeseriesInsert),
+            opCtx, op, /* preConditions=*/boost::none, OperationSource::kTimeseriesInsert),
         request);
 }
 
@@ -287,13 +275,8 @@ void compressUncompressedBucketOnReopen(OperationContext* opCtx,
     // statement id from any user op. Set to Uninitialized to bypass.
     base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
     compressionOp.setWriteCommandRequestBase(std::move(base));
-    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-        opCtx,
-        compressionOp.getNamespace(),
-        /*isRawDataRequest=*/true,
-        compressionOp.getCollectionUUID());
     auto result = write_ops_exec::performUpdates(
-        opCtx, compressionOp, preConditions, OperationSource::kTimeseriesInsert);
+        opCtx, compressionOp, /*preConditions=*/boost::none, OperationSource::kTimeseriesInsert);
     invariant(result.results.size() == 1,
               str::stream() << "Unexpected number of results (" << result.results.size()
                             << ") for update on time-series collection "

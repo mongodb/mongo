@@ -59,7 +59,6 @@
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/str.h"
@@ -224,13 +223,8 @@ StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::
     UpsertType upsert,
     bool multi,
     boost::optional<OID> targetEpoch) {
-    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-        expCtx->getOperationContext(),
-        ns,
-        /*isRawDataRequest=*/true,
-        updateCommand->getCollectionUUID());
     auto writeResults = write_ops_exec::performUpdates(
-        expCtx->getOperationContext(), *updateCommand, preConditions);
+        expCtx->getOperationContext(), *updateCommand, /*preConditions=*/boost::none);
 
     // Need to check each result in the batch since the writes are unordered.
     UpdateResult updateResult;

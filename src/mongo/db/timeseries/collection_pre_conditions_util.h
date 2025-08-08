@@ -46,19 +46,24 @@ namespace mongo::timeseries {
  */
 class CollectionPreConditions {
 public:
-    CollectionPreConditions()
+    explicit CollectionPreConditions(boost::optional<UUID> expectedUUID)
         : _uuid(boost::none),
           _isTimeseriesCollection(false),
+          _expectedUUID(expectedUUID),
           _isViewlessTimeseriesCollection(false),
+          _isTimeseriesLogicalRequest(false),
           _translatedNss(boost::none) {};
 
     CollectionPreConditions(UUID collectionUUID,
                             bool isTimeseriesCollection,
                             bool isViewlessTimeseriesCollection,
-                            boost::optional<NamespaceString> translatedNss)
+                            boost::optional<NamespaceString> translatedNss,
+                            boost::optional<UUID> expectedUUID)
         : _uuid(collectionUUID),
           _isTimeseriesCollection(isTimeseriesCollection),
+          _expectedUUID(expectedUUID),
           _isViewlessTimeseriesCollection(isViewlessTimeseriesCollection),
+          _isTimeseriesLogicalRequest(false),
           _translatedNss(translatedNss) {};
     ~CollectionPreConditions() = default;
 
@@ -72,6 +77,11 @@ public:
      * Returns the UUID of the target collection. Fails if the collection does not exist.
      */
     UUID uuid() const;
+
+    /**
+     * Returns the expected UUID if one was passed in, boost::none otherwise.
+     */
+    boost::optional<UUID> expectedUUID() const;
 
     /**
      * Returns a bool indicating whether the target collection is a time-series collection.
@@ -110,14 +120,27 @@ public:
     bool wasNssTranslated() const;
 
     /**
+     * Returns whether the request was on a time-series view. This can not always be re-constructed
+     * from the other information in this struct, because of the edge case where operations on
+     * sharded legacy time-series collections operate on the buckets namespace and the only way to
+     * differentiate between logical and buckets-level operations is by checking the
+     * isTimeseriesNamespace flag on the request.
+     *
+     * TODO SERVER-101784 Remove this once 9.0 becomes last-LTS and there are no more legacy
+     * time-series collections, and it becomes possible to differentiate raw data requests based
+     * only on information in the operationContext
+     */
+    bool getIsTimeseriesLogicalRequest() const;
+
+    void setIsTimeseriesLogicalRequest(bool isTimeseriesLogicalRequest);
+
+    /**
      * Given a namespace, performs a catalog lookup of the collection for that namespace if one
      * exists and constructs a CollectionPreConditions object.
      */
-    static CollectionPreConditions getCollectionPreConditions(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        bool isRawDataRequest,
-        boost::optional<UUID> expectedUUID = boost::none);
+    static CollectionPreConditions getCollectionPreConditions(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              boost::optional<UUID> expectedUUID);
 
     /**
      * Given a CollectionPreConditions struct and a CollectionAcquisition, checks whether any of the
@@ -133,9 +156,11 @@ public:
 private:
     boost::optional<UUID> _uuid;
     bool _isTimeseriesCollection;
-    // TODO SERVER-101784 Remove the two fields below once 9.0 becomes LTS, at which point only
+    boost::optional<UUID> _expectedUUID;
+    // TODO SERVER-101784 Remove the three fields below once 9.0 becomes LTS, at which point only
     // viewless time-series collections will exist.
     bool _isViewlessTimeseriesCollection;
+    bool _isTimeseriesLogicalRequest;
     boost::optional<NamespaceString> _translatedNss;
 };
 

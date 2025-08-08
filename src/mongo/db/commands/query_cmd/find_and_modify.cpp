@@ -386,7 +386,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     auto request = requestAndMsg.first;
     auto nss = request.getNamespace();
     const auto [preConditions, isTimeseriesLogicalRequest] =
-        timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(opCtx, nss, request);
+        timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+            opCtx, nss, request, /*expectedUUID=*/boost::none);
 
     nss = preConditions.getTargetNs(nss);
 
@@ -506,7 +507,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
 
     auto [preConditions, isTimeseriesLogicalRequest] =
         timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
-            opCtx, req.getNamespace(), request());
+            opCtx, req.getNamespace(), request(), /*expectedUUID=*/boost::none);
     if (req.getEncryptionInformation().has_value()) {
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());

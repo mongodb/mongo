@@ -211,13 +211,14 @@ std::pair<CollectionPreConditions, bool> getCollectionPreConditionsAndIsTimeseri
     OperationContext* opCtx,
     const NamespaceString& nss,
     const T& request,
-    boost::optional<UUID> expectedUUID = boost::none) {
+    boost::optional<UUID> expectedUUID) {
 
     const bool isRawDataReq = isRawDataRequest(opCtx, request);
-    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-        opCtx, nss, isRawDataReq, expectedUUID);
+    auto preConditions =
+        timeseries::CollectionPreConditions::getCollectionPreConditions(opCtx, nss, expectedUUID);
 
     const auto isTimeseriesLogicalRequest = preConditions.isTimeseriesCollection() && !isRawDataReq;
+    preConditions.setIsTimeseriesLogicalRequest(isTimeseriesLogicalRequest);
 
     return {preConditions, isTimeseriesLogicalRequest};
 }
