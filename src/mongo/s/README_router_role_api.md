@@ -8,7 +8,7 @@ Operations performed in the _Router Role_ must retrieve the routing information 
 
 ## CollectionRouter and DBPrimaryRouter
 
-[router_role.h] provides(https://github.com/mongodb/mongo/blob/57f6749350f1c01904c726af505759df3f937424/src/mongo/s/router_role.h) the `CollectionRouter` and `DBPrimaryRouter` classes. These should be used to route commands either to the shards that own data for a collection or to the DBPrimary shard of a database respectively.
+[router_role.h](https://github.com/mongodb/mongo/blob/57f6749350f1c01904c726af505759df3f937424/src/mongo/s/router_role.h) provides the `CollectionRouter` and `DBPrimaryRouter` classes. These should be used to route commands either to the shards that own data for a collection or to the DBPrimary shard of a database respectively.
 
 Here are two usage examples:
 
