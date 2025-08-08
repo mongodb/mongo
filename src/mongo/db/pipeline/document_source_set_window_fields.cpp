@@ -534,8 +534,12 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         initialize();
     }
 
-    if (_eof)
+    if (_eof) {
+        // On EOF, update SetWindowFieldStats so explain has $_internalSetWindowFields-level
+        // statistics.
+        _stats.maxUsedMemoryBytes = _memoryTracker.maxMemoryBytes();
         return DocumentSource::GetNextResult::makeEOF();
+    }
 
     auto curDoc = _iterator.current();
     if (!curDoc) {

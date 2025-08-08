@@ -284,13 +284,10 @@ function verifyExplainMetrics(
         for (let stage of stages) {
             assert(stage.hasOwnProperty("maxUsedMemBytes"),
                    `Expected maxUsedMemBytes in ${stageName} stage: ` + tojson(explainRes));
-            // TODO SERVER-106000 Remove explicit check for $_internalSetWindowFields.
-            if (stageName != "$_internalSetWindowFields") {
-                assert.gt(stage.maxUsedMemBytes,
-                          0,
-                          `Expected maxUsedMemBytes to be positive in ${stageName} stage: ` +
-                              tojson(explainRes));
-            }
+            assert.gt(stage.maxUsedMemBytes,
+                      0,
+                      `Expected maxUsedMemBytes to be positive in ${stageName} stage: ` +
+                          tojson(explainRes));
         }
     }
 

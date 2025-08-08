@@ -16,19 +16,18 @@
  * ]
  */
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+
+// TODO SERVER-104607 Delete this block once SBE tests are implemented.
+if (checkSbeFullyEnabled(db)) {
+    jsTest.log.info(
+        "Skipping test for classic '$setWindowFields' stage when SBE is fully enabled.");
+    quit();
+}
 
 const collName = jsTestName();
 const coll = db[collName];
 db[collName].drop();
-
-// Get the current value of the query framework server parameter so we can restore it at the end of
-// the test. Otherwise, the tests run after this will be affected.
-const kOriginalInternalQueryFrameworkControl =
-    assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-        .internalQueryFrameworkControl;
-// TODO SERVER-104607 Test with SBE knob.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 
 const docs = [];
 const stocks = ["AAPL", "MSFT", "GOOG", "AMZN", "META"];
@@ -55,11 +54,12 @@ for (let i = 0; i < 10; i++) {
 }
 assert.commandWorked(coll.insertMany(docs));
 
+const pipeline = [
+    {$setWindowFields: {sortBy: {date: 1}, output: {movingAvgPrice: {$avg: "$price"}}}},
+    {$match: {symbol: "AAPL"}},
+];
+
 {
-    const pipeline = [
-        {$setWindowFields: {sortBy: {date: 1}, output: {movingAvgPrice: {$avg: "$price"}}}},
-        {$match: {symbol: "AAPL"}},
-    ];
     jsTest.log.info("Running pipeline " + tojson(pipeline));
 
     runMemoryStatsTest({
@@ -74,11 +74,66 @@ assert.commandWorked(coll.insertMany(docs));
         },
         stageName: "$_internalSetWindowFields",
         expectedNumGetMores: 10,
+        // This stage does not release memory on EOF.
         checkInUseMemBytesResets: false
     });
 }
 
-// Clean up.
-db[collName].drop();
-assert.commandWorked(db.adminCommand(
-    {setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}));
+{
+    const pipelineWithLimit = [
+        {$setWindowFields: {sortBy: {date: 1}, output: {movingAvgPrice: {$avg: "$price"}}}},
+        {$match: {symbol: "AAPL"}},
+        {$limit: 5}
+    ];
+    jsTest.log.info("Running pipeline " + tojson(pipelineWithLimit));
+
+    runMemoryStatsTest({
+        db: db,
+        collName: collName,
+        commandObj: {
+            aggregate: collName,
+            pipeline: pipelineWithLimit,
+            comment: "memory stats setWindowFields test with limit",
+            cursor: {batchSize: 1},
+            allowDiskUse: false
+        },
+        stageName: "$_internalSetWindowFields",
+        expectedNumGetMores: 3,
+        // This stage does not release memory on EOF.
+        checkInUseMemBytesResets: false
+    });
+}
+
+{
+    const originalMemoryLimit =
+        assert
+            .commandWorked(db.adminCommand(
+                {getParameter: 1, internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 1}))
+            .internalDocumentSourceSetWindowFieldsMaxMemoryBytes;
+
+    assert.commandWorked(db.adminCommand(
+        {setParameter: 1, internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 5000}));
+
+    jsTest.log.info("Running pipeline " + tojson(pipeline));
+
+    runMemoryStatsTest({
+        db: db,
+        collName: collName,
+        commandObj: {
+            aggregate: collName,
+            pipeline: pipeline,
+            comment: "memory stats setWindowFields spilling test",
+            cursor: {batchSize: 1},
+            allowDiskUse: true
+        },
+        stageName: "$_internalSetWindowFields",
+        expectedNumGetMores: 10,
+        skipInUseMemBytesCheck: true,
+    });
+
+    // Restore the original memory limit.
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        internalDocumentSourceSetWindowFieldsMaxMemoryBytes: originalMemoryLimit
+    }));
+}
