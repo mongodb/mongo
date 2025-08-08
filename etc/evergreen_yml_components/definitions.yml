@@ -321,18 +321,6 @@ functions:
         - "https://mciuploads.s3.amazonaws.com/${mongo_jstestshell}"
         - "mongodb-jstestshell.tgz"
 
-  "fetch extensions": &fetch_extensions
-    command: s3.get
-    display_name: "fetch extensions"
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${mongo_extensions}
-      bucket: mciuploads
-      local_file: src/mongo-extensions.tgz
-      # Mark as optional to silence failures on build variants ineligible for extensions.
-      optional: true
-
   "write mongo binary URL to downstream_expansions.yml": &echo_mongo_binary_url
     command: subprocess.exec
     params:
@@ -386,19 +374,6 @@ functions:
         - "--change-dir=${extraction_change_dir}"
         - "--move-output=dist-test/:bazel-bin/install"
 
-  "extract extensions": &extract_extensions
-    command: subprocess.exec
-    display_name: "extract extensions"
-    params:
-      binary: bash
-      args:
-        - "src/evergreen/functions/extract_extensions.sh"
-        - "evergreen/functions/binaries_extract.py"
-        - "--tarball=mongo-extensions.tgz"
-        - "--extraction-command=${decompress}"
-        - "--change-dir=${extraction_change_dir}"
-        - "${move_outputs}"
-
   "find all extensions": &find_all_extensions
     command: subprocess.exec
     display_name: "find all extensions"
@@ -411,9 +386,8 @@ functions:
     command: expansions.update
     display_name: "apply extensions expansions"
     params:
-      # Ignore missing file to silence failures on build variants ineligible for extensions.
-      ignore_missing_file: true
-      file: src/extension_paths.yml
+      ignore_missing_file: false
+      file: extension_paths.yml
 
   "get version expansions": &get_version_expansions
     command: s3.get
@@ -726,8 +700,6 @@ functions:
           value: ${project}/${build_variant}/${version_id}/libfuzzer-corpora/corpora-${revision_order_id}.${ext|tgz}
         - key: mongo_fuzzer_corpus
           value: corpora-${project}-${build_variant}.${ext|tgz}
-        - key: mongo_extensions
-          value: ${project}/${compile_variant}/${version_id}/extensions/extensions-${revision_order_id}.tgz
         - key: skip_tests
           value: skip_test-${build_id}
 
@@ -830,10 +802,8 @@ functions:
     - *verify_binaries_sha
     - *fetch_jstestshell
     - *verify_jstestshell_sha
-    - *fetch_extensions
     - *extract_binaries
     - *extract_jstestshell
-    - *extract_extensions
     - *find_all_extensions
     - *apply_extensions_expansions
     - *f_expansions_write

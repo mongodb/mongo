@@ -347,10 +347,6 @@ common:evg_crypt_dbg --//bazel/config:dbg=True
 common:evg_crypt_test --config=evg_crypt
 common:evg_crypt_test --//bazel/config:shared_archive=False
 
---config=evg_extensions
-common:evg_extensions --config=evg
-common:evg_extensions --//bazel/config:allocator=system
-common:evg_extensions --//bazel/config:shared_archive=True
 
 --config=evg_stitch
 common:evg_stitch --config=evg

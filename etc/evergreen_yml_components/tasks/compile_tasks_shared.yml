@@ -543,38 +543,3 @@ tasks:
             src/bazel-bin/mongo-stripped.${ext|tgz}
             src/bazel-bin/dist-debug.${ext|tgz}
             src/bazel-bin/dist-stripped.${ext|tgz}
-  - name: archive_extensions
-    tags:
-      [
-        "assigned_to_jira_team_server_query_integration",
-        "development_critical_single_variant",
-        "incompatible_mac",
-        "incompatible_windows",
-        "requires_compile_variant",
-        "blocked_in_query_alias",
-        "no_commit_queue",
-      ]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "do bazel setup"
-      - func: "f_expansions_write"
-      - func: "bazel compile"
-        vars:
-          targets: >-
-            archive-extensions
-          bazel_args: >-
-            --config=evg_extensions
-          task_compile_flags: --linkstatic=True
-      - command: s3.put
-        params:
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
-          local_file: src/bazel-bin/extensions.tgz
-          remote_file: ${mongo_extensions}
-          bucket: mciuploads
-          permissions: private
-          visibility: signed
-          content_type: application/gzip
-          display_name: Extension Shared Libraries
