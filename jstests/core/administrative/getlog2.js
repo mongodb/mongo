@@ -9,6 +9,7 @@
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
 //   no_selinux,
+//   requires_profiling,
 //   # Uses $where operation.
 //   requires_scripting,
 // ]
@@ -18,8 +19,11 @@
 // will fail to match the find and update patterns defined later on in this test.
 TestData.skipGossipingClusterTime = true;
 
+// Reset slowMs to -1 so that all queries are logged as slow.
+assert.commandWorked(db.setProfilingLevel(0, {slowms: -1}));
+
 const glcol = db.getLogTest2;
-glcol.drop();
+assert(glcol.drop());
 
 function contains(arr, func) {
     let i = arr.length;
@@ -44,14 +48,14 @@ if (db.hello().msg === "isdbgrid") {
 }
 
 // 1. Run a slow query
-glcol.save({"SENTINEL": 1});
-glcol.findOne({
+assert.commandWorked(glcol.save({"SENTINEL": 1}));
+assert.neq(null, glcol.findOne({
     "SENTINEL": 1,
     "$where": function() {
         sleep(1000);
         return true;
     }
-});
+}));
 
 const query = assert.commandWorked(db.adminCommand({getLog: "global"}));
 assert(query.log, "no log field");
@@ -66,14 +70,14 @@ assert(contains(query.log, function(v) {
 }));
 
 // 2. Run a slow update
-glcol.update({
+assert.commandWorked(glcol.update({
     "SENTINEL": 1,
     "$where": function() {
         sleep(1000);
         return true;
     }
 },
-             {"x": "x"});
+                                  {"x": "x"}));
 
 const update = assert.commandWorked(db.adminCommand({getLog: "global"}));
 assert(update.log, "no log field");
