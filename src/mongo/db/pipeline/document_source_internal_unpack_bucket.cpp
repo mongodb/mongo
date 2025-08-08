@@ -41,20 +41,17 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
-#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -645,11 +642,11 @@ DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
     bool fixedBuckets,
     boost::optional<bool> sbeCompatible)
     : DocumentSource(kStageNameInternal, expCtx),
-      exec::agg::Stage(kStageNameInternal, expCtx),
       _assumeNoMixedSchemaData(assumeNoMixedSchemaData),
       _fixedBuckets(fixedBuckets),
-      _bucketUnpacker(std::move(bucketUnpacker)),
       _bucketMaxSpanSeconds{bucketMaxSpanSeconds},
+      _sharedState(std::make_shared<InternalUnpackBucketSharedState>(
+          InternalUnpackBucketSharedState{._bucketUnpacker = std::move(bucketUnpacker)})),
       _isSbeCompatible(sbeCompatible) {}
 
 DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
@@ -674,9 +671,9 @@ DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
     }
     if (wholeBucketFilterBson) {
         _wholeBucketFilterBson = wholeBucketFilterBson->getOwned();
-        _wholeBucketFilter =
+        _sharedState->_wholeBucketFilter =
             uassertStatusOK(MatchExpressionParser::parse(_wholeBucketFilterBson,
-                                                         pExpCtx,
+                                                         getExpCtx(),
                                                          ExtensionsCallbackNoop(),
                                                          Pipeline::kAllowedMatcherFeatures));
     }
@@ -926,32 +923,37 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     auto explain = opts.verbosity;
 
     MutableDocument out;
-    auto behavior =
-        _bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude ? kInclude : kExclude;
-    const auto& spec = _bucketUnpacker.bucketSpec();
+    auto behavior = _sharedState->_bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude
+        ? kInclude
+        : kExclude;
+    const auto& spec = _sharedState->_bucketUnpacker.bucketSpec();
     std::vector<Value> fields;
     for (auto&& field : spec.fieldSet()) {
         fields.emplace_back(opts.serializeFieldPathFromString(field));
     }
-    if (_bucketUnpacker.removedMetaFieldFromFieldSet() &&
+    if (_sharedState->_bucketUnpacker.removedMetaFieldFromFieldSet() &&
         std::find(spec.computedMetaProjFields().cbegin(),
                   spec.computedMetaProjFields().cend(),
-                  *_bucketUnpacker.getMetaField()) == spec.computedMetaProjFields().cend())
-        fields.emplace_back(opts.serializeFieldPathFromString(*_bucketUnpacker.getMetaField()));
+                  *_sharedState->_bucketUnpacker.getMetaField()) ==
+            spec.computedMetaProjFields().cend())
+        fields.emplace_back(
+            opts.serializeFieldPathFromString(*_sharedState->_bucketUnpacker.getMetaField()));
 
     out.addField(behavior, Value{std::move(fields)});
-    out.addField(timeseries::kTimeFieldName,
-                 Value{opts.serializeFieldPathFromString(_bucketUnpacker.getTimeField())});
-    if (_bucketUnpacker.getMetaField()) {
+    out.addField(
+        timeseries::kTimeFieldName,
+        Value{opts.serializeFieldPathFromString(_sharedState->_bucketUnpacker.getTimeField())});
+    if (_sharedState->_bucketUnpacker.getMetaField()) {
         out.addField(timeseries::kMetaFieldName,
-                     Value{opts.serializeFieldPathFromString(*_bucketUnpacker.getMetaField())});
+                     Value{opts.serializeFieldPathFromString(
+                         *_sharedState->_bucketUnpacker.getMetaField())});
     }
     out.addField(kBucketMaxSpanSeconds, opts.serializeLiteral(Value{_bucketMaxSpanSeconds}));
     if (_assumeNoMixedSchemaData)
         out.addField(kAssumeNoMixedSchemaData,
                      opts.serializeLiteral(Value(_assumeNoMixedSchemaData)));
 
-    if (_bucketUnpacker.getUsesExtendedRange()) {
+    if (_sharedState->_bucketUnpacker.getUsesExtendedRange()) {
         // Include this flag so that 'explain' is more helpful.
         // But this is not so useful for communicating from one process to another,
         // because mongos and/or the primary shard don't know whether any other shard
@@ -972,20 +974,22 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
                          return compFields;
                      }()});
 
-    if (_bucketUnpacker.includeMinTimeAsMetadata()) {
-        out.addField(kIncludeMinTimeAsMetadata,
-                     opts.serializeLiteral(Value{_bucketUnpacker.includeMinTimeAsMetadata()}));
+    if (_sharedState->_bucketUnpacker.includeMinTimeAsMetadata()) {
+        out.addField(
+            kIncludeMinTimeAsMetadata,
+            opts.serializeLiteral(Value{_sharedState->_bucketUnpacker.includeMinTimeAsMetadata()}));
     }
-    if (_bucketUnpacker.includeMaxTimeAsMetadata()) {
-        out.addField(kIncludeMaxTimeAsMetadata,
-                     opts.serializeLiteral(Value{_bucketUnpacker.includeMaxTimeAsMetadata()}));
+    if (_sharedState->_bucketUnpacker.includeMaxTimeAsMetadata()) {
+        out.addField(
+            kIncludeMaxTimeAsMetadata,
+            opts.serializeLiteral(Value{_sharedState->_bucketUnpacker.includeMaxTimeAsMetadata()}));
     }
 
-    if (_wholeBucketFilter) {
-        out.addField(kWholeBucketFilter, Value{_wholeBucketFilter->serialize(opts)});
+    if (_sharedState->_wholeBucketFilter) {
+        out.addField(kWholeBucketFilter, Value{_sharedState->_wholeBucketFilter->serialize(opts)});
     }
-    if (_eventFilter) {
-        out.addField(kEventFilter, Value{_eventFilter->serialize(opts)});
+    if (_sharedState->_eventFilter) {
+        out.addField(kEventFilter, Value{_sharedState->_eventFilter->serialize(opts)});
     }
 
     if (_fixedBuckets) {
@@ -999,7 +1003,7 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     if (!explain) {
         array.push_back(Value(DOC(getSourceName() << out.freeze())));
         if (_sampleSize) {
-            auto sampleSrc = DocumentSourceSample::create(pExpCtx, *_sampleSize);
+            auto sampleSrc = DocumentSourceSample::create(getExpCtx(), *_sampleSize);
             sampleSrc->serializeToArray(array, opts);
         }
     } else {
@@ -1012,73 +1016,15 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     }
 }
 
-boost::optional<Document> DocumentSourceInternalUnpackBucket::getNextMatchingMeasure() {
-    while (_bucketUnpacker.hasNext()) {
-        if (_eventFilter) {
-            if (_unpackToBson) {
-                auto measure = _bucketUnpacker.getNextBson();
-                if (_bucketUnpacker.bucketMatchedQuery() ||
-                    exec::matcher::matchesBSON(_eventFilter.get(), measure)) {
-                    return Document(measure);
-                }
-            } else {
-                auto measure = _bucketUnpacker.getNext();
-                // MatchExpression only takes BSON documents, so we have to make one. As an
-                // optimization, only serialize the fields we need to do the match.
-                BSONObj measureBson = _eventFilterDeps.needWholeDocument
-                    ? measure.toBson()
-                    : document_path_support::documentToBsonWithPaths(measure,
-                                                                     _eventFilterDeps.fields);
-                if (_bucketUnpacker.bucketMatchedQuery() ||
-                    exec::matcher::matchesBSON(_eventFilter.get(), measureBson)) {
-                    return measure;
-                }
-            }
-        } else {
-            return _bucketUnpacker.getNext();
-        }
-    }
-    return {};
-}
-
-DocumentSource::GetNextResult DocumentSourceInternalUnpackBucket::doGetNext() {
-    tassert(5521502, "calling doGetNext() when '_sampleSize' is set is disallowed", !_sampleSize);
-
-    // Otherwise, fallback to unpacking every measurement in all buckets until the child stage is
-    // exhausted.
-    if (auto measure = getNextMatchingMeasure()) {
-        return GetNextResult(std::move(*measure));
-    }
-
-    auto nextResult = pSource->getNext();
-    while (nextResult.isAdvanced()) {
-        auto bucket = nextResult.getDocument().toBson();
-        auto bucketMatchedQuery =
-            _wholeBucketFilter && exec::matcher::matchesBSON(_wholeBucketFilter.get(), bucket);
-        _bucketUnpacker.reset(std::move(bucket), bucketMatchedQuery);
-
-        uassert(5346509,
-                str::stream() << "A bucket with _id "
-                              << _bucketUnpacker.bucket()[timeseries::kBucketIdFieldName].toString()
-                              << " contains an empty data region",
-                _bucketUnpacker.hasNext());
-        if (auto measure = getNextMatchingMeasure()) {
-            return GetNextResult(std::move(*measure));
-        }
-        nextResult = pSource->getNext();
-    }
-
-    return nextResult;
-}
-
 boost::optional<DocumentSourceContainer::iterator>
 DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    if (_eventFilter || std::next(itr) == container->end()) {
+    if (_sharedState->_eventFilter || std::next(itr) == container->end()) {
         return boost::none;
     }
-    if (!_bucketUnpacker.getMetaField() || !_bucketUnpacker.includeMetaField() ||
-        !_bucketUnpacker.bucketSpec().computedMetaProjFields().empty()) {
+    if (!_sharedState->_bucketUnpacker.getMetaField() ||
+        !_sharedState->_bucketUnpacker.includeMetaField() ||
+        !_sharedState->_bucketUnpacker.bucketSpec().computedMetaProjFields().empty()) {
         return boost::none;
     }
 
@@ -1105,7 +1051,7 @@ DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
     }
     _triedComputedMetaPushDownFor.push_back(nextTransform);
 
-    auto& metaName = _bucketUnpacker.getMetaField().value();
+    auto& metaName = _sharedState->_bucketUnpacker.getMetaField().value();
     auto [addFieldsSpec, deleteStage] =
         nextTransform->extractComputedProjections(metaName,
                                                   std::string{timeseries::kBucketMetaFieldName},
@@ -1127,11 +1073,11 @@ DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
         }
     }
 
-    _bucketUnpacker.addComputedMetaProjFields(computedMetaProjFields);
+    _sharedState->_bucketUnpacker.addComputedMetaProjFields(computedMetaProjFields);
     // Insert extracted computed projections before the $_internalUnpackBucket.
     container->insert(itr,
                       DocumentSourceAddFields::createFromBson(
-                          BSON("$addFields" << addFieldsSpec).firstElement(), getContext()));
+                          BSON("$addFields" << addFieldsSpec).firstElement(), getExpCtx()));
     // Remove the next stage if it became empty after the field extraction.
     if (deleteStage) {
         container->erase(std::next(itr));
@@ -1148,23 +1094,26 @@ void DocumentSourceInternalUnpackBucket::setEventFilter(BSONObj eventFilterBson,
     // than tracking the specific exprs, we temporarily reset the context to be fully SBE
     // compatible and check after parsing if the '_eventFilter' made the unpack stage
     // incompatible.
-    auto originalSbeCompatibility = pExpCtx->getSbeCompatibility();
-    pExpCtx->setSbeCompatibility(SbeCompatibility::noRequirements);
+    auto originalSbeCompatibility = getExpCtx()->getSbeCompatibility();
+    getExpCtx()->setSbeCompatibility(SbeCompatibility::noRequirements);
 
-    _eventFilter = uassertStatusOK(MatchExpressionParser::parse(
-        _eventFilterBson, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
+    _sharedState->_eventFilter =
+        uassertStatusOK(MatchExpressionParser::parse(_eventFilterBson,
+                                                     getExpCtx(),
+                                                     ExtensionsCallbackNoop(),
+                                                     Pipeline::kAllowedMatcherFeatures));
     if (shouldOptimize) {
-        _eventFilter =
-            optimizeMatchExpression(std::move(_eventFilter), /* enableSimplification */ false);
+        _sharedState->_eventFilter = optimizeMatchExpression(std::move(_sharedState->_eventFilter),
+                                                             /* enableSimplification */ false);
     }
-    _isEventFilterSbeCompatible.emplace(pExpCtx->getSbeCompatibility());
+    _isEventFilterSbeCompatible.emplace(getExpCtx()->getSbeCompatibility());
 
     // Reset the sbeCompatibility taking _eventFilter into account.
-    pExpCtx->setSbeCompatibility(
+    getExpCtx()->setSbeCompatibility(
         std::min(originalSbeCompatibility, _isEventFilterSbeCompatible.get()));
 
     _eventFilterDeps = DepsTracker();
-    dependency_analysis::addDependencies(_eventFilter.get(), &_eventFilterDeps);
+    dependency_analysis::addDependencies(_sharedState->_eventFilter.get(), &_eventFilterDeps);
 }
 
 void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& project,
@@ -1178,15 +1127,16 @@ void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& proje
     }
 
     // Update '_bucketUnpacker' state with the new fields and behavior.
-    auto spec = _bucketUnpacker.bucketSpec();
+    auto spec = _sharedState->_bucketUnpacker.bucketSpec();
     spec.setFieldSet(fields);
     spec.setBehavior(isInclusion ? BucketSpec::Behavior::kInclude : BucketSpec::Behavior::kExclude);
-    _bucketUnpacker.setBucketSpec(std::move(spec));
+    _sharedState->_bucketUnpacker.setBucketSpec(std::move(spec));
 }
 
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProjectToInternalize(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) const {
-    if (std::next(itr) == container->end() || _bucketUnpacker.hasIncludeExcludeFields()) {
+    if (std::next(itr) == container->end() ||
+        _sharedState->_bucketUnpacker.hasIncludeExcludeFields()) {
         // There is no project to internalize or there are already fields being included/excluded,
         // which means we've already internalized a project.
         return {BSONObj{}, false};
@@ -1200,7 +1150,7 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
     // [{$_internalUnpackBucket}{$match}{$project}], which might return non-empty set of results, so
     // we cannot internalize the $project.
     auto [existingProj, isInclusion] = getIncludeExcludeProjectAndType(std::next(itr)->get());
-    if (!_eventFilter && isInclusion && !existingProj.isEmpty() &&
+    if (!_sharedState->_eventFilter && isInclusion && !existingProj.isEmpty() &&
         canInternalizeProjectObj(existingProj)) {
         container->erase(std::next(itr));
         return {existingProj, isInclusion};
@@ -1217,7 +1167,8 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
     }
 
     // Check for a viable exclusion $project after the $_internalUnpackBucket.
-    if (!_eventFilter && !existingProj.isEmpty() && canInternalizeProjectObj(existingProj)) {
+    if (!_sharedState->_eventFilter && !existingProj.isEmpty() &&
+        canInternalizeProjectObj(existingProj)) {
         container->erase(std::next(itr));
         return {existingProj, isInclusion};
     }
@@ -1229,11 +1180,11 @@ BucketSpec::BucketPredicate DocumentSourceInternalUnpackBucket::createPredicates
     const MatchExpression* matchExpr) const {
     return BucketSpec::createPredicatesOnBucketLevelField(
         matchExpr,
-        _bucketUnpacker.bucketSpec(),
+        _sharedState->_bucketUnpacker.bucketSpec(),
         _bucketMaxSpanSeconds,
-        pExpCtx,
+        getExpCtx(),
         haveComputedMetaField(),
-        _bucketUnpacker.includeMetaField(),
+        _sharedState->_bucketUnpacker.includeMetaField(),
         _assumeNoMixedSchemaData,
         BucketSpec::IneligiblePredicatePolicy::kIgnore,
         _fixedBuckets);
@@ -1242,17 +1193,17 @@ BucketSpec::BucketPredicate DocumentSourceInternalUnpackBucket::createPredicates
 bool DocumentSourceInternalUnpackBucket::generateBucketLevelIdPredicates(
     MatchExpression* matchExpr) const {
     return BucketSpec::generateBucketLevelIdPredicates(
-        *pExpCtx, _bucketUnpacker.bucketSpec(), _bucketMaxSpanSeconds, matchExpr);
+        *getExpCtx(), _sharedState->_bucketUnpacker.bucketSpec(), _bucketMaxSpanSeconds, matchExpr);
 }
 
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPushDown(
     DocumentSource* src) const {
     if (auto nextProject = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(src);
-        _bucketUnpacker.getMetaField() && nextProject &&
+        _sharedState->_bucketUnpacker.getMetaField() && nextProject &&
         nextProject->getTransformerType() ==
             TransformerInterface::TransformerType::kExclusionProjection) {
-        return nextProject->extractProjectOnFieldAndRename(_bucketUnpacker.getMetaField().value(),
-                                                           timeseries::kBucketMetaFieldName);
+        return nextProject->extractProjectOnFieldAndRename(
+            _sharedState->_bucketUnpacker.getMetaField().value(), timeseries::kBucketMetaFieldName);
     }
 
     return {BSONObj{}, false};
@@ -1266,12 +1217,12 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(DocumentSourceContainer::i
     // exprs, we temporarily reset the context to be fully SBE compatible and check later if any of
     // the exprs created by the rewrite mark it as incompatible, so that we can transfer the flag
     // onto the group.
-    const SbeCompatibility origSbeCompat = pExpCtx->getSbeCompatibility();
-    pExpCtx->setSbeCompatibility(SbeCompatibility::noRequirements);
+    const SbeCompatibility origSbeCompat = getExpCtx()->getSbeCompatibility();
+    getExpCtx()->setSbeCompatibility(SbeCompatibility::noRequirements);
 
     // We destruct 'this' object when we replace it with the new group, so the guard has to capture
     // the context's intrusive pointer by value.
-    const ScopeGuard guard([=, ctx = pExpCtx] {
+    const ScopeGuard guard([=, ctx = getExpCtx()] {
         ctx->setSbeCompatibility(std::min(origSbeCompat, ctx->getSbeCompatibility()));
     });
 
@@ -1280,7 +1231,8 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(DocumentSourceContainer::i
     // (e.g. numeric and lexicographic collations compare "5" and "10" in opposite order).
     // NB: Unfortuntealy, this means we have to forgo the optimization even if the source field is
     // numeric and not affected by the collation as we cannot know the data type until runtime.
-    if (pExpCtx->getCollationMatchesDefault() == ExpressionContextCollationMatchesDefault::kNo) {
+    if (getExpCtx()->getCollationMatchesDefault() ==
+        ExpressionContextCollationMatchesDefault::kNo) {
         return {};
     }
 
@@ -1291,10 +1243,10 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(DocumentSourceContainer::i
 
     const auto& idFieldExpressions = groupPtr->getIdExpressions();
     const auto& idFieldNames = groupPtr->getIdFieldNames();
-    auto rewrittenIdExpression = rewriteGroupByField(pExpCtx,
+    auto rewrittenIdExpression = rewriteGroupByField(getExpCtx(),
                                                      idFieldExpressions,
                                                      idFieldNames,
-                                                     _bucketUnpacker,
+                                                     _sharedState->_bucketUnpacker,
                                                      _bucketMaxSpanSeconds,
                                                      _fixedBuckets,
                                                      _usesExtendedRange);
@@ -1310,12 +1262,12 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(DocumentSourceContainer::i
         // into implementing them). $count is desugared to {$sum: 1}.
         std::unique_ptr<AccumulationExpression> accExpr;
         if (op == "$min" || op == "$max") {
-            accExpr = rewriteMinMaxGroupAccm(pExpCtx, stmt, _bucketUnpacker);
+            accExpr = rewriteMinMaxGroupAccm(getExpCtx(), stmt, _sharedState->_bucketUnpacker);
             if (!accExpr) {
                 return {};
             }
         } else if (op == "$sum") {
-            accExpr = rewriteCountGroupAccm(pExpCtx.get(), stmt, _bucketUnpacker);
+            accExpr = rewriteCountGroupAccm(getExpCtx().get(), stmt, _sharedState->_bucketUnpacker);
             if (!accExpr) {
                 return {};
             }
@@ -1326,7 +1278,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(DocumentSourceContainer::i
     }
 
     boost::intrusive_ptr<mongo::DocumentSourceGroup> newGroup =
-        DocumentSourceGroup::create(pExpCtx,
+        DocumentSourceGroup::create(getExpCtx(),
                                     rewrittenIdExpression,
                                     std::move(accumulationStatementsBucket),
                                     groupPtr->willBeMerged(),
@@ -1334,7 +1286,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(DocumentSourceContainer::i
 
     // The exprs used in the rewritten group might or might not be supported by SBE, so we have to
     // transfer the state from the expr context onto the group.
-    newGroup->setSbeCompatibility(pExpCtx->getSbeCompatibility());
+    newGroup->setSbeCompatibility(getExpCtx()->getSbeCompatibility());
 
     // Replace the current stage (DocumentSourceInternalUnpackBucket) and the following group stage
     // with the new group.
@@ -1352,8 +1304,9 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(DocumentSourceContainer::i
 }
 
 bool DocumentSourceInternalUnpackBucket::haveComputedMetaField() const {
-    return _bucketUnpacker.getMetaField() &&
-        _bucketUnpacker.bucketSpec().fieldIsComputed(_bucketUnpacker.getMetaField().value());
+    return _sharedState->_bucketUnpacker.getMetaField() &&
+        _sharedState->_bucketUnpacker.bucketSpec().fieldIsComputed(
+            _sharedState->_bucketUnpacker.getMetaField().value());
 }
 
 bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
@@ -1361,7 +1314,7 @@ bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
     // skip unpack stage
     itr = std::next(itr);
 
-    FieldPath timeField = _bucketUnpacker.getTimeField();
+    FieldPath timeField = _sharedState->_bucketUnpacker.getTimeField();
     DocumentSourceGroup* groupStage = nullptr;
     bool isSortedOnTime = false;
     for (; itr != container->end(); ++itr) {
@@ -1410,7 +1363,7 @@ bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
     }
 
     *itr = DocumentSourceStreamingGroup::create(
-        pExpCtx,
+        getExpCtx(),
         groupStage->getIdExpression(),
         std::move(monotonicIdFields),
         std::move(groupStage->getMutableAccumulationStatements()),
@@ -1418,7 +1371,7 @@ bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
 
     // Streaming group isn't supported in SBE yet and we don't want to run the pipeline in hybrid
     // mode due to potential perf impact.
-    pExpCtx->setSbePipelineCompatibility(SbeCompatibility::notCompatible);
+    getExpCtx()->setSbePipelineCompatibility(SbeCompatibility::notCompatible);
     _isSbeCompatible = false;
 
     return true;
@@ -1562,7 +1515,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(DocumentSourceContain
         // Try to rewrite the $group to a $sort+$group-style lastpoint query before proceeding with
         // the optimization.
         std::tie(sortStagePtr, groupStagePtr) =
-            tryCreateBucketLevelSortGroup(pExpCtx, itr, container, groupStage);
+            tryCreateBucketLevelSortGroup(getExpCtx(), itr, container, groupStage);
 
         // Both these stages should be discarded once we exit this function; either because the
         // rewrite failed validation checks, or because we created updated versions of these stages
@@ -1581,8 +1534,8 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(DocumentSourceContain
         return false;
     }
 
-    auto maybeMetaField = _bucketUnpacker.getMetaField();
-    auto timeField = _bucketUnpacker.getTimeField();
+    auto maybeMetaField = _sharedState->_bucketUnpacker.getMetaField();
+    auto timeField = _sharedState->_bucketUnpacker.getTimeField();
     if (!maybeMetaField || haveComputedMetaField()) {
         return false;
     }
@@ -1648,7 +1601,8 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(DocumentSourceContain
     std::vector<std::string> fieldsToInclude{std::string{timeseries::kBucketMetaFieldName},
                                              std::string{timeseries::kBucketControlFieldName},
                                              std::string{timeseries::kBucketDataFieldName}};
-    const auto& computedMetaProjFields = _bucketUnpacker.bucketSpec().computedMetaProjFields();
+    const auto& computedMetaProjFields =
+        _sharedState->_bucketUnpacker.bucketSpec().computedMetaProjFields();
     std::copy(computedMetaProjFields.begin(),
               computedMetaProjFields.end(),
               std::back_inserter(fieldsToInclude));
@@ -1660,7 +1614,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(DocumentSourceContain
 
         bool flipSort = (accum == AccumulatorDocumentsNeeded::kLastInputDocument);
         auto newSort = createMetadataSortForReorder(*sortStage, timeField, newFieldPath, flipSort);
-        auto newGroup = createBucketGroupForReorder(pExpCtx, fieldsToInclude, newFieldPath);
+        auto newGroup = createBucketGroupForReorder(getExpCtx(), fieldsToInclude, newFieldPath);
 
         // Note that we don't erase any of the original stages for this rewrite. This allows us to
         // preserve the particular semantics of the original group (e.g. $top behaves differently
@@ -1680,7 +1634,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(DocumentSourceContain
     // SBE due to the current limitations of 'TsBucketToCellBlockStage', but we don't want to
     // run this pipeline in hybrid mode because of the potential perf impact.
     if (optimized) {
-        pExpCtx->setSbePipelineCompatibility(SbeCompatibility::notCompatible);
+        getExpCtx()->setSbePipelineCompatibility(SbeCompatibility::notCompatible);
         _isSbeCompatible = false;
     }
     return optimized;
@@ -1728,20 +1682,20 @@ DepsTracker DocumentSourceInternalUnpackBucket::getRestPipelineDependencies(
     DocumentSourceContainer* container,
     bool includeEventFilter) const {
     auto deps = Pipeline::getDependenciesForContainer(
-        pExpCtx,
+        getExpCtx(),
         DocumentSourceContainer{std::next(itr), container->end()},
         DepsTracker::NoMetadataValidation());
-    if (_eventFilter && includeEventFilter) {
-        dependency_analysis::addDependencies(_eventFilter.get(), &deps);
+    if (_sharedState->_eventFilter && includeEventFilter) {
+        dependency_analysis::addDependencies(_sharedState->_eventFilter.get(), &deps);
     }
     return deps;
 }
 
 void DocumentSourceInternalUnpackBucket::addVariableRefs(std::set<Variables::Id>* refs) const {
-    if (_eventFilter) {
+    if (_sharedState->_eventFilter) {
         dependency_analysis::addVariableRefs(eventFilter(), refs);
     }
-    if (_wholeBucketFilter) {
+    if (_sharedState->_wholeBucketFilter) {
         dependency_analysis::addVariableRefs(wholeBucketFilter(), refs);
     }
 }
@@ -1800,8 +1754,8 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
         // Unlike other rewrites for this stage, this rewrite affects a $match stage that is
         // *before* the unpack stage. So we need to apply this rewrite first, before the others,
         // which might cause us to return early.
-        if (auto prevMatch = dynamic_cast<DocumentSourceMatch*>(std::prev(itr)->get());
-            prevMatch && !pExpCtx->getInRouter() && !_bucketUnpacker.getUsesExtendedRange()) {
+        if (auto prevMatch = dynamic_cast<DocumentSourceMatch*>(std::prev(itr)->get()); prevMatch &&
+            !getExpCtx()->getInRouter() && !_sharedState->_bucketUnpacker.getUsesExtendedRange()) {
             MatchExpression* matchExpr = prevMatch->getMatchExpression();
             bool updated = generateBucketLevelIdPredicates(matchExpr);
             if (updated) {
@@ -1822,8 +1776,9 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
 
     // Before any other rewrites for the current stage, consider reordering with $sort.
     if (auto sortPtr = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get());
-        sortPtr && !_eventFilter) {
-        if (auto metaField = _bucketUnpacker.getMetaField(); metaField && !haveComputedMetaField) {
+        sortPtr && !_sharedState->_eventFilter) {
+        if (auto metaField = _sharedState->_bucketUnpacker.getMetaField();
+            metaField && !haveComputedMetaField) {
             if (checkMetadataSortReorder(sortPtr->getSortKeyPattern(), metaField.value())) {
                 // We have a sort on metadata field following this stage. Reorder the two stages
                 // and return a pointer to the preceding stage.
@@ -1838,7 +1793,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
                     auto limitPos = itr;
                     std::advance(limitPos, 2);
                     _triedLimitPushDownLocally = true;
-                    container->insert(limitPos, DocumentSourceLimit::create(pExpCtx, *limit));
+                    container->insert(limitPos, DocumentSourceLimit::create(getExpCtx(), *limit));
                 }
 
                 // Reorder sort and current doc.
@@ -1862,7 +1817,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
 
     // Attempt to push geoNear on the metaField past $_internalUnpackBucket.
     if (auto nextNear = dynamic_cast<DocumentSourceGeoNear*>(std::next(itr)->get());
-        nextNear && !_eventFilter) {
+        nextNear && !_sharedState->_eventFilter) {
         // Currently we only support geo indexes on the meta field, and we enforce this by
         // requiring the key field to be set so we can check before we try to look up indexes.
         auto keyField = nextNear->getKeyField();
@@ -1876,7 +1831,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
             "Must not specify 'query' for $geoNear on a time-series collection; use $match instead",
             nextNear->getQuery().binaryEqual(BSONObj()));
 
-        auto metaField = _bucketUnpacker.getMetaField();
+        auto metaField = _sharedState->_bucketUnpacker.getMetaField();
         if (metaField && *metaField == keyField->front()) {
             // Make sure we actually re-write the key field for the buckets collection so we can
             // locate the index.
@@ -1941,15 +1896,15 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
     // documents we return from limit, hence we don't want to push limit.
     // If _triedLimitPushDown is true, we have already done a limit push down and don't want to
     // push again to avoid an infinite loop.
-    if (!_eventFilter && !_triedLimitPushDownLocally) {
+    if (!_sharedState->_eventFilter && !_triedLimitPushDownLocally) {
         if (auto limitPtr = dynamic_cast<DocumentSourceLimit*>(std::next(itr)->get()); limitPtr) {
             _triedLimitPushDownLocally = true;
-            container->insert(itr, DocumentSourceLimit::create(getContext(), limitPtr->getLimit()));
+            container->insert(itr, DocumentSourceLimit::create(getExpCtx(), limitPtr->getLimit()));
             return container->begin();
         }
     }
 
-    if (!_eventFilter) {
+    if (!_sharedState->_eventFilter) {
         // Check if we can avoid unpacking if we have a group stage with min/max/count aggregates.
         auto [success, result] = rewriteGroupStage(itr, container);
         if (success) {
@@ -1963,34 +1918,35 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
     // also invalidate the control block summaries. The optimizations below this check may assume
     // that the bucket fields and the control block is still valid.
     //
-    bool hasAlreadyAbsorbedProjectSpec = _bucketUnpacker.hasIncludeExcludeFields() ||
-        !_bucketUnpacker.bucketSpec().computedMetaProjFields().empty();
+    bool hasAlreadyAbsorbedProjectSpec = _sharedState->_bucketUnpacker.hasIncludeExcludeFields() ||
+        !_sharedState->_bucketUnpacker.bucketSpec().computedMetaProjFields().empty();
 
     {
         // Check if the rest of the pipeline needs any fields. For example we might only be
         // interested in $count.
         auto deps = getRestPipelineDependencies(itr, container, true /* includeEventFilter */);
         if (deps.hasNoRequirements() && !hasAlreadyAbsorbedProjectSpec) {
-            _bucketUnpacker.setBucketSpec({_bucketUnpacker.getTimeField(),
-                                           _bucketUnpacker.getMetaField(),
-                                           {},
-                                           BucketSpec::Behavior::kInclude});
+            _sharedState->_bucketUnpacker.setBucketSpec(
+                {_sharedState->_bucketUnpacker.getTimeField(),
+                 _sharedState->_bucketUnpacker.getMetaField(),
+                 {},
+                 BucketSpec::Behavior::kInclude});
 
             // Keep going for next optimization.
         }
 
         if (deps.getNeedsMetadata(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime)) {
-            _bucketUnpacker.setIncludeMinTimeAsMetadata();
+            _sharedState->_bucketUnpacker.setIncludeMinTimeAsMetadata();
         }
 
         if (deps.getNeedsMetadata(DocumentMetadataFields::MetaType::kTimeseriesBucketMaxTime)) {
-            _bucketUnpacker.setIncludeMaxTimeAsMetadata();
+            _sharedState->_bucketUnpacker.setIncludeMaxTimeAsMetadata();
         }
     }
 
     // Attempt to optimize last-point type queries.
-    if (!hasAlreadyAbsorbedProjectSpec && !_triedLastpointRewriteLocally && !_eventFilter &&
-        optimizeLastpoint(itr, container)) {
+    if (!hasAlreadyAbsorbedProjectSpec && !_triedLastpointRewriteLocally &&
+        !_sharedState->_eventFilter && optimizeLastpoint(itr, container)) {
         _triedLastpointRewriteLocally = true;
         // If we are able to rewrite the aggregation, give the resulting pipeline a chance to
         // perform further optimizations.
@@ -2014,13 +1970,14 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
         if (predicates.tightPredicate && !predicates.rewriteProvidesExactMatchPredicate) {
 
             _wholeBucketFilterBson = predicates.tightPredicate->serialize();
-            _wholeBucketFilter =
+            _sharedState->_wholeBucketFilter =
                 uassertStatusOK(MatchExpressionParser::parse(_wholeBucketFilterBson,
-                                                             pExpCtx,
+                                                             getExpCtx(),
                                                              ExtensionsCallbackNoop(),
                                                              Pipeline::kAllowedMatcherFeatures));
-            _wholeBucketFilter = optimizeMatchExpression(std::move(_wholeBucketFilter),
-                                                         /* enableSimplification */ false);
+            _sharedState->_wholeBucketFilter =
+                optimizeMatchExpression(std::move(_sharedState->_wholeBucketFilter),
+                                        /* enableSimplification */ false);
         }
 
         if (!predicates.rewriteProvidesExactMatchPredicate) {
@@ -2037,7 +1994,8 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
         // Create a loose bucket predicate and push it before the unpacking stage.
         if (predicates.loosePredicate) {
             container->insert(
-                itr, DocumentSourceMatch::create(predicates.loosePredicate->serialize(), pExpCtx));
+                itr,
+                DocumentSourceMatch::create(predicates.loosePredicate->serialize(), getExpCtx()));
 
             // If we generated predicates on the control block's min or max of the time field we may
             // be able to also generate predicates on _id.
@@ -2054,12 +2012,12 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
 
     // Attempt to push down an exclusion $project on the metaField past $_internalUnpackBucket. Only
     // patterns {$project: {metaField: 0, ...}} would be eligible for this optimization.
-    if (!_eventFilter && !haveComputedMetaField) {
+    if (!_sharedState->_eventFilter && !haveComputedMetaField) {
         if (auto [metaProject, deleteRemainder] = extractProjectForPushDown(std::next(itr)->get());
             !metaProject.isEmpty()) {
             container->insert(itr,
                               DocumentSourceProject::createFromBson(
-                                  BSON("$project" << metaProject).firstElement(), getContext()));
+                                  BSON("$project" << metaProject).firstElement(), getExpCtx()));
 
             if (deleteRemainder) {
                 // We have pushed down the entire $project. Remove the old $project from the
@@ -2108,7 +2066,7 @@ bool DocumentSourceInternalUnpackBucket::isSbeCompatible() {
             // SBE. While optimizing pipeline, we may end up with pushing SBE-incompatible filters
             // down to the '$_internalUnpackBucket' stage. We've stored the sbeCompatibility of
             // '_eventFilter' in '_isEventFilterSbeCompatible'.
-            if (_eventFilter) {
+            if (_sharedState->_eventFilter) {
                 tassert(8062700,
                         "If _eventFilter is set, we must have determined if it is compatible with "
                         "SBE or not.",
@@ -2119,7 +2077,8 @@ bool DocumentSourceInternalUnpackBucket::isSbeCompatible() {
             }
 
             // Currently we only support in SBE unpacking with a statically known set of fields.
-            if (_bucketUnpacker.bucketSpec().behavior() != BucketSpec::Behavior::kInclude) {
+            if (_sharedState->_bucketUnpacker.bucketSpec().behavior() !=
+                BucketSpec::Behavior::kInclude) {
                 return false;
             }
 
@@ -2131,9 +2090,10 @@ bool DocumentSourceInternalUnpackBucket::isSbeCompatible() {
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceInternalUnpackBucket::getModifiedPaths() const {
-    if (_bucketUnpacker.includeMetaField()) {
+    if (_sharedState->_bucketUnpacker.includeMetaField()) {
         StringMap<std::string> renames;
-        renames.emplace(*_bucketUnpacker.getMetaField(), timeseries::kBucketMetaFieldName);
+        renames.emplace(*_sharedState->_bucketUnpacker.getMetaField(),
+                        timeseries::kBucketMetaFieldName);
         return {GetModPathsReturn::Type::kAllExcept, OrderedPathSet{}, std::move(renames)};
     }
     return {GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};

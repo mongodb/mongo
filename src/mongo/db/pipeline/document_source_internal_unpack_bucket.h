@@ -60,7 +60,23 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-class DocumentSourceInternalUnpackBucket : public DocumentSource, public exec::agg::Stage {
+
+struct InternalUnpackBucketSharedState {
+    // It's beneficial to do as much filtering at the bucket level as possible to avoid unpacking
+    // buckets that wouldn't contribute to the results anyway. There is a generic mechanism that
+    // allows to swap $match stages with this one (see 'getModifiedPaths()'). It lets us split out
+    // and push down a filter on the metaField "as is". The remaining filters might cause creation
+    // of additional bucket-level filters (see 'createPredicatesOnBucketLevelField()') that are
+    // inserted before this stage while the original filter is incorporated into this stage as
+    // '_eventFilter' (to be applied to each unpacked document) and/or '_wholeBucketFilter' for the
+    // cases when _all_ events in a bucket would match so that the filter is evaluated only once
+    // rather than on all events from the bucket (currently, we only do this for the 'timeField').
+    std::unique_ptr<MatchExpression> _eventFilter;
+    std::unique_ptr<MatchExpression> _wholeBucketFilter;
+    timeseries::BucketUnpacker _bucketUnpacker;
+};
+
+class DocumentSourceInternalUnpackBucket : public DocumentSource {
 public:
     static constexpr StringData kStageNameInternal = "$_internalUnpackBucket"_sd;
     static constexpr StringData kStageNameExternal = "$_unpackBucket"_sd;
@@ -118,11 +134,11 @@ public:
     }
 
     bool includeMetaField() const {
-        return _bucketUnpacker.includeMetaField();
+        return _sharedState->_bucketUnpacker.includeMetaField();
     }
 
     bool includeTimeField() const {
-        return _bucketUnpacker.includeTimeField();
+        return _sharedState->_bucketUnpacker.includeTimeField();
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
@@ -158,11 +174,13 @@ public:
     }
 
     std::string getMinTimeField() const {
-        return _bucketUnpacker.getMinField(_bucketUnpacker.getTimeField());
+        return _sharedState->_bucketUnpacker.getMinField(
+            _sharedState->_bucketUnpacker.getTimeField());
     }
 
     std::string getMaxTimeField() const {
-        return _bucketUnpacker.getMaxField(_bucketUnpacker.getTimeField());
+        return _sharedState->_bucketUnpacker.getMaxField(
+            _sharedState->_bucketUnpacker.getTimeField());
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
@@ -170,7 +188,7 @@ public:
     };
 
     const timeseries::BucketUnpacker& bucketUnpacker() const {
-        return _bucketUnpacker;
+        return _sharedState->_bucketUnpacker;
     }
 
     /**
@@ -237,11 +255,11 @@ public:
     }
 
     void setIncludeMinTimeAsMetadata() {
-        _bucketUnpacker.setIncludeMinTimeAsMetadata();
+        _sharedState->_bucketUnpacker.setIncludeMinTimeAsMetadata();
     }
 
     void setIncludeMaxTimeAsMetadata() {
-        _bucketUnpacker.setIncludeMaxTimeAsMetadata();
+        _sharedState->_bucketUnpacker.setIncludeMaxTimeAsMetadata();
     }
 
     boost::optional<long long> sampleSize() const {
@@ -309,19 +327,18 @@ public:
                                             bool includeEventFilter) const;
 
     const MatchExpression* eventFilter() const {
-        return _eventFilter.get();
+        return _sharedState->_eventFilter.get();
     }
 
     const MatchExpression* wholeBucketFilter() const {
-        return _wholeBucketFilter.get();
+        return _sharedState->_wholeBucketFilter.get();
     }
 
     bool isSbeCompatible();
 
 private:
-    GetNextResult doGetNext() final;
-
-    boost::optional<Document> getNextMatchingMeasure();
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalUnpackBucketOpToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
 
     bool haveComputedMetaField() const;
 
@@ -381,25 +398,15 @@ private:
     // different from the DB primary shard.
     bool _usesExtendedRange = false;
 
-    timeseries::BucketUnpacker _bucketUnpacker;
     int _bucketMaxSpanSeconds;
 
     int _bucketMaxCount = 0;
     boost::optional<long long> _sampleSize;
 
-    // It's beneficial to do as much filtering at the bucket level as possible to avoid unpacking
-    // buckets that wouldn't contribute to the results anyway. There is a generic mechanism that
-    // allows to swap $match stages with this one (see 'getModifiedPaths()'). It lets us split out
-    // and push down a filter on the metaField "as is". The remaining filters might cause creation
-    // of additional bucket-level filters (see 'createPredicatesOnBucketLevelField()') that are
-    // inserted before this stage while the original filter is incorporated into this stage as
-    // '_eventFilter' (to be applied to each unpacked document) and/or '_wholeBucketFilter' for the
-    // cases when _all_ events in a bucket would match so that the filter is evaluated only once
-    // rather than on all events from the bucket (currently, we only do this for the 'timeField').
-    std::unique_ptr<MatchExpression> _eventFilter;
+    std::shared_ptr<InternalUnpackBucketSharedState> _sharedState;
+
     BSONObj _eventFilterBson;
     DepsTracker _eventFilterDeps;
-    std::unique_ptr<MatchExpression> _wholeBucketFilter;
     BSONObj _wholeBucketFilterBson;
 
     // This will be boost::none or true if should check to see if we can generate predicates on _id
