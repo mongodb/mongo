@@ -25,8 +25,7 @@ if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
   echo "common --action_env=TMP=Z:/bazel_tmp" >> .bazelrc.evergreen
   echo "common --action_env=TEMP=Z:/bazel_tmp" >> .bazelrc.evergreen
   echo "BAZELISK_HOME=${abs_path}/bazelisk_home" >> .bazeliskrc
-  #  echo "common --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" >> .bazelrc.git
-  echo "common --define GIT_COMMIT_HASH=nogitversion" >> .bazelrc.git
+  echo "common --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" >> .bazelrc.git
 else
   echo "startup --output_user_root=${TMPDIR}/bazel-output-root" > .bazelrc.evergreen
   echo "BAZELISK_HOME=${TMPDIR}/bazelisk_home" >> .bazeliskrc
