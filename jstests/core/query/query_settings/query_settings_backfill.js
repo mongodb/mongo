@@ -1,8 +1,7 @@
 // Test that query settings set by hash have their representative queries backfilled on the
 // following execution.
 // @tags: [
-//   requires_fcv_82,
-//   featureFlagPQSBackfill,
+//   requires_fcv_83,
 //   # TODO SERVER-98659 Investigate why this test is failing on
 //   # 'sharding_kill_stepdown_terminate_jscore_passthrough'.
 //   does_not_support_stepdowns,

@@ -347,6 +347,7 @@ protected:
 
     boost::optional<RAIIServerParameterControllerForTest> _querySettingsFeatureFlag;
     boost::optional<RAIIServerParameterControllerForTest> _multitenancyFeatureFlag;
+    boost::optional<RAIIServerParameterControllerForTest> _internalQuerySettingsDisableBackfillFlag;
 };
 
 class QuerySettingsNotMultitenantLookupBenchmark : public QuerySettingsLookupBenchmark {
@@ -361,6 +362,8 @@ class QuerySettingsNotMultitenantLookupBenchmark : public QuerySettingsLookupBen
             // settings.
             setGlobalServiceContext(ServiceContext::make());
             query_settings::QuerySettingsService::initializeForTest(getGlobalServiceContext());
+            _internalQuerySettingsDisableBackfillFlag.emplace(
+                "internalQuerySettingsDisableBackfill", true);
 
             // Query settings are populated only for a single tenant (global scope).
             auto numberOfExistingSettings = state.range(0);
@@ -389,6 +392,8 @@ class QuerySettingsMultiTenantLookupBenchmark : public QuerySettingsLookupBenchm
 
             // Initialize the feature flags.
             _multitenancyFeatureFlag.emplace("multitenancySupport", true);
+            _internalQuerySettingsDisableBackfillFlag.emplace(
+                "internalQuerySettingsDisableBackfill", true);
         }
 
         // Query settings are populated for every tenant.
