@@ -65,7 +65,6 @@ protected:
         ReshardingMetricsTestFixture::setUp();
         _reshardingCumulativeMetrics =
             static_cast<ReshardingCumulativeMetrics*>(_cumulativeMetrics.get());
-        _fieldNames = std::make_unique<ReshardingCumulativeMetricsFieldNameProvider>();
     }
 
     StringData getRootSectionName() override {
@@ -190,7 +189,6 @@ protected:
     }
 
     ReshardingCumulativeMetrics* _reshardingCumulativeMetrics;
-    std::unique_ptr<ReshardingCumulativeMetricsFieldNameProvider> _fieldNames;
 };
 
 class ScopedObserverMock {

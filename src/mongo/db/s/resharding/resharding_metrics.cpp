@@ -34,6 +34,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/s/resharding/resharding_metrics_common.h"
+#include "mongo/db/s/resharding/resharding_metrics_field_names.h"
 #include "mongo/db/s/resharding/resharding_metrics_observer_impl.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -203,7 +204,6 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
       _originalCommand{createOriginalCommand(nss, std::move(shardKey))},
       _sourceNs{nss},
       _role{role},
-      _fieldNames{std::make_unique<ReshardingMetricsFieldNameProvider>()},
       _startTime{startTime},
       _clockSource{clockSource},
       _observer{std::move(observer)},
@@ -218,7 +218,6 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
       _ableToEstimateRemainingRecipientTime{!mustRestoreExternallyTrackedRecipientFields(state)},
       _isSameKeyResharding{false},
       _scopedObserver(registerInstanceMetrics()),
-      _reshardingFieldNames{static_cast<ReshardingMetricsFieldNameProvider*>(_fieldNames.get())},
       _provenance{provenance} {
     setState(state);
 }
@@ -662,52 +661,52 @@ StringData ReshardingMetrics::getStateString() const {
 }
 
 BSONObj ReshardingMetrics::reportForCurrentOp() const {
+    using namespace resharding_metrics::field_names;
+
     BSONObjBuilder builder;
-    builder.append(_fieldNames->getForType(), "op");
-    builder.append(_fieldNames->getForDescription(), createOperationDescription());
-    builder.append(_fieldNames->getForOp(), "command");
-    builder.append(_fieldNames->getForNamespace(),
+    builder.append(kType, "op");
+    builder.append(kDescription, createOperationDescription());
+    builder.append(kOp, "command");
+    builder.append(kNamespace,
                    NamespaceStringUtil::serialize(_sourceNs, SerializationContext::stateDefault()));
-    builder.append(_fieldNames->getForOriginatingCommand(), _originalCommand);
-    builder.append(_fieldNames->getForOpTimeElapsed(), getOperationRunningTimeSecs().count());
+    builder.append(kOriginatingCommand, _originalCommand);
+    builder.append(kOpTimeElapsed, getOperationRunningTimeSecs().count());
     builder.appendElements(BSON("provenance" << ReshardingProvenance_serializer(_provenance)));
     switch (_role) {
         case Role::kCoordinator:
             appendOptionalMillisecondsFieldAs<Seconds>(
                 builder,
-                _fieldNames->getForAllShardsHighestRemainingOperationTimeEstimatedSecs(),
+                kAllShardsHighestRemainingOperationTimeEstimatedSecs,
                 getHighEstimateRemainingTimeMillis());
             appendOptionalMillisecondsFieldAs<Seconds>(
                 builder,
-                _fieldNames->getForAllShardsLowestRemainingOperationTimeEstimatedSecs(),
+                kAllShardsLowestRemainingOperationTimeEstimatedSecs,
                 getLowEstimateRemainingTimeMillis());
-            builder.append(_fieldNames->getForCoordinatorState(), getStateString());
-            builder.append(_reshardingFieldNames->getForIsSameKeyResharding(),
+            builder.append(kCoordinatorState, getStateString());
+            builder.append(resharding_metrics::field_names::kIsSameKeyResharding,
                            _isSameKeyResharding.load());
             break;
         case Role::kDonor:
-            builder.append(_fieldNames->getForDonorState(), getStateString());
-            builder.append(_fieldNames->getForCountWritesDuringCriticalSection(),
-                           _writesDuringCriticalSection.load());
-            builder.append(_fieldNames->getForCountReadsDuringCriticalSection(),
-                           _readsDuringCriticalSection.load());
+            builder.append(kDonorState, getStateString());
+            builder.append(kCountWritesDuringCriticalSection, _writesDuringCriticalSection.load());
+            builder.append(kCountReadsDuringCriticalSection, _readsDuringCriticalSection.load());
             break;
         case Role::kRecipient:
-            builder.append(_fieldNames->getForRecipientState(), getStateString());
+            builder.append(kRecipientState, getStateString());
             appendOptionalMillisecondsFieldAs<Seconds>(
-                builder,
-                _fieldNames->getForRemainingOpTimeEstimated(),
-                getHighEstimateRemainingTimeMillis());
-            builder.append(_fieldNames->getForApproxDocumentsToProcess(),
-                           _approxDocumentsToProcess.load());
-            builder.append(_fieldNames->getForApproxBytesToScan(), _approxBytesToScan.load());
-            builder.append(_fieldNames->getForBytesWritten(), _bytesWritten.load());
-            builder.append(_fieldNames->getForCountWritesToStashCollections(),
-                           _writesToStashCollections.load());
-            builder.append(_fieldNames->getForDocumentsProcessed(), _documentsProcessed.load());
-            builder.append(_reshardingFieldNames->getForIndexesToBuild(), _indexesToBuild.load());
-            builder.append(_reshardingFieldNames->getForIndexesBuilt(), _indexesBuilt.load());
-            reportOplogApplicationCountMetrics(_reshardingFieldNames, &builder);
+                builder, kRemainingOpTimeEstimated, getHighEstimateRemainingTimeMillis());
+            builder.append(kApproxDocumentsToCopy, _approxDocumentsToProcess.load());
+            builder.append(kApproxBytesToCopy, _approxBytesToScan.load());
+            builder.append(kBytesCopied, _bytesWritten.load());
+            builder.append(kCountWritesToStashCollections, _writesToStashCollections.load());
+            builder.append(kDocumentsCopied, _documentsProcessed.load());
+            builder.append(kIndexesToBuild, _indexesToBuild.load());
+            builder.append(kIndexesBuilt, _indexesBuilt.load());
+            builder.append(kOplogEntriesFetched, getOplogEntriesFetched());
+            builder.append(kOplogEntriesApplied, getOplogEntriesApplied());
+            builder.append(kInsertsApplied, getInsertsApplied());
+            builder.append(kUpdatesApplied, getUpdatesApplied());
+            builder.append(kDeletesApplied, getDeletesApplied());
             break;
         default:
             MONGO_UNREACHABLE;

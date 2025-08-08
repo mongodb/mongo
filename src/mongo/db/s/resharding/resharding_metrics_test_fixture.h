@@ -86,18 +86,6 @@ private:
     ReshardingMetricsCommon::Role _role;
 };
 
-class ReshardingCumulativeMetricsFieldNameProviderForTest
-    : public ReshardingCumulativeMetricsFieldNameProvider {
-public:
-    ~ReshardingCumulativeMetricsFieldNameProviderForTest() override = default;
-    StringData getForDocumentsProcessed() const override {
-        return "documentsProcessed";
-    }
-    StringData getForBytesWritten() const override {
-        return "bytesWritten";
-    }
-};
-
 class ReshardingMetricsTestFixture : public unittest::Test {
 
 public:

@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/cumulative_metrics_state_tracker.h"
-#include "mongo/db/s/resharding/resharding_cumulative_metrics_field_name_provider.h"
 #include "mongo/db/s/resharding/resharding_metrics_common.h"
 #include "mongo/db/s/resharding/resharding_metrics_observer.h"
 #include "mongo/db/service_context.h"
@@ -47,7 +46,6 @@ namespace mongo {
 
 class ReshardingCumulativeMetrics {
 public:
-    using NameProvider = ReshardingCumulativeMetricsFieldNameProvider;
     using Role = ReshardingMetricsCommon::Role;
     using StateTracker =
         CumulativeMetricsStateTracker<CoordinatorStateEnum, DonorStateEnum, RecipientStateEnum>;
@@ -184,7 +182,6 @@ private:
 
     const std::string _rootSectionName;
     mutable stdx::mutex _mutex;
-    std::unique_ptr<NameProvider> _fieldNames;
     std::vector<MetricsSet> _instanceMetricsForAllRoles;
 
     StateTracker _stateTracker;

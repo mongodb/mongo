@@ -38,7 +38,6 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
-#include "mongo/db/s/resharding/resharding_metrics_field_name_provider.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/service_context.h"
@@ -74,8 +73,6 @@ public:
     using TimedPhase = resharding_metrics::TimedPhase;
     using TimedPhaseNameMap = resharding_metrics::PhaseDurationTracker::TimedPhaseNameMap;
     using Role = ReshardingMetricsCommon::Role;
-    using FieldNameProviderPtr =
-        std::unique_ptr<ShardingDataTransformInstanceMetricsFieldNameProvider>;
     using ObserverPtr = std::unique_ptr<ReshardingMetricsObserver>;
 
     /**
@@ -393,17 +390,6 @@ private:
     void restoreOplogEntriesFetched(int64_t count);
     void restoreOplogEntriesApplied(int64_t count);
 
-    template <typename FieldNameProvider>
-    void reportOplogApplicationCountMetrics(const FieldNameProvider* names,
-                                            BSONObjBuilder* bob) const {
-
-        bob->append(names->getForOplogEntriesFetched(), getOplogEntriesFetched());
-        bob->append(names->getForOplogEntriesApplied(), getOplogEntriesApplied());
-        bob->append(names->getForInsertsApplied(), getInsertsApplied());
-        bob->append(names->getForUpdatesApplied(), getUpdatesApplied());
-        bob->append(names->getForDeletesApplied(), getDeletesApplied());
-    }
-
     template <typename TimeUnit>
     void reportDurationsForAllPhases(const TimedPhaseNameMap& names,
                                      ClockSource* clock,
@@ -487,7 +473,6 @@ private:
     const BSONObj _originalCommand;
     const NamespaceString _sourceNs;
     const Role _role;
-    FieldNameProviderPtr _fieldNames;
 
     const Date_t _startTime;
 
@@ -535,7 +520,6 @@ private:
     AtomicWord<int64_t> _indexesBuilt;
 
     UniqueScopedObserver _scopedObserver;
-    ReshardingMetricsFieldNameProvider* _reshardingFieldNames;
     const ReshardingProvenanceEnum _provenance;
 };
 

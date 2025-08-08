@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 
+#include "mongo/db/s/resharding/resharding_metrics_field_names.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 #include <array>
@@ -147,8 +148,6 @@ ReshardingCumulativeMetrics::ReshardingCumulativeMetrics()
 
 ReshardingCumulativeMetrics::ReshardingCumulativeMetrics(const std::string& rootName)
     : _rootSectionName{rootName},
-      _fieldNames{std::make_unique<ReshardingCumulativeMetricsFieldNameProvider>()},
-
       _instanceMetricsForAllRoles(ReshardingMetricsCommon::kRoleCount),
       _shouldReportMetrics{false} {}
 
@@ -201,45 +200,41 @@ size_t ReshardingCumulativeMetrics::getObservedMetricsCount(Role role) const {
 }
 
 void ReshardingCumulativeMetrics::reportActive(BSONObjBuilder* bob) const {
-    bob->append(_fieldNames->getForDocumentsProcessed(), _documentsProcessed.load());
-    bob->append(_fieldNames->getForBytesWritten(), _bytesWritten.load());
-    bob->append(_fieldNames->getForCountWritesToStashCollections(),
-                _writesToStashedCollections.load());
-    bob->append(_fieldNames->getForCountWritesDuringCriticalSection(),
-                _writesDuringCriticalSection.load());
-    bob->append(_fieldNames->getForCountReadsDuringCriticalSection(),
-                _readsDuringCriticalSection.load());
-    bob->append(_fieldNames->getForOplogEntriesFetched(), getOplogEntriesFetched());
-    bob->append(_fieldNames->getForOplogEntriesApplied(), getOplogEntriesApplied());
-    bob->append(_fieldNames->getForInsertsApplied(), getInsertsApplied());
-    bob->append(_fieldNames->getForUpdatesApplied(), getUpdatesApplied());
-    bob->append(_fieldNames->getForDeletesApplied(), getDeletesApplied());
+    using namespace resharding_metrics::field_names;
+    bob->append(kDocumentsCopied, _documentsProcessed.load());
+    bob->append(kBytesCopied, _bytesWritten.load());
+    bob->append(kCountWritesToStashCollections, _writesToStashedCollections.load());
+    bob->append(kCountWritesDuringCriticalSection, _writesDuringCriticalSection.load());
+    bob->append(kCountReadsDuringCriticalSection, _readsDuringCriticalSection.load());
+    bob->append(kOplogEntriesFetched, getOplogEntriesFetched());
+    bob->append(kOplogEntriesApplied, getOplogEntriesApplied());
+    bob->append(kInsertsApplied, getInsertsApplied());
+    bob->append(kUpdatesApplied, getUpdatesApplied());
+    bob->append(kDeletesApplied, getDeletesApplied());
 }
 
 void ReshardingCumulativeMetrics::reportLatencies(BSONObjBuilder* bob) const {
-    bob->append(_fieldNames->getForCollectionCloningTotalRemoteBatchRetrievalTimeMillis(),
+    using namespace resharding_metrics::field_names;
+    bob->append(kCollectionCloningTotalRemoteBatchRetrievalTimeMillis,
                 _totalBatchRetrievedDuringCloneMillis.load());
-    bob->append(_fieldNames->getForCollectionCloningTotalRemoteBatchesRetrieved(),
+    bob->append(kCollectionCloningTotalRemoteBatchesRetrieved,
                 _totalBatchRetrievedDuringClone.load());
-    bob->append(_fieldNames->getForCollectionCloningTotalLocalInsertTimeMillis(),
+    bob->append(kCollectionCloningTotalLocalInsertTimeMillis,
                 _collectionCloningTotalLocalInsertTimeMillis.load());
-    bob->append(_fieldNames->getForCollectionCloningTotalLocalInserts(),
+    bob->append(kCollectionCloningTotalLocalInserts,
                 _collectionCloningTotalLocalBatchInserts.load());
-    bob->append(_fieldNames->getForOplogFetchingTotalRemoteBatchRetrievalTimeMillis(),
+    bob->append(kOplogFetchingTotalRemoteBatchRetrievalTimeMillis,
                 getOplogFetchingTotalRemoteBatchesRetrievalTimeMillis());
-    bob->append(_fieldNames->getForOplogFetchingTotalRemoteBatchesRetrieved(),
+    bob->append(kOplogFetchingTotalRemoteBatchesRetrieved,
                 getOplogFetchingTotalRemoteBatchesRetrieved());
-    bob->append(_fieldNames->getForOplogFetchingTotalLocalInsertTimeMillis(),
+    bob->append(kOplogFetchingTotalLocalInsertTimeMillis,
                 getOplogFetchingTotalLocalInsertTimeMillis());
-    bob->append(_fieldNames->getForOplogFetchingTotalLocalInserts(),
-                getOplogFetchingTotalLocalInserts());
-    bob->append(_fieldNames->getForOplogApplyingTotalLocalBatchRetrievalTimeMillis(),
+    bob->append(kOplogFetchingTotalLocalInserts, getOplogFetchingTotalLocalInserts());
+    bob->append(kOplogApplyingTotalLocalBatchRetrievalTimeMillis,
                 getOplogApplyingTotalBatchesRetrievalTimeMillis());
-    bob->append(_fieldNames->getForOplogApplyingTotalLocalBatchesRetrieved(),
-                getOplogApplyingTotalBatchesRetrieved());
-    bob->append(_fieldNames->getForOplogApplyingTotalLocalBatchApplyTimeMillis(),
-                getOplogBatchAppliedMillis());
-    bob->append(_fieldNames->getForOplogApplyingTotalLocalBatchesApplied(), getOplogBatchApplied());
+    bob->append(kOplogApplyingTotalLocalBatchesRetrieved, getOplogApplyingTotalBatchesRetrieved());
+    bob->append(kOplogApplyingTotalLocalBatchApplyTimeMillis, getOplogBatchAppliedMillis());
+    bob->append(kOplogApplyingTotalLocalBatchesApplied, getOplogBatchApplied());
 }
 
 void ReshardingCumulativeMetrics::reportCurrentInSteps(BSONObjBuilder* bob) const {
@@ -247,23 +242,24 @@ void ReshardingCumulativeMetrics::reportCurrentInSteps(BSONObjBuilder* bob) cons
 }
 
 void ReshardingCumulativeMetrics::reportForServerStatus(BSONObjBuilder* bob) const {
+    using namespace resharding_metrics::field_names;
+
     if (!_shouldReportMetrics.load()) {
         return;
     }
 
     BSONObjBuilder root(bob->subobjStart(_rootSectionName));
-    root.append(_fieldNames->getForCountStarted(), _countStarted.load());
-    root.append(_fieldNames->getForCountSucceeded(), _countSucceeded.load());
-    root.append(_fieldNames->getForCountFailed(), _countFailed.load());
-    root.append(_fieldNames->getForCountCanceled(), _countCancelled.load());
-    root.append(_fieldNames->getForLastOpEndingChunkImbalance(),
-                _lastOpEndingChunkImbalance.load());
+    root.append(kCountStarted, _countStarted.load());
+    root.append(kCountSucceeded, _countSucceeded.load());
+    root.append(kCountFailed, _countFailed.load());
+    root.append(kCountCanceled, _countCancelled.load());
+    root.append(kLastOpEndingChunkImbalance, _lastOpEndingChunkImbalance.load());
 
     if (_rootSectionName == kResharding) {
-        root.append(_fieldNames->getForCountSameKeyStarted(), _countSameKeyStarted.load());
-        root.append(_fieldNames->getForCountSameKeySucceeded(), _countSameKeySucceeded.load());
-        root.append(_fieldNames->getForCountSameKeyFailed(), _countSameKeyFailed.load());
-        root.append(_fieldNames->getForCountSameKeyCanceled(), _countSameKeyCancelled.load());
+        root.append(kCountSameKeyStarted, _countSameKeyStarted.load());
+        root.append(kCountSameKeySucceeded, _countSameKeySucceeded.load());
+        root.append(kCountSameKeyFailed, _countSameKeyFailed.load());
+        root.append(kCountSameKeyCanceled, _countSameKeyCancelled.load());
     }
 
     {
@@ -285,13 +281,12 @@ void ReshardingCumulativeMetrics::reportForServerStatus(BSONObjBuilder* bob) con
 }
 
 void ReshardingCumulativeMetrics::reportOldestActive(BSONObjBuilder* bob) const {
-    bob->append(
-        _fieldNames->getForCoordinatorAllShardsHighestRemainingOperationTimeEstimatedMillis(),
-        getOldestOperationHighEstimateRemainingTimeMillis(Role::kCoordinator));
-    bob->append(
-        _fieldNames->getForCoordinatorAllShardsLowestRemainingOperationTimeEstimatedMillis(),
-        getOldestOperationLowEstimateRemainingTimeMillis(Role::kCoordinator));
-    bob->append(_fieldNames->getForRecipientRemainingOperationTimeEstimatedMillis(),
+    using namespace resharding_metrics::field_names;
+    bob->append(kCoordinatorAllShardsHighestRemainingOperationTimeEstimatedMillis,
+                getOldestOperationHighEstimateRemainingTimeMillis(Role::kCoordinator));
+    bob->append(kCoordinatorAllShardsLowestRemainingOperationTimeEstimatedMillis,
+                getOldestOperationLowEstimateRemainingTimeMillis(Role::kCoordinator));
+    bob->append(kRecipientRemainingOperationTimeEstimatedMillis,
                 getOldestOperationHighEstimateRemainingTimeMillis(Role::kRecipient));
 }
 
