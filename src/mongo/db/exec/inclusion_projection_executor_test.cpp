@@ -831,7 +831,6 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchRootDocumentId]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
@@ -858,7 +857,6 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchRootDocumentId]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
@@ -881,9 +879,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
                                                             "k: {$meta: 'sortKey'}, "
                                                             "l: {$meta: 'searchScoreDetails'}, "
                                                             "m: {$meta: 'vectorSearchScore'}, "
-                                                            "n: {$meta: 'score'}, "
-                                                            "o: {$meta: 'searchRootDocumentId'}}"));
-
+                                                            "n: {$meta: 'score'}}"));
 
     DepsTracker deps;
     inclusion->addDependencies(&deps);
@@ -898,7 +894,6 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
-    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchRootDocumentId]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
@@ -920,9 +915,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMeta
                                                             "k: {$meta: 'sortKey'}, "
                                                             "l: {$meta: 'searchScoreDetails'}, "
                                                             "m: {$meta: 'vectorSearchScore'}, "
-                                                            "n: {$meta: 'score'}, "
-                                                            "o: {$meta: 'searchRootDocumentId'}}"));
-
+                                                            "n: {$meta: 'score'}}"));
 
     MutableDocument inputDocBuilder(Document{{"a", 1}});
     inputDocBuilder.metadata().setTextScore(0.0);

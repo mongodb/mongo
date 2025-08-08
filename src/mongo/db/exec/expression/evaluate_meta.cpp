@@ -76,9 +76,6 @@ Value evaluate(const ExpressionMeta& expr, const Document& root, Variables* vari
         case DocumentMetadataFields::MetaType::kSearchScoreDetails:
             return metadata.hasSearchScoreDetails() ? Value(metadata.getSearchScoreDetails())
                                                     : Value();
-        case DocumentMetadataFields::MetaType::kSearchRootDocumentId:
-            return metadata.hasSearchRootDocumentId() ? Value(metadata.getSearchRootDocumentId())
-                                                      : Value();
         case DocumentMetadataFields::MetaType::kSearchSequenceToken:
             return metadata.hasSearchSequenceToken() ? Value(metadata.getSearchSequenceToken())
                                                      : Value();

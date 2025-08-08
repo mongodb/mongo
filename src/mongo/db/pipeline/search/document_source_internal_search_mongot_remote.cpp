@@ -236,11 +236,6 @@ DepsTracker::State DocumentSourceInternalSearchMongotRemote::getDependencies(
     if (hasScoreDetails()) {
         deps->setMetadataAvailable(DocumentMetadataFields::kSearchScoreDetails);
     }
-
-    if (hasSearchRootDocumentId()) {
-        deps->setMetadataAvailable(DocumentMetadataFields::kSearchRootDocumentId);
-    }
-
     return DepsTracker::State::NOT_SUPPORTED;
 }
 

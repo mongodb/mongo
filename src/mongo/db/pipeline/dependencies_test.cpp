@@ -124,7 +124,6 @@ TEST(DependenciesNeedsMetadataTest, OnlyChosenMetadataFieldsShouldThrowIfUnavail
         DocumentMetadataFields::MetaType::kGeoNearPoint,
         DocumentMetadataFields::MetaType::kScore,
         DocumentMetadataFields::MetaType::kScoreDetails,
-        DocumentMetadataFields::MetaType::kSearchRootDocumentId,
     };
 
     DepsTracker deps(DepsTracker::kNoMetadata);

@@ -62,7 +62,6 @@ static const std::set<DocumentMetadataFields::MetaType> kMetadataFieldsToBeStric
     DocumentMetadataFields::MetaType::kGeoNearPoint,
     DocumentMetadataFields::MetaType::kScore,
     DocumentMetadataFields::MetaType::kScoreDetails,
-    DocumentMetadataFields::MetaType::kSearchRootDocumentId,
 };
 }  // namespace
 

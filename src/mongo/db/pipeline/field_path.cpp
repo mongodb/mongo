@@ -57,7 +57,6 @@ const StringDataSet kAllowedDollarPrefixedFields = {
     // This is necessary for $search queries with a specified sort.
     "$searchSortValues"_sd,
     "$searchScore"_sd,
-    "$searchRootDocumentId"_sd,
 };
 
 }  // namespace

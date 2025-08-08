@@ -2031,7 +2031,6 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* 
         APIParameters::get(expCtx->getOperationContext()).getAPIStrict().value_or(false);
     static const std::set<MetaType> kUnstableMetaFields = {MetaType::kSearchScore,
                                                            MetaType::kSearchScoreDetails,
-                                                           MetaType::kSearchRootDocumentId,
                                                            MetaType::kIndexKey,
                                                            MetaType::kTextScore,
                                                            MetaType::kSearchHighlights,
