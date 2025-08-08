@@ -643,14 +643,56 @@ private:
 };
 
 /**
- * Appends a pre-sorted range of data to a given file and hands back an Iterator over that file
- * range.
+ * Appends a pre-sorted range of data to a given storage and hands back an Iterator over that
+ * storage range.
  */
 template <typename Key, typename Value>
-class SortedFileWriter {
-    SortedFileWriter(const SortedFileWriter&) = delete;
-    SortedFileWriter& operator=(const SortedFileWriter&) = delete;
+class SortedStorageWriter {
+    SortedStorageWriter(const SortedStorageWriter&) = delete;
+    SortedStorageWriter& operator=(const SortedStorageWriter&) = delete;
 
+public:
+    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef std::pair<typename Key::SorterDeserializeSettings,
+                      typename Value::SorterDeserializeSettings>
+        Settings;
+
+    explicit SortedStorageWriter(const SortOptions& opts, const Settings& settings);
+    virtual ~SortedStorageWriter() = default;
+
+    virtual void addAlreadySorted(const Key&, const Value&) = 0;
+
+    /**
+     * Writes any data remaining in the buffer to disk and then closes the storage to which data was
+     * written.
+     *
+     * No more data can be added via addAlreadySorted() after calling done().
+     */
+    virtual std::shared_ptr<Iterator> done() = 0;
+    virtual std::unique_ptr<Iterator> doneUnique() = 0;
+
+    /**
+     * The SortedStorageWriter organizes data into chunks, with a chunk getting written to the
+     * output storage when it exceeds a maximum chunks size. A SortedStorageWriter client can
+     * produce a short chunk by manually calling this function.
+     *
+     * If no new data has been added since the last chunk was written, this function is a no-op.
+     */
+    virtual void writeChunk() = 0;
+
+protected:
+    const Settings _settings;
+    BufBuilder _buffer;
+
+    // Keeps track of the hash of all data objects spilled to disk. Passed to the FileIterator
+    // to ensure data has not been corrupted after reading from disk.
+    SorterChecksumCalculator _checksumCalculator;
+
+    SortOptions _opts;
+};
+
+template <typename Key, typename Value>
+class SortedFileWriter : public SortedStorageWriter<Key, Value> {
 public:
     typedef SortIteratorInterface<Key, Value> Iterator;
     typedef std::pair<typename Key::SorterDeserializeSettings,
@@ -661,39 +703,20 @@ public:
                               std::shared_ptr<SorterBase::File> file,
                               const Settings& settings = Settings());
 
-    void addAlreadySorted(const Key&, const Value&);
+    ~SortedFileWriter() override = default;
 
-    /**
-     * Writes any data remaining in the buffer to disk and then closes the file to which data was
-     * written.
-     *
-     * No more data can be added via addAlreadySorted() after calling done().
-     */
-    std::shared_ptr<Iterator> done();
-    std::unique_ptr<Iterator> doneUnique();
+    void addAlreadySorted(const Key&, const Value&) override;
 
-    /**
-     * The SortedFileWriter organizes data into chunks, with a chunk getting written to the output
-     * file when it exceeds a maximum chunks size. A SortedFilerWriter client can produce a short
-     * chunk by manually calling this function.
-     *
-     * If no new data has been added since the last chunk was written, this function is a no-op.
-     */
-    void writeChunk();
+    std::shared_ptr<Iterator> done() override;
+    std::unique_ptr<Iterator> doneUnique() override;
+
+    void writeChunk() override;
 
 private:
-    const Settings _settings;
     std::shared_ptr<SorterBase::File> _file;
-    BufBuilder _buffer;
-
-    // Keeps track of the hash of all data objects spilled to disk. Passed to the FileIterator
-    // to ensure data has not been corrupted after reading from disk.
-    SorterChecksumCalculator _checksumCalculator;
 
     // Tracks where in the file we started writing the sorted data range so that the information can
     // be given to the Iterator in done().
     std::streamoff _fileStartOffset;
-
-    SortOptions _opts;
 };
 }  // namespace mongo

@@ -1546,18 +1546,12 @@ inline void SorterBase::File::_ensureOpenForWriting() {
 }
 
 //
-// SortedFileWriter
+// SortedStorageWriter
 //
-
 template <typename Key, typename Value>
-SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
-                                               std::shared_ptr<SorterBase::File> file,
-                                               const Settings& settings)
-    : _settings(settings),
-      _file(std::move(file)),
-      _checksumCalculator(opts.checksumVersion),
-      _fileStartOffset(_file->currentOffset()),
-      _opts(opts) {
+SortedStorageWriter<Key, Value>::SortedStorageWriter(const SortOptions& opts,
+                                                     const Settings& settings)
+    : _settings(settings), _checksumCalculator(opts.checksumVersion), _opts(opts) {
     // This should be checked by consumers, but if we get here don't allow writes.
     uassert(16946,
             "Attempting to use external sort from mongos. This is not allowed.",
@@ -1568,35 +1562,47 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
             !opts.tempDir.empty());
 }
 
+//
+// SortedFileWriter
+//
+
+template <typename Key, typename Value>
+SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
+                                               std::shared_ptr<SorterBase::File> file,
+                                               const Settings& settings)
+    : SortedStorageWriter<Key, Value>(opts, settings),
+      _file(std::move(file)),
+      _fileStartOffset(_file->currentOffset()) {}
+
 template <typename Key, typename Value>
 void SortedFileWriter<Key, Value>::addAlreadySorted(const Key& key, const Value& val) {
     // Add serialized key and value to the buffer.
-    key.serializeForSorter(_buffer);
-    val.serializeForSorter(_buffer);
+    key.serializeForSorter(this->_buffer);
+    val.serializeForSorter(this->_buffer);
 
-    if (_buffer.len() > static_cast<int>(sorter::kSortedFileBufferSize))
+    if (this->_buffer.len() > static_cast<int>(sorter::kSortedFileBufferSize))
         writeChunk();
 }
 
 template <typename Key, typename Value>
 void SortedFileWriter<Key, Value>::writeChunk() {
-    int32_t size = _buffer.len();
-    char* outBuffer = _buffer.buf();
+    int32_t size = this->_buffer.len();
+    char* outBuffer = this->_buffer.buf();
 
     if (size == 0)
         return;
 
-    _checksumCalculator.addData(outBuffer, size);
+    this->_checksumCalculator.addData(outBuffer, size);
 
-    if (_opts.sorterFileStats) {
-        _opts.sorterFileStats->addSpilledDataSizeUncompressed(size);
+    if (this->_opts.sorterFileStats) {
+        this->_opts.sorterFileStats->addSpilledDataSizeUncompressed(size);
     }
 
     std::string compressed;
     snappy::Compress(outBuffer, size, &compressed);
     invariant(compressed.size() <= size_t(std::numeric_limits<int32_t>::max()));
 
-    const bool shouldCompress = compressed.size() < (size_t(_buffer.len()) / 10 * 9);
+    const bool shouldCompress = compressed.size() < (size_t(this->_buffer.len()) / 10 * 9);
     if (shouldCompress) {
         size = compressed.size();
         outBuffer = const_cast<char*>(compressed.data());
@@ -1610,7 +1616,7 @@ void SortedFileWriter<Key, Value>::writeChunk() {
         Status status = encryptionHooks->protectTmpData(
             ConstDataRange(reinterpret_cast<const uint8_t*>(outBuffer), size),
             &outRange,
-            _opts.dbName);
+            this->_opts.dbName);
         uassert(28842,
                 str::stream() << "Failed to compress data: " << status.toString(),
                 status.isOK());
@@ -1626,9 +1632,9 @@ void SortedFileWriter<Key, Value>::writeChunk() {
     // will be a read checksum mismatch in the worst case, which callers must recover from.
     _file->write(reinterpret_cast<const char*>(&signedSize), sizeof(signedSize));
     _file->write(outBuffer, size);
-    sortCounters.incrementSortCountersPerSpilling(1 /* sortSpills */, sizeof(signedSize) + size);
+    sortCounters.incrementSortCountersPerSpilling(/*sortSpills=*/1, sizeof(signedSize) + size);
 
-    _buffer.reset();
+    this->_buffer.reset();
 }
 
 template <typename Key, typename Value>
@@ -1638,10 +1644,10 @@ std::shared_ptr<SortIteratorInterface<Key, Value>> SortedFileWriter<Key, Value>:
     return std::make_shared<sorter::FileIterator<Key, Value>>(_file,
                                                               _fileStartOffset,
                                                               _file->currentOffset(),
-                                                              _settings,
-                                                              _opts.dbName,
-                                                              _checksumCalculator.checksum(),
-                                                              _checksumCalculator.version());
+                                                              this->_settings,
+                                                              this->_opts.dbName,
+                                                              this->_checksumCalculator.checksum(),
+                                                              this->_checksumCalculator.version());
 }
 
 template <typename Key, typename Value>
@@ -1651,10 +1657,10 @@ std::unique_ptr<SortIteratorInterface<Key, Value>> SortedFileWriter<Key, Value>:
     return std::make_unique<sorter::FileIterator<Key, Value>>(_file,
                                                               _fileStartOffset,
                                                               _file->currentOffset(),
-                                                              _settings,
-                                                              _opts.dbName,
-                                                              _checksumCalculator.checksum(),
-                                                              _checksumCalculator.version());
+                                                              this->_settings,
+                                                              this->_opts.dbName,
+                                                              this->_checksumCalculator.checksum(),
+                                                              this->_checksumCalculator.version());
 }
 
 //
