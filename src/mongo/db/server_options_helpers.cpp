@@ -470,11 +470,12 @@ Status storeBaseOptions(const moe::Environment& params) {
         }
     }
 
-    if (params.count("extensions")) {
+    if (params.count("loadExtensions")) {
 #ifdef __linux__
         // Save off configured extensions, but don't do any validation at this point - that will be
         // done later on during startup when we attempt to load them.
-        for (const std::string& extension : params["extensions"].as<std::vector<std::string>>()) {
+        for (const std::string& extension :
+             params["loadExtensions"].as<std::vector<std::string>>()) {
             std::vector<std::string> intermediates;
             str::splitStringDelim(extension, &intermediates, ',');
             std::copy(intermediates.begin(),
@@ -483,7 +484,7 @@ Status storeBaseOptions(const moe::Environment& params) {
         }
 #else
         return Status(ErrorCodes::BadValue,
-                      "The --extensions parameter is only supported on Linux");
+                      "The --loadExtensions parameter is only supported on Linux");
 #endif
     }
 

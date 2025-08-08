@@ -180,7 +180,7 @@ def _validate_config(parser: argparse.ArgumentParser):
             parser.error("--shellTlsCertificateKeyFile requires --shellTls")
 
     if not sys.platform.startswith("linux") and _config.EXTENSIONS:
-        parser.error("--extensions is only supported on Linux")
+        parser.error("--loadExtensions is only supported on Linux")
         
     # Ranges through param specs and checks that they are valid parameter declarations.
     for param_type in config_fuzzer_params:

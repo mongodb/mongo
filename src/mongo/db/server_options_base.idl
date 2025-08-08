@@ -148,7 +148,7 @@ configs:
         arg_vartype: Switch
         hidden: true
 
-    extensions:
+    loadExtensions:
         description: "Specify paths to extensions to load"
         arg_vartype: StringVector
         duplicate_behavior: append

@@ -2077,7 +2077,7 @@ class RunPlugin(PluginInterface):
         )
 
         mongodb_server_options.add_argument(
-            "--extensions",
+            "--loadExtensions",
             dest="extensions",
             metavar="EXTENSION1,EXTENSION2",
             help="Comma separated list of extensions to load into the server upon startup.",
