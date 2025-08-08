@@ -707,25 +707,6 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
-  # TODO(SERVER-108818): remove this temporary suite and all its usages.
-  - <<: *task_template
-    name: jsCore_ese_primary_driven_index_builds
-    tags:
-      [
-        "assigned_to_jira_team_server_execution",
-        "release_critical",
-        "incompatible_community",
-        "incompatible_mac",
-        "primary_driven_index_builds",
-        "jscore",
-        "encrypt",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-        vars:
-          suite: core_ese_primary_driven_index_builds
-
   - <<: *task_template
     name: audit
     tags:
