@@ -123,13 +123,13 @@ void deleteRecipientResumeData(OperationContext* opCtx, const UUID& reshardingUU
 /**
  * Returns the largest _id value in the collection.
  */
-Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection);
+Value findHighestInsertedId(OperationContext* opCtx, const CollectionAcquisition& collection);
 
 /**
  * Returns the full document of the largest _id value in the collection.
  */
 boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
-                                                       const CollectionPtr& collection);
+                                                       const CollectionAcquisition& collection);
 
 /**
  * Atomically inserts a batch of documents in a single multi-document transaction, and updates

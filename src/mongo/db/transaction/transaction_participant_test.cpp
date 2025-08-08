@@ -6809,6 +6809,16 @@ private:
     OperationContext* _opCtx;
 };
 
+boost::optional<CollectionAcquisition> acquireUserColl(OperationContext* opCtx) {
+    return boost::make_optional<CollectionAcquisition>(acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(kNss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IX));
+}
+
 TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
     // This test simulates:
     // 1) Preparing a transaction with multiple logical sessions as a secondary.
@@ -6846,8 +6856,7 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
     userTxnParticipant.unstashTransactionResources(opCtx, "crud ops");
 
     // Hold the collection lock/datastructure such that it can be released prior to rollback.
-    boost::optional<AutoGetCollection> userColl;
-    userColl.emplace(opCtx, kNss, LockMode::MODE_IX);
+    auto userColl = acquireUserColl(opCtx);
 
     // We split our user session into 2 split sessions.
     const std::vector<uint32_t> requesterIds{1, 3};
@@ -6857,20 +6866,20 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
         opCtx->getLogicalSessionId().get(), opCtx->getTxnNumber().get(), requesterIds);
     // Insert an `_id: 1` document.
     callUnderSplitSession(splitSessions[0].session, [nullOpDbg](OperationContext* opCtx) {
-        AutoGetCollection userColl(opCtx, kNss, LockMode::MODE_IX);
+        auto userColl = acquireUserColl(opCtx);
         ASSERT_OK(
             collection_internal::insertDocument(opCtx,
-                                                userColl.getCollection(),
+                                                userColl->getCollectionPtr(),
                                                 InsertStatement(BSON("_id" << 1 << "value" << 1)),
                                                 nullOpDbg));
     });
 
     // Insert an `_id: 2` document.
     callUnderSplitSession(splitSessions[1].session, [nullOpDbg](OperationContext* opCtx) {
-        AutoGetCollection userColl(opCtx, kNss, LockMode::MODE_IX);
+        auto userColl = acquireUserColl(opCtx);
         ASSERT_OK(
             collection_internal::insertDocument(opCtx,
-                                                userColl.getCollection(),
+                                                userColl->getCollectionPtr(),
                                                 InsertStatement(BSON("_id" << 2 << "value" << 1)),
                                                 nullOpDbg));
     });
@@ -6924,11 +6933,11 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
     //    open.
     {
         OneOffRead oor(opCtx, Timestamp());
-        BSONObj userWrite = Helpers::findOneForTesting(
-            opCtx, userColl->getCollection(), BSON("_id" << 1), !invariantOnError);
+        BSONObj userWrite =
+            Helpers::findOneForTesting(opCtx, *userColl, BSON("_id" << 1), !invariantOnError);
         ASSERT(userWrite.isEmpty());
-        userWrite = Helpers::findOneForTesting(
-            opCtx, userColl->getCollection(), BSON("_id" << 2), !invariantOnError);
+        userWrite =
+            Helpers::findOneForTesting(opCtx, *userColl, BSON("_id" << 2), !invariantOnError);
         ASSERT(userWrite.isEmpty());
     }
 
@@ -6936,7 +6945,7 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
         WriteUnitOfWork wuow(opCtx);
         ASSERT_DOES_NOT_THROW(auto _ = collection_internal::insertDocument(
                                   opCtx,
-                                  userColl->getCollection(),
+                                  userColl->getCollectionPtr(),
                                   InsertStatement(BSON("_id" << 1 << "value" << 1)),
                                   nullOpDbg));
         wuow.commit();
@@ -6954,13 +6963,18 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
             });
     }
 
-    AutoGetCollection configTransactions(
-        opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
+    auto configTransactions = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
     {
         OneOffRead oor(opCtx, Timestamp());
         BSONObj userTxnObj =
             Helpers::findOneForTesting(opCtx,
-                                       configTransactions.getCollection(),
+                                       configTransactions,
                                        BSON("_id.id" << opCtx->getLogicalSessionId()->getId()),
                                        !invariantOnError);
         ASSERT(!userTxnObj.isEmpty());
@@ -6973,10 +6987,8 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
     // "prepared" state.
     for (const LogicalSessionId& splitLSID : splitLSIDs) {
         OneOffRead oor(opCtx, Timestamp());
-        BSONObj splitTxnObj = Helpers::findOneForTesting(opCtx,
-                                                         configTransactions.getCollection(),
-                                                         BSON("_id.id" << splitLSID.getId()),
-                                                         !invariantOnError);
+        BSONObj splitTxnObj = Helpers::findOneForTesting(
+            opCtx, configTransactions, BSON("_id.id" << splitLSID.getId()), !invariantOnError);
         if (!splitTxnObj.isEmpty()) {
             assertNotInSessionState(splitTxnObj, DurableTxnStateEnum::kPrepared);
         }
@@ -7026,8 +7038,7 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     userTxnParticipant.unstashTransactionResources(opCtx, "crud ops");
 
     // Hold the collection lock/data structure such that it can be released prior to rollback.
-    boost::optional<AutoGetCollection> userColl;
-    userColl.emplace(opCtx, kNss, LockMode::MODE_IX);
+    auto userColl = acquireUserColl(opCtx);
 
     // We split our user session into 2 split sessions.
     const std::vector<uint32_t> requesterIds{1, 3};
@@ -7037,20 +7048,20 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
         opCtx->getLogicalSessionId().get(), opCtx->getTxnNumber().get(), requesterIds);
     // Insert an `_id: 1` document.
     callUnderSplitSession(splitSessions[0].session, [nullOpDbg](OperationContext* opCtx) {
-        AutoGetCollection userColl(opCtx, kNss, LockMode::MODE_IX);
+        auto userColl = acquireUserColl(opCtx);
         ASSERT_OK(
             collection_internal::insertDocument(opCtx,
-                                                userColl.getCollection(),
+                                                userColl->getCollectionPtr(),
                                                 InsertStatement(BSON("_id" << 1 << "value" << 1)),
                                                 nullOpDbg));
     });
 
     // Insert an `_id: 2` document.
     callUnderSplitSession(splitSessions[1].session, [nullOpDbg](OperationContext* opCtx) {
-        AutoGetCollection userColl(opCtx, kNss, LockMode::MODE_IX);
+        auto userColl = acquireUserColl(opCtx);
         ASSERT_OK(
             collection_internal::insertDocument(opCtx,
-                                                userColl.getCollection(),
+                                                userColl->getCollectionPtr(),
                                                 InsertStatement(BSON("_id" << 2 << "value" << 1)),
                                                 nullOpDbg));
     });
@@ -7058,11 +7069,8 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     // Update `2` to increment its `value` to 2. This must be done in the same split session as the
     // insert.
     callUnderSplitSession(splitSessions[1].session, [nullOpDbg](OperationContext* opCtx) {
-        auto userColl = acquireCollection(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kWrite),
-            MODE_IX);
-        Helpers::update(opCtx, userColl, BSON("_id" << 2), BSON("$inc" << BSON("value" << 1)));
+        auto userColl = acquireUserColl(opCtx);
+        Helpers::update(opCtx, *userColl, BSON("_id" << 2), BSON("$inc" << BSON("value" << 1)));
     });
 
     // Mimic the methods to call for a secondary performing a split prepare. Those are called inside
@@ -7114,10 +7122,10 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
         LOGV2(7274401,
               "Pre-rollback values",
               "readTimestamp"_attr = ts,
-              "Doc(_id: 1)"_attr = Helpers::findOneForTesting(
-                  opCtx, userColl->getCollection(), BSON("_id" << 1), !invariantOnError),
+              "Doc(_id: 1)"_attr =
+                  Helpers::findOneForTesting(opCtx, *userColl, BSON("_id" << 1), !invariantOnError),
               "Doc(_id: 2)"_attr = Helpers::findOneForTesting(
-                  opCtx, userColl->getCollection(), BSON("_id" << 2), !invariantOnError));
+                  opCtx, *userColl, BSON("_id" << 2), !invariantOnError));
     }
 
     // Reading at the prepare timestamp should not see anything.
@@ -7127,12 +7135,10 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
             PrepareConflictBehavior::kIgnoreConflicts);
         ASSERT_BSONOBJ_EQ(
             BSONObj::kEmptyObject,
-            Helpers::findOneForTesting(
-                opCtx, userColl->getCollection(), BSON("_id" << 1), !invariantOnError));
+            Helpers::findOneForTesting(opCtx, *userColl, BSON("_id" << 1), !invariantOnError));
         ASSERT_BSONOBJ_EQ(
             BSONObj::kEmptyObject,
-            Helpers::findOneForTesting(
-                opCtx, userColl->getCollection(), BSON("_id" << 2), !invariantOnError));
+            Helpers::findOneForTesting(opCtx, *userColl, BSON("_id" << 2), !invariantOnError));
     }
 
     // Reading at the visible/commit timestamp should see the inserted and updated documents.
@@ -7140,22 +7146,25 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
         OneOffRead oor(opCtx, visibleTs);
         ASSERT_BSONOBJ_EQ(
             BSON("_id" << 1 << "value" << 1),
-            Helpers::findOneForTesting(
-                opCtx, userColl->getCollection(), BSON("_id" << 1), !invariantOnError));
+            Helpers::findOneForTesting(opCtx, *userColl, BSON("_id" << 1), !invariantOnError));
         ASSERT_BSONOBJ_EQ(
             BSON("_id" << 2 << "value" << 2),
-            Helpers::findOneForTesting(
-                opCtx, userColl->getCollection(), BSON("_id" << 2), !invariantOnError));
+            Helpers::findOneForTesting(opCtx, *userColl, BSON("_id" << 2), !invariantOnError));
     }
 
     {
         // We also assert that the user transaction record is in the committed state.
-        AutoGetCollection configTransactions(
-            opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
+        auto configTransactions = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
         // The user config.transactions document must exist and must be in the "committed" state.
         BSONObj userTxnObj =
             Helpers::findOneForTesting(opCtx,
-                                       configTransactions.getCollection(),
+                                       configTransactions,
                                        BSON("_id.id" << opCtx->getLogicalSessionId()->getId()),
                                        !invariantOnError);
         ASSERT(!userTxnObj.isEmpty());
@@ -7167,7 +7176,7 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
         for (std::size_t idx = 0; idx < splitLSIDs.size(); ++idx) {
             BSONObj splitTxnObj =
                 Helpers::findOneForTesting(opCtx,
-                                           configTransactions.getCollection(),
+                                           configTransactions,
                                            BSON("_id.id" << splitLSIDs[idx].getId()),
                                            !invariantOnError);
             if (!splitTxnObj.isEmpty()) {
@@ -7200,16 +7209,16 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     opCtx->setTxnNumber(txnNum);
 
     // Again, display read values for diagnostics.
-    userColl.emplace(opCtx, kNss, LockMode::MODE_IX);
+    userColl = acquireUserColl(opCtx);
     for (const auto& ts : std::vector<Timestamp>{prepTs, visibleTs}) {
         OneOffRead oor(opCtx, ts);
         LOGV2(7274402,
               "Post-rollback values",
               "readTimestamp"_attr = ts,
-              "Doc(_id: 1)"_attr = Helpers::findOneForTesting(
-                  opCtx, userColl->getCollection(), BSON("_id" << 1), !invariantOnError),
+              "Doc(_id: 1)"_attr =
+                  Helpers::findOneForTesting(opCtx, *userColl, BSON("_id" << 1), !invariantOnError),
               "Doc(_id: 2)"_attr = Helpers::findOneForTesting(
-                  opCtx, userColl->getCollection(), BSON("_id" << 2), !invariantOnError));
+                  opCtx, *userColl, BSON("_id" << 2), !invariantOnError));
     }
 
     // Now when we read at the commit/visible timestamp, the documents must not exist.
@@ -7217,22 +7226,25 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
         OneOffRead oor(opCtx, visibleTs);
         ASSERT_BSONOBJ_EQ(
             BSONObj::kEmptyObject,
-            Helpers::findOneForTesting(
-                opCtx, userColl->getCollection(), BSON("_id" << 1), !invariantOnError));
+            Helpers::findOneForTesting(opCtx, *userColl, BSON("_id" << 1), !invariantOnError));
         ASSERT_BSONOBJ_EQ(
             BSONObj::kEmptyObject,
-            Helpers::findOneForTesting(
-                opCtx, userColl->getCollection(), BSON("_id" << 2), !invariantOnError));
+            Helpers::findOneForTesting(opCtx, *userColl, BSON("_id" << 2), !invariantOnError));
     }
 
     // We also assert that the user transaction record is in the prepared state. The split sessions
     // are not.
-    AutoGetCollection configTransactions(
-        opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
+    auto configTransactions = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
     // The user `config.transactions` document must be in the "prepared" state.
     BSONObj userTxnObj =
         Helpers::findOneForTesting(opCtx,
-                                   configTransactions.getCollection(),
+                                   configTransactions,
                                    BSON("_id.id" << opCtx->getLogicalSessionId()->getId()),
                                    !invariantOnError);
     ASSERT(!userTxnObj.isEmpty());
@@ -7243,7 +7255,7 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     // "prepared" state.
     for (std::size_t idx = 0; idx < splitLSIDs.size(); ++idx) {
         BSONObj splitTxnObj = Helpers::findOneForTesting(opCtx,
-                                                         configTransactions.getCollection(),
+                                                         configTransactions,
                                                          BSON("_id.id" << splitLSIDs[idx].getId()),
                                                          !invariantOnError);
         if (!splitTxnObj.isEmpty()) {

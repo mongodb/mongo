@@ -452,14 +452,20 @@ public:
             shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
                 RecoveryUnit::ReadSource::kNoTimestamp);
             shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
-            AutoGetCollection collRaii(_opCtx, nss, LockMode::MODE_X);
+            AutoGetDb autoDb(_opCtx, nss.dbName(), MODE_IX);
+            auto coll1 = acquireCollection(_opCtx,
+                                           CollectionAcquisitionRequest::fromOpCtx(
+                                               _opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                           MODE_X);
             // Only creating new namespaces is supported. We restart the storage engine across all
             // tests. If a test wants to remove data from existing collections, care must be taken
             // to timestamp those deletes appropriately.
-            invariant(!collRaii);
-
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-            auto db = autoColl.ensureDbExists(_opCtx);
+            invariant(!coll1.exists());
+            auto collAcq = acquireCollection(_opCtx,
+                                             CollectionAcquisitionRequest::fromOpCtx(
+                                                 _opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                             MODE_IX);
+            auto db = autoDb.ensureDbExists(_opCtx);
             WriteUnitOfWork wunit(_opCtx);
             if (_opCtx->writesAreReplicated() &&
                 shard_role_details::getRecoveryUnit(_opCtx)->getCommitTimestamp().isNull()) {
@@ -574,8 +580,7 @@ public:
 
     BSONObj queryCollection(NamespaceString nss, const BSONObj& query) {
         BSONObj ret;
-        ASSERT_TRUE(Helpers::findOne(
-            _opCtx, acquireCollForRead(_opCtx, nss).getCollectionPtr(), query, ret))
+        ASSERT_TRUE(Helpers::findOne(_opCtx, acquireCollForRead(_opCtx, nss), query, ret))
             << "Query: " << query;
         return ret;
     }
@@ -595,13 +600,16 @@ public:
     void assertMinValidDocumentAtTimestamp(const NamespaceString& nss,
                                            const Timestamp& ts,
                                            const repl::MinValidDocument& expectedDoc) {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        const CollectionPtr& coll = autoColl.getCollection();
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        const CollectionPtr& collPtr = collAcq.getCollectionPtr();
 
         OneOffRead oor(_opCtx, ts);
 
         auto doc =
-            repl::MinValidDocument::parse(IDLParserContext("MinValidDocument"), findOne(coll));
+            repl::MinValidDocument::parse(IDLParserContext("MinValidDocument"), findOne(collPtr));
         ASSERT_EQ(expectedDoc.getMinValidTimestamp(), doc.getMinValidTimestamp())
             << "minValid timestamps weren't equal at " << ts.toString()
             << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
@@ -632,19 +640,19 @@ public:
         }
     }
 
-    void assertFilteredDocumentAtTimestamp(const CollectionPtr& coll,
+    void assertFilteredDocumentAtTimestamp(const CollectionAcquisition& collAcq,
                                            const BSONObj& query,
                                            const Timestamp& ts,
                                            boost::optional<const BSONObj&> expectedDoc) {
         OneOffRead oor(_opCtx, ts);
         BSONObj doc;
-        bool found = Helpers::findOne(_opCtx, coll, query, doc);
+        bool found = Helpers::findOne(_opCtx, collAcq, query, doc);
         if (!expectedDoc) {
             ASSERT_FALSE(found) << "Should not find any documents in "
-                                << coll->ns().toStringForErrorMsg() << " matching " << query
+                                << collAcq.nss().toStringForErrorMsg() << " matching " << query
                                 << " at ts: " << ts;
         } else {
-            ASSERT(found) << "Should find document in " << coll->ns().toStringForErrorMsg()
+            ASSERT(found) << "Should find document in " << collAcq.nss().toStringForErrorMsg()
                           << " matching " << query << " at ts: " << ts;
             ASSERT_BSONOBJ_EQ(doc, *expectedDoc);
         }
@@ -656,10 +664,7 @@ public:
         OneOffRead oor(_opCtx, ts, true);
         BSONObj ret;
         bool found = Helpers::findOne(
-            _opCtx,
-            acquireCollForRead(_opCtx, NamespaceString::kRsOplogNamespace).getCollectionPtr(),
-            query,
-            ret);
+            _opCtx, acquireCollForRead(_opCtx, NamespaceString::kRsOplogNamespace), query, ret);
         ASSERT_EQ(found, exists) << "Found " << ret << " at " << ts.toBSON();
         ASSERT_EQ(!ret.isEmpty(), exists) << "Found " << ret << " at " << ts.toBSON();
     }
@@ -879,13 +884,13 @@ public:
         return ss.str();
     }
 
-    void assertMultikeyPaths(OperationContext* opCtx,
+    void assertMultikeyPaths(OperationContext* _opCtx,
                              const CollectionPtr& collection,
                              StringData indexName,
                              Timestamp ts,
                              bool shouldBeMultikey,
                              const MultikeyPaths& expectedMultikeyPaths) {
-        MDBCatalog* mdbCatalog = MDBCatalog::get(opCtx);
+        MDBCatalog* mdbCatalog = MDBCatalog::get(_opCtx);
         auto indexMetaData = getIndexMetaData(
             getMetaDataAtTime(mdbCatalog, collection->getCatalogId(), ts), indexName);
         if (!shouldBeMultikey) {
@@ -932,7 +937,10 @@ TEST_F(StorageTimestampTest, SecondaryInsertTimes) {
         NamespaceString::createNamespaceString_forTest("unittests.timestampedUpdates");
     create(nss);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     const std::int32_t docsToInsert = 10;
     const LogicalTime firstInsertTime = _clock->tickClusterTime(docsToInsert);
@@ -945,7 +953,7 @@ TEST_F(StorageTimestampTest, SecondaryInsertTimes) {
                                               << 1LL << "v" << 2 << "op"
                                               << "i"
                                               << "ns" << nss.ns_forTest() << "ui"
-                                              << autoColl.getCollection()->uuid() << "wall"
+                                              << collAcq.getCollectionPtr()->uuid() << "wall"
                                               << Date_t() << "o" << BSON("_id" << idx))
                                     << BSON("ts" << firstInsertTime.addTicks(idx).asTimestamp()
                                                  << "t" << 1LL << "op"
@@ -984,10 +992,13 @@ TEST_F(StorageTimestampTest, SecondaryArrayInsertTimes) {
     BSONObjBuilder oplogCommonBuilder;
 
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
         oplogCommonBuilder << "v" << 2 << "op"
                            << "i"
-                           << "ns" << nss.ns_forTest() << "ui" << autoColl.getCollection()->uuid()
+                           << "ns" << nss.ns_forTest() << "ui" << collAcq.getCollectionPtr()->uuid()
                            << "wall" << Date_t();
     }
     auto oplogCommon = oplogCommonBuilder.done();
@@ -1038,7 +1049,10 @@ TEST_F(StorageTimestampTest, SecondaryDeleteTimes) {
         NamespaceString::createNamespaceString_forTest("unittests.timestampedDeletes");
     create(nss);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     // Insert some documents.
     const std::int32_t docsToInsert = 10;
@@ -1046,13 +1060,13 @@ TEST_F(StorageTimestampTest, SecondaryDeleteTimes) {
     const LogicalTime lastInsertTime = firstInsertTime.addTicks(docsToInsert - 1);
     WriteUnitOfWork wunit(_opCtx);
     for (std::int32_t num = 0; num < docsToInsert; ++num) {
-        insertDocument(autoColl.getCollection(),
+        insertDocument(collAcq.getCollectionPtr(),
                        InsertStatement(BSON("_id" << num << "a" << num),
                                        firstInsertTime.addTicks(num).asTimestamp(),
                                        0LL));
     }
     wunit.commit();
-    ASSERT_EQ(docsToInsert, itCount(autoColl.getCollection()));
+    ASSERT_EQ(docsToInsert, itCount(collAcq.getCollectionPtr()));
 
     // Delete all documents one at a time.
     const LogicalTime startDeleteTime = _clock->tickClusterTime(docsToInsert);
@@ -1062,7 +1076,7 @@ TEST_F(StorageTimestampTest, SecondaryDeleteTimes) {
                                         << "v" << 2 << "op"
                                         << "d"
                                         << "ns" << nss.ns_forTest() << "ui"
-                                        << autoColl.getCollection()->uuid() << "wall" << Date_t()
+                                        << collAcq.getCollectionPtr()->uuid() << "wall" << Date_t()
                                         << "o" << BSON("_id" << num))})
                       .getStatus());
     }
@@ -1071,7 +1085,7 @@ TEST_F(StorageTimestampTest, SecondaryDeleteTimes) {
         // The first loop queries at `lastInsertTime` and should count all documents. Querying
         // at each successive tick counts one less document.
         OneOffRead oor(_opCtx, lastInsertTime.addTicks(num).asTimestamp());
-        ASSERT_EQ(docsToInsert - num, itCount(autoColl.getCollection()));
+        ASSERT_EQ(docsToInsert - num, itCount(collAcq.getCollectionPtr()));
     }
 }
 
@@ -1084,15 +1098,18 @@ TEST_F(StorageTimestampTest, SecondaryUpdateTimes) {
         NamespaceString::createNamespaceString_forTest("unittests.timestampedUpdates");
     create(nss);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     // Insert one document that will go through a series of updates.
     const LogicalTime insertTime = _clock->tickClusterTime(1);
     WriteUnitOfWork wunit(_opCtx);
-    insertDocument(autoColl.getCollection(),
+    insertDocument(collAcq.getCollectionPtr(),
                    InsertStatement(BSON("_id" << 0), insertTime.asTimestamp(), 0LL));
     wunit.commit();
-    ASSERT_EQ(1, itCount(autoColl.getCollection()));
+    ASSERT_EQ(1, itCount(collAcq.getCollectionPtr()));
 
     // Each pair in the vector represents the update to perform at the next tick of the
     // clock. `pair.first` is the update to perform and `pair.second` is the full value of the
@@ -1135,7 +1152,7 @@ TEST_F(StorageTimestampTest, SecondaryUpdateTimes) {
                                         << "v" << 2 << "op"
                                         << "u"
                                         << "ns" << nss.ns_forTest() << "ui"
-                                        << autoColl.getCollection()->uuid() << "wall" << Date_t()
+                                        << collAcq.getCollectionPtr()->uuid() << "wall" << Date_t()
                                         << "o2" << BSON("_id" << 0) << "o" << updates[idx].first)})
                       .getStatus());
     }
@@ -1145,7 +1162,7 @@ TEST_F(StorageTimestampTest, SecondaryUpdateTimes) {
         // the series.
         OneOffRead oor(_opCtx, insertTime.addTicks(idx + 1).asTimestamp());
 
-        auto doc = findOne(autoColl.getCollection());
+        auto doc = findOne(collAcq.getCollectionPtr());
         ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, updates[idx].second))
             << "Doc: " << doc.toString() << " Expected: " << updates[idx].second.toString();
     }
@@ -1160,7 +1177,10 @@ TEST_F(StorageTimestampTest, SecondaryInsertToUpsert) {
         NamespaceString::createNamespaceString_forTest("unittests.insertToUpsert");
     create(nss);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     const LogicalTime insertTime = _clock->tickClusterTime(2);
 
@@ -1172,12 +1192,12 @@ TEST_F(StorageTimestampTest, SecondaryInsertToUpsert) {
         nss.dbName(),
         {BSON("ts" << insertTime.asTimestamp() << "t" << 1LL << "op"
                    << "i"
-                   << "ns" << nss.ns_forTest() << "ui" << autoColl.getCollection()->uuid() << "wall"
-                   << Date_t() << "o" << BSON("_id" << 0 << "field" << 0)),
+                   << "ns" << nss.ns_forTest() << "ui" << collAcq.getCollectionPtr()->uuid()
+                   << "wall" << Date_t() << "o" << BSON("_id" << 0 << "field" << 0)),
          BSON("ts" << insertTime.addTicks(1).asTimestamp() << "t" << 1LL << "op"
                    << "i"
-                   << "ns" << nss.ns_forTest() << "ui" << autoColl.getCollection()->uuid() << "wall"
-                   << Date_t() << "o" << BSON("_id" << 0))}));
+                   << "ns" << nss.ns_forTest() << "ui" << collAcq.getCollectionPtr()->uuid()
+                   << "wall" << Date_t() << "o" << BSON("_id" << 0))}));
 
     ASSERT_EQ(2, result.getIntField("applied"));
     ASSERT(result["results"].Array()[0].Bool());
@@ -1188,7 +1208,7 @@ TEST_F(StorageTimestampTest, SecondaryInsertToUpsert) {
     recoveryUnit->abandonSnapshot();
     recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                          insertTime.asTimestamp());
-    auto doc = findOne(autoColl.getCollection());
+    auto doc = findOne(collAcq.getCollectionPtr());
     ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, BSON("_id" << 0 << "field" << 0)))
         << "Doc: " << doc.toString() << " Expected: {_id: 0, field: 0}";
 
@@ -1197,7 +1217,7 @@ TEST_F(StorageTimestampTest, SecondaryInsertToUpsert) {
     recoveryUnit->abandonSnapshot();
     recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                          insertTime.addTicks(1).asTimestamp());
-    doc = findOne(autoColl.getCollection());
+    doc = findOne(collAcq.getCollectionPtr());
     ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, BSON("_id" << 0)))
         << "Doc: " << doc.toString() << " Expected: {_id: 0}";
 }
@@ -1303,7 +1323,10 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
     {
         create(nss1);
         Lock::GlobalWrite lk{_opCtx};  // avoid global lock upgrade during applyOps.
-        AutoGetCollection autoColl(_opCtx, nss1, LockMode::MODE_IX);
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss1, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
 
         ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
         ASSERT_FALSE(acquireCollForRead(_opCtx, nss2).exists());
@@ -1314,7 +1337,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
             {
                 BSON("ts" << _presentTs << "t" << 1LL << "op"
                           << "i"
-                          << "ns" << nss1.ns_forTest() << "ui" << autoColl.getCollection()->uuid()
+                          << "ns" << nss1.ns_forTest() << "ui" << collAcq.getCollectionPtr()->uuid()
                           << "wall" << Date_t() << "o" << doc1),
                 BSON("ts" << _futureTs << "t" << 1LL << "op"
                           << "c"
@@ -1404,8 +1427,11 @@ TEST_F(StorageTimestampTest, SecondarySetIndexMultikeyOnInsert) {
     create(nss);
     UUID uuid = UUID::gen();
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        uuid = autoColl.getCollection()->uuid();
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        uuid = collAcq.getCollectionPtr()->uuid();
     }
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
@@ -1450,15 +1476,18 @@ TEST_F(StorageTimestampTest, SecondarySetIndexMultikeyOnInsert) {
         workerPool.get());
     ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(oplogApplier.applyOplogBatch(_opCtx, ops)));
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     assertMultikeyPaths(
-        _opCtx, autoColl.getCollection(), indexName, pastTime.asTimestamp(), false, {{}});
+        _opCtx, collAcq.getCollectionPtr(), indexName, pastTime.asTimestamp(), false, {{}});
     assertMultikeyPaths(
-        _opCtx, autoColl.getCollection(), indexName, insertTime0.asTimestamp(), true, {{0}});
+        _opCtx, collAcq.getCollectionPtr(), indexName, insertTime0.asTimestamp(), true, {{0}});
     assertMultikeyPaths(
-        _opCtx, autoColl.getCollection(), indexName, insertTime1.asTimestamp(), true, {{0}});
+        _opCtx, collAcq.getCollectionPtr(), indexName, insertTime1.asTimestamp(), true, {{0}});
     assertMultikeyPaths(
-        _opCtx, autoColl.getCollection(), indexName, insertTime2.asTimestamp(), true, {{0}});
+        _opCtx, collAcq.getCollectionPtr(), indexName, insertTime2.asTimestamp(), true, {{0}});
 }
 
 TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
@@ -1476,8 +1505,11 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
         nss.dbName(),
         BSON("create" << nss.coll() << "capped" << true << "size" << 1 * 1024 * 1024)));
     auto uuid = [&]() {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        return autoColl.getCollection()->uuid();
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        return collAcq.getCollectionPtr()->uuid();
     }();
 
     auto indexName = "a_1";
@@ -1529,11 +1561,11 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
 
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
 
-    const auto coll = acquireCollForRead(_opCtx, nss);
+    const auto collAcq = acquireCollForRead(_opCtx, nss);
     auto wildcardIndexDescriptor =
-        coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
+        collAcq.getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     const IndexCatalogEntry* entry =
-        coll.getCollectionPtr()->getIndexCatalog()->getEntry(wildcardIndexDescriptor);
+        collAcq.getCollectionPtr()->getIndexCatalog()->getEntry(wildcardIndexDescriptor);
     {
         // Verify that, even though op2 was applied first, the multikey state is observed in all
         // WiredTiger transactions that can contain the data written by op1.
@@ -1568,8 +1600,11 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
     create(nss);
     UUID uuid = UUID::gen();
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        uuid = autoColl.getCollection()->uuid();
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        uuid = collAcq.getCollectionPtr()->uuid();
     }
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("$**" << 1) << "v"
@@ -1622,11 +1657,11 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
 
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
 
-    const auto coll = acquireCollForRead(_opCtx, nss);
+    const auto collAcq = acquireCollForRead(_opCtx, nss);
     auto wildcardIndexDescriptor =
-        coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
+        collAcq.getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     const IndexCatalogEntry* entry =
-        coll.getCollectionPtr()->getIndexCatalog()->getEntry(wildcardIndexDescriptor);
+        collAcq.getCollectionPtr()->getIndexCatalog()->getEntry(wildcardIndexDescriptor);
     {
         // Verify that, even though op2 was applied first, the multikey state is observed in all
         // WiredTiger transactions that can contain the data written by op1.
@@ -1665,16 +1700,19 @@ TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsert) {
     const LogicalTime pastTime = _clock->tickClusterTime(1);
     const LogicalTime insertTime = pastTime.addTicks(1);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     BSONObj doc = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
     WriteUnitOfWork wunit(_opCtx);
-    insertDocument(autoColl.getCollection(), InsertStatement(doc));
+    insertDocument(collAcq.getCollectionPtr(), InsertStatement(doc));
     wunit.commit();
 
     assertMultikeyPaths(
-        _opCtx, autoColl.getCollection(), indexName, pastTime.asTimestamp(), false, {{}});
+        _opCtx, collAcq.getCollectionPtr(), indexName, pastTime.asTimestamp(), false, {{}});
     assertMultikeyPaths(
-        _opCtx, autoColl.getCollection(), indexName, insertTime.asTimestamp(), true, {{0}});
+        _opCtx, collAcq.getCollectionPtr(), indexName, insertTime.asTimestamp(), true, {{0}});
 }
 
 TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsertUnreplicated) {
@@ -1692,16 +1730,19 @@ TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsertUnreplicated) {
     const LogicalTime pastTime = _clock->tickClusterTime(1);
     const LogicalTime insertTime = pastTime.addTicks(1);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     BSONObj doc = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
     WriteUnitOfWork wunit(_opCtx);
-    insertDocument(autoColl.getCollection(), InsertStatement(doc));
+    insertDocument(collAcq.getCollectionPtr(), InsertStatement(doc));
     wunit.commit();
 
     assertMultikeyPaths(
-        _opCtx, autoColl.getCollection(), indexName, pastTime.asTimestamp(), true, {{0}});
+        _opCtx, collAcq.getCollectionPtr(), indexName, pastTime.asTimestamp(), true, {{0}});
     assertMultikeyPaths(
-        _opCtx, autoColl.getCollection(), indexName, insertTime.asTimestamp(), true, {{0}});
+        _opCtx, collAcq.getCollectionPtr(), indexName, insertTime.asTimestamp(), true, {{0}});
 }
 
 TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) {
@@ -1759,22 +1800,28 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
     txnParticipant.unstashTransactionResources(_opCtx, "insert");
     {
         // Insert a document that will set the index as multikey.
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        insertDocument(autoColl.getCollection(), InsertStatement(doc));
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        insertDocument(collAcq.getCollectionPtr(), InsertStatement(doc));
     }
 
     txnParticipant.commitUnpreparedTransaction(_opCtx);
     txnParticipant.stashTransactionResources(_opCtx);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-    const auto& coll = autoColl.getCollection();
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    const auto& collPtr = collAcq.getCollectionPtr();
 
     // Make sure the transaction committed and its writes were timestamped correctly.
-    assertDocumentAtTimestamp(coll, presentTs, BSONObj());
-    assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
-    assertDocumentAtTimestamp(coll, multikeyNoopTs, BSONObj());
-    assertDocumentAtTimestamp(coll, commitEntryTs, doc);
-    assertDocumentAtTimestamp(coll, _nullTs, doc);
+    assertDocumentAtTimestamp(collPtr, presentTs, BSONObj());
+    assertDocumentAtTimestamp(collPtr, beforeTxnTs, BSONObj());
+    assertDocumentAtTimestamp(collPtr, multikeyNoopTs, BSONObj());
+    assertDocumentAtTimestamp(collPtr, commitEntryTs, doc);
+    assertDocumentAtTimestamp(collPtr, _nullTs, doc);
 
     // Make sure the multikey write was timestamped correctly. For correctness, the timestamp of
     // the write that sets the multikey flag to true should be less than or equal to the first
@@ -1783,12 +1830,14 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
     // but it is incorrect to assign a timestamp that is too late. In this specific case, we
     // expect the write to be timestamped at the logical clock tick directly preceding the
     // commit time.
-    assertMultikeyPaths(_opCtx, coll, indexName, presentTs, false /* shouldBeMultikey */, {{}});
-    assertMultikeyPaths(_opCtx, coll, indexName, beforeTxnTs, false /* shouldBeMultikey */, {{}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, presentTs, false /* shouldBeMultikey */, {{}});
     assertMultikeyPaths(
-        _opCtx, coll, indexName, multikeyNoopTs, true /* shouldBeMultikey */, {{0}});
-    assertMultikeyPaths(_opCtx, coll, indexName, commitEntryTs, true /* shouldBeMultikey */, {{0}});
-    assertMultikeyPaths(_opCtx, coll, indexName, _nullTs, true /* shouldBeMultikey */, {{0}});
+        _opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {{}});
+    assertMultikeyPaths(
+        _opCtx, collPtr, indexName, multikeyNoopTs, true /* shouldBeMultikey */, {{0}});
+    assertMultikeyPaths(
+        _opCtx, collPtr, indexName, commitEntryTs, true /* shouldBeMultikey */, {{0}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {{0}});
 }
 
 TEST_F(StorageTimestampTest, InitializeMinValid) {
@@ -1896,7 +1945,11 @@ public:
         std::string sysProfileIndexIdent;
         for (auto& tuple : {std::tie(nss, collIdent, indexIdent),
                             std::tie(sysProfile, sysProfileIdent, sysProfileIndexIdent)}) {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+            auto collAcq = acquireCollection(_opCtx,
+                                             CollectionAcquisitionRequest::fromOpCtx(
+                                                 _opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                             MODE_X);
+            ;
 
             // Save the pre-state idents so we can capture the specific idents related to collection
             // creation.
@@ -2151,17 +2204,21 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
 
     std::vector<std::string> origIdents;
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        ;
 
         const LogicalTime insertTimestamp = _clock->tickClusterTime(1);
 
         WriteUnitOfWork wuow(_opCtx);
-        insertDocument(autoColl.getCollection(),
+        insertDocument(collAcq.getCollectionPtr(),
                        InsertStatement(BSON("_id" << 0 << "a" << 1 << "b" << 2 << "c" << 3),
                                        insertTimestamp.asTimestamp(),
                                        _presentTerm));
         wuow.commit();
-        ASSERT_EQ(1, itCount(autoColl.getCollection()));
+        ASSERT_EQ(1, itCount(collAcq.getCollectionPtr()));
 
         // Save the pre-state idents so we can capture the specific ident related to index
         // creation.
@@ -2200,8 +2257,11 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
             .timestamp();
     auto indexBComplete = commitIndexBuildTs;
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_S);
-    RecordId catalogId = autoColl.getCollection()->getCatalogId();
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_S);
+    RecordId catalogId = collAcq.getCollectionPtr()->getCatalogId();
 
     // The idents are created and persisted with the "ready: false" write.
     // There should be two new index idents visible at this time.
@@ -2250,17 +2310,21 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     create(nss);
 
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        ;
 
         const LogicalTime insertTimestamp = _clock->tickClusterTime(1);
 
         WriteUnitOfWork wuow(_opCtx);
-        insertDocument(autoColl.getCollection(),
+        insertDocument(collAcq.getCollectionPtr(),
                        InsertStatement(BSON("_id" << 0 << "a" << 1 << "b" << 2 << "c" << 3),
                                        insertTimestamp.asTimestamp(),
                                        _presentTerm));
         wuow.commit();
-        ASSERT_EQ(1, itCount(autoColl.getCollection()));
+        ASSERT_EQ(1, itCount(collAcq.getCollectionPtr()));
 
         // Ensure we have a committed snapshot to avoid ReadConcernMajorityNotAvailableYet
         // error at the beginning of the the collection scan phase.
@@ -2283,7 +2347,11 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
         ASSERT(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
     }
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    ;
 
     NamespaceString renamedNss = NamespaceString::createNamespaceString_forTest(
         "unittestsRename.timestampMultiIndexBuildsDuringRename");
@@ -2366,7 +2434,11 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
 
     std::vector<std::string> origIdents;
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        ;
 
         auto insertTimestamp1 = _clock->tickClusterTime(1);
         auto insertTimestamp2 = _clock->tickClusterTime(1);
@@ -2374,16 +2446,16 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
         // Insert two documents with the same value for field 'a' so that
         // we will fail to create a unique index.
         WriteUnitOfWork wuow(_opCtx);
-        insertDocument(autoColl.getCollection(),
+        insertDocument(collAcq.getCollectionPtr(),
                        InsertStatement(BSON("_id" << 0 << "a" << 1),
                                        insertTimestamp1.asTimestamp(),
                                        _presentTerm));
-        insertDocument(autoColl.getCollection(),
+        insertDocument(collAcq.getCollectionPtr(),
                        InsertStatement(BSON("_id" << 1 << "a" << 1),
                                        insertTimestamp2.asTimestamp(),
                                        _presentTerm));
         wuow.commit();
-        ASSERT_EQ(2, itCount(autoColl.getCollection()));
+        ASSERT_EQ(2, itCount(collAcq.getCollectionPtr()));
 
         // Save the pre-state idents so we can capture the specific ident related to index
         // creation.
@@ -2426,8 +2498,12 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
 
     // Check index state in catalog at oplog entry times for both startIndexBuild and
     // abortIndexBuild.
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-    RecordId catalogId = autoColl.getCollection()->getCatalogId();
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    ;
+    RecordId catalogId = collAcq.getCollectionPtr()->getCatalogId();
 
     // We expect one new one new index ident during this index build.
     assertRenamedCollectionIdentsAtTimestamp(
@@ -2469,18 +2545,22 @@ TEST_F(StorageTimestampTest, TimestampIndexDropsWildcard) {
         NamespaceString::createNamespaceString_forTest("unittests.timestampIndexDrops");
     create(nss);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-    CollectionWriter coll(_opCtx, autoColl);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    ;
+    CollectionWriter coll(_opCtx, &collAcq);
 
     const LogicalTime insertTimestamp = _clock->tickClusterTime(1);
     {
         WriteUnitOfWork wuow(_opCtx);
-        insertDocument(autoColl.getCollection(),
+        insertDocument(collAcq.getCollectionPtr(),
                        InsertStatement(BSON("_id" << 0 << "a" << 1 << "b" << 2 << "c" << 3),
                                        insertTimestamp.asTimestamp(),
                                        _presentTerm));
         wuow.commit();
-        ASSERT_EQ(1, itCount(autoColl.getCollection()));
+        ASSERT_EQ(1, itCount(collAcq.getCollectionPtr()));
     }
 
 
@@ -2518,7 +2598,7 @@ TEST_F(StorageTimestampTest, TimestampIndexDropsWildcard) {
     dropIndexes(_opCtx, nss, boost::none, "*");
 
     // Assert that each index is dropped individually and with its own timestamp. The order of
-    // dropping and creating are not guaranteed to be the same, but assert all of the created
+    // dropping and creating are not guaranteed to be the same, but Assert all of the created
     // indexes were also dropped.
     size_t nIdents = indexIdents.size();
     for (size_t i = 0; i < nIdents; i++) {
@@ -2541,18 +2621,22 @@ TEST_F(StorageTimestampTest, TimestampIndexDropsListed) {
         NamespaceString::createNamespaceString_forTest("unittests.timestampIndexDrops");
     create(nss);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-    CollectionWriter coll(_opCtx, autoColl);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    ;
+    CollectionWriter coll(_opCtx, &collAcq);
 
     const LogicalTime insertTimestamp = _clock->tickClusterTime(1);
     {
         WriteUnitOfWork wuow(_opCtx);
-        insertDocument(autoColl.getCollection(),
+        insertDocument(collAcq.getCollectionPtr(),
                        InsertStatement(BSON("_id" << 0 << "a" << 1 << "b" << 2 << "c" << 3),
                                        insertTimestamp.asTimestamp(),
                                        _presentTerm));
         wuow.commit();
-        ASSERT_EQ(1, itCount(autoColl.getCollection()));
+        ASSERT_EQ(1, itCount(collAcq.getCollectionPtr()));
     }
 
 
@@ -2590,7 +2674,7 @@ TEST_F(StorageTimestampTest, TimestampIndexDropsListed) {
     dropIndexes(_opCtx, nss, boost::none, std::vector<std::string>{"a_1", "b_1", "c_1"});
 
     // Assert that each index is dropped individually and with its own timestamp. The order of
-    // dropping and creating are not guaranteed to be the same, but assert all of the created
+    // dropping and creating are not guaranteed to be the same, but Assert all of the created
     // indexes were also dropped.
     size_t nIdents = indexIdents.size();
     for (size_t i = 0; i < nIdents; i++) {
@@ -2728,7 +2812,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
     // to the side writes table and must be drained.
     Helpers::upsert(_opCtx, collectionAcquisition, BSON("_id" << 0 << "a" << 1 << "b" << 1));
     {
-        RecordId badRecord = Helpers::findOne(_opCtx, collection.get(), BSON("_id" << 1));
+        RecordId badRecord = Helpers::findOne(_opCtx, collectionAcquisition, BSON("_id" << 1));
         WriteUnitOfWork wuow(_opCtx);
         collection_internal::deleteDocument(_opCtx,
                                             collectionAcquisition.getCollectionPtr(),
@@ -2807,10 +2891,13 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
     {
         // Create the collection and insert a document.
         create(nss);
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        collUUID = autoColl.getCollection()->uuid();
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        collUUID = collAcq.getCollectionPtr()->uuid();
         WriteUnitOfWork wuow(_opCtx);
-        insertDocument(autoColl.getCollection(),
+        insertDocument(collAcq.getCollectionPtr(),
                        InsertStatement(doc, setupStart.asTimestamp(), _presentTerm));
         wuow.commit();
     }
@@ -2818,12 +2905,12 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
 
     {
         // Sanity check everything exists.
-        auto coll = acquireCollForRead(_opCtx, nss);
-        ASSERT(coll.exists());
+        auto collAcq = acquireCollForRead(_opCtx, nss);
+        ASSERT(collAcq.exists());
 
         const auto currentTime = _clock->getTime();
         const auto presentTs = currentTime.clusterTime().asTimestamp();
-        assertDocumentAtTimestamp(coll.getCollectionPtr(), presentTs, doc);
+        assertDocumentAtTimestamp(collAcq.getCollectionPtr(), presentTs, doc);
     }
 
     // Simulate a scenario where the node is a primary, but does not accept writes. This is
@@ -2867,13 +2954,16 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
         auto mdbCatalog = _opCtx->getServiceContext()->getStorageEngine()->getMDBCatalog();
 
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
+            auto collAcq = acquireCollection(_opCtx,
+                                             CollectionAcquisitionRequest::fromOpCtx(
+                                                 _opCtx, nss, AcquisitionPrerequisites::kRead),
+                                             MODE_IS);
             assertIdentsMissingAtTimestamp(
                 mdbCatalog, "", indexIdent, beforeBuildTime.asTimestamp());
             assertIdentsExistAtTimestamp(mdbCatalog, "", indexIdent, startBuildTs);
 
             // The index has not committed yet, so it is not ready.
-            RecordId catalogId = autoColl.getCollection()->getCatalogId();
+            RecordId catalogId = collAcq.getCollectionPtr()->getCatalogId();
             ASSERT_FALSE(
                 getIndexMetaData(getMetaDataAtTime(mdbCatalog, catalogId, startBuildTs), "field_1")
                     .ready);
@@ -2888,8 +2978,11 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
                                                         dataIsConsistent));
 
         // Reacquire read lock to check index metadata.
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
-        RecordId catalogId = autoColl.getCollection()->getCatalogId();
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        RecordId catalogId = collAcq.getCollectionPtr()->getCatalogId();
         ASSERT_TRUE(
             getIndexMetaData(getMetaDataAtTime(mdbCatalog, catalogId, startBuildTs), "field_1")
                 .ready);
@@ -2924,9 +3017,12 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
     const auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     const auto mdbCatalog = storageEngine->getMDBCatalog();
     {
-        Lock::GlobalRead read(_opCtx);
-        AutoGetCollection autoColl(_opCtx, systemViewsNss, LockMode::MODE_IS);
-        RecordId catalogId = autoColl.getCollection()->getCatalogId();
+        auto collAcq =
+            acquireCollection(_opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  _opCtx, systemViewsNss, AcquisitionPrerequisites::kRead),
+                              MODE_IS);
+        RecordId catalogId = collAcq.getCollectionPtr()->getCatalogId();
 
         auto systemViewsMd =
             getMetaDataAtTime(mdbCatalog, catalogId, Timestamp(systemViewsCreateTs.asULL() - 1));
@@ -2938,8 +3034,8 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
         auto nss = systemViewsMd->nss;
         ASSERT_EQ(systemViewsNss, nss);
 
-        assertDocumentAtTimestamp(autoColl.getCollection(), systemViewsCreateTs, BSONObj());
-        assertDocumentAtTimestamp(autoColl.getCollection(),
+        assertDocumentAtTimestamp(collAcq.getCollectionPtr(), systemViewsCreateTs, BSONObj());
+        assertDocumentAtTimestamp(collAcq.getCollectionPtr(),
                                   viewCreateTs,
                                   BSON("_id" << viewNss.ns_forTest() << "viewOn"
                                              << backingCollNss.coll() << "pipeline"
@@ -2956,9 +3052,9 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
 
     RecordId catalogId;
     {
-        auto coll = acquireCollForRead(_opCtx, nss);
-        ASSERT(coll.getCollectionPtr());
-        catalogId = coll.getCollectionPtr()->getCatalogId();
+        auto collAcq = acquireCollForRead(_opCtx, nss);
+        ASSERT(collAcq.getCollectionPtr());
+        catalogId = collAcq.getCollectionPtr()->getCatalogId();
     }
 
     BSONObj result = queryOplog(BSON("op" << "c"
@@ -2998,7 +3094,10 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
     assertNamespaceInIdents(nss, _nullTs, true);
 
     ASSERT_GT(indexCompleteTs, _futureTs);
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
     const auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     const auto mdbCatalog = storageEngine->getMDBCatalog();
     const auto indexIdent = mdbCatalog->getIndexIdent(_opCtx, catalogId, "user_1_db_1");
@@ -3032,15 +3131,18 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
     create(nss);
 
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
 
         WriteUnitOfWork wuow(_opCtx);
         insertDocument(
-            autoColl.getCollection(),
+            collAcq.getCollectionPtr(),
             InsertStatement(BSON("_id" << 0 << "a" << 1 << "b" << 2), Timestamp(), _presentTerm));
         wuow.commit();
-        ASSERT_EQ(1, itCount(autoColl.getCollection()));
-        catalogId = autoColl.getCollection()->getCatalogId();
+        ASSERT_EQ(1, itCount(collAcq.getCollectionPtr()));
+        catalogId = collAcq.getCollectionPtr()->getCatalogId();
     }
 
     DBDirectClient client(_opCtx);
@@ -3058,7 +3160,10 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
         ASSERT(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
     }
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     Timestamp tsBeforeMultikeyWrites = getTopOfOplog();
     {
         const LogicalTime firstInsertTime = _clock->tickClusterTime(2);
@@ -3073,7 +3178,7 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
 
         WriteUnitOfWork wuow(_opCtx);
         ASSERT_OK(collection_internal::insertDocuments(_opCtx,
-                                                       autoColl.getCollection(),
+                                                       collAcq.getCollectionPtr(),
                                                        vectoredInsert.begin(),
                                                        vectoredInsert.end(),
                                                        nullptr,
@@ -3114,9 +3219,12 @@ public:
         UUID ui = UUID::gen();
 
         {
-            AutoGetCollection coll(_opCtx, nss, LockMode::MODE_IX);
-            ASSERT(coll);
-            ui = coll->uuid();
+            auto collAcq = acquireCollection(_opCtx,
+                                             CollectionAcquisitionRequest::fromOpCtx(
+                                                 _opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                             MODE_IX);
+            ASSERT(collAcq.exists());
+            ui = collAcq.uuid();
         }
 
         const auto currentTime = _clock->getTime();
@@ -3137,9 +3245,12 @@ public:
         ocs = mongoDSessionCatalog->checkOutSession(_opCtx);
 
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+            auto collAcq = acquireCollection(_opCtx,
+                                             CollectionAcquisitionRequest::fromOpCtx(
+                                                 _opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                             MODE_IX);
             WriteUnitOfWork wunit(_opCtx);
-            insertDocument(autoColl.getCollection(), InsertStatement(oldObj));
+            insertDocument(collAcq.getCollectionPtr(), InsertStatement(oldObj));
             wunit.commit();
         }
         assertOplogDocumentExistsAtTimestamp(BSON("ts" << insertTs << "op"
@@ -3169,8 +3280,12 @@ protected:
 };
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-    CollectionWriter collection(_opCtx, autoColl);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+
+    CollectionWriter collection(_opCtx, &collAcq);
     const auto criteria = BSON("_id" << 0);
     const auto newObj = BSON("_id" << 0 << "a" << 1 << "b" << 1);
     CollectionUpdateArgs args{oldObj};
@@ -3226,8 +3341,12 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
 
     // Enable in-place mutation for this document
     ASSERT_EQUALS(mmb::Document::kInPlaceEnabled, doc.getCurrentInPlaceMode());
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-    CollectionWriter collection(_opCtx, autoColl);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+
+    CollectionWriter collection(_opCtx, &collAcq);
     const auto criteria = BSON("_id" << 0);
     const auto newObj = BSON("_id" << 0 << "a" << 0);
     CollectionUpdateArgs args{oldObj};
@@ -3247,7 +3366,7 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
         WriteUnitOfWork wuow(_opCtx);
         const auto statusWith =
             collection_internal::updateDocumentWithDamages(_opCtx,
-                                                           *autoColl,
+                                                           collAcq.getCollectionPtr(),
                                                            record->id,
                                                            objSnapshot,
                                                            source,
@@ -3274,8 +3393,12 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
 }
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyDelete) {
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-    CollectionWriter collection(_opCtx, autoColl);
+    auto collAcq = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+
+    CollectionWriter collection(_opCtx, &collAcq);
     const auto bsonObj = BSON("_id" << 0 << "a" << 1);
 
     {
@@ -3286,7 +3409,7 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyDelete) {
         invariant(record);
         WriteUnitOfWork wuow(_opCtx);
         collection_internal::deleteDocument(_opCtx,
-                                            *autoColl,
+                                            collAcq.getCollectionPtr(),
                                             objSnapshot,
                                             1,
                                             record->id,
@@ -3330,9 +3453,12 @@ public:
         create(nss);
         UUID ui = UUID::gen();
         {
-            AutoGetCollection coll(_opCtx, nss, LockMode::MODE_IX);
-            ASSERT(coll);
-            ui = coll->uuid();
+            auto collAcq = acquireCollection(_opCtx,
+                                             CollectionAcquisitionRequest::fromOpCtx(
+                                                 _opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                             MODE_IX);
+            ASSERT(collAcq.exists());
+            ui = collAcq.uuid();
         }
 
         const auto currentTime = _clock->getTime();
@@ -3361,18 +3487,24 @@ public:
                                        TransactionParticipant::TransactionActions::kStart);
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-            insertDocument(autoColl.getCollection(), InsertStatement(doc));
+            auto collAcq = acquireCollection(_opCtx,
+                                             CollectionAcquisitionRequest::fromOpCtx(
+                                                 _opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                             MODE_IX);
+            insertDocument(collAcq.getCollectionPtr(), InsertStatement(doc));
         }
         txnParticipant.stashTransactionResources(_opCtx);
 
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-            const auto& coll = autoColl.getCollection();
-            assertDocumentAtTimestamp(coll, presentTs, BSONObj());
-            assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
-            assertDocumentAtTimestamp(coll, commitEntryTs, BSONObj());
-            assertDocumentAtTimestamp(coll, _nullTs, BSONObj());
+            auto collAcq = acquireCollection(_opCtx,
+                                             CollectionAcquisitionRequest::fromOpCtx(
+                                                 _opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                             MODE_IX);
+            const auto& collPtr = collAcq.getCollectionPtr();
+            assertDocumentAtTimestamp(collPtr, presentTs, BSONObj());
+            assertDocumentAtTimestamp(collPtr, beforeTxnTs, BSONObj());
+            assertDocumentAtTimestamp(collPtr, commitEntryTs, BSONObj());
+            assertDocumentAtTimestamp(collPtr, _nullTs, BSONObj());
 
             const auto commitFilter = BSON("ts" << commitEntryTs);
             assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
@@ -3389,16 +3521,18 @@ public:
     }
 
     BSONObj getSessionTxnInfoAtTimestamp(const Timestamp& ts, bool expected) {
-        AutoGetCollection autoColl(
-            _opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IX);
+        auto collAcq = acquireCollection(_opCtx,
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             _opCtx,
+                                             NamespaceString::kSessionTransactionsTableNamespace,
+                                             AcquisitionPrerequisites::kWrite),
+                                         LockMode::MODE_IX);
         const auto sessionId = *_opCtx->getLogicalSessionId();
         const auto txnNum = *_opCtx->getTxnNumber();
         BSONObj doc;
         OneOffRead oor(_opCtx, ts);
-        bool found = Helpers::findOne(_opCtx,
-                                      autoColl.getCollection(),
-                                      BSON("_id" << sessionId.toBSON() << "txnNum" << txnNum),
-                                      doc);
+        bool found = Helpers::findOne(
+            _opCtx, collAcq, BSON("_id" << sessionId.toBSON() << "txnNum" << txnNum), doc);
         if (expected) {
             ASSERT(found) << "Missing session transaction info at " << ts;
         } else {
@@ -3429,12 +3563,15 @@ TEST_F(MultiDocumentTransactionTest, MultiDocumentTransaction) {
     txnParticipant.stashTransactionResources(_opCtx);
     assertNoStartOpTime();
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        const auto& coll = autoColl.getCollection();
-        assertDocumentAtTimestamp(coll, presentTs, BSONObj());
-        assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
-        assertDocumentAtTimestamp(coll, commitEntryTs, doc);
-        assertDocumentAtTimestamp(coll, _nullTs, doc);
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        const auto& collPtr = collAcq.getCollectionPtr();
+        assertDocumentAtTimestamp(collPtr, presentTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, beforeTxnTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, commitEntryTs, doc);
+        assertDocumentAtTimestamp(collPtr, _nullTs, doc);
 
         const auto commitFilter = BSON("ts" << commitEntryTs);
         assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
@@ -3478,36 +3615,42 @@ TEST_F(MultiDocumentTransactionTest, MultiOplogEntryTransaction) {
     const BSONObj doc2 = BSON("_id" << 2 << "TestValue" << 2);
     const BSONObj doc2Key = BSON("_id" << 2);
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        insertDocument(autoColl.getCollection(), InsertStatement(doc2));
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        insertDocument(collAcq.getCollectionPtr(), InsertStatement(doc2));
     }
     txnParticipant.commitUnpreparedTransaction(_opCtx);
 
     txnParticipant.stashTransactionResources(_opCtx);
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            LockMode::MODE_IX);
         const BSONObj query1 = BSON("_id" << 1);
         const BSONObj query2 = BSON("_id" << 2);
-        const auto& coll = autoColl.getCollection();
+        const auto& collPtr = collAcq.getCollectionPtr();
 
         // Collection should be empty until commit, at which point both documents
         // should show up.
-        assertDocumentAtTimestamp(coll, presentTs, BSONObj());
-        assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
-        assertDocumentAtTimestamp(coll, firstOplogEntryTs, BSONObj());
-        assertFilteredDocumentAtTimestamp(coll, query1, commitEntryTs, doc);
-        assertFilteredDocumentAtTimestamp(coll, query2, commitEntryTs, doc2);
-        assertFilteredDocumentAtTimestamp(coll, query1, _nullTs, doc);
-        assertFilteredDocumentAtTimestamp(coll, query2, _nullTs, doc2);
+        assertDocumentAtTimestamp(collPtr, presentTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, beforeTxnTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, firstOplogEntryTs, BSONObj());
+        assertFilteredDocumentAtTimestamp(collAcq, query1, commitEntryTs, doc);
+        assertFilteredDocumentAtTimestamp(collAcq, query2, commitEntryTs, doc2);
+        assertFilteredDocumentAtTimestamp(collAcq, query1, _nullTs, doc);
+        assertFilteredDocumentAtTimestamp(collAcq, query2, _nullTs, doc2);
 
         // Implicit commit oplog entry should exist at commitEntryTs.
-        const auto commitFilter = BSON(
-            "ts" << commitEntryTs << "o"
-                 << BSON("applyOps"
-                         << BSON_ARRAY(BSON("op" << "i"
-                                                 << "ns" << nss.ns_forTest() << "ui" << coll->uuid()
-                                                 << "o" << doc2 << "o2" << doc2Key))
-                         << "count" << 2));
+        const auto commitFilter =
+            BSON("ts" << commitEntryTs << "o"
+                      << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                                 << "ns" << nss.ns_forTest() << "ui"
+                                                                 << collAcq.uuid() << "o" << doc2
+                                                                 << "o2" << doc2Key))
+                                         << "count" << 2));
         assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
         assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
         assertOplogDocumentExistsAtTimestamp(commitFilter, firstOplogEntryTs, false);
@@ -3527,8 +3670,8 @@ TEST_F(MultiDocumentTransactionTest, MultiOplogEntryTransaction) {
             "ts" << firstOplogEntryTs << "o"
                  << BSON("applyOps"
                          << BSON_ARRAY(BSON("op" << "i"
-                                                 << "ns" << nss.ns_forTest() << "ui" << coll->uuid()
-                                                 << "o" << doc << "o2" << docKey))
+                                                 << "ns" << nss.ns_forTest() << "ui"
+                                                 << collAcq.uuid() << "o" << doc << "o2" << docKey))
                          << "partialTxn" << true));
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, presentTs, false);
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, beforeTxnTs, false);
@@ -3575,13 +3718,16 @@ TEST_F(MultiDocumentTransactionTest, CommitPreparedMultiOplogEntryTransaction) {
     const auto prepareFilter = BSON("ts" << prepareEntryTs);
     const auto commitFilter = BSON("ts" << commitEntryTs);
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        const auto& coll = autoColl.getCollection();
-        assertDocumentAtTimestamp(coll, presentTs, BSONObj());
-        assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
-        assertDocumentAtTimestamp(coll, firstOplogEntryTs, BSONObj());
-        assertDocumentAtTimestamp(coll, prepareEntryTs, BSONObj());
-        assertDocumentAtTimestamp(coll, commitEntryTs, BSONObj());
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        const auto& collPtr = collAcq.getCollectionPtr();
+        assertDocumentAtTimestamp(collPtr, presentTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, beforeTxnTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, firstOplogEntryTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, prepareEntryTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, commitEntryTs, BSONObj());
 
         assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
         assertOplogDocumentExistsAtTimestamp(prepareFilter, beforeTxnTs, false);
@@ -3606,8 +3752,11 @@ TEST_F(MultiDocumentTransactionTest, CommitPreparedMultiOplogEntryTransaction) {
     const BSONObj doc2 = BSON("_id" << 2 << "TestValue" << 2);
     const BSONObj doc2Key = BSON("_id" << 2);
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        insertDocument(autoColl.getCollection(), InsertStatement(doc2));
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        insertDocument(collAcq.getCollectionPtr(), InsertStatement(doc2));
     }
     txnParticipant.prepareTransaction(_opCtx, {});
 
@@ -3616,19 +3765,22 @@ TEST_F(MultiDocumentTransactionTest, CommitPreparedMultiOplogEntryTransaction) {
 
     txnParticipant.stashTransactionResources(_opCtx);
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        const auto& coll = autoColl.getCollection();
-        assertDocumentAtTimestamp(coll, presentTs, BSONObj());
-        assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
-        assertDocumentAtTimestamp(coll, firstOplogEntryTs, BSONObj());
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        const auto& collPtr = collAcq.getCollectionPtr();
+        assertDocumentAtTimestamp(collPtr, presentTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, beforeTxnTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, firstOplogEntryTs, BSONObj());
 
         {
             IgnorePrepareBlock ignorePrepare(_opCtx);
             // Perform the following while ignoring prepare conflicts. These calls would
             // otherwise wait forever until the prepared transaction committed or aborted.
-            assertDocumentAtTimestamp(coll, prepareEntryTs, BSONObj());
-            assertDocumentAtTimestamp(coll, commitEntryTs, BSONObj());
-            assertDocumentAtTimestamp(coll, _nullTs, BSONObj());
+            assertDocumentAtTimestamp(collPtr, prepareEntryTs, BSONObj());
+            assertDocumentAtTimestamp(collPtr, commitEntryTs, BSONObj());
+            assertDocumentAtTimestamp(collPtr, _nullTs, BSONObj());
         }
 
         assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
@@ -3664,16 +3816,19 @@ TEST_F(MultiDocumentTransactionTest, CommitPreparedMultiOplogEntryTransaction) {
 
     txnParticipant.stashTransactionResources(_opCtx);
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        const auto& coll = autoColl.getCollection();
-        assertDocumentAtTimestamp(coll, presentTs, BSONObj());
-        assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
-        assertDocumentAtTimestamp(coll, firstOplogEntryTs, BSONObj());
-        assertDocumentAtTimestamp(coll, prepareEntryTs, BSONObj());
-        assertFilteredDocumentAtTimestamp(coll, query1, commitEntryTs, doc);
-        assertFilteredDocumentAtTimestamp(coll, query2, commitEntryTs, doc2);
-        assertFilteredDocumentAtTimestamp(coll, query1, _nullTs, doc);
-        assertFilteredDocumentAtTimestamp(coll, query2, _nullTs, doc2);
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        const auto& collPtr = collAcq.getCollectionPtr();
+        assertDocumentAtTimestamp(collPtr, presentTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, beforeTxnTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, firstOplogEntryTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, prepareEntryTs, BSONObj());
+        assertFilteredDocumentAtTimestamp(collAcq, query1, commitEntryTs, doc);
+        assertFilteredDocumentAtTimestamp(collAcq, query2, commitEntryTs, doc2);
+        assertFilteredDocumentAtTimestamp(collAcq, query1, _nullTs, doc);
+        assertFilteredDocumentAtTimestamp(collAcq, query2, _nullTs, doc2);
 
         // The prepare oplog entry should exist at prepareEntryTs and onwards.
         assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
@@ -3694,8 +3849,8 @@ TEST_F(MultiDocumentTransactionTest, CommitPreparedMultiOplogEntryTransaction) {
             "ts" << firstOplogEntryTs << "o"
                  << BSON("applyOps"
                          << BSON_ARRAY(BSON("op" << "i"
-                                                 << "ns" << nss.ns_forTest() << "ui" << coll->uuid()
-                                                 << "o" << doc << "o2" << docKey))
+                                                 << "ns" << nss.ns_forTest() << "ui"
+                                                 << collAcq.uuid() << "o" << doc << "o2" << docKey))
                          << "partialTxn" << true));
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, presentTs, false);
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, beforeTxnTs, false);
@@ -3704,13 +3859,13 @@ TEST_F(MultiDocumentTransactionTest, CommitPreparedMultiOplogEntryTransaction) {
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, commitEntryTs, true);
         assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, _nullTs, true);
         // The prepare oplog entry should exist at prepareEntryTs and onwards.
-        const auto prepareOplogEntryFilter = BSON(
-            "ts" << prepareEntryTs << "o"
-                 << BSON("applyOps"
-                         << BSON_ARRAY(BSON("op" << "i"
-                                                 << "ns" << nss.ns_forTest() << "ui" << coll->uuid()
-                                                 << "o" << doc2 << "o2" << doc2Key))
-                         << "prepare" << true << "count" << 2));
+        const auto prepareOplogEntryFilter =
+            BSON("ts" << prepareEntryTs << "o"
+                      << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                                 << "ns" << nss.ns_forTest() << "ui"
+                                                                 << collAcq.uuid() << "o" << doc2
+                                                                 << "o2" << doc2Key))
+                                         << "prepare" << true << "count" << 2));
         assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, presentTs, false);
         assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, beforeTxnTs, false);
         assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, firstOplogEntryTs, false);
@@ -3808,9 +3963,12 @@ TEST_F(MultiDocumentTransactionTest, AbortPreparedMultiOplogEntryTransaction) {
 
         UUID ui = UUID::gen();
         {
-            AutoGetCollection coll(_opCtx, nss, LockMode::MODE_IX);
-            ASSERT(coll);
-            ui = coll->uuid();
+            auto collAcq = acquireCollection(_opCtx,
+                                             CollectionAcquisitionRequest::fromOpCtx(
+                                                 _opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                             MODE_IX);
+            ASSERT(collAcq.exists());
+            ui = collAcq.uuid();
         }
 
         // The prepare oplog entry should exist at firstOplogEntryTs and onwards.
@@ -3852,10 +4010,13 @@ TEST_F(MultiDocumentTransactionTest, PreparedMultiDocumentTransaction) {
     logTimestamps();
 
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        const auto& coll = autoColl.getCollection();
-        assertDocumentAtTimestamp(coll, prepareTs, BSONObj());
-        assertDocumentAtTimestamp(coll, commitEntryTs, BSONObj());
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        const auto& collPtr = collAcq.getCollectionPtr();
+        assertDocumentAtTimestamp(collPtr, prepareTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, commitEntryTs, BSONObj());
 
         const auto prepareFilter = BSON("ts" << prepareTs);
         assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
@@ -3906,13 +4067,16 @@ TEST_F(MultiDocumentTransactionTest, PreparedMultiDocumentTransaction) {
 
     txnParticipant.stashTransactionResources(_opCtx);
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        const auto& coll = autoColl.getCollection();
-        assertDocumentAtTimestamp(coll, presentTs, BSONObj());
-        assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
-        assertDocumentAtTimestamp(coll, prepareTs, BSONObj());
-        assertDocumentAtTimestamp(coll, commitEntryTs, doc);
-        assertDocumentAtTimestamp(coll, _nullTs, doc);
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        const auto& collPtr = collAcq.getCollectionPtr();
+        assertDocumentAtTimestamp(collPtr, presentTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, beforeTxnTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, prepareTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, commitEntryTs, doc);
+        assertDocumentAtTimestamp(collPtr, _nullTs, doc);
 
         const auto prepareFilter = BSON("ts" << prepareTs);
         assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
@@ -3948,10 +4112,13 @@ TEST_F(MultiDocumentTransactionTest, AbortedPreparedMultiDocumentTransaction) {
     logTimestamps();
 
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        const auto& coll = autoColl.getCollection();
-        assertDocumentAtTimestamp(coll, prepareTs, BSONObj());
-        assertDocumentAtTimestamp(coll, abortEntryTs, BSONObj());
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        const auto& collPtr = collAcq.getCollectionPtr();
+        assertDocumentAtTimestamp(collPtr, prepareTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, abortEntryTs, BSONObj());
 
         const auto prepareFilter = BSON("ts" << prepareTs);
         assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
@@ -3998,13 +4165,16 @@ TEST_F(MultiDocumentTransactionTest, AbortedPreparedMultiDocumentTransaction) {
 
     txnParticipant.stashTransactionResources(_opCtx);
     {
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        const auto& coll = autoColl.getCollection();
-        assertDocumentAtTimestamp(coll, presentTs, BSONObj());
-        assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
-        assertDocumentAtTimestamp(coll, prepareTs, BSONObj());
-        assertDocumentAtTimestamp(coll, abortEntryTs, BSONObj());
-        assertDocumentAtTimestamp(coll, _nullTs, BSONObj());
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        const auto& collPtr = collAcq.getCollectionPtr();
+        assertDocumentAtTimestamp(collPtr, presentTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, beforeTxnTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, prepareTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, abortEntryTs, BSONObj());
+        assertDocumentAtTimestamp(collPtr, _nullTs, BSONObj());
 
         const auto prepareFilter = BSON("ts" << prepareTs);
         assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);

@@ -62,7 +62,7 @@ struct Helpers {
      * node does not need to be primary or secondary.
      */
     static bool findOne(OperationContext* opCtx,
-                        const CollectionPtr& collection,
+                        const CollectionAcquisition& collection,
                         const BSONObj& query,
                         BSONObj& result);
 
@@ -71,7 +71,7 @@ struct Helpers {
      * Otherwise the empty BSONObj will be returned.
      */
     static BSONObj findOneForTesting(OperationContext* opCtx,
-                                     const CollectionPtr& collection,
+                                     const CollectionAcquisition& collection,
                                      const BSONObj& query,
                                      bool invariantOnError = true);
 
@@ -80,10 +80,10 @@ struct Helpers {
      * document, or a null RecordId if no such document exists.
      */
     static RecordId findOne(OperationContext* opCtx,
-                            const CollectionPtr& collection,
+                            const CollectionAcquisition& collection,
                             const BSONObj& query);
     static RecordId findOne(OperationContext* opCtx,
-                            const CollectionPtr& collection,
+                            const CollectionAcquisition& collection,
                             std::unique_ptr<FindCommandRequest> qr);
 
     /**

@@ -556,7 +556,7 @@ ReshardingDonorOplogId ReshardingDataReplication::getOplogFetcherResumeId(
         MODE_IS);
     if (coll.exists()) {
         auto highestOplogBufferId =
-            resharding::data_copy::findDocWithHighestInsertedId(opCtx, coll.getCollectionPtr());
+            resharding::data_copy::findDocWithHighestInsertedId(opCtx, coll);
 
         if (highestOplogBufferId) {
             auto oplogEntry = repl::OplogEntry{highestOplogBufferId->toBson()};

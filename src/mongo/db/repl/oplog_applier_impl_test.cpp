@@ -940,12 +940,17 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
         _opCtx.get(), NamespaceString::kConfigImagesNamespace, {imageEntry.toBSON()}, 0));
 
     {
-        AutoGetCollection sideCollection(
-            _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
-        auto imageEntry = ImageEntry::parse(
-            IDLParserContext("test"),
-            Helpers::findOneForTesting(
-                _opCtx.get(), sideCollection.getCollection(), BSON("_id" << sessionId.toBSON())));
+        auto sideCollection = acquireCollection(
+            _opCtx.get(),
+            CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(_opCtx.get()),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        auto imageEntry =
+            ImageEntry::parse(IDLParserContext("test"),
+                              Helpers::findOneForTesting(
+                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
         ASSERT_FALSE(imageEntry.getInvalidated());
     }
 
@@ -963,12 +968,17 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
                       ExceptionFor<ErrorCodes::NamespaceNotFound>);
     }
 
-    AutoGetCollection sideCollection(
-        _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
-    imageEntry = ImageEntry::parse(IDLParserContext("test"),
-                                   Helpers::findOneForTesting(_opCtx.get(),
-                                                              sideCollection.getCollection(),
-                                                              BSON("_id" << sessionId.toBSON())));
+    auto sideCollection = acquireCollection(
+        _opCtx.get(),
+        CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(_opCtx.get()),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    imageEntry =
+        ImageEntry::parse(IDLParserContext("test"),
+                          Helpers::findOneForTesting(
+                              _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
     ASSERT(imageEntry.getInvalidated());
 }
 
@@ -1000,12 +1010,17 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateNonModPreImages) {
         _opCtx.get(), NamespaceString::kConfigImagesNamespace, {imageEntry.toBSON()}, 0));
 
     {
-        AutoGetCollection sideCollection(
-            _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
-        auto imageEntry = ImageEntry::parse(
-            IDLParserContext("test"),
-            Helpers::findOneForTesting(
-                _opCtx.get(), sideCollection.getCollection(), BSON("_id" << sessionId.toBSON())));
+        auto sideCollection = acquireCollection(
+            _opCtx.get(),
+            CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(_opCtx.get()),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        auto imageEntry =
+            ImageEntry::parse(IDLParserContext("test"),
+                              Helpers::findOneForTesting(
+                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
         ASSERT_FALSE(imageEntry.getInvalidated());
     }
     OpTime updateOpTime{{2, 1}, 1};
@@ -1030,12 +1045,17 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateNonModPreImages) {
                                                       /* isDataConsistent */ false));
     }
 
-    AutoGetCollection sideCollection(
-        _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
-    imageEntry = ImageEntry::parse(IDLParserContext("test"),
-                                   Helpers::findOneForTesting(_opCtx.get(),
-                                                              sideCollection.getCollection(),
-                                                              BSON("_id" << sessionId.toBSON())));
+    auto sideCollection = acquireCollection(
+        _opCtx.get(),
+        CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(_opCtx.get()),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    imageEntry =
+        ImageEntry::parse(IDLParserContext("test"),
+                          Helpers::findOneForTesting(
+                              _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
 
     ASSERT(imageEntry.getInvalidated());
 }
@@ -1071,12 +1091,17 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
         _opCtx.get(), NamespaceString::kConfigImagesNamespace, {imageEntry.toBSON()}, 0));
 
     {
-        AutoGetCollection sideCollection(
-            _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
-        auto imageEntry = ImageEntry::parse(
-            IDLParserContext("test"),
-            Helpers::findOneForTesting(
-                _opCtx.get(), sideCollection.getCollection(), BSON("_id" << sessionId.toBSON())));
+        auto sideCollection = acquireCollection(
+            _opCtx.get(),
+            CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(_opCtx.get()),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        auto imageEntry =
+            ImageEntry::parse(IDLParserContext("test"),
+                              Helpers::findOneForTesting(
+                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
         ASSERT_FALSE(imageEntry.getInvalidated());
     }
 
@@ -1097,12 +1122,17 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
                       ExceptionFor<ErrorCodes::NamespaceNotFound>);
 
         // Confirm that we wrote an invalidate entry.
-        AutoGetCollection sideCollection(
-            _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
-        imageEntry = ImageEntry::parse(
-            IDLParserContext("test"),
-            Helpers::findOneForTesting(
-                _opCtx.get(), sideCollection.getCollection(), BSON("_id" << sessionId.toBSON())));
+        auto sideCollection = acquireCollection(
+            _opCtx.get(),
+            CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(_opCtx.get()),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        imageEntry =
+            ImageEntry::parse(IDLParserContext("test"),
+                              Helpers::findOneForTesting(
+                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
         ASSERT(imageEntry.getInvalidated());
         ASSERT_EQ(imageEntry.getTs(), invalidateOpTime.getTimestamp());
     }
@@ -1125,12 +1155,17 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
     }
 
     // The image collection entgry should be unchanged.
-    AutoGetCollection sideCollection(
-        _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
-    imageEntry = ImageEntry::parse(IDLParserContext("test"),
-                                   Helpers::findOneForTesting(_opCtx.get(),
-                                                              sideCollection.getCollection(),
-                                                              BSON("_id" << sessionId.toBSON())));
+    auto sideCollection = acquireCollection(
+        _opCtx.get(),
+        CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(_opCtx.get()),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    imageEntry =
+        ImageEntry::parse(IDLParserContext("test"),
+                          Helpers::findOneForTesting(
+                              _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
     ASSERT(imageEntry.getInvalidated());
 }
 

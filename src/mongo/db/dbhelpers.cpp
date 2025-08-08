@@ -87,18 +87,18 @@ using std::string;
 using std::unique_ptr;
 
 bool Helpers::findOne(OperationContext* opCtx,
-                      const CollectionPtr& collection,
+                      const CollectionAcquisition& collection,
                       const BSONObj& query,
                       BSONObj& result) {
     RecordId loc = findOne(opCtx, collection, query);
     if (loc.isNull())
         return false;
-    result = collection->docFor(opCtx, loc).value();
+    result = collection.getCollectionPtr()->docFor(opCtx, loc).value();
     return true;
 }
 
 BSONObj Helpers::findOneForTesting(OperationContext* opCtx,
-                                   const CollectionPtr& collection,
+                                   const CollectionAcquisition& collection,
                                    const BSONObj& query,
                                    const bool invariantOnError) {
     BSONObj ret;
@@ -115,27 +115,27 @@ BSONObj Helpers::findOneForTesting(OperationContext* opCtx,
    set your db SavedContext first
 */
 RecordId Helpers::findOne(OperationContext* opCtx,
-                          const CollectionPtr& collection,
+                          const CollectionAcquisition& collection,
                           const BSONObj& query) {
-    if (!collection)
+    if (!collection.exists())
         return RecordId();
 
-    auto findCommand = std::make_unique<FindCommandRequest>(collection->ns());
+    auto findCommand = std::make_unique<FindCommandRequest>(collection.nss());
     findCommand->setFilter(query);
     return findOne(opCtx, collection, std::move(findCommand));
 }
 
 RecordId Helpers::findOne(OperationContext* opCtx,
-                          const CollectionPtr& collection,
+                          const CollectionAcquisition& collection,
                           std::unique_ptr<FindCommandRequest> findCommand) {
-    if (!collection)
+    if (!collection.exists())
         return RecordId();
 
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{
             .findCommand = std::move(findCommand),
-            .extensionsCallback = ExtensionsCallbackReal(opCtx, &collection->ns()),
+            .extensionsCallback = ExtensionsCallbackReal(opCtx, &collection.nss()),
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
     cq->setForceGenerateRecordId(true);
 

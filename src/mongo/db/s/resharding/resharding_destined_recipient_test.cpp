@@ -345,7 +345,7 @@ protected:
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
             MODE_IX);
-        RecordId rid = Helpers::findOne(opCtx, coll.getCollectionPtr(), query);
+        RecordId rid = Helpers::findOne(opCtx, coll, query);
         ASSERT(!rid.isNull());
 
         WriteUnitOfWork wuow(opCtx);

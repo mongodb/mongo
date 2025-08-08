@@ -164,14 +164,14 @@ public:
             if (collection) {
                 _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            // TODO(SERVER-103403): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            collection =
-                CollectionPtr::CollectionPtr_UNSAFE(_database->createCollection(&_opCtx, nss()));
+            _database->createCollection(&_opCtx, nss());
             wunit.commit();
-            _collection = std::move(collection);
         }
-
+        _collection = acquireCollection(&_opCtx,
+                                        CollectionAcquisitionRequest::fromOpCtx(
+                                            &_opCtx, nss(), AcquisitionPrerequisites::kWrite),
+                                        MODE_IS);
+        ASSERT(_collection->exists());
         addIndex(IndexSpec().addKey("a").unique(false));
     }
 
@@ -195,7 +195,7 @@ protected:
         builder.append("v", int(IndexConfig::kLatestIndexVersion));
         auto specObj = builder.obj();
 
-        CollectionWriter collection(&_opCtx, _collection->ns());
+        CollectionWriter collection(&_opCtx, &(*_collection));
         MultiIndexBlock indexer;
         ScopeGuard abortOnExit([&] {
             indexer.abortIndexBuild(&_opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
@@ -220,8 +220,6 @@ protected:
             wunit.commit();
         }
         abortOnExit.dismiss();
-        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        _collection = CollectionPtr::CollectionPtr_UNSAFE(collection.get().get());
     }
 
     void insert(const char* s) {
@@ -237,12 +235,15 @@ protected:
             oid.init();
             b.appendOID("_id", &oid);
             b.appendElements(o);
-            collection_internal::insertDocument(
-                &_opCtx, _collection, InsertStatement(b.obj()), nullOpDebug, false)
+            collection_internal::insertDocument(&_opCtx,
+                                                _collection->getCollectionPtr(),
+                                                InsertStatement(b.obj()),
+                                                nullOpDebug,
+                                                false)
                 .transitional_ignore();
         } else {
             collection_internal::insertDocument(
-                &_opCtx, _collection, InsertStatement(o), nullOpDebug, false)
+                &_opCtx, _collection->getCollectionPtr(), InsertStatement(o), nullOpDebug, false)
                 .transitional_ignore();
         }
         wunit.commit();
@@ -255,7 +256,7 @@ protected:
     Lock::GlobalWrite _lk;
 
     Database* _database;
-    CollectionPtr _collection;
+    boost::optional<CollectionAcquisition> _collection;
 };
 
 class FindOneOr : public Base {
@@ -269,12 +270,13 @@ public:
         BSONObj query = fromjson("{$or:[{b:2},{c:3}]}");
         BSONObj ret;
         // Check findOne() returning object.
-        ASSERT(Helpers::findOne(&_opCtx, _collection, query, ret));
+        ASSERT(Helpers::findOne(&_opCtx, *_collection, query, ret));
         ASSERT_EQUALS(string("b"), ret.firstElement().fieldName());
         // Cross check with findOne() returning location.
-        ASSERT_BSONOBJ_EQ(
-            ret,
-            _collection->docFor(&_opCtx, Helpers::findOne(&_opCtx, _collection, query)).value());
+        ASSERT_BSONOBJ_EQ(ret,
+                          _collection->getCollectionPtr()
+                              ->docFor(&_opCtx, Helpers::findOne(&_opCtx, *_collection, query))
+                              .value());
     }
 };
 
@@ -288,16 +290,12 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             Database* db = getDbOrCreate(&_opCtx, nss());
             if (CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss())) {
-                _collection = CollectionPtr();
+                _collection.reset();
                 db->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            // TODO(SERVER-103403): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            _collection = CollectionPtr::CollectionPtr_UNSAFE(
-                db->createCollection(&_opCtx, nss(), CollectionOptions(), false));
+            db->createCollection(&_opCtx, nss(), CollectionOptions(), false);
             wunit.commit();
         }
-        ASSERT(_collection);
 
         DBDirectClient cl(&_opCtx);
         BSONObj info;
@@ -306,15 +304,20 @@ public:
                                                  << "obj" << BSONObj()),
                                 info);
         ASSERT(ok);
-
+        _collection = acquireCollection(&_opCtx,
+                                        CollectionAcquisitionRequest::fromOpCtx(
+                                            &_opCtx, nss(), AcquisitionPrerequisites::kRead),
+                                        MODE_IS);
+        ASSERT(_collection->exists());
         insert(BSONObj());
         BSONObj query;
         BSONObj ret;
-        ASSERT(Helpers::findOne(&_opCtx, _collection, query, ret));
+        ASSERT(Helpers::findOne(&_opCtx, *_collection, query, ret));
         ASSERT(ret.isEmpty());
-        ASSERT_BSONOBJ_EQ(
-            ret,
-            _collection->docFor(&_opCtx, Helpers::findOne(&_opCtx, _collection, query)).value());
+        ASSERT_BSONOBJ_EQ(ret,
+                          _collection->getCollectionPtr()
+                              ->docFor(&_opCtx, Helpers::findOne(&_opCtx, *_collection, query))
+                              .value());
     }
 };
 
@@ -1485,8 +1488,7 @@ public:
         ASSERT_EQUALS(50, count());
 
         BSONObj res;
-        ASSERT(Helpers::findOne(
-            &_opCtx, ctx.getCollection().getCollectionPtr(), BSON("_id" << 20), res));
+        ASSERT(Helpers::findOne(&_opCtx, ctx.getCollection(), BSON("_id" << 20), res));
         ASSERT_EQUALS(40, res["x"].numberInt());
 
         ASSERT(Helpers::findById(&_opCtx, nss(), BSON("_id" << 20), res));
@@ -1501,8 +1503,7 @@ public:
         {
             Timer t;
             for (int i = 0; i < n; i++) {
-                ASSERT(Helpers::findOne(
-                    &_opCtx, ctx.getCollection().getCollectionPtr(), BSON("_id" << 20), res));
+                ASSERT(Helpers::findOne(&_opCtx, ctx.getCollection(), BSON("_id" << 20), res));
             }
             slow = t.micros();
         }

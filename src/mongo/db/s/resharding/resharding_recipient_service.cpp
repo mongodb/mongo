@@ -1880,7 +1880,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
                 BSONObj result;
                 Helpers::findOne(
                     opCtx.get(),
-                    fetcherProgressColl.getCollectionPtr(),
+                    fetcherProgressColl,
                     BSON(ReshardingOplogFetcherProgress::kOplogSourceIdFieldName << sourceIdBson),
                     result);
 
@@ -1923,7 +1923,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
                 BSONObj result;
                 Helpers::findOne(
                     opCtx.get(),
-                    applierProgressColl.getCollectionPtr(),
+                    applierProgressColl,
                     BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceIdBson),
                     result);
 

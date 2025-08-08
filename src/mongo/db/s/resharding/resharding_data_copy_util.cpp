@@ -263,7 +263,7 @@ void deleteRecipientResumeData(OperationContext* opCtx, const UUID& reshardingUU
         });
 }
 
-Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection) {
+Value findHighestInsertedId(OperationContext* opCtx, const CollectionAcquisition& collection) {
     auto doc = findDocWithHighestInsertedId(opCtx, collection);
     if (!doc) {
         return Value{};
@@ -278,12 +278,12 @@ Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collec
 }
 
 boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
-                                                       const CollectionPtr& collection) {
-    if (collection && collection->isEmpty(opCtx)) {
+                                                       const CollectionAcquisition& collection) {
+    if (collection.exists() && collection.getCollectionPtr()->isEmpty(opCtx)) {
         return boost::none;
     }
 
-    auto findCommand = std::make_unique<FindCommandRequest>(collection->ns());
+    auto findCommand = std::make_unique<FindCommandRequest>(collection.nss());
     findCommand->setLimit(1);
     findCommand->setSort(BSON("_id" << -1));
 
@@ -292,7 +292,7 @@ boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
         return boost::none;
     }
 
-    auto doc = collection->docFor(opCtx, recordId).value();
+    auto doc = collection.getCollectionPtr()->docFor(opCtx, recordId).value();
     return Document{doc};
 }
 

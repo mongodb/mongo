@@ -299,8 +299,7 @@ public:
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
-        ASSERT_TRUE(Helpers::findOne(_opCtx, coll.getCollectionPtr(), query, ret))
-            << "Query: " << query;
+        ASSERT_TRUE(Helpers::findOne(_opCtx, coll, query, ret)) << "Query: " << query;
         return ret;
     }
 

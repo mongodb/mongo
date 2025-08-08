@@ -848,11 +848,15 @@ boost::optional<ShardIdentity> ShardingInitializationMongoD::getShardIdentityDoc
     // document is inserted)
     BSONObj shardIdentityBSON;
     const bool foundShardIdentity = [&] {
-        AutoGetCollection autoColl(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IS);
-        return Helpers::findOne(opCtx,
-                                autoColl.getCollection(),
-                                BSON("_id" << ShardIdentityType::IdName),
-                                shardIdentityBSON);
+        auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kServerConfigurationNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            LockMode::MODE_IS);
+        return Helpers::findOne(
+            opCtx, coll, BSON("_id" << ShardIdentityType::IdName), shardIdentityBSON);
     }();
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {

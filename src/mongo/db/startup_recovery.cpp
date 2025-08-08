@@ -172,7 +172,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(
     // Restore the featureCompatibilityVersion document if it is missing.
     BSONObj featureCompatibilityVersion;
     if (!Helpers::findOne(opCtx,
-                          fcvColl.getCollectionPtr(),
+                          fcvColl,
                           BSON("_id" << multiversion::kParameterName),
                           featureCompatibilityVersion)) {
         SectionScopedTimer scopedTimer(&opCtx->fastClockSource(),
@@ -195,10 +195,8 @@ Status restoreMissingFeatureCompatibilityVersionDocument(
         });
     }
 
-    invariant(Helpers::findOne(opCtx,
-                               fcvColl.getCollectionPtr(),
-                               BSON("_id" << multiversion::kParameterName),
-                               featureCompatibilityVersion));
+    invariant(Helpers::findOne(
+        opCtx, fcvColl, BSON("_id" << multiversion::kParameterName), featureCompatibilityVersion));
 
     return Status::OK();
 }

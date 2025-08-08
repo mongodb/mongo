@@ -1383,7 +1383,7 @@ private:
                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                     repl::ReadConcernArgs::get(opCtx),
                     AcquisitionPrerequisites::kRead});
-            hasUserDocs = Helpers::findOne(opCtx, userColl.getCollectionPtr(), BSONObj(), userDoc);
+            hasUserDocs = Helpers::findOne(opCtx, userColl, BSONObj(), userDoc);
         }
 
         {
@@ -1394,7 +1394,7 @@ private:
                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                     repl::ReadConcernArgs::get(opCtx),
                     AcquisitionPrerequisites::kRead});
-            hasRoleDocs = Helpers::findOne(opCtx, rolesColl.getCollectionPtr(), BSONObj(), roleDoc);
+            hasRoleDocs = Helpers::findOne(opCtx, rolesColl, BSONObj(), roleDoc);
         }
 
         // If they do, write an authorization schema document to disk set to schemaVersionSCRAM28.

@@ -38,6 +38,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/database_sharding_state_factory_mock.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -316,6 +317,9 @@ public:
         DatabaseShardingStateFactory::set(getServiceContext(),
                                           std::make_unique<DatabaseShardingStateFactoryMock>());
 
+        CollectionShardingStateFactory::set(
+            getServiceContext(),
+            std::make_unique<CollectionShardingStateFactoryShard>(getServiceContext()));
         ShardingState::create(getServiceContext());
     }
 

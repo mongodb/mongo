@@ -359,9 +359,15 @@ protected:
 
     bool didWriteImageEntryToSideCollection(OperationContext* opCtx,
                                             const LogicalSessionId& sessionId) {
-        AutoGetCollection sideCollection(opCtx, NamespaceString::kConfigImagesNamespace, MODE_IS);
+        auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
         const auto imageEntry = Helpers::findOneForTesting(opCtx,
-                                                           sideCollection.getCollection(),
+                                                           coll,
                                                            BSON("_id" << sessionId.toBSON()),
                                                            /*invariantOnError=*/false);
         return !imageEntry.isEmpty();
@@ -369,10 +375,15 @@ protected:
 
     bool didWriteDeletedDocToPreImagesCollection(OperationContext* opCtx,
                                                  const ChangeStreamPreImageId preImageId) {
-        AutoGetCollection preImagesCollection(
-            opCtx, NamespaceString::makePreImageCollectionNSS(boost::none), LockMode::MODE_IS);
+        auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::makeChangeCollectionNSS(boost::none),
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
         const auto preImage = Helpers::findOneForTesting(opCtx,
-                                                         preImagesCollection.getCollection(),
+                                                         coll,
                                                          BSON("_id" << preImageId.toBSON()),
                                                          /*invariantOnError=*/false);
         return !preImage.isEmpty();
@@ -380,28 +391,38 @@ protected:
 
     repl::ImageEntry getImageEntryFromSideCollection(OperationContext* opCtx,
                                                      const LogicalSessionId& sessionId) {
-        AutoGetCollection sideCollection(opCtx, NamespaceString::kConfigImagesNamespace, MODE_IS);
+        auto sideCollection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
         auto doc = Helpers::findOneForTesting(opCtx,
-                                              sideCollection.getCollection(),
+                                              sideCollection,
                                               BSON("_id" << sessionId.toBSON()),
                                               /*invariantOnError=*/false);
         ASSERT_FALSE(doc.isEmpty())
             << "Change stream pre-image not found: " << sessionId.toBSON()
-            << " (pre-images collection: " << sideCollection->ns().toStringForErrorMsg() << ")";
+            << " (pre-images collection: " << sideCollection.nss().toStringForErrorMsg() << ")";
         return repl::ImageEntry::parse(IDLParserContext("image entry"), doc);
     }
 
     SessionTxnRecord getTxnRecord(OperationContext* opCtx, const LogicalSessionId& sessionId) {
-        AutoGetCollection configTransactions(
-            opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
-
+        auto configTransactions = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
         auto doc = Helpers::findOneForTesting(opCtx,
-                                              configTransactions.getCollection(),
+                                              configTransactions,
                                               BSON("_id" << sessionId.toBSON()),
                                               /*invariantOnError=*/false);
         ASSERT_FALSE(doc.isEmpty())
             << "Transaction not found for session: " << sessionId.toBSON()
-            << "(transactions collection: " << configTransactions->ns().toStringForErrorMsg()
+            << "(transactions collection: " << configTransactions.nss().toStringForErrorMsg()
             << ")";
         return SessionTxnRecord::parse(IDLParserContext("txn record"), doc);
     }
@@ -415,15 +436,20 @@ protected:
     ChangeStreamPreImage getChangeStreamPreImage(OperationContext* opCtx,
                                                  const ChangeStreamPreImageId& preImageId,
                                                  BSONObj* container) {
-        AutoGetCollection preImagesCollection(
-            opCtx, NamespaceString::makePreImageCollectionNSS(boost::none), LockMode::MODE_IS);
+        auto preImagesCollection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(boost::none),
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
         *container = Helpers::findOneForTesting(opCtx,
-                                                preImagesCollection.getCollection(),
+                                                preImagesCollection,
                                                 BSON("_id" << preImageId.toBSON()),
                                                 /*invariantOnError=*/false);
         ASSERT_FALSE(container->isEmpty())
             << "Change stream pre-image not found: " << preImageId.toBSON()
-            << " (pre-images collection: " << preImagesCollection->ns().toStringForErrorMsg()
+            << " (pre-images collection: " << preImagesCollection.nss().toStringForErrorMsg()
             << ")";
         return ChangeStreamPreImage::parse(IDLParserContext("pre-image"), *container);
     }

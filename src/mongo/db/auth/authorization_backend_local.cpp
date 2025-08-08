@@ -90,10 +90,13 @@ Status AuthorizationBackendLocal::findOne(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const BSONObj& query,
                                           BSONObj* result) {
-    AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, nss);
+    auto collection = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::OperationType::kRead));
 
     BSONObj found;
-    if (Helpers::findOne(opCtx, ctx.getCollection(), query, found)) {
+    if (Helpers::findOne(opCtx, collection, query, found)) {
         *result = found.getOwned();
         return Status::OK();
     }
@@ -122,8 +125,11 @@ Status query(OperationContext* opCtx,
 }
 
 bool hasOne(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& query) {
-    AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, nss);
-    return !Helpers::findOne(opCtx, ctx.getCollection(), query).isNull();
+    auto collection = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::OperationType::kRead));
+    return !Helpers::findOne(opCtx, collection, query).isNull();
 }
 
 }  // namespace
