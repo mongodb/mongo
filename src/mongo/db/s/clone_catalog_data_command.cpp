@@ -50,6 +50,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -195,6 +196,12 @@ public:
                 newOpCtxPtr->setWriteConcern(
                     ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
                 WriteBlockBypass::get(newOpCtxPtr.get()).set(true);
+                // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators enabled on lastLTS
+                if (VersionContext::getDecoration(opCtx).isInitialized()) {
+                    ClientLock lk(newOpCtxPtr->getClient());
+                    VersionContext::setDecoration(
+                        lk, newOpCtxPtr.get(), VersionContext::getDecoration(opCtx));
+                }
                 cloneDatabase(newOpCtxPtr.get(), dbName, from, result);
             }
             // Since no write happened on this txnNumber, we need to make a dummy write to protect

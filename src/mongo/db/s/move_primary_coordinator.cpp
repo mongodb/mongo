@@ -37,14 +37,15 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/database_sharding_runtime.h"
@@ -55,6 +56,7 @@
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/shardsvr_commit_create_database_metadata_command.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
@@ -455,17 +457,11 @@ void MovePrimaryCoordinator::logChange(OperationContext* opCtx,
 std::vector<NamespaceString> MovePrimaryCoordinator::getCollectionsToClone(
     OperationContext* opCtx) const {
     const auto allCollections = [&] {
-        DBDirectClient dbClient(opCtx);
-        const auto collInfos =
-            dbClient.getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
-
         std::vector<NamespaceString> colls;
-        for (const auto& collInfo : collInfos) {
-            std::string collName;
-            uassertStatusOK(bsonExtractStringField(collInfo, "name", &collName));
 
-            const NamespaceString nss(NamespaceStringUtil::deserialize(_dbName, collName));
-
+        auto catalog = CollectionCatalog::get(opCtx);
+        for (auto&& coll : catalog->range(_dbName)) {
+            const auto& nss = coll->ns();
             if (!nss.isSystem() || nss.isLegalClientSystemNS()) {
                 colls.push_back(nss);
             }
@@ -538,10 +534,15 @@ void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
         const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
 
         const auto listCommand = [&] {
-            BSONObjBuilder commandBuilder;
-            commandBuilder.append("listCollections", 1);
-            commandBuilder.append("filter", ListCollectionsFilter::makeTypeCollectionFilter());
-            return commandBuilder.obj();
+            ListCollections listCollectionsCmd;
+            listCollectionsCmd.setDbName(_dbName);
+            listCollectionsCmd.setFilter(ListCollectionsFilter::makeTypeCollectionFilter());
+            if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                listCollectionsCmd.setRawData(true);
+            }
+            return listCollectionsCmd.toBSON();
         }();
 
         const auto listResponse = uassertStatusOK(

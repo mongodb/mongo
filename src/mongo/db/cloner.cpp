@@ -60,6 +60,8 @@
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/db/list_collections_gen.h"
+#include "mongo/db/list_indexes_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/insert.h"
@@ -68,6 +70,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -306,6 +309,9 @@ void DefaultClonerImpl::_copy(OperationContext* opCtx,
     FindCommandRequest findCmd{nss};
     findCmd.setNoCursorTimeout(true);
     findCmd.setReadConcern(repl::ReadConcernArgs::kLocal);
+    if (shouldUseRawDataOperations(VersionContext::getDecoration(opCtx))) {
+        findCmd.setRawData(true);
+    }
     auto cursor = getConn()->find(
         std::move(findCmd), ReadPreferenceSetting{ReadPreference::PrimaryOnly}, ExhaustMode::kOn);
 
@@ -556,8 +562,14 @@ StatusWith<std::vector<BSONObj>> DefaultClonerImpl::getListOfCollections(
     }
     // Gather the list of collections to clone
     // No tenant id required as the db cloner is only used for moving primary dbs in sharding.
-    std::list<BSONObj> initialCollections =
-        getConn()->getCollectionInfos(dbName, ListCollectionsFilter::makeTypeCollectionFilter());
+    ListCollections listCollectionsCmd;
+    listCollectionsCmd.setDbName(dbName);
+    listCollectionsCmd.setFilter(ListCollectionsFilter::makeTypeCollectionFilter());
+    if (shouldUseRawDataOperations(VersionContext::getDecoration(opCtx))) {
+        listCollectionsCmd.setRawData(true);
+    }
+    auto initialCollections = uassertStatusOK(getConn()->runExhaustiveCursorCommand(
+        dbName, listCollectionsCmd.toBSON(), QueryOption_SecondaryOk));
     return _filterCollectionsForClone(dbName, initialCollections);
 }
 
@@ -598,9 +610,12 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
     std::map<StringData, std::list<BSONObj>> collectionIndexSpecs;
     for (auto&& params : createCollectionParams) {
         const auto nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
-        const bool includeBuildUUIDs = false;
-        const int options = 0;
-        auto indexSpecs = getConn()->getIndexSpecs(nss, includeBuildUUIDs, options);
+        ListIndexes listIndexesCmd(nss);
+        if (shouldUseRawDataOperations(VersionContext::getDecoration(opCtx))) {
+            listIndexesCmd.setRawData(true);
+        }
+        auto indexSpecs = uassertStatusOK(
+            getConn()->runExhaustiveCursorCommand(nss.dbName(), listIndexesCmd.toBSON()));
 
         collectionIndexSpecs[params.collectionName] = indexSpecs;
 
@@ -665,6 +680,11 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
     }
 
     return Status::OK();
+}
+
+bool DefaultClonerImpl::shouldUseRawDataOperations(const VersionContext& vCtx) {
+    return gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+        vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 Cloner::Cloner() : Cloner(std::make_unique<DefaultClonerImpl>()) {}

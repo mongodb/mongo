@@ -133,6 +133,13 @@ private:
     DBClientBase* getConn() {
         return _conn.get();
     }
+
+    /**
+     * Returns true if we should use raw data operations during cloning.
+     * If available, they must be used in order to clone viewless timeseries collections.
+     * TODO(SERVER-101595): This method always returns true once 9.0 becomes lastLTS.
+     */
+    bool shouldUseRawDataOperations(const VersionContext& vCtx);
 };
 
 class Cloner {
