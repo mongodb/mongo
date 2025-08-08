@@ -1,6 +1,7 @@
 # This script validates the msi can be installed, uninstalled, and checks for the default install location and some of the possible install files
 import glob
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -87,6 +88,8 @@ def validate_files(is_enterprise):
             print(f"File exists: {file_match[0]}")
             if file_match[0].endswith(".exe"):
                 validate_help(file_match[0])
+            if file_match[0].endswith("mongod.exe"):
+                validate_version(file_match[0])
         else:
             print(f"Error: {file_path} could not be found.")
             sys.exit(1)
@@ -102,6 +105,24 @@ def validate_help(exe_path):
         print(f"Error while calling help for {exe_path}: {e}")
         sys.exit(1)
 
+# Make sure we have a proper git version in the windows release
+def validate_version(exe_path):
+    try:
+        version_command = [exe_path, "--version"]
+        print(f"Calling '{exe_path}' with command: {' '.join(version_command)}...")
+        result = subprocess.run(version_command, check=True, stdout=subprocess.PIPE, text=True)
+        print(f"{exe_path} called version successfully.")
+        match = re.search('.*"gitVersion": "[0-9a-fA-F]{40}".*', result.stdout)
+        if match:
+            print("Found a valid git version.")
+            return
+        else:
+            print("--version command did not contain a valid git version in gitVersion. Stdout:")
+            print(result.stdout)
+            sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"Error while calling version for {exe_path}: {e}")
+        sys.exit(1)
 
 def main():
     if len(sys.argv) != 2:
