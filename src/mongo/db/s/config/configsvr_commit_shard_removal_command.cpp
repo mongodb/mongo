@@ -119,6 +119,10 @@ public:
 
             auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, requestShardId);
 
+            if (swShard == ErrorCodes::ShardNotFound) {
+                return;
+            }
+
             const auto shard = uassertStatusOK(swShard);
             shardId.emplace(shard->getId());
 

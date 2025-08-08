@@ -64,9 +64,12 @@ describe("commitShardRemoval correct functionality test", function() {
 
         assert.eq(0, this.st.s.getDB("config").shards.find({_id: 'repl1'}).toArray().length);
     });
-    it("can't remove non existent shard", () => {
-        assert.commandFailedWithCode(this.st.s.adminCommand({commitShardRemoval: "shard1"}),
-                                     ErrorCodes.ShardNotFound);
+    it("check command is idempotent", () => {
+        assert.commandWorked(this.st.s.adminCommand({commitShardRemoval: this.rs1.name}));
+        assert.commandWorked(this.st.s.adminCommand({commitShardRemoval: this.rs1.name}));
+    });
+    it("check removing non-existent shard returns ok", () => {
+        assert.commandWorked(this.st.s.adminCommand({commitShardRemoval: "shard1"}));
     });
     it("can't remove non-draining shard", () => {
         assert.commandFailedWithCode(
