@@ -18,7 +18,13 @@ class CleanEveryN(interface.Hook):
     DEFAULT_N = 20
 
     def __init__(
-        self, hook_logger, fixture, n=DEFAULT_N, shell_options=None, skip_database_deletion=False
+        self,
+        hook_logger,
+        fixture,
+        n=DEFAULT_N,
+        shell_options=None,
+        skip_database_deletion=False,
+        skip_fixture_restart=False,
     ):
         """Initialize CleanEveryN."""
         description = "CleanEveryN (restarts the fixture after running `n` tests)"
@@ -37,6 +43,7 @@ class CleanEveryN(interface.Hook):
         self.tests_run = 0
         self.shell_options = shell_options
         self.skip_database_deletion = skip_database_deletion
+        self.skip_fixture_restart = skip_fixture_restart
 
     def after_test(self, test, test_report):
         """After test cleanup."""
@@ -67,6 +74,8 @@ class CleanEveryN(interface.Hook):
                     self.logger.info(f"Successfully dropped database: {db_name}")
             return
 
+        if self.skip_fixture_restart:
+            return
         hook_test_case = CleanEveryNTestCase.create_after_test(test.logger, test, self)
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)

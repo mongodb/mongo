@@ -51,3 +51,6 @@ filters:
   - "generate_and_check_perf_results.py":
     approvers:
       - 10gen/devprod-performance-analysis
+  - "replicaset_transition_to_and_from_csrs.py":
+    approvers:
+      - 10gen/server-catalog-and-routing

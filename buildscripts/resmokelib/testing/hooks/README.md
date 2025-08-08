@@ -30,6 +30,7 @@ Specify any of the following as the `hooks` in your [Suite](../../../../buildscr
 - [`ContinuousAddRemoveShard`](./add_remove_shards.py) - Continuously adds and removes shards at regular intervals. If running with `configsvr` transitions, will transition in/out of config shard mode.
 - [`ContinuousInitialSync`](./continuous_initial_sync.py) - Periodically initial sync nodes then step them up.
 - [`ContinuousStepdown`](./stepdown.py) - regularly connect to replica sets and send a `replSetStepDown` command.
+- [`ContinuousTransition`](./replicaset_transition_to_and_from_csrs.py) - connects to replica sets and transitions them from replica set to CSRS node in the background.
 - [`DoReconfigInBackground`](./reconfig_background.py) - A hook for running a safe reconfig against a replica set while a test is running.
 - [`DropUserCollections`](./drop_user_collections.py) - Drops all user collections.
 - [`EnableChangeStream`](./enable_change_stream.py) - Enable change stream hook class.

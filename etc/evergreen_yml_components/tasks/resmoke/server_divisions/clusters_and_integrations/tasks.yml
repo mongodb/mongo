@@ -1420,6 +1420,12 @@ tasks:
           use_large_distro: "true"
 
   - <<: *gen_task_template
+    name: replica_sets_transition_to_csrs_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
     name: retryable_writes_downgrade_gen
     tags:
       [

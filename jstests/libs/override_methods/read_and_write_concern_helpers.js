@@ -46,6 +46,7 @@ export var kCommandsSupportingWriteConcern = new Set([
     "appendOplogNote",
     "applyOps",
     "aggregate",
+    "bulkWrite",
     "cleanupOrphaned",
     "clone",
     "cloneCollectionAsCapped",

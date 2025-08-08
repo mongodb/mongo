@@ -1,0 +1,179 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+  exclude_files:
+    # Transactions do not support retryability of individual operations.
+    # TODO: Remove this once it is supported (SERVER-33952).
+    - jstests/core/txns/**/*.js
+    # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
+    # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
+    # server parameter.
+    - jstests/core/**/set_param1.js
+
+    # No-op retries are not ignored by top, the profiler, or opcount.
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/profile2.js
+    - jstests/core/**/profile3.js
+    - jstests/core/**/profile_findandmodify.js
+    - jstests/core/**/query/top/top.js
+    - jstests/core/catalog/views/views_stats.js
+
+    # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
+    - jstests/core/**/crud_api.js
+    - jstests/core/**/find_and_modify.js
+    - jstests/core/**/find_and_modify_fields.js
+    - jstests/core/**/find_and_modify_pipeline_update.js
+    - jstests/core/**/find_and_modify_positional_new_remove.js
+    - jstests/core/**/project_with_collation.js
+
+    # These test run commands using legacy queries, which are not supported on sessions.
+    - jstests/core/**/query/comment_field.js
+    - jstests/core/**/query/exhaust.js
+
+    # Stepdown commands during fsync lock will fail.
+    - jstests/core/**/currentop.js
+    - jstests/core/**/fsync.js
+
+    # Spawns new mongo shells, which don't retry connecting on stepdown errors.
+    - jstests/core/**/shell_connection_strings.js
+
+    # Expect drops/creates to fail or have a certain response:
+    - jstests/core/**/indexes_multiple_commands.js
+
+    # Expect certain responses, but retries of successfully completed commands may return
+    # different values:
+    - jstests/core/**/create_indexes.js
+    - jstests/core/**/objid5.js
+
+    # Unacknowledged writes prohibited in an explicit session.
+    - jstests/core/**/batch_write_command_w0.js
+
+    - jstests/core/**/bench_test*.js # benchRun() used for writes
+    - jstests/core/**/benchrun_pipeline_updates.js # benchRun() used for writes
+    - jstests/core/**/list_collections_filter.js # Temporary collections are dropped on failover.
+    - jstests/core/**/query/top/top.js # Tests read commands (including getMore) against the secondary
+    - jstests/core/ddl/drop_collection_cursors.js # getMore is not causally consistent if collection is dropped
+    - jstests/core/**/list_collections_filter.js # Temporary collections are dropped on failover.
+    - jstests/core/**/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
+
+    # Tests that fail for Causal Consistency as they have statements that do not support
+    # non-local read concern.
+    - jstests/core/**/query/collation/collation.js
+    # Parallel shell is not causally consistent
+    - jstests/core/**/benchrun_pipeline_updates.js
+    - jstests/core/**/find_and_modify_concurrent_update.js
+    - jstests/core/**/shellstartparallel.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    ##
+    # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js
+    # override when it refuses to run a certain command. Above each tag are the message(s) that cause
+    # the tag to be warranted.
+    ##
+    # "Refusing to run a test that issues a getMore command since if a network error occurs during
+    #   it then we won't know whether the cursor was advanced or not"
+    - requires_getmore
+    # "Refusing to run a test that issues non-retryable write operations since the test likely makes
+    #   assertions on the write results and can lead to spurious failures if a network error occurs"
+    - requires_non_retryable_writes
+    # "Refusing to run a test that issues commands that are not blindly retryable"
+    # "Refusing to run a test that issues an aggregation command with $out because it is not
+    #   retryable"
+    - requires_non_retryable_commands
+    # "Refusing to run a test that issues commands that may return different values after a failover"
+    # "Refusing to run a test that issues an aggregation command with explain because it may return
+    #   incomplete results"
+    # "Refusing to run a test that issues an aggregation command with
+    #   $listLocalSessions because it relies on in-memory state that may not survive failovers"
+    # "Refusing to run a test that issues a mapReduce command, because it calls std::terminate() if
+    #   interrupted by a stepdown"
+    - does_not_support_stepdowns
+    ##
+    # The next two tags correspond to the special errors thrown by the
+    # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+    # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+    # warranted.
+    ##
+    # "Cowardly refusing to override read concern of command: ..."
+    - assumes_read_concern_unchanged
+    # "Cowardly refusing to override write concern of command: ..."
+    - assumes_write_concern_unchanged
+    ## The next tag corresponds to long running-operations, as they may exhaust their number
+    # of retries and result in a network error being thrown.
+    - operations_longer_than_stepdown_interval
+    - does_not_support_causal_consistency
+    - uses_transactions
+    # collStats is not causally consistent
+    - requires_collstats
+    - requires_dbstats
+    - requires_sharding
+    # Operations in the main test shell aren't guaranteed to be causally consistent with operations
+    # performed earlier in a parallel shell if multiple nodes are electable because the latest
+    # operation and cluster times aren't shared between shells.
+    # "Cowardly refusing to run test with network retries enabled when it uses startParallelShell()"
+    - uses_parallel_shell
+    - assumes_sharding_initialized
+    # These tests must be run through mongos or a regular replica set. Thus, they are incompatible
+    # with the fixture because it runs directly against a config server replica set.
+    - directly_against_shardsvrs_incompatible
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+      - ContinuousTransition
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+        globalThis.db = connect(TestData.connectionString);
+        await import("jstests/libs/override_methods/enable_sessions.js");
+        await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
+      global_vars:
+        TestData:
+          runningWithCausalConsistency: true
+          alwaysInjectTransactionNumber: true
+          defaultReadConcernLevel: "majority"
+          logRetryAttempts: true
+          networkErrorAndTxnOverrideConfig:
+            retryOnNetworkErrors: true
+            backgroundReconfigs: true
+          overrideRetryAttempts: 3
+          sessionOptions:
+            writeConcern:
+              w: "majority"
+            readConcern:
+              level: "majority"
+            # Force DBClientRS to find the primary for non-write commands.
+            readPreference:
+              mode: "primary"
+            retryWrites: true
+            maybeUseCausalConsistency: true
+      # We specify nodb so the shell used by each test will attempt to connect after loading the
+      # retry logic in auto_retry_on_network_error.js.
+      nodb: ""
+  hooks:
+    - class: ContinuousTransition
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+      skip_fixture_restart: true
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    all_nodes_electable: true
+    num_nodes: 5
+    replset_config_options:
+      settings:
+        electionTimeoutMillis: 5000 # Allow secondaries to step up if we end up without a primary
+        catchUpTimeoutMillis: 0
