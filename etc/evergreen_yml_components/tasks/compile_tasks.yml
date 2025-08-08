@@ -875,6 +875,7 @@ tasks:
           binary: bash
           env:
             PROMOTE_TASK_ID: ${promote_task_id}
+            PROMOTE_PROJECT_IDENTIFIER: ${promote_custom_project_identifier}
             EVERGREEN_API_USER: ${evergreen_api_user}
             EVERGREEN_API_KEY: ${evergreen_api_key}
           args:
@@ -888,6 +889,7 @@ tasks:
           binary: bash
           env:
             PROMOTE_TASK_ID: ${promote_archive_dist_test_task_id}
+            PROMOTE_PROJECT_IDENTIFIER: ${promote_custom_project_identifier}
             CDN_PATH: "server-custom-builds"
             EVERGREEN_API_USER: ${evergreen_api_user}
             EVERGREEN_API_KEY: ${evergreen_api_key}
@@ -965,6 +967,7 @@ tasks:
           binary: bash
           env:
             PROMOTE_TASK_ID: ${promote_task_id}
+            PROMOTE_PROJECT_IDENTIFIER: ${promote_custom_project_identifier}
             CDN_PATH: "sys-perf-builds"
             EVERGREEN_API_USER: ${evergreen_api_user}
             EVERGREEN_API_KEY: ${evergreen_api_key}

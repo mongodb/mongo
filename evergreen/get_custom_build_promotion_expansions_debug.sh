@@ -20,7 +20,12 @@ else
     promote_extension="tgz"
 fi
 
-promote_project_identifier=$(cat debug_task_data.json | jq -r ".project_identifier")
+if [ -z "$PROMOTE_PROJECT_IDENTIFIER" ]; then
+    promote_project_identifier=$(cat task_data.json | jq -r ".project_identifier")
+else
+    promote_project_identifier=$PROMOTE_PROJECT_IDENTIFIER
+fi
+
 promote_version_id=$(cat debug_task_data.json | jq -r ".version_id")
 promote_build_id=$(cat debug_task_data.json | jq -r ".build_id")
 promote_build_variant=$(cat debug_task_data.json | jq -r ".build_variant")
