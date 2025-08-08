@@ -175,6 +175,13 @@ void initFIPS() {
                             "error"_attr =
                                 SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
     }
+
+    if (!EVP_default_properties_enable_fips(nullptr, 1)) {
+        LOGV2_FATAL_NOTRACE(10788001,
+                            "Failed to set FIPS as default OpenSSL 3 provider",
+                            "error"_attr =
+                                SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
+    };
 }
 #elif defined(MONGO_CONFIG_HAVE_FIPS_MODE_SET)
 
