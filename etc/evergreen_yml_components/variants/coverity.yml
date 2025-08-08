@@ -13,6 +13,14 @@ buildvariants:
       - name: run_coverity
 
 functions:
+  f_generate_evergreen_bazelrc:
+    command: subprocess.exec
+    display_name: "generate evergreen bazelrc"
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/generate_evergreen_bazelrc.sh"
+
   f_setup_python:
     command: subprocess.exec
     display_name: "set up venv"
@@ -35,8 +43,8 @@ functions:
 tasks:
   - name: run_coverity
     depends_on:
-    - name: version_expansions_gen
-      variant: generate-tasks-for-version
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
     tags:
       [
         "assigned_to_jira_team_devprod_build",
@@ -52,11 +60,12 @@ tasks:
           module_prefix: ${workdir}/devprodCoveritySrc
           module_name: devprod_coverity
       # Functions to prepare for Coverity build
-      - func: f_setup_python
-      - func: "get version expansions"
-      - func: "apply version expansions"
       - func: f_expansions_write
-      #- func: f_generate_evergreen_bazelrc
+      - func: f_setup_python
+      - func: f_expansions_write
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - func: f_generate_evergreen_bazelrc
       - func: f_download_and_extract_coverity
         vars:
           module_prefix: ${workdir}/devprodCoveritySrc
