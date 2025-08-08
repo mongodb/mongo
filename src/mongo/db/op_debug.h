@@ -496,9 +496,6 @@ public:
     // Stores storage statistics.
     std::unique_ptr<StorageStats> storageStats;
 
-    // Stores storage statistics from the spill engine.
-    std::unique_ptr<StorageStats> spillStorageStats;
-
     bool waitingForFlowControl{false};
 
     // Records the WC that was waited on during the operation. (The WC in opCtx can't be used

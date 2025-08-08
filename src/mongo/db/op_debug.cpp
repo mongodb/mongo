@@ -426,10 +426,6 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("storage", storageStats->toBSON());
     }
 
-    if (spillStorageStats) {
-        pAttrs->add("spillStorage", spillStorageStats->toBSON());
-    }
-
     // Always report cpuNanos in rare cases that it is zero to facilitate testing that expects this
     // field to always exist.
     if (cpuTime >= Nanoseconds::zero()) {
@@ -671,10 +667,6 @@ void OpDebug::append(OperationContext* opCtx,
 
     if (storageStats) {
         b.append("storage", storageStats->toBSON());
-    }
-
-    if (spillStorageStats) {
-        b.append("spillStorage", spillStorageStats->toBSON());
     }
 
     if (!errInfo.isOK()) {
@@ -1020,12 +1012,6 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     addIfNeeded("storage", [](auto field, auto args, auto& b) {
         if (args.op.storageStats) {
             b.append(field, args.op.storageStats->toBSON());
-        }
-    });
-
-    addIfNeeded("spillStorage", [](auto field, auto args, auto& b) {
-        if (args.op.spillStorageStats) {
-            b.append(field, args.op.spillStorageStats->toBSON());
         }
     });
 
