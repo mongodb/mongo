@@ -39,6 +39,7 @@
 #include "mongo/db/repl/initial_sync/repl_sync_shared_data.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -78,6 +79,19 @@ InitialSyncBaseCloner::InitialSyncBaseCloner(StringData clonerName,
 
 void InitialSyncBaseCloner::clearRetryingState() {
     _retryableOp = boost::none;
+}
+
+bool InitialSyncBaseCloner::shouldUseRawDataOperations() {
+    // We can use this FCV-gated feature flag to check if raw data operations are supported, since:
+    // - The in-memory FCV is always initialized, since the cloner runs after _fcvFetcherCallback.
+    // - If the FCV changes during initial sync, it will fail (SERVER-31019).
+    //
+    // Also note that, since the choice of whether to use raw data operations depends on the FCV
+    // (not the sync source's binary), we may pessimistically return `false` here.
+    // This is fine, because raw data operations are only required to clone viewless timeseries
+    // collections, which can only be created on an FCV that supports raw data operations.
+    return gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+        kNoVersionContext, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 int InitialSyncBaseCloner::getRetryableOperationCount_forTest() {

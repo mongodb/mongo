@@ -41,8 +41,10 @@
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/db/list_indexes_gen.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -241,12 +243,20 @@ BaseCloner::AfterStageBehavior CollectionCloner::collStatsStage() {
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
-    auto count = getClient()->count(_sourceDbAndUuid,
-                                    {} /* Query */,
-                                    QueryOption_SecondaryOk,
-                                    0 /* limit */,
-                                    0 /* skip */,
-                                    ReadConcernArgs::kLocal);
+    CountCommandRequest countCmd(_sourceDbAndUuid);
+    countCmd.setQuery({});
+    countCmd.setReadConcern(ReadConcernArgs::kLocal);
+    if (shouldUseRawDataOperations()) {
+        countCmd.setRawData(true);
+    }
+
+    BSONObj res;
+    if (!getClient()->runCommand(
+            _sourceDbAndUuid.dbName(), countCmd.toBSON(), res, QueryOption_SecondaryOk)) {
+        uassertStatusOK(getStatusFromCommandResult(res).withContext("count failed"));
+    }
+    uassert(ErrorCodes::NoSuchKey, "Missing 'n' field for count command.", res.hasField("n"));
+    auto count = res["n"].numberLong();
 
     // The count command may return a negative value after an unclean shutdown,
     // so we set it to zero here to avoid aborting the collection clone.
@@ -267,10 +277,13 @@ BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
-    const bool includeBuildUUIDs = true;
-
-    auto indexSpecs =
-        getClient()->getIndexSpecs(_sourceDbAndUuid, includeBuildUUIDs, QueryOption_SecondaryOk);
+    ListIndexes listIndexesCmd(_sourceDbAndUuid);
+    listIndexesCmd.setIncludeBuildUUIDs(true);
+    if (shouldUseRawDataOperations()) {
+        listIndexesCmd.setRawData(true);
+    }
+    auto indexSpecs = uassertStatusOK(getClient()->runExhaustiveCursorCommand(
+        _sourceDbAndUuid.dbName(), listIndexesCmd.toBSON(), QueryOption_SecondaryOk));
     if (indexSpecs.empty()) {
         LOGV2_WARNING(21143,
                       "No indexes found for collection while cloning",
@@ -416,6 +429,9 @@ void CollectionCloner::runQuery() {
     findCmd.setReadConcern(ReadConcernArgs::kLocal);
     if (_collectionClonerBatchSize) {
         findCmd.setBatchSize(_collectionClonerBatchSize);
+    }
+    if (shouldUseRawDataOperations()) {
+        findCmd.setRawData(true);
     }
 
     ExhaustMode exhaustMode = collectionClonerUsesExhaust ? ExhaustMode::kOn : ExhaustMode::kOff;

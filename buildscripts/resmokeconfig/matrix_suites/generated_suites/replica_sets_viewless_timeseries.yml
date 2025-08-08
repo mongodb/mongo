@@ -19,5 +19,8 @@ selector:
   exclude_with_any_tags:
     - viewless_timeseries_incompatible
     - does_not_support_viewless_timeseries_yet
-  roots: []
+  roots:
+    - jstests/replsets/backwards_compatible_timeseries_catalog_options.js
+    - jstests/replsets/secondary_as_sync_source.js
+    - jstests/replsets/timeseries_mixed_schema_bucket_initial_sync.js
 test_kind: js_test

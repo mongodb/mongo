@@ -68,6 +68,13 @@ protected:
      */
     void clearRetryingState() final;
 
+    /**
+     * Returns true if we should use raw data operations during cloning.
+     * If available, they must be used in order to clone viewless timeseries collections.
+     * TODO(SERVER-101595): This method always returns true once 9.0 becomes lastLTS.
+     */
+    bool shouldUseRawDataOperations();
+
 private:
     /**
      * Make sure the initial sync ID on the sync source has not changed.  Throws an exception

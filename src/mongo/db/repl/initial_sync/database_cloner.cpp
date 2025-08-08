@@ -37,6 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/repl/initial_sync/database_cloner.h"
 #include "mongo/db/repl/initial_sync/database_cloner_gen.h"
 #include "mongo/db/service_context.h"
@@ -82,9 +83,14 @@ void DatabaseCloner::preStage() {
 }
 
 BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
-    BSONObj res;
-    auto collectionInfos =
-        getClient()->getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
+    ListCollections listCollectionsCmd;
+    listCollectionsCmd.setDbName(_dbName);
+    listCollectionsCmd.setFilter(ListCollectionsFilter::makeTypeCollectionFilter());
+    if (shouldUseRawDataOperations()) {
+        listCollectionsCmd.setRawData(true);
+    }
+    auto collectionInfos = uassertStatusOK(getClient()->runExhaustiveCursorCommand(
+        _dbName, listCollectionsCmd.toBSON(), QueryOption_SecondaryOk));
     const auto storageEngine = getGlobalServiceContext()->getStorageEngine();
 
     stdx::unordered_set<std::string> seen;
