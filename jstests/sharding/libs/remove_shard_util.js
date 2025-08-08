@@ -10,12 +10,27 @@ export function removeShard(shardingTestOrConn, shardName, timeout) {
     }
 
     var s;
+    let admin;
     if (shardingTestOrConn instanceof ShardingTest) {
         s = shardingTestOrConn.s;
+        admin = s.getDB("admin");
     } else {
         s = shardingTestOrConn;
+        admin = s.getSiblingDB("admin");
     }
 
+    // TODO SERVER-97816 remove the removeShardOld function
+    // Check the fcv. If 8.3 or above run the new path, otherwise run the old path.
+    const res = admin.system.version.find({_id: "featureCompatibilityVersion"}).toArray();
+    const is_83 = res.length == 0 || MongoRunner.compareBinVersions(res[0].version, "8.3") >= 0;
+    if (is_83) {
+        removeShardNew(s, shardName, timeout);
+    } else {
+        removeShardOld(s, shardName, timeout);
+    }
+}
+
+function removeShardOld(s, shardName, timeout) {
     assert.soon(function() {
         let res;
         if (shardName == "config") {
@@ -49,6 +64,68 @@ export function removeShard(shardingTestOrConn, shardName, timeout) {
         assert.commandWorked(res);
         return res.state == 'completed';
     }, "failed to remove shard " + shardName + " within " + timeout + "ms", timeout);
+}
+
+function removeShardNew(s, shardName, timeout) {
+    let res;
+    if (shardName == "config") {
+        assert.soon(function() {
+            // Need to use transitionToDedicatedConfigServer if trying
+            // to remove config server as a shard
+            res = s.adminCommand({transitionToDedicatedConfigServer: shardName});
+            if (!res.ok) {
+                if (res.code == ErrorCodes.ShardNotFound) {
+                    // TODO SERVER-32553: same as above
+                    return kNoRetry;
+                }
+                if (res.code === ErrorCodes.HostUnreachable &&
+                    TestData.runningWithConfigStepdowns) {
+                    // The mongos may exhaust its retries due to having consecutive config
+                    // stepdowns. In this case, the mongos will return a HostUnreachable error.
+                    // We should retry the operation when this happens.
+                    return kRetry;
+                }
+            }
+            assert.commandWorked(res);
+            return res.state == 'completed';
+        }, "failed to remove shard " + shardName + " within " + timeout + "ms", timeout);
+    } else {
+        assert.soon(function() {
+            assert.soon(function() {
+                return retryIfRetriableError(s, {startShardDraining: shardName});
+            }, "failed to remove shard " + shardName + " within " + timeout + "ms", timeout);
+
+            assert.soon(function() {
+                return retryIfRetriableError(s, {shardDrainingStatus: shardName});
+            }, "failed to remove shard " + shardName + " within " + timeout + "ms", timeout);
+
+            res = s.adminCommand({commitShardRemoval: shardName});
+
+            if (!res.ok) {
+                // If commitShardRemoval fails for any reason, retry.
+                return kRetry;
+            }
+            assert.commandWorked(res);
+            return true;
+        }, "failed to remove shard " + shardName + " within " + timeout + "ms", timeout);
+    }
+}
+function retryIfRetriableError(s, command) {
+    let res = s.adminCommand(command);
+    if (!res.ok) {
+        if (res.code == ErrorCodes.ShardNotFound) {
+            // If shardNotFound don't retry to make the removeShard function idempotent.
+            return kNoRetry;
+        }
+        if (res.code === ErrorCodes.HostUnreachable && TestData.runningWithConfigStepdowns) {
+            // The mongos may exhaust its retries due to having consecutive config
+            // stepdowns. In this case, the mongos will return a HostUnreachable error.
+            // We should retry the operation when this happens.
+            return kRetry;
+        }
+    }
+    assert.commandWorked(res);
+    return res.state ? res.state == 'drainingComplete' : kNoRetry;
 }
 
 export function moveOutSessionChunks(st, fromShard, toShard) {

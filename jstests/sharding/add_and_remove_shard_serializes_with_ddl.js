@@ -159,13 +159,21 @@ let coll1 = db["coll1"];
 
         if (testCase === "killOp") {
             let configPrimary = st.configRS.getPrimary();
-            let removeShardOpId = configPrimary.getDB("admin")
-                                      .aggregate([
-                                          {$currentOp: {allUsers: true}},
-                                          {$match: {"command._configsvrRemoveShard": shardToRemove}}
-                                      ])
-                                      .toArray()[0]
-                                      .opid;
+            let removeShardOpId =
+                configPrimary.getDB("admin")
+                    .aggregate([
+                        {$currentOp: {allUsers: true}},
+                        {
+                            $match: {
+                                $or: [
+                                    {"command._configsvrRemoveShard": shardToRemove},
+                                    {"command._configsvrCommitShardRemoval": shardToRemove}
+                                ]
+                            }
+                        }
+                    ])
+                    .toArray()[0]
+                    .opid;
             assert.commandWorked(configPrimary.getDB("admin").killOp(removeShardOpId));
         } else if (testCase === "stopServer") {
             // Restart the configsvr.

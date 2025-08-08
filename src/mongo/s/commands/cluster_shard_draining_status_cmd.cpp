@@ -51,7 +51,7 @@
 namespace mongo {
 namespace {
 
-const ReadPreferenceSetting kNearestReadPreference{ReadPreference::Nearest};
+const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
 
 class ShardDrainingStatusCmd : public TypedCommand<ShardDrainingStatusCmd> {
 public:
@@ -77,7 +77,7 @@ public:
                     ->getConfigShard()
                     ->runCommandWithFixedRetryAttempts(
                         opCtx,
-                        kNearestReadPreference,
+                        kPrimaryOnlyReadPreference,
                         DatabaseName::kAdmin,
                         CommandHelpers::filterCommandRequestForPassthrough(
                             configsvrRequest.toBSON()),
@@ -112,7 +112,7 @@ public:
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+        return AllowedOnSecondary::kNever;
     }
 
     bool adminOnly() const override {

@@ -76,6 +76,8 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrShardDrainingStatus can only be run on config servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
@@ -141,7 +143,7 @@ public:
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+        return AllowedOnSecondary::kNever;
     }
 
     bool adminOnly() const override {

@@ -1457,6 +1457,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/stop_shard_draining_test.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/remove_shard_interoperability_tests.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/commit_shard_removal_test.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/add_and_remove_shard_serializes_with_ddl.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/analyze_shard_key/OWNERS.yml
 /jstests/sharding/analyze_shard_key/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -1480,6 +1481,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/libs/**/zone_changes_util.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/libs/**/mongos_api_params_util.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/sharding/libs/**/create_sharded_collection_util.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/libs/**/remove_shard_util.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/load_balancer_support/OWNERS.yml
 /jstests/sharding/load_balancer_support/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
