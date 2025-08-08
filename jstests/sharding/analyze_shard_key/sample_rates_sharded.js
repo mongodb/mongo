@@ -21,9 +21,10 @@ import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_s
 import {
     assertDiffWindow,
     fieldName,
+    isSlowBuild,
     runDeleteCmdsOnRepeat,
     runFindCmdsOnRepeat,
-    runNestedAggregateCmdsOnRepeat,
+    runNestedAggregateCmdsOnRepeat
 } from "jstests/sharding/analyze_shard_key/libs/sample_rates_common.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
@@ -197,6 +198,8 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
         AnalyzeShardKeyUtil.calculatePercentage(actualNumDeletePerSec, actualTotalQueriesPerSec);
     const expectedAggPercentage =
         AnalyzeShardKeyUtil.calculatePercentage(actualNumAggPerSec, actualTotalQueriesPerSec);
+
+    const slowBuild = isSlowBuild(st.s);
     jsTest.log("Checking that the number of sampled queries is within the threshold: " +
                tojsononeline({
                    expectedSampleSize: {
@@ -204,20 +207,27 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
                        find: expectedFindPercentage * expectedTotalCount / 100,
                        [deleteField]: expectedDeletePercentage * expectedTotalCount / 100,
                        aggregate: expectedAggPercentage * expectedTotalCount / 100
-                   }
+                   },
+                   isSlowBuild: slowBuild,
                }));
 
+    // The maximum percentage difference between the actual and expected total number of samples.
+    const maxTotalSampleDiffPercentage = slowBuild ? 50 : 25;
+    // The maximum difference between the actual and expected percentage of samples for each
+    // command.
+    const maxCommandPercentageDiff = slowBuild ? 15 : 10;
+
     AnalyzeShardKeyUtil.assertDiffPercentage(
-        sampleSize.total, expectedTotalCount, 20 /* maxDiffPercentage */);
+        sampleSize.total, expectedTotalCount, maxTotalSampleDiffPercentage);
     const actualFindPercentage =
         AnalyzeShardKeyUtil.calculatePercentage(sampleSize.find, sampleSize.total);
-    assertDiffWindow(actualFindPercentage, expectedFindPercentage, 7.5 /* maxDiff */);
+    assertDiffWindow(actualFindPercentage, expectedFindPercentage, maxCommandPercentageDiff);
     const actualDeletePercentage =
         AnalyzeShardKeyUtil.calculatePercentage(sampleSize[deleteField], sampleSize.total);
-    assertDiffWindow(actualDeletePercentage, expectedDeletePercentage, 7.5 /* maxDiff */);
+    assertDiffWindow(actualDeletePercentage, expectedDeletePercentage, maxCommandPercentageDiff);
     const actualAggPercentage =
         AnalyzeShardKeyUtil.calculatePercentage(sampleSize.aggregate, sampleSize.total);
-    assertDiffWindow(actualAggPercentage, expectedAggPercentage, 7.5 /* maxDiff */);
+    assertDiffWindow(actualAggPercentage, expectedAggPercentage, maxCommandPercentageDiff);
 
     QuerySamplingUtil.clearSampledQueryCollectionOnAllShards(st);
 }
