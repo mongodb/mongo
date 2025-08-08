@@ -11,6 +11,7 @@ load("//bazel:separate_debug.bzl", "TagInfo")
 load("//bazel/install_rules:pretty_printer_tests.bzl", "mongo_pretty_printer_test")
 load("//bazel/install_rules:providers.bzl", "TestBinaryInfo")
 load("//bazel/toolchains/cc:mongo_errors.bzl", "DWP_ERROR_MESSAGE")
+load("//bazel:transitions.bzl", "extensions_transition")
 
 # Used to skip rules on certain OS architectures
 def _empty_rule_impl(ctx):
@@ -595,3 +596,14 @@ def mongo_install(
                 "//conditions:default": "archive-" + name + install_type + "_tar",
             }),
         )
+
+def _extensions_with_config_impl(ctx):
+    """Implementation for the extensions_with_config rule."""
+    return [DefaultInfo(files = depset(ctx.files.srcs))]
+
+extensions_with_config = rule(
+    implementation = _extensions_with_config_impl,
+    attrs = {
+        "srcs": attr.label_list(cfg = extensions_transition, allow_files = True),
+    },
+)
