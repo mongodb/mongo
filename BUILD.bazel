@@ -4,6 +4,7 @@ load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS", "mongo_install")
 load("//bazel/install_rules:bolt.bzl", "bolt_instrument", "bolt_optimize")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
+load("//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl", "setup_gdb_toolchain_aliases")
 load("//bazel/config:render_template.bzl", "render_template")
 load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
 load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
@@ -94,6 +95,8 @@ alias(
 )
 
 setup_mongo_toolchain_aliases()
+
+setup_gdb_toolchain_aliases()
 
 render_template(
     name = "clang_tidy_config",

@@ -17,13 +17,10 @@ if not gdb:
 
 
 def detect_toolchain(progspace):
-    readelf_bin = "readelf"
-    for path in [
-        "/opt/mongodbtoolchain/v5/bin/llvm-readelf",
-    ]:
-        if os.path.exists(path):
-            readelf_bin = path
-            break
+
+    readelf_bin = os.environ.get("MONGO_GDB_READELF", "/opt/mongodbtoolchain/v5/bin/llvm-readelf")
+    if not os.path.exists(readelf_bin):
+        readelf_bin = "readelf"
 
     gcc_version_regex = re.compile(r".*\]\s*GCC: \(GNU\) (\d+\.\d+\.\d+)\s*$")
     clang_version_regex = re.compile(r".*\]\s*MongoDB clang version (\d+\.\d+\.\d+).*")
@@ -79,8 +76,9 @@ STDERR:
 -----------------
 Assuming {toolchain_ver} as a default, this could cause issues with the printers.""")
 
+    base_toolchain_dir = os.environ.get("MONGO_GDB_PP_DIR", f"/opt/mongodbtoolchain/{toolchain_ver}/share")
     pp = glob.glob(
-        f"/opt/mongodbtoolchain/{toolchain_ver}/share/gcc-*/python/libstdcxx/v6/printers.py"
+        f"{base_toolchain_dir}/gcc-*/python/libstdcxx/v6/printers.py"
     )
     printers = pp[0]
     return os.path.dirname(os.path.dirname(os.path.dirname(printers)))
@@ -587,7 +585,7 @@ class MongoDBDumpLocks(gdb.Command):
         print("Running Hang Analyzer Supplement - MongoDBDumpLocks")
 
         main_binary_name = get_process_name()
-        if main_binary_name == "mongod":
+        if main_binary_name == "mongod" or main_binary_name == "mongod_with_debug":
             self.dump_mongod_locks()
         else:
             print("Not invoking mongod lock dump for: %s" % (main_binary_name))
