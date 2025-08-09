@@ -2188,7 +2188,7 @@ TEST_F(RollbackImplObserverInfoTest,
     auto uuid = UUID::gen();
 
     BSONObj indexObj;
-    if (shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(_opCtx.get()))) {
+    if (shouldReplicateLocalCatalogIdentifers(_opCtx.get())) {
         indexObj = BSON("createIndexes" << nss.coll() << "spec"
                                         << BSON("v" << 2 << "key"
                                                     << "x"

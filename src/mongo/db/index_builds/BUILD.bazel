@@ -94,10 +94,8 @@ mongo_cc_library(
     deps = [
         ":commit_quorum_options",
         ":index_builds_common",
-        ":resumable_index_builds_idl",
         "//src/mongo:base",
         "//src/mongo/bson/util:bson_extract",
-        "//src/mongo/db/op_observer:op_observer_util",
         "//src/mongo/db/repl:oplog_entry",
     ],
 )

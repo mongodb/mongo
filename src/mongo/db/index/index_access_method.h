@@ -317,7 +317,7 @@ public:
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
         const DatabaseName& dbName,
-        const IndexBuildMethodEnum& method) = 0;
+        const IndexBuildMethod& method) = 0;
 };
 
 /**
@@ -638,7 +638,7 @@ public:
                                               size_t maxMemoryUsageBytes,
                                               const boost::optional<IndexStateInfo>& stateInfo,
                                               const DatabaseName& dbName,
-                                              const IndexBuildMethodEnum& method) final;
+                                              const IndexBuildMethod& method) final;
 
 protected:
     /**

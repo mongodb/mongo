@@ -453,7 +453,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 : InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints;
             // Foreground index builds have to check for duplicates. Other index builds can relax
             // constraints and check for violations at commit-time.
-            index.options.dupsAllowed = _method == IndexBuildMethodEnum::kForeground
+            index.options.dupsAllowed = _method == IndexBuildMethod::kForeground
                 ? !descriptor->unique() || _ignoreUnique
                 : true;
 
@@ -1177,16 +1177,15 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
 }
 
 bool MultiIndexBlock::isBackgroundBuilding() const {
-    return _method == IndexBuildMethodEnum::kHybrid ||
-        _method == IndexBuildMethodEnum::kPrimaryDriven;
+    return _method == IndexBuildMethod::kHybrid || _method == IndexBuildMethod::kPrimaryDriven;
 }
 
-void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethodEnum indexBuildMethod) {
+void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethod indexBuildMethod) {
     _method = indexBuildMethod;
 }
 
 void MultiIndexBlock::appendBuildInfo(BSONObjBuilder* builder) const {
-    builder->append("method", IndexBuildMethod_serializer(_method));
+    builder->append("method", toString(_method));
     builder->append("phase", static_cast<int>(_phase));
     builder->append("phaseStr", IndexBuildPhase_serializer(_phase));
 }
@@ -1208,7 +1207,7 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
                                                rss::consensus::IntentRegistry::Intent::LocalWrite});
     }
 
-    if (isResumable && _method == IndexBuildMethodEnum::kHybrid) {
+    if (isResumable && _method == IndexBuildMethod::kHybrid) {
         invariant(_buildUUID);
         _writeStateToDisk(opCtx, collection);
 

@@ -1042,7 +1042,6 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
     const auto nss = getNsFromUUID(opCtx, collUUID);
 
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
-    indexBuildOptions.indexBuildMethod = oplogEntry.indexBuildMethod;
     indexBuildOptions.applicationMode = applicationMode;
     if (repl::feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
         // When gReduceMajorityWriteLatency is enabled, the oplog can be written far ahead of oplog
@@ -2140,7 +2139,7 @@ void IndexBuildsCoordinator::_createIndex(OperationContext* opCtx,
         options.indexConstraints = indexConstraints;
         // As the caller has exclusive access to the collection, we can safely assume they want to
         // build the index in the foreground instead of yielding during element insertion.
-        options.method = IndexBuildMethodEnum::kForeground;
+        options.method = IndexBuildMethod::kForeground;
         uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
             opCtx, collection, {indexBuildInfo}, buildUUID, onInitFn, options));
     } catch (DBException& ex) {

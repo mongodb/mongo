@@ -52,16 +52,11 @@ const OpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
 MONGO_FAIL_POINT_DEFINE(addDestinedRecipient);
 MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 
-bool shouldReplicateLocalCatalogIdentifers(const VersionContext& vCtx) {
+bool shouldReplicateLocalCatalogIdentifers(OperationContext* opCtx) {
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     return fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(vCtx, fcvSnapshot);
-}
-
-bool isPrimaryDrivenIndexBuildEnabled(const VersionContext& vCtx) {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    return fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(vCtx, fcvSnapshot);
+        feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
 }
 
 /**

@@ -57,6 +57,19 @@ const IndexCatalogEntry* IndexIterator::next() {
     return _prev;
 }
 
+StringData toString(IndexBuildMethod method) {
+    switch (method) {
+        case IndexBuildMethod::kHybrid:
+            return "Hybrid"_sd;
+        case IndexBuildMethod::kForeground:
+            return "Foreground"_sd;
+        case IndexBuildMethod::kPrimaryDriven:
+            return "Primary driven"_sd;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(10083503);
+}
+
 // Returns normalized version of 'indexSpec' for the catalog.
 BSONObj IndexCatalog::normalizeIndexSpec(OperationContext* opCtx,
                                          const CollectionPtr& collection,

@@ -604,8 +604,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
         .indexBuildMethod = ((fcvSnapshot.isVersionInitialized() &&
                               feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
                                   VersionContext::getDecoration(opCtx), fcvSnapshot))
-                                 ? IndexBuildMethodEnum::kPrimaryDriven
-                                 : IndexBuildMethodEnum::kHybrid),
+                                 ? IndexBuildMethod::kPrimaryDriven
+                                 : IndexBuildMethod::kHybrid),
         .commitQuorum = commitQuorum};
 
     LOGV2(20438,

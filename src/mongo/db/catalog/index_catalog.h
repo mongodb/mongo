@@ -79,6 +79,36 @@ struct BsonRecord {
  */
 enum class CheckRecordId { Off, On };
 
+enum class IndexBuildMethod {
+    /**
+     * Use a collection scan to dump all keys into an external sorter. During this process,
+     * concurrent client writes are accepted, and their generated keys are written into an
+     * interceptor. On completion, this interceptor is drained and used to verify uniqueness
+     * constraints on the index.
+     *
+     * This is the default for all index builds.
+     */
+    kHybrid,
+    /**
+     * Perform a collection scan to dump all keys into the external sorter, then into the index.
+     * During this process, callers guarantee that no writes will be accepted on this collection.
+     */
+    kForeground,
+    /**
+     * The overall index build process is similar to kHybrid. However, instead of building the index
+     * independently on each replica, only the primary runs the logic to build the index. Replicas
+     * simply apply the oplog entries generated during the build.
+     *
+     * This is the default for all index builds in a disaggregated storage cluster and is currently
+     * not supported in an attached storage cluster.
+     *
+     * TODO(SERVER-103670): Add implementation for this new IndexBuildMethod.
+     */
+    kPrimaryDriven,
+};
+
+StringData toString(IndexBuildMethod method);
+
 enum class CreateIndexEntryFlags : int {
     kNone = 0x0,
     /**

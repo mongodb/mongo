@@ -36,26 +36,6 @@ imports:
     - "mongo/db/sorter/sorter.idl"
 
 enums:
-    IndexBuildMethod:
-        description: "Index build method"
-        type: string
-        values:
-            # Use a collection scan to dump all keys into an external sorter. During this process,
-            # concurrent client writes are accepted, and their generated keys are written into an
-            # interceptor. On completion, this interceptor is drained and used to verify uniqueness
-            # constraints on the index.
-            kHybrid: "hybrid"
-            # Perform a collection scan to dump all keys into the external sorter, then into the
-            # index. During this process, callers guarantee that no writes will be accepted on this
-            # collection.
-            kForeground: "foreground"
-            # The overall index build process is similar to kHybrid. However, instead of building
-            # the index independently on each replica, only the primary runs the logic to build the
-            # index. Replicas simply apply the oplog entries generated during the build.
-            #
-            # This is the default for all index builds in a disaggregated storage cluster and is
-            # currently not supported in an attached storage cluster.
-            kPrimaryDriven: "Primary driven"
     IndexBuildPhase:
         description: "Phase of a hybrid index build"
         type: string

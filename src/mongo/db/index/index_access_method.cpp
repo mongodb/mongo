@@ -1378,8 +1378,8 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::ini
     size_t maxMemoryUsageBytes,
     const boost::optional<IndexStateInfo>& stateInfo,
     const DatabaseName& dbName,
-    const IndexBuildMethodEnum& method) {
-    if (method == IndexBuildMethodEnum::kPrimaryDriven) {
+    const IndexBuildMethod& method) {
+    if (method == IndexBuildMethod::kPrimaryDriven) {
         invariant(!stateInfo);
         return std::make_unique<PrimaryDrivenBulkBuilder>(entry, this, maxMemoryUsageBytes, dbName);
     }

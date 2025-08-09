@@ -221,7 +221,7 @@ Status buildMissingIdIndex(OperationContext* opCtx, const NamespaceString nss) {
     MultiIndexBlock indexer;
     // This method is called in startup recovery so we can safely build the id index in foreground
     // mode. This prevents us from yielding a MODE_X lock (which is disallowed).
-    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kForeground);
+    indexer.setIndexBuildMethod(IndexBuildMethod::kForeground);
     CollectionWriter collWriter(opCtx, nss);
     LOGV2(4805002, "Building missing _id index", logAttrs(*collWriter));
 
