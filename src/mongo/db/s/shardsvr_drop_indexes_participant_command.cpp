@@ -28,11 +28,14 @@
  */
 
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
@@ -97,13 +100,21 @@ public:
                     opCtx->getCancellationToken(),
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
                 alternativeOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-                alternativeOpCtx->setWriteConcern(opCtx->getWriteConcern());
+
+                ForwardableOperationMetadata forwardableOpMetadata(opCtx);
+                forwardableOpMetadata.setOn(alternativeOpCtx.get());
+
+                OperationShardingState::setShardRole(
+                    alternativeOpCtx.get(),
+                    ns(),
+                    OperationShardingState::get(opCtx).getShardVersion(ns()),
+                    OperationShardingState::get(opCtx).getDbVersion(ns().dbName()));
 
                 DBDirectClient client(alternativeOpCtx.get());
 
                 DropIndexes dropIndexesCmd(ns());
                 dropIndexesCmd.setDropIndexesRequest(req.getDropIndexesRequest());
-                dropIndexesCmd.setWriteConcern(opCtx->getWriteConcern());
+                setReadWriteConcern(opCtx, dropIndexesCmd, this);
 
                 commandSucceeded =
                     client.runCommand(ns().dbName(), dropIndexesCmd.toBSON(), response);
@@ -125,6 +136,8 @@ public:
                       "Successfully dropped indexes on participant shard",
                       "dropIndexesRequest"_attr = req.getDropIndexesRequest().toBSON());
             }
+
+            uassertStatusOK(getStatusFromCommandResult(response));
 
             Response dropIndexesResponse =
                 DropIndexesReply::parse(IDLParserContext("DropIndexesReply"), response);

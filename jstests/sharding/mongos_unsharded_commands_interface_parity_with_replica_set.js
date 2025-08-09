@@ -310,7 +310,7 @@ const tests = [
     {
         name: "dropIndexes",
         database: "test",
-        supportsWriteConcern: true,
+        supportsWriteConcern: false,
         teardown: function(db) {
             db.x.drop();
         },

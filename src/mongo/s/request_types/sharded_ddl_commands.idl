@@ -656,6 +656,7 @@ commands:
         cpp_name: ShardsvrDropIndexesParticipant
         namespace: concatenate_with_db
         api_version: ""
+        reply_type: DropIndexesReply
         strict: false
         chained_structs:
             DropIndexesRequest: DropIndexesRequest

@@ -52,6 +52,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_database_coordinator.h"
+#include "mongo/db/s/drop_indexes_coordinator.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
 #include "mongo/db/s/move_primary_coordinator.h"
@@ -100,6 +101,8 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             return std::make_shared<DropDatabaseCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kDropCollection:
             return std::make_shared<DropCollectionCoordinator>(service, std::move(initialState));
+        case DDLCoordinatorTypeEnum::kDropIndexes:
+            return std::make_shared<DropIndexesCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kRenameCollection:
             return std::make_shared<RenameCollectionCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kCreateCollection:
