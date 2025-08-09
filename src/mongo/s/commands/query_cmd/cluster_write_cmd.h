@@ -48,7 +48,6 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/async_requests_sender.h"
-#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -116,7 +115,6 @@ public:
                                const NamespaceString& nss,
                                const BSONObj& command,
                                BatchItemRef targetingBatchItem,
-                               const CollectionRoutingInfoTargeter& targeter,
                                std::vector<AsyncRequestsSender::Response>* results);
 
     /**

@@ -59,8 +59,8 @@
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/cluster_write.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/grid.h"
@@ -303,6 +303,31 @@ UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
     return UpdateShardKeyResult{sharedBlock->updatedShardKey, std::move(upsertedId)};
 }
 
+static BSONObj translateCmdObjForRawData(OperationContext* opCtx,
+                                         const BatchedCommandRequest& batchedRequest,
+                                         const BSONObj& cmdObj,
+                                         NamespaceString& ns) {
+    if (!isRawDataOperation(opCtx) ||
+        !CollectionRoutingInfoTargeter{opCtx, ns}.timeseriesNamespaceNeedsRewrite(ns)) {
+        return cmdObj;
+    }
+
+    ns = ns.makeTimeseriesBucketsNamespace();
+    switch (batchedRequest.getBatchType()) {
+        case BatchedCommandRequest::BatchType_Insert:
+            return rewriteCommandForRawDataOperation<write_ops::InsertCommandRequest>(cmdObj,
+                                                                                      ns.coll());
+        case BatchedCommandRequest::BatchType_Update:
+            return rewriteCommandForRawDataOperation<write_ops::UpdateCommandRequest>(cmdObj,
+                                                                                      ns.coll());
+        case BatchedCommandRequest::BatchType_Delete:
+            return rewriteCommandForRawDataOperation<write_ops::DeleteCommandRequest>(cmdObj,
+                                                                                      ns.coll());
+    }
+
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace
 
 bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
@@ -410,8 +435,8 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      const BSONObj& command,
                                      BatchItemRef targetingBatchItem,
-                                     const CollectionRoutingInfoTargeter& targeter,
                                      std::vector<AsyncRequestsSender::Response>* results) {
+    CollectionRoutingInfoTargeter targeter(opCtx, nss);
     auto endpoints = [&] {
         // Note that this implementation will not handle targeting retries and does not
         // completely emulate write behavior.
@@ -473,85 +498,41 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
 
 bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
                                                 const BatchedCommandRequest& req,
-                                                const NamespaceString& originalNss,
+                                                const NamespaceString& nss,
                                                 ExplainOptions::Verbosity verbosity,
                                                 BSONObjBuilder* result) {
-    if (req.getBatchType() != BatchedCommandRequest::BatchType_Delete &&
-        req.getBatchType() != BatchedCommandRequest::BatchType_Update) {
-        return false;
-    }
+    if (req.getBatchType() == BatchedCommandRequest::BatchType_Delete ||
+        req.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+        bool isMultiWrite = false;
+        BSONObj query;
+        BSONObj collation;
+        bool isUpsert = false;
+        if (req.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+            auto updateOp = req.getUpdateRequest().getUpdates().begin();
+            isMultiWrite = updateOp->getMulti();
+            query = updateOp->getQ();
+            collation = updateOp->getCollation().value_or(BSONObj());
+            isUpsert = updateOp->getUpsert();
+        } else {
+            auto deleteOp = req.getDeleteRequest().getDeletes().begin();
+            isMultiWrite = deleteOp->getMulti();
+            query = deleteOp->getQ();
+            collation = deleteOp->getCollation().value_or(BSONObj());
+        }
 
-    bool isMultiWrite = false;
-    BSONObj query;
-    BSONObj collation;
-    bool isUpsert = false;
-    if (req.getBatchType() == BatchedCommandRequest::BatchType_Update) {
-        auto updateOp = req.getUpdateRequest().getUpdates().begin();
-        isMultiWrite = updateOp->getMulti();
-        query = updateOp->getQ();
-        collation = updateOp->getCollation().value_or(BSONObj());
-        isUpsert = updateOp->getUpsert();
-    } else {
-        auto deleteOp = req.getDeleteRequest().getDeletes().begin();
-        isMultiWrite = deleteOp->getMulti();
-        query = deleteOp->getQ();
-        collation = deleteOp->getCollation().value_or(BSONObj());
-    }
+        auto translatedNs = nss;
+        auto translatedReqBSON = translateCmdObjForRawData(opCtx, req, req.toBSON(), translatedNs);
 
-    if (isMultiWrite) {
-        return false;
-    }
-
-    sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
-    return router.routeWithRoutingContext(
-        opCtx,
-        "explain write"_sd,
-        [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
-            auto translatedReqBSON = req.toBSON();
-            auto translatedNss = originalNss;
-            const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
-            auto& unusedRoutingCtx = translateNssForRawDataAccordingToRoutingInfo(
-                opCtx,
-                originalNss,
-                targeter,
-                originalRoutingCtx,
-                [&](const NamespaceString& bucketsNss) {
-                    translatedNss = bucketsNss;
-                    switch (req.getBatchType()) {
-                        case BatchedCommandRequest::BatchType_Insert:
-                            translatedReqBSON =
-                                rewriteCommandForRawDataOperation<write_ops::InsertCommandRequest>(
-                                    translatedReqBSON, translatedNss.coll());
-                            break;
-                        case BatchedCommandRequest::BatchType_Update:
-                            translatedReqBSON =
-                                rewriteCommandForRawDataOperation<write_ops::UpdateCommandRequest>(
-                                    translatedReqBSON, translatedNss.coll());
-                            break;
-                        case BatchedCommandRequest::BatchType_Delete:
-                            translatedReqBSON =
-                                rewriteCommandForRawDataOperation<write_ops::DeleteCommandRequest>(
-                                    translatedReqBSON, translatedNss.coll());
-                            break;
-                        default:
-                            MONGO_UNREACHABLE_TASSERT(10370603);
-                    }
-                });
-            unusedRoutingCtx.skipValidation();
-
-            if (!write_without_shard_key::useTwoPhaseProtocol(
-                    opCtx,
-                    translatedNss,
-                    true /* isUpdateOrDelete */,
-                    isUpsert,
-                    query,
-                    collation,
-                    req.getLet(),
-                    req.getLegacyRuntimeConstants(),
-                    false /* isTimeseriesViewRequest */)) {
-                return false;
-            }
-
+        if (!isMultiWrite &&
+            write_without_shard_key::useTwoPhaseProtocol(opCtx,
+                                                         translatedNs,
+                                                         true /* isUpdateOrDelete */,
+                                                         isUpsert,
+                                                         query,
+                                                         collation,
+                                                         req.getLet(),
+                                                         req.getLegacyRuntimeConstants(),
+                                                         false /* isTimeseriesViewRequest */)) {
             // Explain currently cannot be run within a transaction, so each command is instead run
             // separately outside of a transaction, and we compose the results at the end.
             auto vts = auth::ValidatedTenancyScope::get(opCtx);
@@ -561,7 +542,7 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
                 const auto explainClusterQueryWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
                     clusterQueryWithoutShardKeyCommand.toBSON(), verbosity);
                 auto opMsg = OpMsgRequestBuilder::create(
-                    vts, translatedNss.dbName(), explainClusterQueryWithoutShardKeyCmd);
+                    vts, translatedNs.dbName(), explainClusterQueryWithoutShardKeyCmd);
                 return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
             }();
 
@@ -578,7 +559,7 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
                     clusterWriteWithoutShardKeyCommand.toBSON(), verbosity);
 
                 auto opMsg = OpMsgRequestBuilder::create(
-                    vts, translatedNss.dbName(), explainClusterWriteWithoutShardKeyCmd);
+                    vts, translatedNs.dbName(), explainClusterWriteWithoutShardKeyCmd);
                 return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
             }();
 
@@ -586,7 +567,10 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
                 clusterQueryWithoutShardKeyExplainRes, clusterWriteWithoutShardKeyExplainRes);
             result->appendElementsUnique(output);
             return true;
-        });
+        }
+        return false;
+    }
+    return false;
 }
 
 void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
@@ -601,104 +585,33 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
         req = processFLEBatchExplain(opCtx, batchedRequest);
     }
 
-    const NamespaceString originalNss = req ? req->getNS() : batchedRequest.getNS();
+    auto nss = req ? req->getNS() : batchedRequest.getNS();
     auto requestPtr = req ? req.get() : &batchedRequest;
     auto bodyBuilder = result->getBodyBuilder();
-    const auto originalRequestBSON = req ? req->toBSON() : requestObj;
+    auto originalRequestBSON = req ? req->toBSON() : requestObj;
 
-    const size_t kMaxDatabaseCreationAttempts = 3;
-    size_t attempts = 1;
-    while (true) {
-        try {
-            // Implicitly create the db if it doesn't exist. There is no way right now to return an
-            // explain on a sharded cluster if the database doesn't exist.
-            // TODO (SERVER-108882) Stop creating the db once explain can be executed when th db
-            // doesn't exist.
-            cluster::createDatabase(opCtx, originalNss.dbName());
-
-            // If we aren't running an explain for updateOne or deleteOne without shard key,
-            // continue and run the original explain path.
-            if (runExplainWithoutShardKey(
-                    opCtx, batchedRequest, originalNss, verbosity, &bodyBuilder)) {
-                return;
-            }
-
-            sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
-            router.routeWithRoutingContext(
-                opCtx,
-                "explain write"_sd,
-                [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
-                    auto translatedReqBSON = originalRequestBSON;
-                    auto translatedNss = originalNss;
-                    const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
-
-                    auto& unusedRoutingCtx = translateNssForRawDataAccordingToRoutingInfo(
-                        opCtx,
-                        originalNss,
-                        targeter,
-                        originalRoutingCtx,
-                        [&](const NamespaceString& bucketsNss) {
-                            translatedNss = bucketsNss;
-                            switch (batchedRequest.getBatchType()) {
-                                case BatchedCommandRequest::BatchType_Insert:
-                                    translatedReqBSON = rewriteCommandForRawDataOperation<
-                                        write_ops::InsertCommandRequest>(originalRequestBSON,
-                                                                         translatedNss.coll());
-                                    break;
-                                case BatchedCommandRequest::BatchType_Update:
-                                    translatedReqBSON = rewriteCommandForRawDataOperation<
-                                        write_ops::UpdateCommandRequest>(originalRequestBSON,
-                                                                         translatedNss.coll());
-                                    break;
-                                case BatchedCommandRequest::BatchType_Delete:
-                                    translatedReqBSON = rewriteCommandForRawDataOperation<
-                                        write_ops::DeleteCommandRequest>(originalRequestBSON,
-                                                                         translatedNss.coll());
-                                    break;
-                            }
-                        });
-                    unusedRoutingCtx.skipValidation();
-
-                    const auto explainCmd =
-                        ClusterExplain::wrapAsExplain(translatedReqBSON, verbosity);
-
-                    // We will time how long it takes to run the commands on the shards.
-                    Timer timer;
-
-                    // Target the command to the shards based on the singleton batch item.
-                    BatchItemRef targetingBatchItem(requestPtr, 0);
-                    std::vector<AsyncRequestsSender::Response> shardResponses;
-                    commandOpWrite(opCtx,
-                                   translatedNss,
-                                   explainCmd,
-                                   std::move(targetingBatchItem),
-                                   targeter,
-                                   &shardResponses);
-                    uassertStatusOK(ClusterExplain::buildExplainResult(
-                        makeBlankExpressionContext(opCtx, translatedNss),
-                        shardResponses,
-                        ClusterExplain::kWriteOnShards,
-                        timer.millis(),
-                        originalRequestBSON,
-                        &bodyBuilder));
-                });
-            break;
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            LOGV2_INFO(10370602,
-                       "Failed initialization of routing info because the database has been "
-                       "concurrently dropped",
-                       logAttrs(originalNss.dbName()),
-                       "attemptNumber"_attr = attempts,
-                       "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
-
-            if (++attempts >= kMaxDatabaseCreationAttempts) {
-                // The maximum number of attempts has been reached, so the procedure fails as it
-                // could be a logical error. At this point, it is unlikely that the error is caused
-                // by concurrent drop database operations.
-                throw;
-            }
-        }
+    // If we aren't running an explain for updateOne or deleteOne without shard key, continue and
+    // run the original explain path.
+    if (runExplainWithoutShardKey(opCtx, batchedRequest, nss, verbosity, &bodyBuilder)) {
+        return;
     }
+
+    auto requestBSON = translateCmdObjForRawData(opCtx, batchedRequest, originalRequestBSON, nss);
+    const auto explainCmd = ClusterExplain::wrapAsExplain(requestBSON, verbosity);
+
+    // We will time how long it takes to run the commands on the shards.
+    Timer timer;
+
+    // Target the command to the shards based on the singleton batch item.
+    BatchItemRef targetingBatchItem(requestPtr, 0);
+    std::vector<AsyncRequestsSender::Response> shardResponses;
+    commandOpWrite(opCtx, nss, explainCmd, std::move(targetingBatchItem), &shardResponses);
+    uassertStatusOK(ClusterExplain::buildExplainResult(makeBlankExpressionContext(opCtx, nss),
+                                                       shardResponses,
+                                                       ClusterExplain::kWriteOnShards,
+                                                       timer.millis(),
+                                                       originalRequestBSON,
+                                                       &bodyBuilder));
 }
 
 bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,

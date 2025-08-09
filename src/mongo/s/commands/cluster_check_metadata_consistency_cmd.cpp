@@ -225,24 +225,19 @@ public:
 
         ClusterClientCursorGuard _establishCursorOnDbPrimary(OperationContext* opCtx,
                                                              const NamespaceString& nss) {
+            const CachedDatabaseInfo dbInfo =
+                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
 
-            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
-            return router.route(
-                opCtx,
-                Request::kCommandName,
-                [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
-                    ShardsvrCheckMetadataConsistency shardsvrRequest{nss};
-                    shardsvrRequest.setDbName(nss.dbName());
-                    shardsvrRequest.setCommonFields(request().getCommonFields());
-                    shardsvrRequest.setCursor(request().getCursor());
-                    generic_argument_util::setDbVersionIfPresent(shardsvrRequest,
-                                                                 dbInfo->getVersion());
-                    // Attach db and shard version;
-                    if (!dbInfo->getVersion().isFixed())
-                        shardsvrRequest.setShardVersion(ShardVersion::UNSHARDED());
-                    return _establishCursors(
-                        opCtx, nss, {{dbInfo->getPrimary(), shardsvrRequest.toBSON()}});
-                });
+            ShardsvrCheckMetadataConsistency shardsvrRequest{nss};
+            shardsvrRequest.setDbName(nss.dbName());
+            shardsvrRequest.setCommonFields(request().getCommonFields());
+            shardsvrRequest.setCursor(request().getCursor());
+            generic_argument_util::setDbVersionIfPresent(shardsvrRequest, dbInfo->getVersion());
+            // Attach db and shard version;
+            if (!dbInfo->getVersion().isFixed())
+                shardsvrRequest.setShardVersion(ShardVersion::UNSHARDED());
+            return _establishCursors(
+                opCtx, nss, {{dbInfo->getPrimary(), shardsvrRequest.toBSON()}});
         }
 
         ClusterClientCursorGuard _establishCursors(

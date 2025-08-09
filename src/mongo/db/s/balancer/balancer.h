@@ -133,16 +133,16 @@ public:
 
     /**
      * Blocking call, which requests the balancer to move a range to the specified location
-     * in accordance with the active balancer policy. An error will be thrown if the attempt to
+     * in accordance with the active balancer policy. An error will be returned if the attempt to
      * move fails for any reason.
      *
      * NOTE: This call disregards the balancer enabled/disabled status and will proceed with the
      *       move regardless.
      */
-    void moveRange(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   const ConfigsvrMoveRange& request,
-                   bool issuedByRemoteUser);
+    Status moveRange(OperationContext* opCtx,
+                     const NamespaceString& nss,
+                     const ConfigsvrMoveRange& request,
+                     bool issuedByRemoteUser);
 
     /**
      * Appends the runtime state of the balancer instance to the specified builder.

@@ -103,7 +103,8 @@ public:
                 "Could not find destination shard");
 
             try {
-                Balancer::get(opCtx)->moveRange(opCtx, nss, req, true /* issuedByRemoteUser */);
+                uassertStatusOK(Balancer::get(opCtx)->moveRange(
+                    opCtx, nss, req, true /* issuedByRemoteUser */));
             } catch (ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>& ex) {
                 // Rewrite `InterruptedDueToReplStateChange` with `RetriableRemoteCommandFailure` to
                 // ensure it is not forwarded to remote callers. Until we can expose the error

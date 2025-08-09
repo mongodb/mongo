@@ -245,6 +245,26 @@ bool processResponseFromRemote(OperationContext* opCtx,
     // Dispatch was ok, note response
     batchOp.noteBatchResponse(*batch, batchedCommandResponse, &trackedErrors);
 
+    // If we are in a transaction, we must fail the batch immediately to facilitate aborting
+    // transaction on any error (excluding WouldChangeOwningShard, which also will fail the
+    // batch but in a more graceful manner that keeps the transaction open).
+    if (TransactionRouter::get(opCtx)) {
+        // Note: this returns a bad status if any part of the batch failed.
+        auto batchStatus = batchedCommandResponse.toStatus();
+        if (!batchStatus.isOK() && batchStatus != ErrorCodes::WouldChangeOwningShard) {
+            auto newStatus = batchStatus.withContext(
+                str::stream() << "Encountered error from " << shardInfo << " during a transaction");
+
+            // Throw when there is a transient transaction error since this
+            // should be a top level error and not just a write error.
+            if (hasTransientTransactionError(batchedCommandResponse)) {
+                uassertStatusOK(newStatus);
+            }
+
+            return true;
+        }
+    }
+
     // Note if anything was stale
     auto staleConfigErrors = trackedErrors.getErrors(ErrorCodes::StaleConfig);
     const auto& staleDbErrors = trackedErrors.getErrors(ErrorCodes::StaleDbVersion);
@@ -264,29 +284,6 @@ bool processResponseFromRemote(OperationContext* opCtx,
     if (!cannotImplicitlyCreateCollectionErrors.empty()) {
         noteCannotImplicitlyCreateCollectionResponses(
             opCtx, cannotImplicitlyCreateCollectionErrors, &targeter);
-    }
-
-    // If we are in a transaction, we must fail the batch immediately to facilitate aborting
-    // transaction on any error (excluding WouldChangeOwningShard, which also will fail the
-    // batch but in a more graceful manner that keeps the transaction open).
-    // Note that if the error belongs to the stale routing family, the routing cache must be
-    // invalidated before the error is thrown. In this case, the routing cache invalidation is
-    // handled via the functions `noteStaleCollVersionResponses` and `noteStaleDbVersionResponses`.
-    if (TransactionRouter::get(opCtx)) {
-        // Note: this returns a bad status if any part of the batch failed.
-        auto batchStatus = batchedCommandResponse.toStatus();
-        if (!batchStatus.isOK() && batchStatus != ErrorCodes::WouldChangeOwningShard) {
-            auto newStatus = batchStatus.withContext(
-                str::stream() << "Encountered error from " << shardInfo << " during a transaction");
-
-            // Throw when there is a transient transaction error since this
-            // should be a top level error and not just a write error.
-            if (hasTransientTransactionError(batchedCommandResponse)) {
-                uassertStatusOK(newStatus);
-            }
-
-            return true;
-        }
     }
 
     return false;
