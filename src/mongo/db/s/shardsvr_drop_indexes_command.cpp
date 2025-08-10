@@ -38,7 +38,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
@@ -49,9 +48,7 @@
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/s/ddl_lock_manager.h"
-#include "mongo/db/s/drop_indexes_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/timeseries/catalog_helper.h"
@@ -65,7 +62,6 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -182,48 +178,6 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     // increase in order to be logged in "<db>.system.profile".
     CurOp::get(opCtx)->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                                .getDatabaseProfileLevel(ns().dbName()));
-    while (true) {
-        boost::optional<FixedFCVRegion> optFixedFcvRegion{boost::in_place_init, opCtx};
-
-        bool useCoordinator = feature_flags::gFeatureFlagDropIndexesDDLCoordinator.isEnabled(
-            VersionContext::getDecoration(opCtx), optFixedFcvRegion.get()->acquireFCVSnapshot());
-
-        if (useCoordinator) {
-            auto coordinatorDoc = [&] {
-                auto doc = DropIndexesCoordinatorDocument();
-                doc.setShardingDDLCoordinatorMetadata(
-                    {{ns(), DDLCoordinatorTypeEnum::kDropIndexes}});
-                doc.setDropIndexesRequest(request().getDropIndexesRequest());
-                return doc;
-            }();
-
-            const auto coordinator = [&] {
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
-                return checked_pointer_cast<DropIndexesCoordinator>(service->getOrCreateInstance(
-                    opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, false /*checkOptions*/));
-            }();
-
-            try {
-                coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON());
-            } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
-                LOGV2_DEBUG(10695003,
-                            1,
-                            "Drop indexes coordinator already running, waiting for completion",
-                            "namespace"_attr = ns(),
-                            "error"_attr = ex);
-
-                optFixedFcvRegion.reset();
-                coordinator->getCompletionFuture().getNoThrow(opCtx).ignore();
-                continue;
-            }
-
-            optFixedFcvRegion.reset();
-            return Response(coordinator->getResult(opCtx));
-        }
-
-        optFixedFcvRegion.reset();
-        break;
-    }
 
     DropIndexes dropIdxCmd(ns());
     dropIdxCmd.setDropIndexesRequest(request().getDropIndexesRequest());

@@ -222,10 +222,6 @@ const dropIndexesCmd = {
     writeConcern: {w: "majority"}
 };
 testTimeout(dbName, dropIndexesCmd);
-testSuccessOnTxnCommit(dbName, dropIndexesCmd, {
-    $or: [
-        {"command._shardsvrDropIndexesParticipant": collName},
-        {$and: [{"command.dropIndexes": collName}, {waitingForLock: true}]}
-    ]
-});
+testSuccessOnTxnCommit(
+    dbName, dropIndexesCmd, {$and: [{"command.dropIndexes": collName}, {waitingForLock: true}]});
 session.endSession();

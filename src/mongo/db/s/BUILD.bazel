@@ -338,18 +338,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "drop_indexes_coordinator_document_gen",
-    src = "drop_indexes_coordinator_document.idl",
-    hdrs = ["//src/mongo/s/catalog:type_collection.h"],
-    deps = [
-        ":sharding_ddl_coordinator_gen",
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db:drop_indexes_gen",
-        "//src/mongo/s:sharding_types_gen",
-    ],
-)
-
-idl_generator(
     name = "move_primary_coordinator_document_gen",
     src = "move_primary_coordinator_document.idl",
     deps = [
@@ -1358,8 +1346,6 @@ mongo_cc_library(
         "drop_collection_coordinator_document_gen",
         "drop_database_coordinator.cpp",
         "drop_database_coordinator_document_gen",
-        "drop_indexes_coordinator.cpp",
-        "drop_indexes_coordinator_document_gen",
         "flush_database_cache_updates_command.cpp",
         "flush_resharding_state_change_command.cpp",
         "flush_routing_table_cache_updates_command.cpp",
@@ -1531,7 +1517,6 @@ mongo_cc_library(
         "create_database_coordinator.h",
         "drop_collection_coordinator.h",
         "drop_database_coordinator.h",
-        "drop_indexes_coordinator.h",
         "move_primary_coordinator.h",
         "refine_collection_shard_key_coordinator.h",
         "remove_shard_commit_coordinator.h",
