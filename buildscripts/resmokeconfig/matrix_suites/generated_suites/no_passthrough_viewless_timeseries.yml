@@ -93,6 +93,7 @@ selector:
     - jstests/noPassthrough/timeseries/ttl/timeseries_expire.js
     - jstests/noPassthrough/timeseries/ttl/timeseries_expires_with_partial_index.js
     - jstests/noPassthrough/timeseries/ttl/timeseries_ttl.js
+    - jstests/noPassthrough/timeseries/updates_deletes/intermediate_data_consistency_check_arbitrary_update.js
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_delete_one_transaction.js
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_direct_update.js
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_multi_update_spill_to_disk.js
