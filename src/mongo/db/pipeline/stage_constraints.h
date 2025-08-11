@@ -406,6 +406,9 @@ struct StageConstraints {
     // without making any modifications or transformations to the fields.
     bool noFieldModifications = false;
 
+    // If false, then this stage should never run on a timeseries collection.
+    bool canRunOnTimeseries = true;
+
     bool operator==(const StageConstraints& other) const {
         return requiredPosition == other.requiredPosition &&
             hostRequirement == other.hostRequirement && diskRequirement == other.diskRequirement &&

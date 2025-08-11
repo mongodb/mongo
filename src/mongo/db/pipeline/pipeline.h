@@ -318,6 +318,13 @@ public:
     bool requiredToRunOnRouter() const;
 
     /**
+     * Checks whether the pipeline can run on the specified collection using catalog data. It is the
+     * caller's responsibility to ensure the catalog data is accurate.
+     */
+    void validateWithCollectionMetadata(const CollectionOrViewAcquisition& collOrView) const;
+    void validateWithCollectionMetadata(const CollectionRoutingInfo& cri) const;
+
+    /**
      * Modifies the pipeline in-place to perform any rewrites that must happen before optimization.
      */
     void performPreOptimizationRewrites(const boost::intrusive_ptr<ExpressionContext>& expCtx,

@@ -514,6 +514,9 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     }
 
     auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+    if (cri && cri->hasRoutingTable()) {
+        pipeline->validateWithCollectionMetadata(cri.get());
+    }
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     // In case query settings have already been looked up (in case the agg request is

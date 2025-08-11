@@ -64,6 +64,8 @@ public:
                                      UnionRequirement::kAllowed,
                                      ChangeStreamRequirement::kDenylist);
         constraints.setConstraintsForNoInputSources();
+        // All search stages are unsupported on timeseries collections.
+        constraints.canRunOnTimeseries = false;
         return constraints;
     }
 

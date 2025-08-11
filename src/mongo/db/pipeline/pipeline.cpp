@@ -157,6 +157,15 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
     }
 }
 
+void validateForTimeseries(const DocumentSourceContainer* sources) {
+    for (const auto& stage : *sources) {
+        uassert(10557302,
+                str::stream() << stage->getSourceName()
+                              << " is unsupported for timeseries collections",
+                stage->constraints().canRunOnTimeseries);
+    }
+}
+
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(disablePipelineOptimization);
@@ -322,6 +331,18 @@ void Pipeline::validateCommon(bool alreadyOptimized) const {
                 "If a stage is broadcast to all shard servers then it must be a data source.",
                 constraints.hostRequirement != HostTypeRequirement::kAllShardHosts ||
                     !constraints.requiresInputDocSource);
+    }
+}
+
+void Pipeline::validateWithCollectionMetadata(const CollectionOrViewAcquisition& collOrView) const {
+    if (collOrView.collectionExists() && collOrView.getCollectionPtr()->isTimeseriesCollection()) {
+        validateForTimeseries(&_sources);
+    }
+}
+
+void Pipeline::validateWithCollectionMetadata(const CollectionRoutingInfo& cri) const {
+    if (cri.getChunkManager().isTimeseriesCollection()) {
+        validateForTimeseries(&_sources);
     }
 }
 

@@ -81,6 +81,8 @@ public:
                                      ChangeStreamRequirement::kDenylist);
         // Set to true to allow this to be run on the shards before the search implicit sort.
         constraints.preservesOrderAndMetadata = true;
+        // All search stages are unsupported on timeseries collections.
+        constraints.canRunOnTimeseries = false;
 
         return constraints;
     }

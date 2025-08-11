@@ -999,6 +999,11 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         expCtx->stopExpressionCounters();
     }
 
+    // Validate the entire pipeline with the view definition.
+    if (aggCatalogState.lockAcquired()) {
+        pipeline->validateWithCollectionMetadata(aggCatalogState.getMainCollectionOrView());
+    }
+
     expCtx->initializeReferencedSystemVariables();
 
     // Report usage statistics for each stage in the pipeline.
