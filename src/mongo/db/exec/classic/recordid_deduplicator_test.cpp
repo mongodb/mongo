@@ -40,7 +40,20 @@ using namespace mongo;
 
 namespace {
 
-class RecordIdDeduplicatorTest : public SpillingTestFixture {};
+class RecordIdDeduplicatorTest : public SpillingTestFixture {
+protected:
+    void assertInsertNew(RecordIdDeduplicator& recordIdDeduplicator, RecordId recordId) {
+        ASSERT_FALSE(recordIdDeduplicator.contains(recordId));
+        ASSERT_TRUE(recordIdDeduplicator.insert(recordId));
+        ASSERT_TRUE(recordIdDeduplicator.contains(recordId));
+    }
+
+    void assertInsertExisting(RecordIdDeduplicator& recordIdDeduplicator, RecordId recordId) {
+        ASSERT_TRUE(recordIdDeduplicator.contains(recordId));
+        ASSERT_FALSE(recordIdDeduplicator.insert(recordId));
+        ASSERT_TRUE(recordIdDeduplicator.contains(recordId));
+    }
+};
 
 //
 // Basic test that we get out valid stats objects.
@@ -53,14 +66,14 @@ TEST_F(RecordIdDeduplicatorTest, basicTest) {
     RecordId longRecordId(12345678);
     RecordId nullRecordId;
 
-    ASSERT(recordIdDeduplicator.insert(stringRecordId));
-    ASSERT(recordIdDeduplicator.insert(longRecordId));
-    ASSERT(recordIdDeduplicator.insert(nullRecordId));
+    assertInsertNew(recordIdDeduplicator, stringRecordId);
+    assertInsertNew(recordIdDeduplicator, longRecordId);
+    assertInsertNew(recordIdDeduplicator, nullRecordId);
 
     // Insert the same records.
-    ASSERT(!recordIdDeduplicator.insert(stringRecordId));
-    ASSERT(!recordIdDeduplicator.insert(longRecordId));
-    ASSERT(!recordIdDeduplicator.insert(nullRecordId));
+    assertInsertExisting(recordIdDeduplicator, stringRecordId);
+    assertInsertExisting(recordIdDeduplicator, longRecordId);
+    assertInsertExisting(recordIdDeduplicator, nullRecordId);
 }
 
 TEST_F(RecordIdDeduplicatorTest, spillNoDiskUsageTest) {
@@ -70,8 +83,8 @@ TEST_F(RecordIdDeduplicatorTest, spillNoDiskUsageTest) {
     RecordId stringRecordId(std::span("ABCDEFGHIJABCDEFGHIJABCDEFGHIJKLMN", 34));
     RecordId longRecordId(12345678);
 
-    ASSERT_TRUE(recordIdDeduplicator.insert(longRecordId));
-    ASSERT_TRUE(recordIdDeduplicator.insert(stringRecordId));
+    assertInsertNew(recordIdDeduplicator, longRecordId);
+    assertInsertNew(recordIdDeduplicator, stringRecordId);
     ASSERT_THROWS_CODE(recordIdDeduplicator.spill(),
                        DBException,
                        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
@@ -90,9 +103,9 @@ TEST_F(RecordIdDeduplicatorTest, basicHashSpillTest) {
     uint64_t expectedSpilledBytes = stringRecordId.memUsage() + longRecordId.memUsage();
     uint64_t expectedSpilledRecords = 2;  // The record with id null is not spilled.
 
-    ASSERT_TRUE(recordIdDeduplicator.insert(nullRecordId));
-    ASSERT_TRUE(recordIdDeduplicator.insert(longRecordId));
-    ASSERT_TRUE(recordIdDeduplicator.insert(stringRecordId));
+    assertInsertNew(recordIdDeduplicator, nullRecordId);
+    assertInsertNew(recordIdDeduplicator, longRecordId);
+    assertInsertNew(recordIdDeduplicator, stringRecordId);
 
     recordIdDeduplicator.spill();
 
@@ -103,16 +116,16 @@ TEST_F(RecordIdDeduplicatorTest, basicHashSpillTest) {
     ASSERT_EQ(expectedSpilledRecords, recordIdDeduplicator.getSpillingStats().getSpilledRecords());
 
     // Insert the same records.
-    ASSERT_FALSE(recordIdDeduplicator.insert(stringRecordId));
-    ASSERT_FALSE(recordIdDeduplicator.insert(longRecordId));
-    ASSERT_FALSE(recordIdDeduplicator.insert(nullRecordId));
+    assertInsertExisting(recordIdDeduplicator, stringRecordId);
+    assertInsertExisting(recordIdDeduplicator, longRecordId);
+    assertInsertExisting(recordIdDeduplicator, nullRecordId);
 
     // Insert a new recordId.
     RecordId longRecordId2(22345678);
-    ASSERT_TRUE(recordIdDeduplicator.insert(longRecordId2));
+    assertInsertNew(recordIdDeduplicator, longRecordId2);
 
     // Insert the same recordId.
-    ASSERT_FALSE(recordIdDeduplicator.insert(longRecordId2));
+    assertInsertExisting(recordIdDeduplicator, longRecordId2);
 
     // The spills should not have changed.
     ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
@@ -129,8 +142,8 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
     RecordId stringRecordId(std::span("ABCDE", 5));
     RecordId nullRecordId;
 
-    ASSERT(recordIdDeduplicator.insert(stringRecordId));
-    ASSERT(recordIdDeduplicator.insert(nullRecordId));
+    assertInsertNew(recordIdDeduplicator, stringRecordId);
+    assertInsertNew(recordIdDeduplicator, nullRecordId);
 
     uint64_t expectedSpills = 1;
     uint64_t expectedSpilledBytes = stringRecordId.memUsage();
@@ -151,7 +164,7 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
     // Add more recordIds to cause roaring to switch to bitmap.
     for (const auto& ridInt : recordIds) {
         RecordId rid{ridInt};
-        ASSERT_TRUE(recordIdDeduplicator.insert(rid));
+        assertInsertNew(recordIdDeduplicator, rid);
         expectedSpilledBytes += rid.memUsage();
         ++expectedSpilledRecords;
     }
@@ -165,8 +178,8 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
     ASSERT_EQ(expectedSpilledRecords, recordIdDeduplicator.getSpillingStats().getSpilledRecords());
 
     // Insert the same records.
-    ASSERT_FALSE(recordIdDeduplicator.insert(stringRecordId));
-    ASSERT_FALSE(recordIdDeduplicator.insert(nullRecordId));
+    assertInsertExisting(recordIdDeduplicator, stringRecordId);
+    assertInsertExisting(recordIdDeduplicator, nullRecordId);
 
     // Shuffle the recordIds.
     const unsigned int seed(12346);
@@ -176,13 +189,14 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
 
     for (const auto& ridInt : recordIds) {
         RecordId rid{ridInt};
-        ASSERT_FALSE(recordIdDeduplicator.insert(rid));
+        assertInsertExisting(recordIdDeduplicator, rid);
     }
 
     // Insert new recordIds.
     RecordId stringRecordId2(std::span("ABCDF", 5));
     RecordId longRecordId2(22345678);
-    ASSERT_TRUE(recordIdDeduplicator.insert(stringRecordId2));
-    ASSERT_TRUE(recordIdDeduplicator.insert(longRecordId2));
+    assertInsertNew(recordIdDeduplicator, stringRecordId2);
+    assertInsertNew(recordIdDeduplicator, longRecordId2);
 }
+
 }  // namespace

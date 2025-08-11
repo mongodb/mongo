@@ -49,22 +49,13 @@ RecordIdDeduplicator::RecordIdDeduplicator(ExpressionContext* expCtx,
       _roaring(threshold, chunkSize, universeSize, [&]() { roaringMetric.increment(); }) {}
 
 bool RecordIdDeduplicator::contains(const RecordId& recordId) const {
-    return recordId.withFormat(
-        [&](RecordId::Null _) -> bool { return _hashset.contains(recordId); },
-        [&](int64_t rid) -> bool { return _roaring.contains(rid); },
-        [&](const char* str, int size) -> bool { return _hashset.contains(recordId); });
-}
-
-bool RecordIdDeduplicator::insert(const RecordId& recordId) {
-    RecordData record;
-
     bool foundInMemory = recordId.withFormat(
         [&](RecordId::Null _) -> bool { return hasNullRecordId; },
         [&](int64_t rid) -> bool { return _roaring.contains(rid); },
         [&](const char* str, int size) -> bool { return _hashset.contains(recordId); });
 
     if (foundInMemory) {
-        return false;
+        return true;
     }
 
     bool foundInDisk = hasSpilled() &&
@@ -80,15 +71,17 @@ bool RecordIdDeduplicator::insert(const RecordId& recordId) {
                                         _expCtx, *_diskStorageString, recordId);
                             });
 
-    if (foundInDisk) {
+    return foundInDisk;
+}
+
+bool RecordIdDeduplicator::insert(const RecordId& recordId) {
+    if (contains(recordId)) {
         return false;
     }
 
-    // The record was found neither in memory nor in disk. Insert it.
     recordId.withFormat([&](RecordId::Null _) { hasNullRecordId = true; },
                         [&](int64_t rid) { _roaring.addChecked(rid); },
                         [&](const char* str, int size) { _hashset.insert(recordId); });
-
 
     return true;
 }
