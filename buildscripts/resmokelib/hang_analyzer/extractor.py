@@ -515,15 +515,13 @@ def download_task_artifacts(
 
     # We support `skip_compile` tasks that download master instead of compiling it
     # For analysis on these tasks we should download the same binaries that the task downloaded
-    variant = task_info.build_variant
-    version_id = task_info.version_id
-    if multiversion_downloads:
-        skip_download = next(
-            filter(lambda v: v.get("bin_suffix") == "", multiversion_downloads), None
-        )
-        if skip_download:
-            version_id = skip_download["evg_urls_info"]["evg_version_id"]
-            variant = skip_download["evg_urls_info"]["evg_build_variant"]
+    if multiversion_downloads and "" in multiversion_downloads:
+        version_downloads = multiversion_downloads[""]
+        variant = version_downloads["evg_build_variant"]
+        version_id = version_downloads["evg_version_id"]
+    else:
+        variant = task_info.build_variant
+        version_id = task_info.version_id
 
     all_downloaded = True
     multiversion_versions = set()
@@ -588,14 +586,9 @@ def download_task_artifacts(
         with OtelThreadPoolExecutor() as executor:
             futures = []
             for version in multiversion_versions:
-                version_downloads = next(
-                    filter(
-                        lambda actual, desired=version: actual.get("bin_suffix") == desired,
-                        multiversion_downloads,
-                    )
-                )
-                version_id = version_downloads["evg_urls_info"]["evg_version_id"]
-                variant = version_downloads["evg_urls_info"]["evg_build_variant"]
+                version_downloads = multiversion_downloads[version]
+                version_id = version_downloads["evg_version_id"]
+                variant = version_downloads["evg_build_variant"]
                 futures.append(
                     executor.submit(
                         run_with_retries,
