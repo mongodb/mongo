@@ -53,6 +53,7 @@
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_database_coordinator.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/initialize_placement_history_coordinator.h"
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
 #include "mongo/db/s/move_primary_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -140,6 +141,9 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
         case DDLCoordinatorTypeEnum::kCompletePromotionToShardedCluster:
             return std::make_shared<CompletePromotionToShardedClusterCoordinator>(
                 service, std::move(initialState));
+        case DDLCoordinatorTypeEnum::kInitializePlacementHistory:
+            return std::make_shared<InitializePlacementHistoryCoordinator>(service,
+                                                                           std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,
                       str::stream()

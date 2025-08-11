@@ -27,32 +27,19 @@
  *    it in the license file.
  */
 
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/s/initialize_placement_history_coordinator.h"
+#include "mongo/db/s/initialize_placement_history_coordinator_document_gen.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/placement_history_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
-
-#include <memory>
-#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 namespace {
@@ -86,9 +73,28 @@ public:
                                   << " can only be run on the config server",
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
-            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
-            ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
+            FixedFCVRegion fcvRegion(opCtx);
+
+            // The Operation FCV is currently propagated only for DDL operations,
+            // which cannot be nested. Therefore, the VersionContext shouldn't have
+            // been initialized yet.
+            // TODO Revisit this invariant once this workflow gets integrated into addShard.
+            invariant(!VersionContext::getDecoration(opCtx).isInitialized());
+            InitializePlacementHistoryCoordinatorDocument coordinatorDoc;
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                  DDLCoordinatorTypeEnum::kInitializePlacementHistory}});
+
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto initializePlacementHistoryCoordinator =
+                checked_pointer_cast<InitializePlacementHistoryCoordinator>(
+                    service->getOrCreateInstance(
+                        opCtx, coordinatorDoc.toBSON(), std::move(fcvRegion)));
+
+            initializePlacementHistoryCoordinator->getCompletionFuture().get(opCtx);
         }
 
     private:

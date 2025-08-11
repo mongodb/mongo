@@ -378,8 +378,7 @@ ShardingCatalogManager::ShardingCatalogManager(
       _kShardMembershipLock("shardMembershipLock"),
       _kClusterCardinalityParameterLock("clusterCardinalityParameterLock"),
       _kChunkOpLock("chunkOpLock"),
-      _kZoneOpLock("zoneOpLock"),
-      _kPlacementHistoryInitializationLock("placementHistoryInitializationOpLock") {
+      _kZoneOpLock("zoneOpLock") {
     startup();
 }
 

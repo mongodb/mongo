@@ -440,7 +440,7 @@ ddl:
     - src/mongo/db/s/sharding_recovery_service*
 
     # placement history
-    - src/mongo/db/s/placement_history_bm.cpp
+    - src/mongo/db/s/*placement_history*
     - src/mongo/db/s/config/*historical_placement*
     - src/mongo/db/s/config/*placement_history*
     - src/mongo/s/commands/*placement_history*

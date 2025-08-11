@@ -63,6 +63,7 @@ enums:
             kAddShard: "addShard"
             kCloneAuthoritativeMetadata: "cloneAuthoritativeMetadata"
             kCompletePromotionToShardedCluster: "completePromotionToShardedCluster"
+            kInitializePlacementHistory: "initializePlacementHistory"
 
     # TODO (SERVER-98118): Remove this enum once v9.0 become last-lts.
     AuthoritativeMetadataAccessLevel:

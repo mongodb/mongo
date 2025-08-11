@@ -761,16 +761,7 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
      * This function will establish an initialization time to collect a consistent description of
      * the placement of each existing namespace through a snapshot read of the sharding catalog.
      * Such description will then be persisted in config.placementHistory.
-     *
-     * Concurrently, sharding DDL operations and chunk may also commit - and insert new documents
-     * into config.placementHistory if they alter the distribution of the targeted namespace. All
-     * these writes operations are not supposed to collide, since:
-     * - initializePlacementHistory() will make use of the config time to access already
-     *   majority-committed information
-     * - incoming (or not yet materialized) DDLs will insert more recent placement information,
-     *   which will have the effect of "updating" the snapshot produced by this function.
      */
-    Lock::ExclusiveLock lk(opCtx, _kPlacementHistoryInitializationLock);
 
     // Suspend the periodic cleanup job that runs in background.
     ScopeGuard restartHistoryCleaner(

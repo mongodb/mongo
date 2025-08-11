@@ -481,6 +481,15 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "initialize_placement_history_coordinator_document_gen",
+    src = "initialize_placement_history_coordinator_document.idl",
+    deps = [
+        ":sharding_ddl_coordinator_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "type_shard_identity_idl",
     srcs = ["type_shard_identity_gen"],
@@ -1352,6 +1361,8 @@ mongo_cc_library(
         "get_database_version_command.cpp",
         "get_shard_version_command.cpp",
         "get_sharding_ready_command.cpp",
+        "initialize_placement_history_coordinator.cpp",
+        "initialize_placement_history_coordinator_document_gen",
         "migration_chunk_cloner_source_commands.cpp",
         "migration_destination_manager_commands.cpp",
         "move_primary_coordinator.cpp",
@@ -1517,6 +1528,7 @@ mongo_cc_library(
         "create_database_coordinator.h",
         "drop_collection_coordinator.h",
         "drop_database_coordinator.h",
+        "initialize_placement_history_coordinator.h",
         "move_primary_coordinator.h",
         "refine_collection_shard_key_coordinator.h",
         "remove_shard_commit_coordinator.h",
