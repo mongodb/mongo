@@ -82,8 +82,7 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    multiversion_platform: rhel80
-    multiversion_platform_50_or_later: rhel8
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
@@ -126,8 +125,7 @@ variables:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
       test_flags: --excludeWithAnyTags=requires_ldap_pool
-      multiversion_platform: rhel80
-      multiversion_platform_50_or_later: rhel8
+      multiversion_platform: rhel8
       multiversion_edition: enterprise
       has_packages: true
       packager_script: packager_enterprise.py
@@ -564,8 +562,7 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
         --linkstatic=False
-      multiversion_platform: rhel80
-      multiversion_platform_50_or_later: rhel8
+      multiversion_platform: rhel8
       multiversion_edition: enterprise
       test_flags: >-
         --mongosSetParameters="joinIngressSessionsOnShutdown: \"true\""

@@ -33,10 +33,6 @@ if [[ -n "${multiversion_last_continuous_variant}" ]]; then
     last_continuous_arg=""
 fi
 
-if [ ! -z "${multiversion_platform_50_or_later}" ]; then
-    platform="${multiversion_platform_50_or_later}"
-fi
-
 base_command="db-contrib-tool setup-repro-env"
 evergreen_args="-sb \
   --platform $platform \

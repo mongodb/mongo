@@ -52,8 +52,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
         --enableEnterpriseTests=off
-      multiversion_platform: rhel80
-      multiversion_platform_50_or_later: rhel8
+      multiversion_platform: rhel8
       multiversion_edition: targeted
       has_packages: true
       packager_script: packager.py
@@ -103,8 +102,7 @@ buildvariants:
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
       test_flags: --excludeWithAnyTags=requires_external_data_source
-      multiversion_platform: rhel80
-      multiversion_platform_50_or_later: rhel8
+      multiversion_platform: rhel8
       multiversion_edition: enterprise
       has_packages: true
       packager_script: packager_enterprise.py

@@ -46,8 +46,7 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    multiversion_platform: rhel80
-    multiversion_platform_50_or_later: rhel8
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
@@ -148,8 +147,7 @@ variables:
     max_sub_suites: 3
     large_distro_name: rhel8.8-xlarge
     xlarge_distro_name: rhel8.8-xxlarge
-    multiversion_platform: rhel80
-    multiversion_platform_50_or_later: rhel8
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
 
   # THIS HAS COPIES IN
@@ -203,8 +201,7 @@ variables:
     large_distro_name: &enterprise-rhel8-debug-tsan-large-distro-name rhel8.8-xlarge
     xlarge_distro_name: rhel8.8-xxlarge
     core_analyzer_distro_name: rhel8.8-xxlarge
-    multiversion_platform: rhel80
-    multiversion_platform_50_or_later: rhel8
+    multiversion_platform: rhel8
     multiversion_edition: enterprise
 
 buildvariants:
@@ -417,8 +414,7 @@ buildvariants:
         --linkstatic=False
         --build_enterprise=False
         --separate_debug=False
-      multiversion_platform: rhel80
-      multiversion_platform_50_or_later: rhel8
+      multiversion_platform: rhel8
       multiversion_edition: enterprise
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under ASAN build.
       hang_analyzer_dump_core: false
@@ -731,8 +727,7 @@ buildvariants:
         --excludeWithAnyTags=requires_increased_memlock_limits,all_feature_flags_incompatible
         --disableUnreleasedIFRFlags
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
-      multiversion_platform: rhel80
-      multiversion_platform_50_or_later: rhel8
+      multiversion_platform: rhel8
       multiversion_edition: enterprise
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under UBSAN build.
       large_distro_name: rhel8.8-large
