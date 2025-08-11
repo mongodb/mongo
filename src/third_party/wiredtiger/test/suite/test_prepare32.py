@@ -26,54 +26,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
-from wtscenario import make_scenarios
-import time
+import wiredtiger
+from prepare_util import test_prepare_preserve_prepare_base
+
 # test_prepare32.py
 # Tests prepared transaction checkpoint behavior:
 # - Skip writing prepared updates if prepared timestamp is not stable
 # - Write committed prepared updates as prepared if prepared timestamp is stable but commit timestamp is not stable
 # - Write committed prepared updates as committed if commit timestamp is stable
 
-class test_prepare32(wttest.WiredTigerTestCase):
-
-    conn_config = 'checkpoint=(precise=true),preserve_prepared=true,statistics=(all)'
+class test_prepare32(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare32'
-
-    def get_stats(self, stats):
-        """Get the current values of multiple statistics."""
-        stat_cursor = self.session.open_cursor('statistics:'+self.uri)
-        results = {}
-        for stat in stats:
-            results[stat] = stat_cursor[stat][2]
-        stat_cursor.close()
-        return results
-
-    def checkpoint_and_verify_stats(self, expected_changes):
-        """
-        Perform a checkpoint and verify the expected changes in multiple statistics.
-
-        Args:
-            expected_changes: Dict mapping stat -> bool
-                             where True means expect increase, False means expect no change
-        """
-        stats_to_check = list(expected_changes.keys())
-        old_stats = self.get_stats(stats_to_check)
-
-        self.session.checkpoint()
-
-        new_stats = self.get_stats(stats_to_check)
-
-        for stat, expect_increase in expected_changes.items():
-            diff = new_stats[stat] - old_stats[stat]
-            if expect_increase:
-                self.assertGreater(diff, 0,
-                    f"Stat {stat}: expected increase, got diff {diff}")
-            else:
-                self.assertEqual(diff, 0,
-                    f"Stat {stat}: expected no change, got diff {diff}")
-
-        return new_stats
 
     def test_committed_prepare(self):
         # Set initial timestamps - start with lower values
@@ -109,7 +72,7 @@ class test_prepare32(wttest.WiredTigerTestCase):
         # Checkpoint should write initial data
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-        })
+        }, self.uri)
         # Start a prepared transaction that will be committed
         session_prepare = self.conn.open_session()
         cursor_prepare = session_prepare.open_cursor(self.uri)
@@ -128,14 +91,14 @@ class test_prepare32(wttest.WiredTigerTestCase):
         # Should not write prepare.
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-        })
+        }, self.uri)
 
         # Move stable timestamp to after prepared timestamp, but before durable timestamp
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(85))
         # Should write update as prepared
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: True,
-        })
+        }, self.uri)
 
         # Move stable timestamp to after durable timestamp
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(95))
@@ -143,7 +106,7 @@ class test_prepare32(wttest.WiredTigerTestCase):
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_durable_start_ts: True,
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-        })
+        }, self.uri)
 
         # Page should be clean now, no more writing
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100))
@@ -151,4 +114,4 @@ class test_prepare32(wttest.WiredTigerTestCase):
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_durable_start_ts: False,
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-        })
+        }, self.uri)

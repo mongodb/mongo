@@ -101,6 +101,7 @@ DUPLICATEV
 Decrypt
 DeleteFileW
 Deterministically
+Disagg
 Disaggregated
 Dk
 DmpRvXx
@@ -1099,6 +1100,7 @@ np
 npos
 nrecs
 nsec
+nsecs
 nset
 nul
 nullptr
@@ -1193,6 +1195,8 @@ qrrSS
 qsort
 quartile
 queueable
+queueing
+queuer
 quiesce
 qup
 rN

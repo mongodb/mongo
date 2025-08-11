@@ -3382,7 +3382,8 @@ split:
         break;
     }
 
-    __wt_atomic_addv16(&ref->ref_changes, 1);
+    if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
+        __wt_atomic_addv8(&ref->ref_changes, 1);
 
     /*
      * If the page has post-instantiation delete information, we don't need it any more. Note: this

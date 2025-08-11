@@ -26,52 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wiredtiger
+from prepare_util import test_prepare_preserve_prepare_base
 
 # Tests checkpoint behavior with prepared transactions, specifically:
 # - Writing prepared updates to disk during checkpoint
 # - Handling of rollback tombstones for aborted prepared transactions
 # - Ensuring prepared updates can be written with stable timestamp validation
 
-class test_prepare35(wttest.WiredTigerTestCase):
-
-    conn_config = 'checkpoint=(precise=true),preserve_prepared=true,statistics=(all)'
+class test_prepare35(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare35'
-
-    def get_stats(self, stats):
-        """Get the current values of multiple statistics."""
-        stat_cursor = self.session.open_cursor('statistics:'+self.uri)
-        results = {}
-        for stat in stats:
-            results[stat] = stat_cursor[stat][2]
-        stat_cursor.close()
-        return results
-
-    def checkpoint_and_verify_stats(self, expected_changes):
-        """
-        Perform a checkpoint and verify the expected changes in multiple statistics.
-
-        Args:
-            expected_changes: Dict mapping stat -> bool
-                             where True means expect increase, False means expect no change
-        """
-        stats_to_check = list(expected_changes.keys())
-        old_stats = self.get_stats(stats_to_check)
-
-        self.session.checkpoint()
-
-        new_stats = self.get_stats(stats_to_check)
-
-        for stat, expect_increase in expected_changes.items():
-            diff = new_stats[stat] - old_stats[stat]
-            if expect_increase:
-                self.assertGreater(diff, 0,
-                    f"Stat {stat}: expected increase, got diff {diff}")
-            else:
-                self.assertEqual(diff, 0,
-                    f"Stat {stat}: expected no change, got diff {diff}")
-
-        return new_stats
 
     def test_committed_prepare(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
@@ -108,7 +72,7 @@ class test_prepare35(wttest.WiredTigerTestCase):
         # Verify checkpoint writes prepared time window to disk
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: True,
-        })
+        }, self.uri)
 
         # Step 3: Force eviction to trigger reconciliation with the prepared data
         # This ensures the prepared update gets written to disk storage
@@ -151,4 +115,4 @@ class test_prepare35(wttest.WiredTigerTestCase):
         # Verify the second prepared update is also be written to disk
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: True,
-        })
+        }, self.uri)

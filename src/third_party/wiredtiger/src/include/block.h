@@ -527,3 +527,29 @@ struct __wt_block_disagg_header {
 #define WT_BLOCK_DISAGG_HEADER_SIZE 16
 #define WT_BLOCK_DISAGG_HEADER_BYTE_SIZE (WT_PAGE_HEADER_SIZE + WT_BLOCK_DISAGG_HEADER_SIZE)
 #define WT_BLOCK_DISAGG_CHECKPOINT_BUFFER (1024)
+
+/*
+ * WT_BLOCK_DISAGG_ADDRESS_COOKIE --
+ *	The disaggregated block manager address cookie.
+ */
+struct __wt_block_disagg_address_cookie {
+
+    uint64_t page_id; /* Page ID */
+
+/*
+ * Flags for address cookies in disaggregated storage. No automatic generation: flag values cannot
+ * change, because they are stored persistently.
+ */
+#define WT_BLOCK_DISAGG_ADDR_FLAG_DELTA 0x1u /* Address is a delta */
+
+/* The mask of all currently supported flags (for verification). */
+#define WT_BLOCK_DISAGG_ADDR_ALL_FLAGS (WT_BLOCK_DISAGG_ADDR_FLAG_DELTA)
+
+    uint64_t flags; /* Flags for the address cookie */
+
+    uint64_t lsn;      /* Log sequence number */
+    uint64_t base_lsn; /* Base log sequence number */
+
+    uint32_t size;     /* Size of the data */
+    uint32_t checksum; /* Checksum of the data */
+};

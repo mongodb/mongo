@@ -93,6 +93,8 @@ struct __wt_block_desc;
 typedef struct __wt_block_desc WT_BLOCK_DESC;
 struct __wt_block_disagg;
 typedef struct __wt_block_disagg WT_BLOCK_DISAGG;
+struct __wt_block_disagg_address_cookie;
+typedef struct __wt_block_disagg_address_cookie WT_BLOCK_DISAGG_ADDRESS_COOKIE;
 struct __wt_block_disagg_header;
 typedef struct __wt_block_disagg_header WT_BLOCK_DISAGG_HEADER;
 struct __wt_block_header;

@@ -391,3 +391,51 @@ __wt_vsize_int(int64_t x)
     /* For non-negative values, use the unsigned code above. */
     return (__wt_vsize_uint((uint64_t)x));
 }
+
+/*
+ * __wt_pack_fixed_uint32 --
+ *     Pack a fixed-length 32-bit unsigned integer.
+ */
+static WT_INLINE int
+__wt_pack_fixed_uint32(uint8_t **pp, size_t maxlen, uint32_t value)
+{
+    uint32_t v;
+    uint8_t *p;
+    p = *pp;
+
+    v = value;
+#ifdef WORDS_BIGENDIAN
+    v = __wt_bswap32(v);
+#endif
+
+    WT_SIZE_CHECK_PACK(4, maxlen);
+    memcpy(p, &v, sizeof(v));
+    p += sizeof(v);
+
+    *pp = p;
+    return (0);
+}
+
+/*
+ * __wt_unpack_fixed_uint32 --
+ *     Unpack a fixed-length 32-bit unsigned integer.
+ */
+static WT_INLINE int
+__wt_unpack_fixed_uint32(const uint8_t **pp, size_t maxlen, uint32_t *valuep)
+{
+    uint32_t v;
+    const uint8_t *p;
+    p = *pp;
+
+    WT_SIZE_CHECK_UNPACK(4, maxlen);
+    memcpy(&v, p, sizeof(v));
+    p += sizeof(v);
+
+#ifdef WORDS_BIGENDIAN
+    v = __wt_bswap32(v);
+#endif
+
+    *valuep = v;
+    *pp = p;
+    return (0);
+}

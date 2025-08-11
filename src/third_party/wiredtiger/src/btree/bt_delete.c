@@ -108,6 +108,7 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     WT_ADDR_COPY addr;
     WT_DECL_RET;
     WT_REF_STATE previous_state;
+    WT_BTREE *btree = S2BT(session);
 
     *skipp = false;
 
@@ -121,9 +122,9 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
         }
 
         WT_RET(__wt_curhs_cache(session));
-        (void)__wt_atomic_addv32(&S2BT(session)->evict_busy, 1);
+        (void)__wt_atomic_addv32(&btree->evict_busy, 1);
         ret = __wt_evict(session, ref, previous_state, 0);
-        (void)__wt_atomic_subv32(&S2BT(session)->evict_busy, 1);
+        (void)__wt_atomic_subv32(&btree->evict_busy, 1);
         WT_RET_BUSY_OK(ret);
         ret = 0;
     }
@@ -213,7 +214,8 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     *skipp = true;
     WT_STAT_CONN_DSRC_INCR(session, rec_page_delete_fast);
 
-    __wt_atomic_addv16(&ref->ref_changes, 1);
+    if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
+        __wt_atomic_addv8(&ref->ref_changes, 1);
 
     /* Set the page to its new state. */
     WT_REF_SET_STATE(ref, WT_REF_DELETED);
@@ -232,13 +234,14 @@ err:
  *     Transaction rollback for a fast-truncate operation.
  */
 int
-__wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 {
     WT_REF_STATE current_state;
     WT_TXN *txn;
     WT_UPDATE **updp;
     uint64_t sleep_usecs, yield_count;
     bool locked;
+    WT_REF *ref = op->u.ref;
 
     txn = session->txn;
 
@@ -327,7 +330,8 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
         }
     }
 
-    __wt_atomic_addv16(&ref->ref_changes, 1);
+    if (WT_DELTA_INT_ENABLED(op->btree, S2C(session)))
+        __wt_atomic_addv8(&ref->ref_changes, 1);
 
     WT_REF_SET_STATE(ref, current_state);
     return (0);

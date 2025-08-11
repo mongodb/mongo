@@ -352,11 +352,12 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
  *     del update list.
  */
 static WT_INLINE void
-__wt_txn_op_delete_apply_prepare_state(WT_SESSION_IMPL *session, WT_REF *ref, bool commit)
+__wt_txn_op_delete_apply_prepare_state(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit)
 {
     WT_PAGE_DELETED *page_del;
     WT_REF_STATE previous_state;
     WT_UPDATE **updp;
+    WT_REF *ref = op->u.ref;
 
     /* Lock the ref to ensure we don't race with page instantiation. */
     WT_REF_LOCK(session, ref, &previous_state);
@@ -389,7 +390,8 @@ __wt_txn_op_delete_apply_prepare_state(WT_SESSION_IMPL *session, WT_REF *ref, bo
     if ((page_del = ref->page_del) != NULL)
         __txn_apply_prepare_state_page_del(session, page_del, commit);
 
-    __wt_atomic_addv16(&ref->ref_changes, 1);
+    if (WT_DELTA_INT_ENABLED(op->btree, S2C(session)))
+        __wt_atomic_addv8(&ref->ref_changes, 1);
 
     WT_REF_UNLOCK(ref, previous_state);
 }
@@ -513,7 +515,8 @@ __wt_txn_op_delete_commit(
     if (assign_timestamp)
         __txn_op_delete_commit_apply_page_del_timestamp(session, op);
 
-    __wt_atomic_addv16(&ref->ref_changes, 1);
+    if (WT_DELTA_INT_ENABLED(op->btree, S2C(session)))
+        __wt_atomic_addv8(&ref->ref_changes, 1);
 
 err:
     WT_REF_UNLOCK(ref, previous_state);
@@ -649,7 +652,7 @@ __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool validate
          * transaction commit call.
          */
         if (op->type == WT_TXN_OP_REF_DELETE)
-            __wt_txn_op_delete_apply_prepare_state(session, op->u.ref, true);
+            __wt_txn_op_delete_apply_prepare_state(session, op, true);
         else {
             upd = op->u.op_upd;
 

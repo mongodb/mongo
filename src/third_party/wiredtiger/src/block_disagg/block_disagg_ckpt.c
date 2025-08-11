@@ -18,6 +18,7 @@ static int
 __bmd_checkpoint_pack_raw(WT_BLOCK_DISAGG *block_disagg, WT_SESSION_IMPL *session,
   WT_ITEM *root_image, WT_PAGE_BLOCK_META *block_meta, WT_CKPT *ckpt)
 {
+    WT_BLOCK_DISAGG_ADDRESS_COOKIE root_cookie;
     uint32_t checksum, size;
     uint8_t *endp;
 
@@ -48,13 +49,22 @@ __bmd_checkpoint_pack_raw(WT_BLOCK_DISAGG *block_disagg, WT_SESSION_IMPL *sessio
         WT_RET(__wti_block_disagg_write_internal(
           session, block_disagg, root_image, block_meta, &size, &checksum, true, true));
         __wt_page_header_byteswap((void *)root_image->data);
-        WT_RET(__wti_block_disagg_ckpt_pack(
-          block_disagg, &endp, block_meta->page_id, block_meta->disagg_lsn, size, checksum));
+
+        /* Initialize and pack the address cookie for the root page. */
+        WT_CLEAR(root_cookie);
+        root_cookie.page_id = block_meta->page_id;
+        root_cookie.flags = 0;
+        root_cookie.lsn = block_meta->disagg_lsn;
+        root_cookie.base_lsn = block_meta->base_lsn;
+        root_cookie.size = size;
+        root_cookie.checksum = checksum;
+        WT_RET(__wti_block_disagg_ckpt_pack(session, block_disagg, &endp, &root_cookie));
+
         ckpt->raw.size = WT_PTRDIFF(endp, ckpt->raw.mem);
         __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
-          "Checkpoint root page: root_id=%" PRIu64 " lsn=%" PRIu64 " root_size=%" PRIu32
-          " root_checksum=%" PRIx32,
-          block_meta->page_id, block_meta->disagg_lsn, size, checksum);
+          "Checkpoint root page: root_id=%" PRIu64 " lsn=%" PRIu64 " base_lsn=%" PRIu64
+          " root_size=%" PRIu32 " root_checksum=%" PRIx32,
+          block_meta->page_id, block_meta->disagg_lsn, block_meta->base_lsn, size, checksum);
     }
 
     return (0);
@@ -190,8 +200,7 @@ __wti_block_disagg_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session, const ui
   size_t addr_size, uint8_t *root_addr, size_t *root_addr_sizep, bool checkpoint)
 {
     WT_BLOCK_DISAGG *block_disagg;
-    uint64_t lsn, root_id;
-    uint32_t root_size, root_checksum;
+    WT_BLOCK_DISAGG_ADDRESS_COOKIE root_cookie;
     uint8_t *endp;
 
     WT_UNUSED(session);
@@ -205,20 +214,20 @@ __wti_block_disagg_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session, const ui
     if (addr == NULL || addr_size == 0)
         return (0);
 
-    WT_RET(__wti_block_disagg_ckpt_unpack(
-      block_disagg, addr, addr_size, &root_id, &lsn, &root_size, &root_checksum));
+    WT_RET(__wti_block_disagg_ckpt_unpack(session, block_disagg, addr, addr_size, &root_cookie));
 
     /*
      * Read root page address.
      */
     endp = root_addr;
-    WT_RET(__wti_block_disagg_addr_pack(&endp, root_id, lsn, root_size, root_checksum));
+    WT_RET(__wti_block_disagg_addr_pack(session, &endp, &root_cookie));
     *root_addr_sizep = WT_PTRDIFF(endp, root_addr);
 
     __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
-      "Loading checkpoint: root_id=%" PRIu64 " lsn=%" PRIu64 " root_size=%" PRIu32
-      " root_checksum=%" PRIx32,
-      root_id, lsn, root_size, root_checksum);
+      "Loading checkpoint: root_id=%" PRIu64 " flags=%" PRIx64 " lsn=%" PRIu64 " base_lsn=%" PRIu64
+      " root_size=%" PRIu32 " root_checksum=%" PRIx32,
+      root_cookie.page_id, root_cookie.flags, root_cookie.lsn, root_cookie.base_lsn,
+      root_cookie.size, root_cookie.checksum);
 
     return (0);
 }

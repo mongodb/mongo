@@ -505,9 +505,8 @@ __rec_hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *bt
      * visible to checkpoint and the modifications it makes to the history store will be the same as
      * what checkpoint would've done.
      */
-    if (error_on_ts_ordering && __wt_txn_tw_start_visible_all(session, tw)) {
+    if (error_on_ts_ordering && __wt_txn_tw_start_visible_all(session, tw))
         error_on_ts_ordering = false;
-    }
 
     if (ret == 0) {
         WT_ASSERT(session, tw->start_ts + 1 > WT_TS_NONE);

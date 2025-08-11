@@ -2162,7 +2162,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
             }
             break;
         case WT_TXN_OP_REF_DELETE:
-            __wt_txn_op_delete_apply_prepare_state(session, op->u.ref, false);
+            __wt_txn_op_delete_apply_prepare_state(session, op, false);
             break;
         case WT_TXN_OP_TRUNCATE_COL:
         case WT_TXN_OP_TRUNCATE_ROW:
@@ -2281,7 +2281,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[], bool api_call)
             }
             break;
         case WT_TXN_OP_REF_DELETE:
-            WT_TRET(__wt_delete_page_rollback(session, op->u.ref));
+            WT_TRET(__wt_delete_page_rollback(session, op));
             break;
         case WT_TXN_OP_TRUNCATE_COL:
         case WT_TXN_OP_TRUNCATE_ROW:

@@ -247,6 +247,7 @@ struct __wt_save_upd {
     WT_ROW *rip;    /* Original on-page reference */
     WT_UPDATE *onpage_upd;
     WT_UPDATE *onpage_tombstone;
+    WT_UPDATE *free_upds; /* Updates to be freed */
     WT_TIME_WINDOW tw;
     bool restore; /* Whether to restore this saved update chain */
 };
@@ -1185,7 +1186,17 @@ struct __wt_ref {
     wt_shared WT_PAGE *volatile home;        /* Reference page */
     wt_shared volatile uint32_t pindex_hint; /* Reference page index hint */
 
-    uint8_t unused; /* Padding: before the flags field so flags can be easily expanded. */
+    /*
+     * A counter used to track how many times a ref has changed during internal page reconciliation.
+     * The value is compared and swapped to 0 for each internal page reconciliation. If the counter
+     * has a value greater than zero, this implies that the ref has been changed concurrently and
+     * that the ref remains dirty after internal page reconciliation. It is possible for other
+     * operations such as page splits and fast-truncate to concurrently write new values to the ref,
+     * but depending on timing or race conditions, it cannot be guaranteed that these new values are
+     * included as part of the reconciliation. The page would need to be reconciled again to ensure
+     * that these modifications are included.
+     */
+    wt_shared volatile uint8_t ref_changes;
 
 /*
  * Define both internal- and leaf-page flags for now: we only need one, but it provides an easy way
@@ -1358,19 +1369,6 @@ struct __wt_ref {
     WT_REF_HIST hist[WT_REF_SAVE_STATE_MAX];
     uint64_t histoff;
 #endif
-
-    /*
-     * A counter used to track how many times a ref has changed during internal page reconciliation.
-     * The value is compared and swapped to 0 for each internal page reconciliation. If the counter
-     * has a value greater than zero, this implies that the ref has been changed concurrently and
-     * that the ref remains dirty after internal page reconciliation. It is possible for other
-     * operations such as page splits and fast-truncate to concurrently write new values to the ref,
-     * but depending on timing or race conditions, it cannot be guaranteed that these new values are
-     * included as part of the reconciliation. The page would need to be reconciled again to ensure
-     * that these modifications are included.
-     */
-    wt_shared volatile uint16_t ref_changes;
-    char pad[6]; /* Padding */
 };
 
 #ifdef HAVE_REF_TRACK
@@ -1383,9 +1381,9 @@ struct __wt_ref {
  * WT_REF_SIZE is the expected structure size -- we verify the build to ensure the compiler hasn't
  * inserted padding which would break the world.
  */
-#define WT_REF_SIZE (56 + WT_REF_SAVE_STATE_MAX * sizeof(WT_REF_HIST) + 8)
+#define WT_REF_SIZE (48 + WT_REF_SAVE_STATE_MAX * sizeof(WT_REF_HIST) + 8)
 #else
-#define WT_REF_SIZE 56
+#define WT_REF_SIZE 48
 #define WT_REF_CLEAR_SIZE (sizeof(WT_REF))
 #endif
 

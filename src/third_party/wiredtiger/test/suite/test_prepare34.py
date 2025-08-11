@@ -26,51 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wiredtiger
+from prepare_util import test_prepare_preserve_prepare_base
 
 # Tests checkpoint behavior for prepared modify operations:
 # - Stable prepares written as prepared
 # - Committed/rolled back properly handled
 # FIXME: Verify that prepared modifies are reconstructed properly when loaded from disk
 
-class test_prepare34(wttest.WiredTigerTestCase):
-    conn_config = 'checkpoint=(precise=true),preserve_prepared=true,statistics=(all)'
+class test_prepare34(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare34'
-
-    def get_stats(self, stats):
-        """Get the current values of multiple statistics."""
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        results = {}
-        for stat in stats:
-            results[stat] = stat_cursor[stat][2]
-        stat_cursor.close()
-        return results
-
-    def checkpoint_and_verify_stats(self, expected_changes):
-        """
-        Perform a checkpoint and verify the expected changes in multiple statistics.
-
-        Args:
-            expected_changes: Dict mapping stat -> bool
-                             where True means expect increase, False means expect no change
-        """
-        stats_to_check = list(expected_changes.keys())
-        old_stats = self.get_stats(stats_to_check)
-
-        self.session.checkpoint()
-
-        new_stats = self.get_stats(stats_to_check)
-
-        for stat, expect_increase in expected_changes.items():
-            diff = new_stats[stat] - old_stats[stat]
-            if expect_increase:
-                self.assertGreater(diff, 0,
-                    f"Stat {stat}: expected increase, got diff {diff}")
-            else:
-                self.assertEqual(diff, 0,
-                    f"Stat {stat}: expected no change, got diff {diff}")
-
-        return new_stats
 
     def test_rollback_prepare_modify(self):
         """
@@ -105,7 +70,7 @@ class test_prepare34(wttest.WiredTigerTestCase):
         # Initial checkpoint should write baseline data, no prepared content
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-        })
+        }, self.uri)
 
         # Create a prepared transaction with modify operations
         session_prepare = self.conn.open_session()
@@ -128,7 +93,7 @@ class test_prepare34(wttest.WiredTigerTestCase):
         # Should not write any prepared content since stable timestamp (40) < prepare timestamp (70)
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-        })
+        }, self.uri)
 
         # Now rollback the prepared transaction at timestamp 80
         session_prepare.rollback_transaction('rollback_timestamp='+ self.timestamp_str(80))
@@ -138,7 +103,7 @@ class test_prepare34(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(75))
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: True,
-        })
+        }, self.uri)
 
         self.session.begin_transaction('read_timestamp='+ self.timestamp_str(75)+ ',isolation=read-uncommitted')
         for i in range(1, 21):
@@ -151,7 +116,7 @@ class test_prepare34(wttest.WiredTigerTestCase):
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
             wiredtiger.stat.dsrc.rec_time_window_stop_ts: False,
             wiredtiger.stat.dsrc.rec_time_window_start_ts: True,
-        })
+        }, self.uri)
 
         self.session.begin_transaction('read_timestamp='+ self.timestamp_str(75))
         for i in range(1, 21):
@@ -190,7 +155,7 @@ class test_prepare34(wttest.WiredTigerTestCase):
         # Initial checkpoint should write baseline data, no prepared content
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-        })
+        }, self.uri)
 
         # Create a prepared transaction with modify operations
         session_prepare = self.conn.open_session()
@@ -216,7 +181,7 @@ class test_prepare34(wttest.WiredTigerTestCase):
         # Should not write any prepared content since stable timestamp (40) < prepare timestamp (70)
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-        })
+        }, self.uri)
 
         # Now rollback the prepared transaction at timestamp 80
         session_prepare.commit_transaction('commit_timestamp='+ self.timestamp_str(80)+',durable_timestamp='+self.timestamp_str(90))
@@ -226,13 +191,13 @@ class test_prepare34(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(75))
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: True,
-        })
+        }, self.uri)
 
         # Write prepare update to disk when prepare ts is stable but durable timestamp is not stable
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(80))
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: True,
-        })
+        }, self.uri)
 
         # Write committed update to disk when prepare ts is stable but durable timestamp is not stable
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(95))
@@ -244,7 +209,7 @@ class test_prepare34(wttest.WiredTigerTestCase):
             wiredtiger.stat.dsrc.rec_time_window_stop_ts: False,
             wiredtiger.stat.dsrc.rec_time_window_stop_txn: False,
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-        })
+        }, self.uri)
 
         self.session.begin_transaction('read_timestamp='+ self.timestamp_str(75))
         for i in range(1, 21):
@@ -255,5 +220,3 @@ class test_prepare34(wttest.WiredTigerTestCase):
         for i in range(1, 21):
             self.assertEqual('dbaaaaa', cursor[i])
         self.session.rollback_transaction()
-
-

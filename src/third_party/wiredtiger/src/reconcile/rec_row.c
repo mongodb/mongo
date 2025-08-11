@@ -238,7 +238,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
  */
 static int
 __rec_row_merge(
-  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref, uint16_t ref_changes, bool *build_delta)
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref, uint8_t ref_changes, bool *build_delta)
 {
     WT_ADDR *addr;
     WT_MULTI *multi;
@@ -343,7 +343,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
     WT_REF *ref;
     WT_TIME_AGGREGATE ft_ta, *source_ta, ta;
     size_t size;
-    uint16_t prev_ref_changes;
+    uint8_t prev_ref_changes;
     bool build_delta, retain_onpage;
     const void *p;
 
@@ -441,7 +441,8 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
              * Set the ref_changes state to zero if there were no concurrent changes while
              * reconciling the internal page.
              */
-            __wt_atomic_casv16(&ref->ref_changes, prev_ref_changes, 0);
+            if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
+                __wt_atomic_casv8(&ref->ref_changes, prev_ref_changes, 0);
             /*
              * Ignored child.
              */
@@ -470,7 +471,8 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
                  * Set the ref_changes state to zero if there were no concurrent changes while
                  * reconciling the internal page.
                  */
-                __wt_atomic_casv16(&ref->ref_changes, prev_ref_changes, 0);
+                if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
+                    __wt_atomic_casv8(&ref->ref_changes, prev_ref_changes, 0);
 
                 WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
@@ -481,7 +483,8 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
                  * Set the ref_changes state to zero if there were no concurrent changes while
                  * reconciling the internal page.
                  */
-                __wt_atomic_casv16(&ref->ref_changes, prev_ref_changes, 0);
+                if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
+                    __wt_atomic_casv8(&ref->ref_changes, prev_ref_changes, 0);
 
                 WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
@@ -593,7 +596,8 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
          * Set the ref_changes state to zero if there were no concurrent changes while reconciling
          * the internal page.
          */
-        __wt_atomic_casv16(&ref->ref_changes, prev_ref_changes, 0);
+        if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
+            __wt_atomic_casv8(&ref->ref_changes, prev_ref_changes, 0);
     }
     WT_INTL_FOREACH_END;
 

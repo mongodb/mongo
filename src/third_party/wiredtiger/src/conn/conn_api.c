@@ -3002,6 +3002,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     /* Configure the file system on the connection. */
     WT_ERR(__conn_config_file_system(session, cfg));
 
+    /*
+     * Check for local files that need to be removed before starting in disaggregated mode.
+     */
+    WT_ERR(__wti_disagg_check_local_files(session, cfg));
+
     /* Make sure no other thread of control already owns this database. */
     WT_ERR(__conn_single(session, cfg));
 

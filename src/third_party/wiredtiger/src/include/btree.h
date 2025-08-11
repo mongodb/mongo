@@ -334,9 +334,9 @@ struct __wt_salvage_cookie {
     (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) && \
       F_ISSET(&S2C(session)->page_delta, WT_LEAF_PAGE_DELTA))
 
-#define WT_DELTA_INT_ENABLED(session)                  \
-    (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) && \
-      F_ISSET(&S2C(session)->page_delta, WT_INTERNAL_PAGE_DELTA))
+#define WT_DELTA_INT_ENABLED(btree, conn) \
+    (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && F_ISSET(&conn->page_delta, WT_INTERNAL_PAGE_DELTA))
 
-#define WT_DELTA_ENABLED_FOR_PAGE(session, type) \
-    ((type) == WT_PAGE_ROW_LEAF ? WT_DELTA_LEAF_ENABLED(session) : WT_DELTA_INT_ENABLED(session))
+#define WT_DELTA_ENABLED_FOR_PAGE(session, type)                   \
+    ((type) == WT_PAGE_ROW_LEAF ? WT_DELTA_LEAF_ENABLED(session) : \
+                                  WT_DELTA_INT_ENABLED(S2BT(session), S2C(session)))

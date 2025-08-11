@@ -1000,7 +1000,6 @@ static int
 __clayered_copy_constituent_bound(WT_CURSOR_LAYERED *clayered, WT_CURSOR *constituent)
 {
     WT_CURSOR *base_cursor;
-    WT_ITEM *layered_bound, *constituent_bound;
     WT_SESSION_IMPL *session;
 
     session = CUR2S(clayered);
@@ -1009,42 +1008,26 @@ __clayered_copy_constituent_bound(WT_CURSOR_LAYERED *clayered, WT_CURSOR *consti
     if (constituent == NULL)
         return (0);
 
-    /* Note that the inclusive flag is additive to upper/lower, so no need to check it as well */
-    if (F_ISSET(base_cursor, WT_CURSTD_BOUND_UPPER)) {
-        /* If an upper bound is already present on the constituent, make sure it matches */
-        if (F_ISSET(constituent, WT_CURSTD_BOUND_UPPER)) {
-            layered_bound = &base_cursor->upper_bound;
-            constituent_bound = &constituent->upper_bound;
-            WT_ASSERT_ALWAYS(session,
-              layered_bound->size == constituent_bound->size &&
-                memcmp(layered_bound->data, constituent_bound->data, layered_bound->size) == 0,
-              "Setting an upper bound on a layered cursor and a constituent already has a "
-              "different bound");
-        } else
-            WT_RET(__wt_buf_set(session, &constituent->upper_bound, base_cursor->upper_bound.data,
-              base_cursor->upper_bound.size));
-    } else {
+    /*
+     * It doesn't matter if the bound in question is already set on the constituent. It is legal to
+     * reset it. Note that the inclusive flag is additive to upper/lower, so no need to check it as
+     * well.
+     */
+    if (F_ISSET(base_cursor, WT_CURSTD_BOUND_UPPER))
+        WT_RET(__wt_buf_set(session, &constituent->upper_bound, base_cursor->upper_bound.data,
+          base_cursor->upper_bound.size));
+    else {
         __wt_buf_free(session, &constituent->upper_bound);
         WT_CLEAR(constituent->upper_bound);
     }
-    if (F_ISSET(base_cursor, WT_CURSTD_BOUND_LOWER)) {
-        /* If a lower bound is already present on the constituent, make sure it matches */
-        if (F_ISSET(constituent, WT_CURSTD_BOUND_LOWER)) {
-            layered_bound = &base_cursor->lower_bound;
-            constituent_bound = &constituent->lower_bound;
-            WT_ASSERT_ALWAYS(session,
-              layered_bound->size == constituent_bound->size &&
-                memcmp(layered_bound->data, constituent_bound->data, layered_bound->size) == 0,
-              "Setting a lower bound on a layered cursor and a constituent already has a different "
-              "bound");
-        } else
-            WT_RET(__wt_buf_set(session, &constituent->lower_bound, base_cursor->lower_bound.data,
-              base_cursor->lower_bound.size));
-    } else {
+    if (F_ISSET(base_cursor, WT_CURSTD_BOUND_LOWER))
+        WT_RET(__wt_buf_set(session, &constituent->lower_bound, base_cursor->lower_bound.data,
+          base_cursor->lower_bound.size));
+    else {
         __wt_buf_free(session, &constituent->lower_bound);
         WT_CLEAR(constituent->lower_bound);
     }
-    /* Copy across all the bound configurations */
+    /* Copy across all the bound configurations. */
     F_CLR(constituent, WT_CURSTD_BOUND_ALL);
     F_SET(constituent, F_MASK(base_cursor, WT_CURSTD_BOUND_ALL));
     return (0);

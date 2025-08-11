@@ -36,6 +36,7 @@ __rec_update_save(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins, WT
     supd->rip = rip;
     supd->onpage_upd = onpage_upd;
     supd->onpage_tombstone = tombstone;
+    supd->free_upds = NULL;
     supd->tw = *tw;
     supd->restore = supd_restore;
     ++r->supd_next;
@@ -1271,26 +1272,16 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
      * Set the flag if the selected tombstone has no timestamp. Based on this flag, the caller
      * functions perform the history store truncation for this key.
      */
-    if (!F_ISSET(session->dhandle, WT_DHANDLE_HS) && upd_select->tombstone != NULL &&
-      !F_ISSET(upd_select->tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS)) {
-        upd = upd_select->upd;
-
-        /*
-         * The selected update can be the tombstone itself when the tombstone is globally visible.
-         * Compare the tombstone's timestamp with either the next update in the update list or the
-         * on-disk cell timestamp to determine if the tombstone is discarding a timestamp.
-         */
-        if (upd_select->tombstone == upd) {
-            upd = upd->next;
-
-            /* Loop until a valid update is found. */
-            while (upd != NULL && upd->txnid == WT_TXN_ABORTED)
-                upd = upd->next;
-        }
-
-        if ((upd != NULL && upd->upd_start_ts > upd_select->tombstone->upd_start_ts) ||
-          (vpack != NULL && vpack->tw.start_ts > upd_select->tombstone->upd_start_ts))
+    if (!WT_IS_HS(session->dhandle) && upd_select->tombstone != NULL &&
+      !F_ISSET(upd_select->tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS) &&
+      !WT_TIME_WINDOW_HAS_STOP_PREPARE(&upd_select->tw)) {
+        if ((upd_select->tombstone != upd_select->upd &&
+              upd_select->tw.start_ts > upd_select->tw.stop_ts) ||
+          (vpack != NULL && vpack->tw.start_ts > upd_select->tw.stop_ts &&
+            upd_select->tw.stop_ts == WT_TS_NONE)) {
+            WT_ASSERT(session, upd_select->tw.stop_ts == WT_TS_NONE);
             upd_select->no_ts_tombstone = true;
+        }
     }
 
     /*
@@ -1390,5 +1381,5 @@ __wt_rec_in_progress(WT_SESSION_IMPL *session)
 {
     WTI_RECONCILE *rec = session->reconcile;
 
-    return (!(rec == NULL && rec->ref == NULL));
+    return (rec != NULL && rec->ref != NULL);
 }

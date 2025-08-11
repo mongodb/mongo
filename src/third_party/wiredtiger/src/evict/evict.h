@@ -138,7 +138,7 @@ struct __wt_evict {
 #define WT_EVICT_CALL_URGENT 0x4u   /* Urgent eviction */
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
-#define WT_EVICT_MAX_WORKERS 20
+#define WT_EVICT_MAX_WORKERS 64
 
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 

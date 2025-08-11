@@ -18,7 +18,7 @@ __bmd_addr_invalid(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, siz
     WT_UNUSED(bm);
     WT_UNUSED(session);
 
-    return (__wti_block_disagg_addr_invalid(addr, addr_size));
+    return (__wti_block_disagg_addr_invalid(session, addr, addr_size));
 }
 
 /*

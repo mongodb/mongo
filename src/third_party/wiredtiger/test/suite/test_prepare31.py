@@ -26,44 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wiredtiger
+from prepare_util import test_prepare_preserve_prepare_base
 
 # Tests checkpoint behavior with aborted prepared transactions based on stable timestamp:
 # - Skip writing aborted prepared updates when rollback timestamp is stable
 # - Skip writing when prepare timestamp is not stable
 # - Write prepared updates when prepare timestamp is stable but rollback timestamp is not
 
-class test_prepare31(wttest.WiredTigerTestCase):
-    conn_config = 'checkpoint=(precise=true),preserve_prepared=true,statistics=(all)'
+class test_prepare31(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare31'
-
-    def get_stats(self, stats):
-        """Get the current values of multiple statistics."""
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        results = {}
-        for stat in stats:
-            results[stat] = stat_cursor[stat][2]
-        stat_cursor.close()
-        return results
-
-    def checkpoint_and_verify_stats(self, expected_changes):
-        stats_to_check = list(expected_changes.keys())
-        old_stats = self.get_stats(stats_to_check)
-
-        self.session.checkpoint()
-
-        new_stats = self.get_stats(stats_to_check)
-
-        for stat, expect_increase in expected_changes.items():
-            diff = new_stats[stat] - old_stats[stat]
-            if expect_increase:
-                self.assertGreater(diff, 0,
-                    f"Stat {stat}: expected increase, got diff {diff}")
-            else:
-                self.assertEqual(diff, 0,
-                    f"Stat {stat}: expected no change, got diff {diff}")
-
-        return new_stats
 
     def setup_initial_data(self, uri):
         """Set up initial test data and verify it's accessible."""
@@ -133,7 +105,7 @@ class test_prepare31(wttest.WiredTigerTestCase):
         # since their rollback timestamp (80) is less than stable timestamp (90)
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-        })
+        }, self.uri)
 
     def test_skip_aborted_prepare_update_if_prepare_timestamp_not_stable(self):
         self.setup_initial_data(self.uri)
@@ -146,7 +118,7 @@ class test_prepare31(wttest.WiredTigerTestCase):
         # since their prepare timestamp is after stable timestamp
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-        })
+        }, self.uri)
 
     def test_write_prepare_update_if_rollback_timestamp_not_stable(self):
         self.setup_initial_data(self.uri)
@@ -161,4 +133,4 @@ class test_prepare31(wttest.WiredTigerTestCase):
         # Since prepare timestamp is stable but rollback ts is not, we write the prepared update to disk
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: True,
-        })
+        }, self.uri)

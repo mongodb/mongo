@@ -177,14 +177,17 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
             /*
              * If we restore an update chain in update restore eviction, there should be no update
              * or a restored tombstone on the existing update chain except for btrees with leaf
-             * delta enabled. FIXME-WT-14885: No need to consider the delta case if we have
-             * implemented delta consolidation.
+             * delta enabled or a prepared update if the preserve prepared config is enabled.
+             * FIXME-WT-14885: No need to consider the delta case if we have implemented delta
+             * consolidation.
              */
             WT_ASSERT_ALWAYS(session,
               !restore ||
                 (*upd_entry == NULL ||
                   (WT_DELTA_LEAF_ENABLED(session) && (*upd_entry)->type == WT_UPDATE_TOMBSTONE &&
-                    F_ISSET(*upd_entry, WT_UPDATE_RESTORED_FROM_DS))),
+                    F_ISSET(*upd_entry, WT_UPDATE_RESTORED_FROM_DS)) ||
+                  (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
+                    (*upd_entry)->prepare_state == WT_PREPARE_INPROGRESS)),
               "Illegal update on chain during update restore eviction");
 
             /*

@@ -458,9 +458,10 @@ typedef struct {
  * Called when building the internal page image to indicate should we start to build a delta for the
  * page. We are still building so multi_next should still be 0 instead of 1.
  */
-#define WT_BUILD_DELTA_INT(session, r)                                                      \
-    WT_DELTA_INT_ENABLED((session)) && !__wt_ref_is_root(r->ref) && (r)->multi_next == 0 && \
-      !F_ISSET_ATOMIC_16(r->ref->page, WT_PAGE_REC_FAIL | WT_PAGE_INTL_PINDEX_UPDATE) &&    \
+#define WT_BUILD_DELTA_INT(session, r)                                                    \
+    WT_DELTA_INT_ENABLED((S2BT(session)), (S2C(session))) && !__wt_ref_is_root(r->ref) && \
+      (r)->multi_next == 0 &&                                                             \
+      !F_ISSET_ATOMIC_16(r->ref->page, WT_PAGE_REC_FAIL | WT_PAGE_INTL_PINDEX_UPDATE) &&  \
       WT_REC_RESULT_SINGLE_PAGE((session), (r))
 
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */

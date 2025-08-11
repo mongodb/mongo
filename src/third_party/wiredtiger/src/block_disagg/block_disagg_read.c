@@ -16,19 +16,19 @@ int
 __wti_block_disagg_corrupt(
   WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
+    WT_BLOCK_DISAGG_ADDRESS_COOKIE root_cookie;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_PAGE_BLOCK_META block_meta;
-    uint64_t lsn, page_id;
-    uint32_t checksum, size;
 
     /* Read the block. */
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
     WT_ERR(__wti_block_disagg_read(bm, session, tmp, &block_meta, addr, addr_size));
 
     /* Crack the cookie, dump the block. */
-    WT_ERR(__wti_block_disagg_addr_unpack(&addr, addr_size, &page_id, &lsn, &size, &checksum));
-    WT_ERR(__wt_bm_corrupt_dump(session, tmp, 0, (wt_off_t)page_id, size, checksum));
+    WT_ERR(__wti_block_disagg_addr_unpack(session, &addr, addr_size, &root_cookie));
+    WT_ERR(__wt_bm_corrupt_dump(
+      session, tmp, 0, (wt_off_t)root_cookie.page_id, root_cookie.size, root_cookie.checksum));
 
 err:
     __wt_scr_free(session, &tmp);
@@ -59,8 +59,8 @@ __block_disagg_read_checksum_err(WT_SESSION_IMPL *session, const char *name, uin
  */
 static int
 __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_disagg,
-  WT_PAGE_BLOCK_META *block_meta, uint64_t page_id, uint64_t lsn, uint32_t size, uint32_t checksum,
-  WT_ITEM *results_array, uint32_t *results_count)
+  WT_PAGE_BLOCK_META *block_meta, uint64_t page_id, uint64_t flags, uint64_t lsn, uint64_t base_lsn,
+  uint32_t size, uint32_t checksum, WT_ITEM *results_array, uint32_t *results_count)
 {
     WT_BLOCK_DISAGG_HEADER *blk, swap;
     WT_DECL_RET;
@@ -82,8 +82,9 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
         WT_CLEAR(*block_meta);
 
     __wt_verbose(session, WT_VERB_READ,
-      "page_id %" PRIu64 ", lsn %" PRIu64 ", size %" PRIu32 ", checksum %" PRIx32, page_id, lsn,
-      size, checksum);
+      "page_id %" PRIu64 ", flags %" PRIx64 ", lsn %" PRIu64 ", base_lsn %" PRIu64 ", size %" PRIu32
+      ", checksum %" PRIx32,
+      page_id, flags, lsn, base_lsn, size, checksum);
 
     WT_STAT_CONN_INCR(session, disagg_block_get);
     WT_STAT_CONN_INCR(session, block_read);
@@ -103,9 +104,9 @@ reread:
          * delta.
          */
         __wt_verbose_notice(session, WT_VERB_READ,
-          "retry #%" PRIu32 " for page_id %" PRIu64 ", lsn %" PRIu64 ", size %" PRIu32
-          ", checksum %" PRIx32,
-          retry, page_id, lsn, size, checksum);
+          "retry #%" PRIu32 " for page_id %" PRIu64 ", flags %" PRIx64 ", lsn %" PRIu64
+          ", base_lsn %" PRIu64 ", size %" PRIu32 ", checksum %" PRIx32,
+          retry, page_id, flags, lsn, base_lsn, size, checksum);
         __wt_sleep(0, 10000 + retry * 5000);
 
         for (i = 0; i < *results_count; i++)
@@ -185,6 +186,15 @@ reread:
 
                 if (result == last && block_meta != NULL) {
                     WT_ASSERT(session, get_args.lsn > 0);
+                    WT_ASSERT(session,
+                      (get_args.delta_count > 0) ==
+                        FLD_ISSET(flags, WT_BLOCK_DISAGG_ADDR_FLAG_DELTA));
+
+                    /* The server is allowed to set base LSN to 0 for full page images. */
+                    WT_ASSERT(session,
+                      (get_args.base_lsn == 0 && get_args.delta_count == 0) ||
+                        get_args.base_lsn == base_lsn);
+
                     /* Set the other metadata returned by the Page Service. */
                     block_meta->page_id = page_id;
                     block_meta->backlink_lsn = get_args.backlink_lsn;
@@ -264,17 +274,17 @@ __wti_block_disagg_read_multiple(WT_BM *bm, WT_SESSION_IMPL *session,
   u_int *buffer_count)
 {
     WT_BLOCK_DISAGG *block_disagg;
-    uint64_t lsn, page_id;
-    uint32_t checksum, size;
+    WT_BLOCK_DISAGG_ADDRESS_COOKIE cookie;
 
     block_disagg = (WT_BLOCK_DISAGG *)bm->block;
 
     /* Crack the cookie. */
-    WT_RET(__wti_block_disagg_addr_unpack(&addr, addr_size, &page_id, &lsn, &size, &checksum));
+    WT_RET(__wti_block_disagg_addr_unpack(session, &addr, addr_size, &cookie));
 
     /* Read the block. */
-    WT_RET(__block_disagg_read_multiple(
-      session, block_disagg, block_meta, page_id, lsn, size, checksum, buffer_array, buffer_count));
+    WT_RET(
+      __block_disagg_read_multiple(session, block_disagg, block_meta, cookie.page_id, cookie.flags,
+        cookie.lsn, cookie.base_lsn, cookie.size, cookie.checksum, buffer_array, buffer_count));
 
     return (0);
 }
