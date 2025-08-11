@@ -38,7 +38,30 @@
 namespace mongo {
 namespace unified_write_executor {
 
+namespace {
+bool isNonVerboseWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
+    if (!opCtx) {
+        return false;
+    }
+
+    // When determining if a write command is non-verbose, we follow slightly different rules
+    // for batch write commands vs. bulk write commands. For batch write commands, we match the
+    // existing behavior of BatchWriteOp::buildClientResponse(). For bulk write commands, we
+    // match the existing behavior of ClusterBulkWriteCmd::Invocation::_populateCursorReply().
+    const auto& wc = opCtx->getWriteConcern();
+    return cmdRef.visitRequest(OverloadedVisitor{
+        [&](const BatchedCommandRequest&) { return !wc.requiresWriteAcknowledgement(); },
+        [&](const BulkWriteCommandRequest&) {
+            return !wc.requiresWriteAcknowledgement() &&
+                (wc.syncMode == WriteConcernOptions::SyncMode::NONE ||
+                 wc.syncMode == WriteConcernOptions::SyncMode::UNSET);
+        }});
+}
+}  // namespace
+
 WriteCommandResponse executeWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
+    const bool isNonVerbose = isNonVerboseWriteCommand(opCtx, cmdRef);
+
     WriteOpProducer producer(cmdRef);
     WriteOpAnalyzer analyzer;
 
@@ -53,7 +76,7 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx, WriteCommandRe
     }
 
     WriteBatchExecutor executor(cmdRef);
-    WriteBatchResponseProcessor processor(cmdRef);
+    WriteBatchResponseProcessor processor(cmdRef, isNonVerbose);
     WriteBatchScheduler scheduler(*batcher, executor, processor);
 
     scheduler.run(opCtx, nssSet);

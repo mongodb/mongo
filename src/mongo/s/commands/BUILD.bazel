@@ -372,6 +372,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/session:logical_session_cache_noop.h",
         "//src/mongo/s/commands/query_cmd:cluster_aggregate_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_bulk_write_test.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_bulk_write_uwe_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_delete_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_distinct_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_explain_test.cpp",

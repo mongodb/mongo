@@ -81,13 +81,16 @@ public:
         CollectionsToCreate collsToCreate{};    // Collections to be explicitly created
     };
 
-    WriteBatchResponseProcessor(WriteCommandRef cmdRef) : _cmdRef(cmdRef) {}
+    explicit WriteBatchResponseProcessor(WriteCommandRef cmdRef, bool isNonVerbose = false)
+        : _cmdRef(cmdRef), _isNonVerbose(isNonVerbose) {}
 
-    WriteBatchResponseProcessor(const BatchedCommandRequest& request)
-        : WriteBatchResponseProcessor(WriteCommandRef{request}) {}
+    explicit WriteBatchResponseProcessor(const BatchedCommandRequest& request,
+                                         bool isNonVerbose = false)
+        : WriteBatchResponseProcessor(WriteCommandRef{request}, isNonVerbose) {}
 
-    WriteBatchResponseProcessor(const BulkWriteCommandRequest& request)
-        : WriteBatchResponseProcessor(WriteCommandRef{request}) {}
+    explicit WriteBatchResponseProcessor(const BulkWriteCommandRequest& request,
+                                         bool isNonVerbose = false)
+        : WriteBatchResponseProcessor(WriteCommandRef{request}, isNonVerbose) {}
 
     /**
      * Process a response from each shard, handle errors, and collect statistics. Returns an
@@ -155,6 +158,7 @@ private:
     };
 
     const WriteCommandRef _cmdRef;
+    const bool _isNonVerbose;
     size_t _nErrors{0};
     size_t _nInserted{0};
     size_t _nMatched{0};

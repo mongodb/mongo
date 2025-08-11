@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -36,7 +36,7 @@
 namespace mongo {
 namespace {
 
-class ClusterBulkWriteTest : public ClusterCommandTestFixture {
+class ClusterBulkWriteUWETest : public ClusterCommandTestFixture {
 protected:
     const BSONObj kBulkWriteCmdTargeted{fromjson(
         "{bulkWrite: 1, ops: [{insert: 0, document: {'_id': -1}}], nsInfo: [{ns: 'test.coll'}]}")};
@@ -59,7 +59,7 @@ protected:
                 0, replyItems, NamespaceString::makeBulkWriteNSS(boost::none));
             bob.append("cursor", cursor.toBSON());
             bob.append("nErrors", 0);
-            bob.append("nInserted", 0);
+            bob.append("nInserted", 1);
             bob.append("nDeleted", 0);
             bob.append("nMatched", 0);
             bob.append("nModified", 0);
@@ -82,7 +82,7 @@ protected:
                 0, replyItems, NamespaceString::makeBulkWriteNSS(boost::none));
             bob.append("cursor", cursor.toBSON());
             bob.append("nErrors", 0);
-            bob.append("nInserted", 0);
+            bob.append("nInserted", 1);
             bob.append("nDeleted", 0);
             bob.append("nMatched", 0);
             bob.append("nModified", 0);
@@ -93,31 +93,31 @@ protected:
     }
 };
 
-TEST_F(ClusterBulkWriteTest, NoErrors) {
+TEST_F(ClusterBulkWriteUWETest, NoErrors) {
     RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", false);
+    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", true);
 
     testNoErrors(kBulkWriteCmdTargeted, kBulkWriteCmdScatterGather);
 }
 
-TEST_F(ClusterBulkWriteTest, AttachesAtClusterTimeForSnapshotReadConcern) {
+TEST_F(ClusterBulkWriteUWETest, AttachesAtClusterTimeForSnapshotReadConcern) {
     RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", false);
+    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", true);
 
     testAttachesAtClusterTimeForSnapshotReadConcern(kBulkWriteCmdTargeted,
                                                     kBulkWriteCmdScatterGather);
 }
 
-TEST_F(ClusterBulkWriteTest, SnapshotReadConcernWithAfterClusterTime) {
+TEST_F(ClusterBulkWriteUWETest, SnapshotReadConcernWithAfterClusterTime) {
     RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", false);
+    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", true);
 
     testSnapshotReadConcernWithAfterClusterTime(kBulkWriteCmdTargeted, kBulkWriteCmdScatterGather);
 }
 
-TEST_F(ClusterBulkWriteTest, FireAndForgetRequestGetsReplyWithOnlyOkStatus) {
+TEST_F(ClusterBulkWriteUWETest, FireAndForgetRequestGetsReplyWithOnlyOkStatus) {
     RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", false);
+    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", true);
 
     auto asFireAndForgetRequest = [](const BSONObj& cmdObj) {
         BSONObjBuilder bob(cmdObj);
@@ -132,27 +132,42 @@ TEST_F(ClusterBulkWriteTest, FireAndForgetRequestGetsReplyWithOnlyOkStatus) {
         testNoErrorsOutsideTransaction(asFireAndForgetRequest(kBulkWriteCmdTargeted),
                                        asFireAndForgetRequest(kBulkWriteCmdScatterGather));
 
-    // A "fire & forget" bulk write is replied with the expected schema, but no meaningful value.
-    const auto expectedBulkCommandReplySection =
+    const BSONObj expectedReplySections[2] = {
         BulkWriteCommandReply(
             BulkWriteCommandResponseCursor(
                 0 /* cursorId */,
                 {} /* firstBatch */,
                 NamespaceString::createNamespaceString_forTest("admin.$cmd.bulkWrite")),
             0 /*nErrors*/,
-            0 /*nInserted*/,
+            1 /*nInserted*/,
             0 /*nMatched*/,
             0 /*nModified*/,
             0 /*nUpserted*/,
             0 /*nDeleted*/)
-            .toBSON();
-    for (const auto& response : bulkCmdresponses) {
+            .toBSON(),
+        BulkWriteCommandReply(
+            BulkWriteCommandResponseCursor(
+                0 /* cursorId */,
+                {} /* firstBatch */,
+                NamespaceString::createNamespaceString_forTest("admin.$cmd.bulkWrite")),
+            0 /*nErrors*/,
+            2 /*nInserted*/,
+            0 /*nMatched*/,
+            0 /*nModified*/,
+            0 /*nUpserted*/,
+            0 /*nDeleted*/)
+            .toBSON()};
+
+    for (size_t i = 0; i < bulkCmdresponses.size(); ++i) {
+        const auto& response = bulkCmdresponses[i];
+        const auto& expectedReplySection = expectedReplySections[i];
+
         ASSERT_FALSE(response.shouldRunAgainForExhaust);
         ASSERT(!response.nextInvocation);
         const auto responseObj = OpMsgRequest::parse(response.response).body;
         ASSERT_EQ(1, responseObj.getIntField("ok"));
-        ASSERT_TRUE(expectedBulkCommandReplySection.isPrefixOf(
-            responseObj, SimpleBSONElementComparator::kInstance));
+        ASSERT_TRUE(
+            expectedReplySection.isPrefixOf(responseObj, SimpleBSONElementComparator::kInstance));
     }
 }
 

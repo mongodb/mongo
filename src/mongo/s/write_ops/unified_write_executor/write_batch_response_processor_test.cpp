@@ -820,6 +820,142 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
     ASSERT_TRUE(wcError->getErrmsg().find(reply2WcErrorMsg) != std::string::npos);
 }
 
+TEST_F(WriteBatchResponseProcessorTest, NonVerboseMode) {
+    auto request = BulkWriteCommandRequest(
+        {
+            BulkWriteInsertOp(0, BSON("_id" << 1)),
+            BulkWriteInsertOp(1, BSON("_id" << 2)),
+        },
+        {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
+    // Original id to shard request Id/status map.
+    WriteOp op1(request, 0);  // shard1, id: 0, OK
+    WriteOp op2(request, 1);  // shard2, id: 2, OK
+
+    auto reply1 = makeReply();
+    reply1.setNInserted(1);
+    reply1.setCursor(
+        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
+    RemoteCommandResponse rcr1(host2, setTopLevelOK(reply1.toBSON()), Microseconds{0}, false);
+
+    auto reply2 = makeReply();
+    reply2.setNInserted(1);
+    reply2.setCursor(
+        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
+    RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef, true /*isNonVerbose*/);
+    auto result = processor.onWriteBatchResponse(opCtx,
+                                                 routingCtx,
+                                                 SimpleWriteBatchResponse{{shard1Name,
+                                                                           Response{
+                                                                               rcr1,
+                                                                               {op2},
+                                                                           }},
+                                                                          {shard2Name,
+                                                                           Response{
+                                                                               rcr2,
+                                                                               {op1},
+                                                                           }}});
+
+    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    ASSERT_EQ(result.opsToRetry.size(), 0);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    ASSERT_EQ(clientReply.getNErrors(), 0);
+    ASSERT_EQ(clientReply.getNInserted(), 2);
+    auto batch = clientReply.getCursor().getFirstBatch();
+    ASSERT_EQ(batch.size(), 0);
+
+    auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
+    ASSERT_EQ(batchedCommandReply.getN(), 0);
+    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_FALSE(batchedCommandReply.isErrDetailsSet());
+}
+
+TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithErrors) {
+    auto request = BulkWriteCommandRequest({BulkWriteInsertOp(0, BSON("_id" << 1))},
+                                           {NamespaceInfoEntry(nss1)});
+    WriteOp op1(request, 0);
+
+    RemoteCommandResponse rcr1(
+        host1,
+        ErrorReply(false, ErrorCodes::BadValue, "Bad Value", "simulating error").toBSON(),
+        Microseconds{0},
+        false);
+
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef, true /*isNonVerbose*/);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx, routingCtx, SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}}});
+
+    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    ASSERT_EQ(result.opsToRetry.size(), 0);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    ASSERT_EQ(clientReply.getNErrors(), 1);
+    ASSERT_EQ(clientReply.getNInserted(), 0);
+    auto batch = clientReply.getCursor().getFirstBatch();
+    ASSERT_EQ(batch.size(), 0);
+
+    auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
+    ASSERT_EQ(batchedCommandReply.getN(), 0);
+    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_FALSE(batchedCommandReply.isErrDetailsSet());
+}
+
+TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithMixedErrorsAndOk) {
+    auto request = BulkWriteCommandRequest({BulkWriteInsertOp(0, BSON("_id" << 1)),
+                                            BulkWriteInsertOp(0, BSON("_id" << 2)),
+                                            BulkWriteInsertOp(0, BSON("_id" << 3))},
+                                           {NamespaceInfoEntry(nss1)});
+    WriteOp op1(request, 0);
+    WriteOp op2(request, 1);
+    WriteOp op3(request, 2);
+
+    auto reply1 = makeReply();
+    reply1.setNInserted(1);
+    reply1.setCursor(
+        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply1.toBSON()), Microseconds{0}, false);
+
+    auto reply2 = BulkWriteCommandReply(
+        BulkWriteCommandResponseCursor(0,
+                                       {BulkWriteReplyItem{1, Status::OK()},
+                                        BulkWriteReplyItem{0, Status(ErrorCodes::BadValue, "")}},
+                                       nss1),
+        1,
+        1,
+        0,
+        0,
+        0,
+        0);
+    RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    WriteBatchResponseProcessor processor(cmdRef, true /*isNonVerbose*/);
+
+    processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}},
+                                 {shard2Name, Response{rcr2, {op2, op3}}}});
+
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    ASSERT_EQ(clientReply.getNErrors(), 1);
+    ASSERT_EQ(clientReply.getNInserted(), 2);
+    auto batch = clientReply.getCursor().getFirstBatch();
+    ASSERT_EQ(batch.size(), 0);
+
+    auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
+    ASSERT_EQ(batchedCommandReply.getN(), 0);
+    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_FALSE(batchedCommandReply.isErrDetailsSet());
+}
+
 class WriteBatchResponseProcessorTxnTest : public WriteBatchResponseProcessorTest {
 public:
     void setUp() override {
