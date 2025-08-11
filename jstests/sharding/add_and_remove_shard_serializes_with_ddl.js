@@ -179,10 +179,6 @@ let coll1 = db["coll1"];
             // Restart the configsvr.
             st.stopAllConfigServers({} /* opts */, true /* forRestart */);
             st.restartAllConfigServers();
-            // Take again references to db and coll1, since in embedded router suites they may be
-            // invalid after restarting the configsvr.
-            db = st.s.getDB(dbName);
-            coll1 = db["coll1"];
         } else if (testCase === "stepUp") {
             st.configRS.stepUp(st.configRS.getSecondary());
         }

@@ -918,14 +918,6 @@ export class ReplSetTest {
             this._unbridgedPorts.push(this._allocatePortForBridge());
         }
 
-        if (this.isRouterServer) {
-            const nextPort = this._allocatePortForNode();
-            jsTest.log.info("ReplSetTest Next router port: " + nextPort);
-
-            this.routerPorts.push(nextPort);
-            jsTest.log.info({routerPorts: this.routerPorts});
-        }
-
         if (jsTestOptions().shellGRPC) {
             const nextPort = this._allocatePortForNode();
             jsTest.log.info("ReplSetTest Next gRPC port: " + nextPort);
@@ -954,9 +946,6 @@ export class ReplSetTest {
         if (this._useBridge) {
             this._unbridgedPorts.splice(nodeId, 1);
             this._unbridgedNodes.splice(nodeId, 1);
-        }
-        if (this.isRouterServer) {
-            this.routerPorts.splice(nodeId, 1);
         }
     }
 
@@ -2541,9 +2530,6 @@ export class ReplSetTest {
             port: this._useBridge ? this._unbridgedPorts[n] : this.ports[n],
             dbpath: "$set-$node"
         };
-        if (this.isRouterServer) {
-            defaults.routerPort = this.routerPorts[n];
-        }
         if (jsTestOptions().shellGRPC) {
             defaults.grpcPort = this.grpcPorts[n];
         }
@@ -3232,7 +3218,6 @@ function _constructStartNewInstances(rst, opts) {
     rst.seedRandomNumberGenerator =
         opts.hasOwnProperty('seedRandomNumberGenerator') ? opts.seedRandomNumberGenerator : true;
     rst.isConfigServer = opts.isConfigServer;
-    rst.isRouterServer = opts.isRouterServer || false;
 
     rst._useBridge = opts.useBridge || false;
     if (rst._useBridge) {
@@ -3334,10 +3319,6 @@ function _constructStartNewInstances(rst, opts) {
                 rst.ports[i] = nodeOpts.port;
             }
         }
-    }
-
-    if (rst.isRouterServer) {
-        rst.routerPorts = Array.from({length: numNodes}, rst._allocatePortForNode);
     }
 
     if (jsTestOptions().shellGRPC) {

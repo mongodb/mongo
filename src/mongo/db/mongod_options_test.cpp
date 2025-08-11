@@ -30,7 +30,6 @@
 #include "mongo/db/mongod_options.h"
 
 #include "mongo/db/server_options.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/environment.h"
@@ -45,11 +44,6 @@ public:
     public:
         auto& setPort(int port) {
             _set("net.port", port);
-            return *this;
-        }
-
-        auto& setRouterPort(int port = ServerGlobalParams::RouterPort) {
-            _set("net.routerPort", port);
             return *this;
         }
 
@@ -81,63 +75,15 @@ public:
         ServerGlobalParams defaults;
         serverGlobalParams.port = defaults.port;
         serverGlobalParams.clusterRole = defaults.clusterRole;
-        serverGlobalParams.routerPort = defaults.routerPort;
 
         env = Environment{};
     }
 
     Environment env;
-
-private:
-    RAIIServerParameterControllerForTest _scopedFeature{"featureFlagRouterPort", true};
 };
 
 TEST_F(MongodOptionsTest, Base) {
     ASSERT_OK(storeMongodOptions(env));
-}
-
-TEST_F(MongodOptionsTest, RouterAndShardServerWithDefaultPorts) {
-    env.setClusterRole("shardsvr").setReplicaSet("myRS").setRouterPort();
-    ASSERT_OK(storeMongodOptions(env));
-
-    ASSERT_EQ(serverGlobalParams.port, ServerGlobalParams::ShardServerPort);
-    ASSERT(serverGlobalParams.routerPort);
-    ASSERT_EQ(*serverGlobalParams.routerPort, ServerGlobalParams::RouterPort);
-    ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
-    ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
-}
-
-TEST_F(MongodOptionsTest, RouterAndShardServerWithCustomPorts) {
-    env.setClusterRole("shardsvr").setReplicaSet("myRS").setPort(123).setRouterPort(456);
-    ASSERT_OK(storeMongodOptions(env));
-
-    ASSERT_EQ(serverGlobalParams.port, 123);
-    ASSERT(serverGlobalParams.routerPort);
-    ASSERT_EQ(*serverGlobalParams.routerPort, 456);
-    ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
-    ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
-}
-
-TEST_F(MongodOptionsTest, RouterAndConfigServerWithDefaultPorts) {
-    env.setClusterRole("configsvr").setReplicaSet("myRS").setRouterPort();
-    ASSERT_OK(storeMongodOptions(env));
-
-    ASSERT_EQ(serverGlobalParams.port, ServerGlobalParams::ConfigServerPort);
-    ASSERT(serverGlobalParams.routerPort);
-    ASSERT_EQ(*serverGlobalParams.routerPort, ServerGlobalParams::RouterPort);
-    ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
-    ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-}
-
-TEST_F(MongodOptionsTest, RouterAndConfigServerWithCustomPorts) {
-    env.setClusterRole("configsvr").setReplicaSet("myRS").setPort(123).setRouterPort(456);
-    ASSERT_OK(storeMongodOptions(env));
-
-    ASSERT_EQ(serverGlobalParams.port, 123);
-    ASSERT(serverGlobalParams.routerPort);
-    ASSERT_EQ(*serverGlobalParams.routerPort, 456);
-    ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
-    ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 }
 
 TEST_F(MongodOptionsTest, MagicRestoreNoReplicaSet) {

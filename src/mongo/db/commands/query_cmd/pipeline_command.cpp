@@ -126,7 +126,6 @@ public:
                                             aggregationRequest,
                                             false));
 
-        // TODO: SERVER-73632 Remove feature flag for PM-635.
         // Forbid users from passing 'querySettings' explicitly.
         uassert(7708001,
                 "BSON field 'querySettings' is an unknown field",

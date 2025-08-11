@@ -273,11 +273,6 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     const bool verbose = !quiet();
 
     auto service = _svcCtx->getService();
-    // Serverless clusters don't support sharding, so they should only ever use the Shard service
-    // and associated ServiceEntryPoint.
-    if (!gMultitenancySupport && session->isFromRouterPort()) {
-        service = _svcCtx->getService(ClusterRole::RouterServer);
-    }
 
     auto uniqueClient = service->makeClient(getClientThreadName(*session), session);
     auto client = uniqueClient.get();

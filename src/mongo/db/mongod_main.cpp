@@ -321,19 +321,7 @@ const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 #endif
 
 auto makeTransportLayer(ServiceContext* svcCtx) {
-    boost::optional<int> routerPort;
     boost::optional<int> proxyPort;
-
-    if (serverGlobalParams.routerPort) {
-        routerPort = serverGlobalParams.routerPort;
-        if (*routerPort == serverGlobalParams.port) {
-            LOGV2_ERROR(7791701,
-                        "The router port must be different from the public listening port.",
-                        "port"_attr = serverGlobalParams.port);
-            quickExit(ExitCode::badOptions);
-        }
-        // TODO SERVER-78730: add support for load-balanced connections.
-    }
 
     // (Ignore FCV check): The proxy port needs to be open before the FCV is set.
     if (gFeatureFlagMongodProxyProtocolSupport.isEnabledAndIgnoreFCVUnsafe()) {
@@ -343,13 +331,6 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
                 LOGV2_ERROR(9967800,
                             "The proxy port must be different from the public listening port.",
                             "port"_attr = serverGlobalParams.port);
-                quickExit(ExitCode::badOptions);
-            }
-
-            if (routerPort && *proxyPort == *routerPort) {
-                LOGV2_ERROR(9967801,
-                            "The proxy port must be different from the public router port.",
-                            "port"_attr = *routerPort);
                 quickExit(ExitCode::badOptions);
             }
         }
@@ -376,7 +357,7 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
     }
 
     return transport::TransportLayerManagerImpl::createWithConfig(
-        &serverGlobalParams, svcCtx, useEgressGRPC, std::move(proxyPort), std::move(routerPort));
+        &serverGlobalParams, svcCtx, useEgressGRPC, std::move(proxyPort));
 }
 
 ExitCode initializeTransportLayer(ServiceContext* serviceContext, BSONObjBuilder* timerReport) {

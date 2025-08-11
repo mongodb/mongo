@@ -32,21 +32,12 @@ if (TestData.configShard) {
     st = new ShardingTest({
         shards: 2,
         rs: {oplogSize: 10, settings: {electionTimeoutMillis: ReplSetTest.kForeverMillis}},
-        // By default, our test infrastructure sets the election timeout to a very high value
-        // (24 hours). This test restarts the router, and if the router is embedded, it will
-        // also restart the config shard. In this case, we need a shorter election timeout
-        // because the test relies on nodes running an election when they don't detect an active
-        // primary. Therefore, we are setting the electionTimeoutMillis to its default value.
-        // This setting won't change the high electionTimeout set for data shards, as it doesn't
-        // override the provided value of electionTimeoutMillis.
-        initiateWithDefaultElectionTimeout: jsTestOptions().embeddedRouter
     });
     replTest = st.rs1;
 } else {
     st = new ShardingTest({
         shards: 1,
         rs: {oplogSize: 10, settings: {electionTimeoutMillis: ReplSetTest.kForeverMillis}},
-        initiateWithDefaultElectionTimeout: jsTestOptions().embeddedRouter
     });
     replTest = st.rs0;
 }
@@ -60,7 +51,7 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 
 // Don't clear the data directory so that the shardIdentity is not deleted.
 replTest.stopSet(undefined /* send default signal */, true /* don't clear data directory */);
 
-st.restartRouterNode(0);
+st.restartMongos(0);
 
 replTest.startSet({restart: true, noCleanData: true});
 replTest.awaitSecondaryNodes();

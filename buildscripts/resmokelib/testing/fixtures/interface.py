@@ -539,4 +539,4 @@ def build_client(node, auth_options=None, read_preference=pymongo.ReadPreference
 
 
 # Represents a row in a node info table.
-NodeInfo = namedtuple("NodeInfo", ["full_name", "name", "port", "pid", "router_port"])
+NodeInfo = namedtuple("NodeInfo", ["full_name", "name", "port", "pid"])

@@ -102,7 +102,6 @@
 #include "mongo/s/config_server_catalog_cache_loader_impl.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/router_uptime_reporter.h"
 #include "mongo/s/routing_information_cache.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
@@ -758,8 +757,6 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
                                      ShardRegistry::ConnectionStringUpdateType::kConfirmed);
         }
     }
-
-    RouterUptimeReporter::get(service).startPeriodicThread(service);
 
     // Determine primary/secondary/standalone state in order to properly initialize sharding
     // components.

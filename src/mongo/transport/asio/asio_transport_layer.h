@@ -102,7 +102,6 @@ public:
 
         int port = ServerGlobalParams::DefaultDBPort;  // port to bind to
         boost::optional<int> loadBalancerPort;         // accepts load balancer connections
-        boost::optional<int> routerPort;               // an optional port for accepting connections
         std::vector<std::string> ipList;               // addresses to bind to
 #ifndef _WIN32
         bool useUnixSockets = true;  // whether to allow UNIX sockets in ipList
@@ -233,14 +232,6 @@ public:
 
     bool isEgress() const override {
         return _listenerOptions.isEgress();
-    }
-
-    /**
-     * Returns the router listening port, if set. This is set and used to separate router from
-     * shard-server traffic when a server acts as both a router and a shard-server.
-     */
-    boost::optional<int> routerPort() const {
-        return _listenerOptions.routerPort;
     }
 
     std::vector<std::pair<SockAddr, int>> getListenerSocketBacklogQueueDepths() const;

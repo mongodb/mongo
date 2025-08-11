@@ -29,7 +29,7 @@ for (i = 0; i < numSplits; i++) {
 }
 
 // restart the router
-s.restartRouterNode(0);
+s.restartMongos(0);
 db = s.getDB("test");
 
 // check for # refreshes started
@@ -37,7 +37,7 @@ ss = db.serverStatus();
 assert.eq(1, ss.shardingStatistics.catalogCache.countFullRefreshesStarted);
 
 // does not pre cache when set parameter is disabled
-s.restartRouterNode(0, {
+s.restartMongos(0, {
     restart: true,
     setParameter: {
         loadRoutingTableOnStartup: false,

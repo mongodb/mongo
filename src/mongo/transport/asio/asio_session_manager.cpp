@@ -73,8 +73,6 @@ std::string AsioSessionManager::getClientThreadName(const Session& session) cons
 
 void AsioSessionManager::configureServiceExecutorContext(Client* client,
                                                          bool isPrivilegedSession) const {
-    // TODO SERVER-77921: use the return value of `Session::isFromRouterPort()` to choose an
-    // instance of `ServiceEntryPoint`.
     auto seCtx = std::make_unique<ServiceExecutorContext>();
     seCtx->setThreadModel(ServiceExecutorContext::kSynchronous);
     seCtx->setCanUseReserved(isPrivilegedSession);

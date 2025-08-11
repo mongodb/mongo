@@ -7,19 +7,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 TestData.disableImplicitSessions = true;
 
-let mongosOptions = {
-    setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}
-};
-
-// Don't add a maxSessions parameter in case of embeddedRouter, otherwise it will be passed to the
-// config server and the cluster won't boot.
-if (!TestData.embeddedRouter) {
-    mongosOptions.setParameter.maxSessions = 1;
-}
-
 const st = new ShardingTest({
     shards: 1,
-    mongosOptions: mongosOptions,
+    mongosOptions: {
+        setParameter:
+            {maxSessions: 1, 'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}
+    },
 });
 const shard0Primary = st.rs0.getPrimary();
 

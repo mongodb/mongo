@@ -144,11 +144,6 @@ public:
         return isLoadBalancerPeer();
     }
 
-    bool isFromRouterPort() const override {
-        auto routerPort = _tl->routerPort();
-        return _isIngressSession && routerPort && *routerPort == _local.port();
-    }
-
 #ifdef MONGO_CONFIG_SSL
     const SSLConfiguration* getSSLConfiguration() const override;
 #endif

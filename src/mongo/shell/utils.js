@@ -478,8 +478,6 @@ function jsTestOptions() {
 
             useAutoBootstrapProcedure: TestData.useAutoBootstrapProcedure || false,
 
-            embeddedRouter: TestData.embeddedRouter || false,
-
             performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert: true,
             fuzzMongodConfigs: TestData.fuzzMongodConfigs || false,
             mozJSGCZeal: TestData.mozJSGCZeal || "",

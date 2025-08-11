@@ -119,11 +119,6 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         # mongos. The MongoTFixture is then launched by the MongoDFixture in setup().
         self.mongot = None
 
-        self.router_port = None
-        if "routerPort" in self.mongod_options:
-            self.router_port = fixturelib.get_next_port(job_num)
-            mongod_options["routerPort"] = self.router_port
-
         if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS or self.mongod_options[
             "set_parameters"
         ].get("featureFlagGRPC"):
@@ -164,10 +159,10 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         )
 
         try:
-            msg = f"Starting mongod on port { self.port }{(' with embedded router on port ' + str(self.router_port)) if self.router_port else ''}...\n{ mongod.as_command() }"
+            msg = f"Starting mongod on port { self.port }...\n{ mongod.as_command() }"
             self.logger.info(msg)
             mongod.start()
-            msg = f"mongod started on port { self.port }{(' with embedded router on port ' + str(self.router_port)) if self.router_port else ''} with pid { mongod.pid }"
+            msg = f"mongod started on port { self.port } with pid { mongod.pid }"
             self.logger.info(msg)
         except Exception as err:
             msg = "Failed to start mongod on port {:d}: {}".format(self.port, err)
@@ -327,7 +322,6 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             name=self.logger.name,
             port=self.port,
             pid=self.mongod.pid,
-            router_port=self.router_port,
         )
         return [info]
 

@@ -272,14 +272,6 @@ export class ShardingTest {
 
     restartAllConfigServers(opts) {
         this.configRS.startSet(opts, true);
-        this.configRS.nodes.forEach((node) => {
-            // node.routerPort is undefined if this node doesn't expose an embedded router, so this
-            // loop only applies for embedded routers.
-            const routerN = this._findRouterByPort(node.routerPort);
-            if (routerN !== undefined) {
-                this.reconnectToEmbeddedRouter(routerN);
-            }
-        });
         // We wait until a primary has been chosen since startSet can return without having elected
         // one. This can cause issues that expect a functioning replicaset once this method returns.
         this.configRS.waitForPrimary();
@@ -288,14 +280,6 @@ export class ShardingTest {
     restartAllShards(opts) {
         this._rs.forEach((rs) => {
             rs.test.startSet(opts, true);
-            rs.test.nodes.forEach((node) => {
-                // node.routerPort is undefined if this node doesn't expose an embedded router, so
-                // this loop only applies for embedded routers.
-                const routerN = this._findRouterByPort(node.routerPort);
-                if (routerN !== undefined) {
-                    this.reconnectToEmbeddedRouter(routerN);
-                }
-            });
             // We wait until a primary has been chosen since startSet can return without having
             // elected one. This can cause issues that expect a functioning replicaset once this
             // method returns.
@@ -666,10 +650,6 @@ export class ShardingTest {
             this["s" + n].stop();
         } else {
             let mongos = this["s" + n];
-            // this isn't a real mongos, it's the embedded router of a mongod. Don't do anything.
-            if (mongos.isEmbeddedRouter) {
-                return;
-            }
             MongoRunner.stopMongos(mongos, undefined, opts, waitpid);
         }
     }
@@ -682,8 +662,7 @@ export class ShardingTest {
     }
 
     /**
-     * Stops and restarts a mongos process. The operation fails if this connection is not against a
-     * mongos process (i.e. an embedded router).
+     * Stops and restarts a mongos process.
      *
      * If 'opts' is not specified, starts the mongos with its previous parameters.  If 'opts' is
      * specified and 'opts.restart' is false or missing, starts mongos with the parameters specified
@@ -702,9 +681,6 @@ export class ShardingTest {
         } else {
             mongos = this["s" + n];
         }
-
-        assert(!mongos.isEmbeddedRouter,
-               "This mongos is an embedded router, it can't be restarted separately");
 
         opts = opts || mongos;
         opts.port = opts.port || mongos.port;
@@ -750,93 +726,6 @@ export class ShardingTest {
             this.admin = this._mongos[n].getDB('admin');
             this.config = this._mongos[n].getDB('config');
         }
-    }
-
-    /**
-     * Restarts a router node. The node can be either a standalone mongoS, or a mongoD with an
-     * embedded router. If the node is a mongoD with embedded router, this command will wait until
-     * the triggered election finishes. As a consequence, the primary of the affected RS could
-     * change.
-     *
-     * If 'opts' is not specified, starts the node with its previous parameters.  If 'opts' is
-     * specified and 'opts.restart' is false or missing, starts the node with the parameters
-     * specified in 'opts'.  If opts is specified and 'opts.restart' is true, merges the previous
-     * options with the options specified in 'opts', with the options in 'opts' taking precedence.
-     *
-     * Warning: Overwrites the old s (if n = 0) admin, config, and sn member variables.
-     */
-    restartRouterNode(n, opts) {
-        const routerConn = (() => {
-            if (this._useBridge) {
-                return this._unbridgedMongos[n];
-            } else {
-                return this["s" + n];
-            }
-        })();
-
-        if (!routerConn.isEmbeddedRouter) {
-            this.restartMongos(n, opts);
-            return;
-        }
-
-        assert(!this._useBridge, "BUG: mongobridge and embedded router are not compatible");
-
-        const nodeInfo = routerConn.nodeInfo;
-
-        if (nodeInfo.isConfig) {
-            this.restartConfigServer(nodeInfo.index, opts);
-        } else {
-            nodeInfo.rs.restart(nodeInfo.index, opts);
-        }
-
-        this.reconnectToEmbeddedRouter(n);
-
-        // Wait for any election to succeed.
-        nodeInfo.rs.awaitNodesAgreeOnPrimary();
-    }
-
-    reconnectToEmbeddedRouter(n) {
-        const routerConn = (() => {
-            if (this._useBridge) {
-                return this._unbridgedMongos[n];
-            } else {
-                return this["s" + n];
-            }
-        })();
-        const nodeInfo = routerConn.nodeInfo;
-
-        const mongodConn = nodeInfo.rs.nodes[nodeInfo.index];
-        const newConn =
-            MongoRunner.awaitConnection({pid: mongodConn.pid, port: mongodConn.routerPort});
-        newConn.isEmbeddedRouter = true;
-        newConn.port = mongodConn.routerPort;
-        newConn.nodeInfo = nodeInfo;
-        newConn.fullOptions = mongodConn.fullOptions;
-        newConn.commandLine = mongodConn.commandLine;
-        newConn.name = routerConn.name;
-        newConn.host = routerConn.host;
-
-        this._mongos[n] = newConn;
-        this["s" + n] = newConn;
-
-        if (n == 0) {
-            this.s = this._mongos[n];
-            this.admin = this._mongos[n].getDB('admin');
-            this.config = this._mongos[n].getDB('config');
-        }
-    }
-
-    /** @private */
-    _findRouterByPort(port) {
-        if (port === undefined) {
-            return undefined;
-        }
-        for (let n = 0; n < this._mongos.length; n++) {
-            if (this._mongos[n].port == port) {
-                return n;
-            }
-        }
-        return undefined;
     }
 
     /**
@@ -1032,10 +921,6 @@ export class ShardingTest {
      * shard and config server if set to true.
      * @property {boolean} [alwaysUseTestNameForShardName] Always use the testname as the name of
      * the shard.
-     * @property {boolean} [embeddedRouter] Use mongod's embedding routing functionality instead of
-     * mongos. Each st.s, s0, s1,.... points to the router port of a mongod instead of a dedicated
-     * mongos. Chooses `numMongos` mongod nodes from the shards to act as routers, at random.
-     * Incompatible with useBridge.
      */
 
     /**
@@ -1132,15 +1017,6 @@ export class ShardingTest {
             this,
             "isConfigShardMode",
             {value: isConfigShardMode, writable: false, enumerable: true, configurable: false});
-
-        let isEmbeddedRouterMode =
-            otherParams.hasOwnProperty('embeddedRouter') ? otherParams.embeddedRouter : false;
-        isEmbeddedRouterMode = isEmbeddedRouterMode || jsTestOptions().embeddedRouter;
-
-        if (isEmbeddedRouterMode) {
-            assert(!otherParams.useBridge,
-                   "Embedded router mode is not compatible with mongobridge");
-        }
 
         if ("shardAsReplicaSet" in otherParams) {
             throw new Error("Use of deprecated option 'shardAsReplicaSet'");
@@ -1323,7 +1199,6 @@ export class ShardingTest {
                     name: testName + "-configRS",
                     seedRandomNumberGenerator: !randomSeedAlreadySet,
                     isConfigServer: true,
-                    isRouterServer: isEmbeddedRouterMode,
                 };
 
                 // always use wiredTiger as the storage engine for CSRS
@@ -1345,14 +1220,6 @@ export class ShardingTest {
                 var nodeOptions = [];
                 for (var i = 0; i < numConfigs; ++i) {
                     nodeOptions.push(otherParams["c" + i] || {});
-                    if (isEmbeddedRouterMode && otherParams.mongosOptions) {
-                        nodeOptions[i] = Object.merge(otherParams.mongosOptions, nodeOptions[i]);
-                        if (otherParams.mongosOptions.setParameter) {
-                            nodeOptions[i].setParameter =
-                                Object.merge(otherParams.mongosOptions.setParameter,
-                                             nodeOptions[i].setParameter);
-                        }
-                    }
                 }
 
                 rstOptions.nodes = nodeOptions;
@@ -1455,17 +1322,8 @@ export class ShardingTest {
                     settings: rsSettings,
                     seedRandomNumberGenerator: !randomSeedAlreadySet,
                     isConfigServer: setIsConfigSvr,
-                    isRouterServer: isEmbeddedRouterMode,
                     useAutoBootstrapProcedure: useAutoBootstrapProcedure,
                 };
-
-                if (isEmbeddedRouterMode && otherParams.mongosOptions) {
-                    replSetTestOpts = Object.merge(otherParams.mongosOptions, replSetTestOpts);
-                    if (otherParams.mongosOptions.setParameter) {
-                        replSetTestOpts.setParameter = Object.merge(
-                            otherParams.mongosOptions.setParameter, replSetTestOpts.setParameter);
-                    }
-                }
 
                 const rs = new ReplSetTest(replSetTestOpts);
 
@@ -1794,119 +1652,50 @@ export class ShardingTest {
 
             this._mongos = [];
 
-            // Start and connect to the MongoS servers if needed; create connections to the embedded
-            // router ports if not.
-            if (isEmbeddedRouterMode) {
-                jsTest.log.info("Connecting to embedded routers...");
+            // Start and connect to the MongoS servers if needed
+            for (var i = 0; i < numMongos; i++) {
+                const options = mongosOptions[i];
+                options.configdb = this._configDB;
 
-                let allShardNodes = this._rs
-                                        .map(r => r.test.nodes.map((_, index) => ({
-                                                                       rs: r.test,
-                                                                       index: index,
-                                                                       isConfig: false,
-                                                                   })))
-                                        .flat();
-                if (!isConfigShardMode) {
-                    allShardNodes =
-                        allShardNodes.concat(this.configRS.nodes.map((_, index) => ({
-                                                                         rs: this.configRS,
-                                                                         index: index,
-                                                                         isConfig: true,
-                                                                     })));
+                if (otherParams.useBridge) {
+                    var bridgeOptions =
+                        Object.merge(otherParams.bridgeOptions, options.bridgeOptions || {});
+                    bridgeOptions = Object.merge(bridgeOptions, {
+                        hostName: otherParams.useHostname ? hostName : "localhost",
+                        port: _allocatePortForBridgeForMongos(),
+                        // The mongos processes identify themselves to mongobridge as host:port,
+                        // where the host is the actual hostname of the machine and not
+                        // localhost.
+                        dest: hostName + ":" + options.port,
+                    });
+
+                    var bridge = new MongoBridge(bridgeOptions);
                 }
 
-                assert(allShardNodes.length >= numMongos,
-                       'Need at least numMongos total mongod nodes in the cluster');
-
-                if (!randomSeedAlreadySet) {
-                    Random.setRandomFixtureSeed();
+                var conn = MongoRunner.runMongos(options, clusterVersionInfo.isMixedVersion);
+                if (!conn) {
+                    throw new Error("Failed to start mongos " + i);
                 }
 
-                // TODO (SERVER-87462): Randomize the list of routers to choose after adding shards
-                // from the router port.
+                if (otherParams.causallyConsistent) {
+                    conn.setCausalConsistency(true);
+                }
 
-                // Make sure to push one configsvr router port as the first one so it will be the
-                // one responsible to run the addShard commands, extend all sh methods and stop the
-                // balancer.
-                const shuffledNodes = Array.shuffle(allShardNodes);
-                const index =
-                    shuffledNodes.findIndex(node => (node.rs === this.configRS && node.index == 0));
-                assert(index != -1, "Can't find first node of the config server");
-                const configNode = shuffledNodes.splice(index, 1)[0];
-                shuffledNodes.unshift(configNode);
-
-                let routerNodes = shuffledNodes.slice(0, numMongos);
-                let i = 0;
-
-                jsTest.log.info("Chose the following nodes to act as embedded routers: " +
-                                routerNodes);
-                for (const nodeInfo of routerNodes) {
-                    const node = nodeInfo.rs.nodes[nodeInfo.index];
-                    const conn =
-                        MongoRunner.awaitConnection({pid: node.pid, port: node.routerPort});
-                    conn.isEmbeddedRouter = true;
-                    conn.port = node.routerPort;
-                    conn.nodeInfo = nodeInfo;
-                    conn.fullOptions = node.fullOptions;
-                    conn.name = MongoRunner.getMongosName(node.routerPort, otherParams.useHostname);
-                    conn.host = conn.name;
-                    conn.commandLine = node.commandLine;
+                if (otherParams.useBridge) {
+                    bridge.connectToBridge();
+                    this._mongos.push(bridge);
+                    this._unbridgedMongos.push(conn);
+                } else {
                     this._mongos.push(conn);
-                    this["s" + i++] = conn;
-                    jsTest.log.info("Connected to embedded router - this.s" + i +
-                                    " == mongod with pid " + node.pid +
-                                    " listening on routerPort " + node.routerPort);
                 }
-                if (i > 0) {
-                    this.s = this._mongos[0];
-                    this.admin = this._mongos[0].getDB('admin');
-                    this.config = this._mongos[0].getDB('config');
+
+                if (i === 0) {
+                    this.s = this._mongos[i];
+                    this.admin = this._mongos[i].getDB('admin');
+                    this.config = this._mongos[i].getDB('config');
                 }
-            } else {
-                for (var i = 0; i < numMongos; i++) {
-                    const options = mongosOptions[i];
-                    options.configdb = this._configDB;
 
-                    if (otherParams.useBridge) {
-                        var bridgeOptions =
-                            Object.merge(otherParams.bridgeOptions, options.bridgeOptions || {});
-                        bridgeOptions = Object.merge(bridgeOptions, {
-                            hostName: otherParams.useHostname ? hostName : "localhost",
-                            port: _allocatePortForBridgeForMongos(),
-                            // The mongos processes identify themselves to mongobridge as host:port,
-                            // where the host is the actual hostname of the machine and not
-                            // localhost.
-                            dest: hostName + ":" + options.port,
-                        });
-
-                        var bridge = new MongoBridge(bridgeOptions);
-                    }
-
-                    var conn = MongoRunner.runMongos(options, clusterVersionInfo.isMixedVersion);
-                    if (!conn) {
-                        throw new Error("Failed to start mongos " + i);
-                    }
-
-                    if (otherParams.causallyConsistent) {
-                        conn.setCausalConsistency(true);
-                    }
-
-                    if (otherParams.useBridge) {
-                        bridge.connectToBridge();
-                        this._mongos.push(bridge);
-                        this._unbridgedMongos.push(conn);
-                    } else {
-                        this._mongos.push(conn);
-                    }
-
-                    if (i === 0) {
-                        this.s = this._mongos[i];
-                        this.admin = this._mongos[i].getDB('admin');
-                        this.config = this._mongos[i].getDB('config');
-                    }
-
-                    this["s" + i] = this._mongos[i];
-                }
+                this["s" + i] = this._mongos[i];
             }
 
             _extendWithShMethods(this);

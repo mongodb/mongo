@@ -82,8 +82,7 @@ void reportStatus(OperationContext* opCtx,
                   const std::string& instanceId,
                   const std::string& hostName,
                   const Date_t& created,
-                  const Timer& upTimeTimer,
-                  bool isEmbeddedRouter) {
+                  const Timer& upTimeTimer) {
     if (MONGO_unlikely(disableShardingUptimeReporting.shouldFail())) {
         LOGV2(426322, "Disabling the reporting of the uptime status for the current instance.");
         return;
@@ -101,7 +100,6 @@ void reportStatus(OperationContext* opCtx,
     if (statusWith.isOK()) {
         mType.setAdvisoryHostFQDNs(statusWith.getValue());
     }
-    mType.setEmbeddedRouter(isEmbeddedRouter);
 
     try {
         // Field "created" should not be updated every time.
@@ -144,27 +142,18 @@ void RouterUptimeReporter::startPeriodicThread(ServiceContext* serviceContext) {
         const std::string hostName(getHostNameCached());
         const std::string instanceId(prettyHostNameAndPort(opCtx->getClient()->getLocalPort()));
         const Timer upTimeTimer;
-        bool isEmbeddedRouter = serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
 
         while (!globalInShutdownDeprecated()) {
-            // Start reporting statistics from the router port uptime if opened.
-            // TODO SERVER-97757 Remove the need to check if the router port is open in the uptime
-            // reporter.
-            if (!isEmbeddedRouter || serverGlobalParams.routerPort) {
-                reportStatus(
-                    opCtx.get(), instanceId, hostName, created, upTimeTimer, isEmbeddedRouter);
+            reportStatus(opCtx.get(), instanceId, hostName, created, upTimeTimer);
+
+            auto status =
+                Grid::get(opCtx.get())->getBalancerConfiguration()->refreshAndCheck(opCtx.get());
+            if (!status.isOK()) {
+                LOGV2_WARNING(22876,
+                              "Failed to refresh balancer settings from config server",
+                              "error"_attr = status);
             }
 
-            if (!isEmbeddedRouter) {
-                auto status = Grid::get(opCtx.get())
-                                  ->getBalancerConfiguration()
-                                  ->refreshAndCheck(opCtx.get());
-                if (!status.isOK()) {
-                    LOGV2_WARNING(22876,
-                                  "Failed to refresh balancer settings from config server",
-                                  "error"_attr = status);
-                }
-            }
             // Refresh the router-role view of RWC defaults, which is always obtained from the
             // config server.
             try {

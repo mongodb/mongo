@@ -2070,13 +2070,6 @@ class RunPlugin(PluginInterface):
         )
 
         mongodb_server_options.add_argument(
-            "--embeddedRouter",
-            dest="embedded_router",
-            metavar="CONFIG",
-            help="If set, uses embedded routers instead of dedicated mongos.",
-        )
-
-        mongodb_server_options.add_argument(
             "--loadExtensions",
             dest="extensions",
             metavar="EXTENSION1,EXTENSION2",

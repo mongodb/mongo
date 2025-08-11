@@ -69,10 +69,6 @@ int64_t generateSeed(const std::string& desc) {
     return seed;
 }
 
-bool checkIfRouterClient(const std::shared_ptr<transport::Session>& session) {
-    return session && session->isFromRouterPort();
-}
-
 // In a normal server process, this will be overridden by AuthorizationSessionImpl
 // to examine the active user's privilege set.
 // For UnitTests, this simply fails closed unless explicitly overridden.
@@ -135,7 +131,6 @@ Client::Client(std::string desc,
       _connectionId(_session ? _session->id() : 0),
       _operationKillable(killable),
       _prng(generateSeed(_desc)),
-      _isRouterClient(checkIfRouterClient(_session)),
       _uuid(UUID::gen()),
       _tags(kPending) {}
 
@@ -264,14 +259,6 @@ Client::TagMask Client::getTags() const {
 }
 
 int Client::getLocalPort() const {
-    if (_service->role().hasExclusively(ClusterRole::RouterServer) &&
-        serverGlobalParams.routerPort) {
-        if (_opCtx && _opCtx->routedByReplicaSetEndpoint()) {
-            // This is a client connected to the replica set endpoint so return the shard/main port.
-            return serverGlobalParams.port;
-        }
-        return serverGlobalParams.routerPort.value();
-    }
     return serverGlobalParams.port;
 }
 

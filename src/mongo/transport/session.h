@@ -188,13 +188,6 @@ public:
     virtual bool bindsToOperationState() const = 0;
 
     /**
-     * Returns true if this session corresponds to a connection accepted from the router port.
-     */
-    virtual bool isFromRouterPort() const {
-        return false;
-    }
-
-    /**
      * Returns the HostAndPort of the directly-connected remote
      * to this session.
      */

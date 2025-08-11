@@ -38,12 +38,6 @@ feature_flags:
         default: true
         version: 6.3
         fcv_gated: true
-    # TODO (SERVER-73632): Remove once 9.0 becomes last LTS.
-    featureFlagRouterPort:
-        description: "Feature flag to open the router port."
-        cpp_varname: feature_flags::gRouterPort
-        default: false
-        fcv_gated: false
     # TODO (SERVER-88107): Remove once 8.0 becomes last LTS.
     featureFlagMultiServiceLogAndFTDCFormat:
         description: "Feature flag to enable multi-service format of the log and FTDC data files."

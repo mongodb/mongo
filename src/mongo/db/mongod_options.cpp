@@ -247,13 +247,6 @@ Status validateMongodOptions(const moe::Environment& params) {
         setShardRole = setShardRole || clusterRole == "shardsvr";
     }
 
-    bool setRouterPort = params.count("routerPort") || params.count("net.routerPort");
-
-    if (setRouterPort && !setConfigRole && !setShardRole) {
-        return Status(ErrorCodes::BadValue,
-                      "The embedded router requires the node to act as a shard or config server");
-    }
-
     if (params.count("maintenanceMode")) {
         auto maintenanceMode = params["maintenanceMode"].as<std::string>();
         if (maintenanceMode == "standalone" &&
@@ -345,19 +338,6 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
             return ret;
         }
         ret = params->remove("shardsvr");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-
-    // If the "--routerPort" option is passed from the command line, override "net.routerPort"
-    // (config file option) as it will be used later.
-    if (params->count("routerPort")) {
-        Status ret = params->set("net.routerPort", moe::Value((*params)["routerPort"].as<int>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("routerPort");
         if (!ret.isOK()) {
             return ret;
         }
@@ -712,12 +692,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         // - { ShardServer, ConfigServer, RouterServer }
         // - { RouterServer }
         serverGlobalParams.clusterRole += ClusterRole::RouterServer;
-
-        if (params.count("net.routerPort")) {
-            if (feature_flags::gRouterPort.isEnabled()) {
-                serverGlobalParams.routerPort = params["net.routerPort"].as<int>();
-            }
-        }
     } else if (gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
                    kNoVersionContext, fcvSnapshot) &&
                serverGlobalParams.maintenanceMode == ServerGlobalParams::MaintenanceMode::None) {

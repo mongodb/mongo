@@ -5,7 +5,6 @@
  * @tags: [
  *    requires_fcv_80,
  *    featureFlagReplicaSetEndpoint,
- *    featureFlagRouterPort,
  *    # TODO SERVER-98511: Enable this test.
  *    __TEMPORARILY_DISABLED__,
  * ]

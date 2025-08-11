@@ -43,21 +43,14 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         cluster_logging_prefix=None,
         config_shard=None,
         use_auto_bootstrap_procedure=None,
-        embedded_router=False,
         replica_set_endpoint=False,
         random_migrations=False,
         launch_mongot=False,
         set_cluster_parameter=None,
         inject_catalog_metadata=None,
     ):
-        """Initialize ShardedClusterFixture with different options for the cluster processes.
-
-        :param embedded_router - True if this ShardedCluster is running in "embedded router mode". Today, this means that:
-            (1) The cluster has no dedicated routers.
-            (2) Each shard-server in the cluster is started with the "--routerPort" CLI switch to enable routing.
-            (3) An arbitrary subset of size `num_routers` of the shard-servers are chosen at fixture startup to serve as the routers,
-                and all routing requests are directed to the routing ports of those nodes.
-            TODO SERVER-86554: Support a mix of shard servers with the routerPort opened and not.
+        """
+        Initialize ShardedClusterFixture with different options for the cluster processes.
         """
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
 
@@ -97,7 +90,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.num_mongos = num_mongos
         self.auth_options = auth_options
         self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
-        self.embedded_router_mode = embedded_router
         self.replica_endpoint_mode = replica_set_endpoint
         self.set_cluster_parameter = set_cluster_parameter
         self.inject_catalog_metadata = inject_catalog_metadata
@@ -200,7 +192,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 task.result()
 
         # Need to get the new config shard connection string generated from the auto-bootstrap procedure
-        if self.use_auto_bootstrap_procedure and not self.embedded_router_mode:
+        if self.use_auto_bootstrap_procedure:
             for mongos in self.mongos:
                 mongos.mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
 
@@ -472,24 +464,10 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             raise ValueError("Cannot use replica set endpoint on a multi-shard cluster")
         return self.shards[0]
 
-    def _get_embedded_router(self):
-        # If the embedded router is enabled, we must have a mongos placed in a node acting as a
-        # configsvr.
-        config_mongos = next((mongos for mongos in self.mongos if mongos.is_from_configsvr()), None)
-        if config_mongos:
-            return config_mongos
-        else:
-            raise ValueError(
-                "Cannot use the embedded router mode without opening the routerPort of the configsvr"
-            )
-
     def get_shell_connection_url(self):
         """Return the driver connection URL."""
         if self.is_ready and self.replica_endpoint_mode:
             return self._get_replica_set_endpoint().get_shell_connection_url()
-
-        if self.embedded_router_mode:
-            return self._get_embedded_router().get_shell_connection_url()
 
         return "mongodb://" + self.get_shell_connection_string()
 
@@ -497,9 +475,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         """Return the driver connection URL."""
         if self.is_ready and self.replica_endpoint_mode:
             return self._get_replica_set_endpoint().get_driver_connection_url()
-
-        if self.embedded_router_mode:
-            return self._get_embedded_router().get_driver_connection_url()
 
         return "mongodb://" + self.get_internal_connection_string()
 
@@ -539,9 +514,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "config")
         mongod_options["replSet"] = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
         mongod_options["storageEngine"] = "wiredTiger"
-
-        if self.embedded_router_mode:
-            mongod_options["routerPort"] = ""
 
         return {
             "mongod_options": mongod_options,
@@ -615,9 +587,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                         )
                 else:
                     shard_options[option] = value
-
-        if self.embedded_router_mode:
-            mongod_options["routerPort"] = ""
 
         use_auto_bootstrap_procedure = (
             self.use_auto_bootstrap_procedure and self.config_shard == index
@@ -747,72 +716,6 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
     def get_node_info(self):
         """Use ExternalFixture method."""
         return external.ExternalFixture.get_node_info(self)
-
-
-class _RouterView(interface.Fixture):
-    """A fixture that exposes the routing API of a routing-enabled shardsvr."""
-
-    def __init__(self, logger, job_num, fixturelib, is_configsvr: bool, mongod):
-        interface.Fixture.__init__(self, logger, job_num, fixturelib)
-        self.mongod = mongod
-        self.port = self.mongod.router_port
-        self.is_configsvr = is_configsvr
-        if not self.port:
-            raise ValueError(
-                "Mongod must be started with the --routerPort flag to support a RouterView"
-            )
-
-    def pids(self):
-        return self.mongod.pids
-
-    def is_from_configsvr(self):
-        """Return true if the router is part of a mongod acting as a config server."""
-        return self.is_configsvr
-
-    def await_ready(self):
-        """Block until the fixture can be used for testing."""
-        deadline = time.time() + interface.Fixture.AWAIT_READY_TIMEOUT_SECS
-
-        # Wait until the router is accepting connections. The retry logic is necessary to support
-        # versions of PyMongo <3.0 that immediately raise a ConnectionFailure if a connection cannot
-        # be established.
-        while True:
-            # Check whether the process exited for some reason.
-            self.mongod.await_ready()
-            try:
-                # Use a shorter connection timeout to more closely satisfy the requested deadline.
-                client = self.mongo_client(timeout_millis=500)
-                client.admin.command("ping")
-                break
-            except pymongo.errors.ConnectionFailure:
-                remaining = deadline - time.time()
-                if remaining <= 0.0:
-                    raise self.fixturelib.ServerFailure(
-                        "Failed to connect to embedded router on port {} after {} seconds".format(
-                            self.port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS
-                        )
-                    )
-
-                self.logger.info("Waiting to connect to embedded router on port %d.", self.port)
-                time.sleep(0.1)  # Wait a little bit before trying again.
-
-        self.logger.info("Successfully contacted the embedded router on port %d.", self.port)
-
-    def is_running(self):
-        """Return true if the cluster is still operating."""
-        return self.mongod.is_running()
-
-    def get_internal_connection_string(self):
-        """Return the internal connection string."""
-        return f"localhost:{self.port}"
-
-    def get_driver_connection_url(self):
-        """Return the driver connection URL."""
-        return "mongodb://" + self.get_internal_connection_string()
-
-    def _all_mongo_d_s_t(self):
-        """Return the _RouterView instance."""
-        return [self]
 
 
 class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
@@ -1020,7 +923,6 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
             name=self.logger.name,
             port=self.port,
             pid=self.mongos.pid,
-            router_port=None,
         )
         return [info]
 

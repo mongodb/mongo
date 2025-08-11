@@ -121,37 +121,11 @@ ScopedSetRouterService::~ScopedSetRouterService() {
 }
 
 bool isReplicaSetEndpointClient(const VersionContext& vCtx, Client* client) {
-    if (client->isRouterClient()) {
-        return false;
-    }
-    return replica_set_endpoint::ReplicaSetEndpointShardingState::get(client->getServiceContext())
-        ->supportsReplicaSetEndpoint(vCtx);
+    return false;
 }
 
 bool shouldRouteRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
-    // The request must have come in through a client on the shard port.
-    invariant(!opCtx->getClient()->isRouterClient());
-
-    if (!replica_set_endpoint::ReplicaSetEndpointShardingState::get(opCtx)
-             ->supportsReplicaSetEndpoint(VersionContext::getDecoration(opCtx))) {
-        return false;
-    }
-
-    if (!Grid::get(opCtx)->isShardingInitialized()) {
-        return false;
-    }
-
-    if (isInternalClient(opCtx) || isLocalDatabaseCommandRequest(opMsgReq) ||
-        isTargetedCommandRequest(opCtx, opMsgReq) || !isRoutableCommandRequest(opCtx, opMsgReq)) {
-        return false;
-    }
-
-    // There is nothing that will prevent the cluster from becoming multi-shard (i.e. no longer
-    // supporting as replica set endpoint) after the check here is done. However, the contract is
-    // that users must have transitioned to the sharded connection string (i.e. connect to mongoses
-    // and/or router port of mongods) before adding a second shard. Also, commands that make it to
-    // here should be safe to route even when the cluster has more than one shard.
-    return true;
+    return false;
 }
 
 void checkIfCanRunCommand(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {

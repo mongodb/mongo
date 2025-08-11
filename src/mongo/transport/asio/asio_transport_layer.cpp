@@ -1001,10 +1001,6 @@ Status AsioTransportLayer::setup() {
         if (_listenerOptions.loadBalancerPort) {
             listenAddrs.push_back(makeUnixSockPath(*_listenerOptions.loadBalancerPort));
         }
-
-        if (auto port = _listenerOptions.routerPort) {
-            listenAddrs.push_back(makeUnixSockPath(*port));
-        }
     }
 #endif
 
@@ -1023,9 +1019,6 @@ Status AsioTransportLayer::setup() {
     std::vector<int> ports = {_listenerPort};
     if (_listenerOptions.loadBalancerPort) {
         ports.push_back(*_listenerOptions.loadBalancerPort);
-    }
-    if (auto port = _listenerOptions.routerPort) {
-        ports.push_back(*port);
     }
 
     // Self-deduplicating list of unique endpoint addresses.

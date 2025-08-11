@@ -270,7 +270,6 @@ int CryptDMain(int argc, char** argv) {
         serviceContext,
         false /* useEgressGRPC */,
         boost::none,
-        boost::none,
         std::make_unique<ClientObserverCryptD>());
     serviceContext->setTransportLayerManager(std::move(tl));
 

@@ -148,7 +148,6 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
             name=self.logger.name,
             port=self.port,
             pid=self.mongot.pid,
-            router_port=self.router_port,
         )
         return [info]
 

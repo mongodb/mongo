@@ -185,7 +185,6 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
     ServiceContext* svcCtx,
     bool useEgressGRPC,
     boost::optional<int> loadBalancerPort,
-    boost::optional<int> routerPort,
     std::shared_ptr<ClientTransportObserver> observer) {
 
     std::vector<std::unique_ptr<TransportLayer>> retVector;
@@ -197,7 +196,6 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
     {
         AsioTransportLayer::Options opts(config);
         opts.loadBalancerPort = std::move(loadBalancerPort);
-        opts.routerPort = std::move(routerPort);
 
         auto sm = std::make_unique<AsioSessionManager>(svcCtx, observers);
         auto tl = std::make_unique<AsioTransportLayer>(opts, std::move(sm));

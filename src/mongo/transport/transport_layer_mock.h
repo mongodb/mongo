@@ -68,7 +68,7 @@ public:
         : _sessionManager(std::move(sm)) {}
     ~TransportLayerMock() override;
 
-    std::shared_ptr<Session> createSession(bool isFromRouterPort = false);
+    std::shared_ptr<Session> createSession();
     std::shared_ptr<Session> get(Session::Id id);
     bool owns(Session::Id id);
     void deleteSession(Session::Id id);
