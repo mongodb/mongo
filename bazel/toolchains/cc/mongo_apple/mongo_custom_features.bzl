@@ -10,7 +10,6 @@ load(
     "all_compile_actions",
     "get_common_features",
 )
-load("//bazel/toolchains/cc/mongo_apple:mongo_defines.bzl", "DEFINES")
 
 _OBJCPP_EXECUTABLE_ACTION_NAME = "objc++-executable"
 
@@ -50,14 +49,6 @@ def get_apple_features(ctx):
                         ACTION_NAMES.linkstamp_compile,
                         ACTION_NAMES.objc_compile,
                         ACTION_NAMES.objcpp_compile,
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                "-D{}".format(preprocessor_define)
-                                for preprocessor_define in DEFINES
-                            ],
-                        ),
                     ],
                 ),
             ],

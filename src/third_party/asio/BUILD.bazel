@@ -20,6 +20,14 @@ mongo_cc_library(
         # than expanding all definitions inline everywhere asio/* headers are
         # included.
         "ASIO_SEPARATE_COMPILATION",
+        # Many functions in ASIO used to report errors by returning
+        # `error_code` values. This was then changed to a convention of
+        # reporting errors via an `error_code&` output parameter instead. To
+        # ease the migration, ASIO defined an error return type macro that
+        # expands to `error_code` in a backward compatible build configuration
+        # but expands to `void` in a strict build configuration.
+        # `ASIO_NO_DEPRECATED` is the strict build configuration.
+        "ASIO_NO_DEPRECATED",
     ],
     includes = [
         "dist/asio/include",

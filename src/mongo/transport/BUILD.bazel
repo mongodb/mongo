@@ -441,17 +441,6 @@ mongo_cc_integration_test(
     srcs = [
         "//src/mongo/transport/asio:asio_transport_layer_integration_test.cpp",
     ],
-    copts = select({
-        "@platforms//os:windows": [],
-        "//conditions:default": [
-            # TODO(SERVER-54659): Work around casted nullptrs in
-            # asio/impl/connect.hpp, which has an open PR upstream
-            # https://github.com/chriskohlhoff/asio/pull/882, and will
-            # hopefully arrive in a future released version to which we will
-            # upgrade per SERVER-54569.
-            "-Wno-nonnull",
-        ],
-    }),
     deps = [
         ":transport_layer_egress_init",
         ":transport_layer_integration_test_fixture",
