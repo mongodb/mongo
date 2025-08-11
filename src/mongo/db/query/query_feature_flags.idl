@@ -270,3 +270,9 @@ feature_flags:
         cpp_varname: gFeatureFlagMqlJsEngineGap
         default: false
         fcv_gated: true
+
+    featureFlagExtendedAutoSpilling:
+        description: "Feature flag to enable auto spilling to additional stages"
+        cpp_varname: gFeatureFlagExtendedAutoSpilling
+        default: false
+        fcv_gated: false
