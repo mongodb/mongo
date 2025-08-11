@@ -539,7 +539,8 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
         maybeTsNss.isTimeseriesBucketsCollection()) {
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot perform findAndModify with sort on a sharded timeseries collection",
-                !cri.getChunkManager().isNewTimeseriesWithoutView() || !cmdObj.hasField("sort"));
+                !cri.getChunkManager().isNewTimeseriesWithoutView() || !cmdObj.hasField("sort") ||
+                    isRawDataOperation(opCtx));
         return cri;
     }
 
