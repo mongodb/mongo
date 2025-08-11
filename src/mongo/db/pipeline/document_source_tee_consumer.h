@@ -62,12 +62,11 @@ class Value;
  * documents held in a TeeBuffer stage. It will simply open an iterator on the TeeBuffer stage, and
  * answer calls to getNext() by advancing said iterator.
  */
-class DocumentSourceTeeConsumer : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceTeeConsumer : public DocumentSource {
 public:
     static boost::intrusive_ptr<DocumentSourceTeeConsumer> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         size_t facetId,
-        const boost::intrusive_ptr<TeeBuffer>& bufferSource,
         StringData stageName);
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
@@ -104,18 +103,15 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-protected:
-    GetNextResult doGetNext() final;
-    void doDispose() final;
-
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceTeeConsumerToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
+
     DocumentSourceTeeConsumer(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               size_t facetId,
-                              const boost::intrusive_ptr<TeeBuffer>& bufferSource,
                               StringData stageName);
 
     size_t _facetId;
-    boost::intrusive_ptr<TeeBuffer> _bufferSource;
 
     // Specific name of the tee consumer.
     std::string _stageName;

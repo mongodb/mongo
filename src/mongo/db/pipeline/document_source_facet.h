@@ -33,10 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/exec/agg/exec_pipeline.h"
-#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -45,7 +42,6 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
-#include "mongo/db/pipeline/tee_buffer.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -53,7 +49,6 @@
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <cstddef>
 #include <memory>
@@ -72,10 +67,38 @@
 namespace mongo {
 
 class BSONElement;
-class TeeBuffer;
-class DocumentSourceTeeConsumer;
 class ExpressionContext;
 class NamespaceString;
+
+class DSFacetExecStatsWrapper {
+public:
+    class StatsProvider {
+    public:
+        virtual std::vector<Value> getStats(size_t facetId, const SerializationOptions& opts) = 0;
+        virtual ~StatsProvider() = default;
+    };
+
+    /**
+     * Retrieves the execution statistics tracked by the pipeline given by 'facetId'.
+     */
+    std::vector<Value> getExecStats(size_t facetId, const SerializationOptions& opts) {
+        if (!_provider) {
+            return {};
+        }
+        return _provider->getStats(facetId, opts);
+    }
+
+    void attachStatsProvider(std::unique_ptr<StatsProvider> provider) {
+        _provider = std::move(provider);
+    }
+
+    bool isStatsProviderAttached() const {
+        return bool(_provider);
+    }
+
+private:
+    std::unique_ptr<StatsProvider> _provider{nullptr};
+};
 
 /**
  * A $facet stage contains multiple sub-pipelines. Each input to the $facet stage will feed into
@@ -86,7 +109,7 @@ class NamespaceString;
  * stage which will produce a document like the following:
  * {facetA: [<all input documents except the first one>], facetB: [<the first document>]}.
  */
-class DocumentSourceFacet final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceFacet final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$facet"_sd;
     static constexpr StringData kTeeConsumerStageName = "$internalFacetTeeConsumer"_sd;
@@ -96,7 +119,6 @@ public:
 
         std::string name;
         std::unique_ptr<Pipeline> pipeline;
-        std::unique_ptr<exec::agg::Pipeline> execPipeline;
     };
 
     class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {
@@ -150,11 +172,6 @@ public:
     }
 
     /**
-     * Sets 'source' as the source of '_teeBuffer'.
-     */
-    void setSource(Stage* source) final;
-
-    /**
      * The $facet stage must be run on the merging shard.
      *
      * TODO SERVER-24154: Should be smarter about splitting so that parts of the sub-pipelines can
@@ -175,26 +192,15 @@ public:
 
     // The following are overridden just to forward calls to sub-pipelines.
     void addInvolvedCollections(stdx::unordered_set<NamespaceString>* involvedNssSet) const final;
-    void detachFromOperationContext() final;
     void detachSourceFromOperationContext() final;
-    void reattachToOperationContext(OperationContext* opCtx) final;
     void reattachSourceToOperationContext(OperationContext* opCtx) final;
-    bool validateOperationContext(const OperationContext* opCtx) const final;
     bool validateSourceOperationContext(const OperationContext* opCtx) const final;
     StageConstraints constraints(PipelineSplitState pipeState) const final;
-    bool usedDisk() const final;
-    const SpecificStats* getSpecificStats() const final {
-        return &_stats;
-    }
-
-protected:
-    /**
-     * Blocking call. Will consume all input and produces one output document.
-     */
-    GetNextResult doGetNext() final;
-    void doDispose() final;
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceFacetToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
+
     DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         size_t bufferSizeBytes,
@@ -202,13 +208,10 @@ private:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    boost::intrusive_ptr<TeeBuffer> _teeBuffer;
     std::vector<FacetPipeline> _facets;
+    std::shared_ptr<DSFacetExecStatsWrapper> _execStatsWrapper;
 
+    const size_t _bufferSizeBytes;
     const size_t _maxOutputDocSizeBytes;
-
-    bool _done = false;
-
-    DocumentSourceFacetStats _stats;
 };
 }  // namespace mongo

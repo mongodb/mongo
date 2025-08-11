@@ -47,4 +47,9 @@ std::vector<Value> mergeExplains(const Pipeline& p1,
                                  const exec::agg::Pipeline& p2,
                                  const SerializationOptions& opts);
 
+/**
+ * Utility to merge already generated explain outputs from two pipelines (QO and QE).
+ */
+std::vector<Value> mergeExplains(const std::vector<Value>& lhs, const std::vector<Value>& rhs);
+
 }  // namespace mongo

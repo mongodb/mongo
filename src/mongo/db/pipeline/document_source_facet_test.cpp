@@ -37,6 +37,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/explain_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/tenant_id.h"
@@ -418,6 +420,7 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptEmptyPipelines) {
 TEST_F(DocumentSourceFacetTest,
        ShouldCorrectlyHandleSubPipelinesYieldingDifferentNumbersOfResults) {
     auto ctx = getExpCtx();
+    ctx->setExplain(ExplainOptions::Verbosity::kQueryPlanner);
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}, Document{{"_id", 3}}};
@@ -454,6 +457,23 @@ TEST_F(DocumentSourceFacetTest,
     ASSERT(facetStage->getNext().isEOF());
     ASSERT(facetStage->getNext().isEOF());
     ASSERT(facetStage->getNext().isEOF());
+
+    vector<Value> serialization;
+    facetSource->serializeToArray(
+        serialization, SerializationOptions{.verbosity = ExplainOptions::Verbosity::kExecStats});
+
+    ASSERT_EQ(serialization.size(), 1UL);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
+
+    // The fields are in no guaranteed order, so we can't make a simple Document comparison.
+    ASSERT_EQ(serialization[0].getDocument().computeSize(), 1ULL);
+    ASSERT_EQ(serialization[0].getDocument()["$facet"].getType(), BSONType::object);
+
+    // Should have two fields: "all" and "first".
+    auto serializedStage = serialization[0].getDocument()["$facet"].getDocument();
+    ASSERT_EQ(serializedStage.computeSize(), 2ULL);
+    ASSERT_EQ(serializedStage["all"][0]["nReturned"].getLong(), inputs.size());
+    ASSERT_EQ(serializedStage["first"][0]["nReturned"].getLong(), 1ULL);
 }
 
 TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSubPipeline) {
@@ -590,8 +610,8 @@ TEST_F(DocumentSourceFacetTest, ShouldOptimizeInnerPipelines) {
 
 TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     auto ctx = getExpCtx();
-    // We're going to be changing the OperationContext, so we need to use a MongoProcessInterface
-    // that won't throw when we do so.
+    // We're going to be changing the OperationContext, so we need to use a
+    // MongoProcessInterface that won't throw when we do so.
     ctx->setMongoProcessInterface(std::make_unique<StubMongoProcessInterface>());
 
     auto firstDummy = DocumentSourcePassthrough::create(ctx);
@@ -608,12 +628,12 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     // Test detaching.
     ASSERT_FALSE(firstDummy->isDetachedFromOpCtx);
     ASSERT_FALSE(secondDummy->isDetachedFromOpCtx);
-    facetStage->detachFromOperationContext();
+    facetStage->detachSourceFromOperationContext();
     ASSERT_TRUE(firstDummy->isDetachedFromOpCtx);
     ASSERT_TRUE(secondDummy->isDetachedFromOpCtx);
 
     // Test reattaching.
-    facetStage->reattachToOperationContext(ctx->getOperationContext());
+    facetStage->reattachSourceToOperationContext(ctx->getOperationContext());
     ASSERT_FALSE(firstDummy->isDetachedFromOpCtx);
     ASSERT_FALSE(secondDummy->isDetachedFromOpCtx);
 }

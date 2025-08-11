@@ -42,9 +42,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/tee_buffer.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -69,14 +67,14 @@ DocumentSourceFacet::DocumentSourceFacet(std::vector<FacetPipeline> facetPipelin
                                          size_t bufferSizeBytes,
                                          size_t maxOutputDocBytes)
     : DocumentSource(kStageName, expCtx),
-      exec::agg::Stage(kStageName, expCtx),
-      _teeBuffer(TeeBuffer::create(facetPipelines.size(), bufferSizeBytes)),
       _facets(std::move(facetPipelines)),
+      _execStatsWrapper(std::make_shared<DSFacetExecStatsWrapper>()),
+      _bufferSizeBytes(bufferSizeBytes),
       _maxOutputDocSizeBytes(maxOutputDocBytes) {
     for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
         auto& facet = _facets[facetId];
         facet.pipeline->addInitialSource(
-            DocumentSourceTeeConsumer::create(pExpCtx, facetId, _teeBuffer, kTeeConsumerStageName));
+            DocumentSourceTeeConsumer::create(expCtx, facetId, kTeeConsumerStageName));
     }
 }
 
@@ -177,85 +175,17 @@ intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
         std::move(facetPipelines), expCtx, bufferSizeBytes, maxOutputDocBytes);
 }
 
-void DocumentSourceFacet::setSource(Stage* source) {
-    _teeBuffer->setSource(source);
-}
-
-void DocumentSourceFacet::doDispose() {
-    for (auto&& facet : _facets) {
-        // TODO SERVER-102417: Remove the following if-block when all sources are split into
-        // QO and QE parts and the QO stage auto-disposes resources in destructor.
-        if (!facet.execPipeline) {
-            // Create an execution pipeline to make sure the resources are correctly disposed.
-            facet.execPipeline = exec::agg::buildPipeline(facet.pipeline->freeze());
-        }
-        if (facet.execPipeline) {
-            facet.execPipeline->dismissDisposal();
-            facet.execPipeline->dispose(pExpCtx->getOperationContext());
-        }
-    }
-}
-
-DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
-    if (_done) {
-        // stats update (previously done in usedDisk())
-        _stats.planSummaryStats.usedDisk =
-            std::any_of(_facets.begin(), _facets.end(), [](const auto& facet) {
-                return facet.execPipeline && facet.execPipeline->usedDisk();
-            });
-
-        return GetNextResult::makeEOF();
-    }
-
-    // Create execution pipeline for each facet (this code is executed only once).
-    for (auto&& facet : _facets) {
-        tassert(10616300, "facet execution pipeline is already initialized", !facet.execPipeline);
-        facet.execPipeline = exec::agg::buildPipeline(facet.pipeline->freeze());
-    }
-
-    const size_t maxBytes = _maxOutputDocSizeBytes;
-    auto ensureUnderMemoryLimit = [usedBytes = 0ul, &maxBytes](long long additional) mutable {
-        usedBytes += additional;
-        uassert(4031700,
-                str::stream() << "document constructed by $facet is " << usedBytes
-                              << " bytes, which exceeds the limit of " << maxBytes << " bytes",
-                usedBytes <= maxBytes);
-    };
-
-    vector<vector<Value>> results(_facets.size());
-    bool allPipelinesEOF = false;
-    while (!allPipelinesEOF) {
-        allPipelinesEOF = true;  // Set this to false if any pipeline isn't EOF.
-        for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
-            auto& execPipeline = *_facets[facetId].execPipeline;
-            auto next = execPipeline.getNextResult();
-            for (; next.isAdvanced(); next = execPipeline.getNextResult()) {
-                ensureUnderMemoryLimit(next.getDocument().getApproximateSize());
-                results[facetId].emplace_back(next.releaseDocument());
-            }
-            allPipelinesEOF = allPipelinesEOF && next.isEOF();
-            execPipeline.accumulatePlanSummaryStats(_stats.planSummaryStats);
-        }
-    }
-
-    MutableDocument resultDoc;
-    for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
-        resultDoc[_facets[facetId].name] = Value(std::move(results[facetId]));
-    }
-
-    _done = true;  // We will only ever produce one result.
-    return resultDoc.freeze();
-}
-
 Value DocumentSourceFacet::serialize(const SerializationOptions& opts) const {
     MutableDocument serialized;
-
-    for (auto&& facet : _facets) {
+    for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
+        auto&& facet = _facets[facetId];
         if (opts.isSerializingForExplain()) {
             bool canAddExecPipelineExplain =
-                opts.verbosity >= ExplainOptions::Verbosity::kExecStats && facet.execPipeline;
+                opts.verbosity >= ExplainOptions::Verbosity::kExecStats &&
+                _execStatsWrapper->isStatsProviderAttached();
             auto explain = canAddExecPipelineExplain
-                ? mergeExplains(*facet.pipeline, *facet.execPipeline, opts)
+                ? mergeExplains(facet.pipeline->writeExplainOps(opts),
+                                _execStatsWrapper->getExecStats(facetId, opts))
                 : facet.pipeline->writeExplainOps(opts);
             serialized[opts.serializeFieldPathFromString(facet.name)] = Value(std::move(explain));
         } else {
@@ -282,55 +212,16 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::optimize() {
     return this;
 }
 
-void DocumentSourceFacet::detachFromOperationContext() {
-    for (auto&& facet : _facets) {
-        if (facet.execPipeline) {
-            facet.execPipeline->detachFromOperationContext();
-        }
-        if (facet.pipeline) {
-            facet.pipeline->detachFromOperationContext();
-        }
-    }
-}
-
 void DocumentSourceFacet::detachSourceFromOperationContext() {
     for (auto&& facet : _facets) {
-        if (facet.execPipeline) {
-            facet.execPipeline->detachFromOperationContext();
-        }
-        if (facet.pipeline) {
-            facet.pipeline->detachFromOperationContext();
-        }
-    }
-}
-
-void DocumentSourceFacet::reattachToOperationContext(OperationContext* opCtx) {
-    for (auto&& facet : _facets) {
-        if (facet.execPipeline) {
-            facet.execPipeline->reattachToOperationContext(opCtx);
-        }
-        if (facet.pipeline) {
-            facet.pipeline->reattachToOperationContext(opCtx);
-        }
+        facet.pipeline->detachFromOperationContext();
     }
 }
 
 void DocumentSourceFacet::reattachSourceToOperationContext(OperationContext* opCtx) {
     for (auto&& facet : _facets) {
-        if (facet.execPipeline) {
-            facet.execPipeline->reattachToOperationContext(opCtx);
-        }
-        if (facet.pipeline) {
-            facet.pipeline->reattachToOperationContext(opCtx);
-        }
+        facet.pipeline->reattachToOperationContext(opCtx);
     }
-}
-
-bool DocumentSourceFacet::validateOperationContext(const OperationContext* opCtx) const {
-    return getContext()->getOperationContext() == opCtx &&
-        std::all_of(_facets.begin(), _facets.end(), [opCtx](const auto& f) {
-               return (!f.execPipeline || f.execPipeline->validateOperationContext(opCtx));
-           });
 }
 
 bool DocumentSourceFacet::validateSourceOperationContext(const OperationContext* opCtx) const {
@@ -357,7 +248,7 @@ StageConstraints DocumentSourceFacet::constraints(PipelineSplitState state) cons
         const auto& sources = fi->pipeline->getSources();
         for (auto si = sources.cbegin(); si != sources.cend() && host != kDefinitiveHost; si++) {
             const auto subConstraints = (*si)->constraints(state);
-            const auto hostReq = subConstraints.resolvedHostTypeRequirement(pExpCtx);
+            const auto hostReq = subConstraints.resolvedHostTypeRequirement(getExpCtx());
 
             if (hostReq != HostTypeRequirement::kNone) {
                 host = hostReq;
@@ -395,13 +286,6 @@ StageConstraints DocumentSourceFacet::constraints(PipelineSplitState state) cons
         constraints.mergeShardId = mergeShardId;
     }
     return constraints;
-}
-
-bool DocumentSourceFacet::usedDisk() const {
-    return _done ? _stats.planSummaryStats.usedDisk
-                 : std::any_of(_facets.begin(), _facets.end(), [](const auto& facet) {
-                       return facet.execPipeline && facet.execPipeline->usedDisk();
-                   });
 }
 
 DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const {

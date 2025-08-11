@@ -27,39 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/explain_util.h"
+#pragma once
 
-#include "mongo/db/exec/document_value/document.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/tee_buffer.h"
 
-namespace mongo {
+#include <cstddef>
 
-std::vector<Value> mergeExplains(const Pipeline& p1,
-                                 const exec::agg::Pipeline& p2,
-                                 const SerializationOptions& opts) {
-    auto e1 = p1.writeExplainOps(opts);
-    auto e2 = p2.writeExplainOps(opts);
-    return mergeExplains(e1, e2);
-}
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-std::vector<Value> mergeExplains(const std::vector<Value>& lhs, const std::vector<Value>& rhs) {
-    tassert(10422601, "pipeline sizes are not equal", lhs.size() == rhs.size());
+namespace mongo::exec::agg {
 
-    std::vector<Value> result;
-    result.reserve(lhs.size());
+class TeeConsumerStage final : public Stage {
+public:
+    TeeConsumerStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                     size_t facetId,
+                     StringData stageName);
 
-    for (size_t i = 0; i < lhs.size(); i++) {
-        tassert(10422602,
-                "expected explain input of type object",
-                lhs[i].getType() == BSONType::object);
-        tassert(10422603,
-                "expected explain input of type object",
-                rhs[i].getType() == BSONType::object);
-        Document d1 = lhs[i].getDocument();
-        Document d2 = rhs[i].getDocument();
-        result.emplace_back(Document::merge(d1, d2));
-    }
+    void setTeeBuffer(const boost::intrusive_ptr<TeeBuffer>& bufferSource);
 
-    return result;
-}
+private:
+    GetNextResult doGetNext() final;
+    void doDispose() final;
 
-}  // namespace mongo
+    size_t _facetId;
+    boost::intrusive_ptr<TeeBuffer> _bufferSource;
+};
+
+}  // namespace mongo::exec::agg
