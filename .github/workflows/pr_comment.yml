@@ -1,0 +1,67 @@
+on:
+  pull_request:
+    types: [opened, edited]
+
+concurrency:
+  group: pr-comment-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  comment-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const targetBranch = context.payload.pull_request.base.ref;
+            if (targetBranch !== "v8.2-staging") {
+              console.log(`PR targets ${targetBranch}, not v8.2-staging. Skipping.`);
+              return;
+            }
+
+            console.log("Checking for existing backport policy comment...");
+            const commentHeader = "[Backport Policy](https://wiki.corp.mongodb.com/spaces/KERNEL/pages/155324063/Database+SERVER+Backports+Policy+and+Workflow)";
+
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+
+            const alreadyCommented = comments.some(comment =>
+              comment.body && comment.body.includes(commentHeader)
+            );
+
+            if (alreadyCommented) {
+              console.log("Backport Policy comment already exists. Skipping.");
+              return;
+            }
+
+            const prAuthor = context.payload.pull_request.user.login;
+
+            const comment_body =
+              "### ✅ [Backport Policy](https://wiki.corp.mongodb.com/spaces/KERNEL/pages/155324063/Database+SERVER+Backports+Policy+and+Workflow) Overview\n\n" +
+              "@" + prAuthor + ", please ensure the following before auto-merge is enabled:\n\n" +
+              "- A full Evergreen patch has been run and and the patch link has been posted in this PR. Any failures should be reviewed and confirmed in the comment as unrelated.\n" +
+              "- The PR has been reviewed by a member of [server-backport-mergers](https://github.com/orgs/10gen/teams/server-backport-mergers).\n" +
+              "  - If this PR requires a break-glass rebase, **do not enable auto-merge**. Post in [#10gen-mongo-break-glass-requests](https://mongodb.enterprise.slack.com/archives/C0877CMLRB4) for a manual review.\n\n" +
+              "---\n"+
+              "Once auto-merge is enabled, @svc-auto-approve-bot will automatically approve on behalf of server-release when:\n\n" +
+              "- Any associated BACKPORT ticket meets all upstream release requirements\n" +
+              "- Any associated Jira ticket is in a valid status\n\n" +
+              "If upstream release requirements are not met, @svc-auto-approve-bot will leave a comment and periodically recheck until the PR becomes eligible.\n\n" +
+              "---\n"+
+              "Check Release Dates: [Server Release Schedule](https://jira.mongodb.org/secure/Dashboard.jspa?selectPageId=33483).\n"+
+              "Please reach out in [#server-release](https://mongodb.enterprise.slack.com/archives/C1XQ502TA) if you have any questions.";
+
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment_body
+            });
+
+            console.log("✅ Comment posted.");
