@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalUnpackBucketOpToStageFn(
+boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalUnpackBucketToStageFn(
     const boost::intrusive_ptr<DocumentSource>& documentSource) {
     auto dsInternalUnpackBucket =
         boost::dynamic_pointer_cast<const DocumentSourceInternalUnpackBucket>(documentSource);
@@ -57,7 +57,7 @@ namespace agg {
 
 REGISTER_AGG_STAGE_MAPPING(_internalUnpackBucket,
                            DocumentSourceInternalUnpackBucket::id,
-                           documentSourceInternalUnpackBucketOpToStageFn);
+                           documentSourceInternalUnpackBucketToStageFn);
 
 InternalUnpackBucketStage::InternalUnpackBucketStage(
     StringData stageName,

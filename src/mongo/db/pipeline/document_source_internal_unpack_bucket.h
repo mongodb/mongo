@@ -337,7 +337,7 @@ public:
     bool isSbeCompatible();
 
 private:
-    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalUnpackBucketOpToStageFn(
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalUnpackBucketToStageFn(
         const boost::intrusive_ptr<DocumentSource>& documentSource);
 
     bool haveComputedMetaField() const;
