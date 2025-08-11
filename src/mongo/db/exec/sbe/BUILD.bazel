@@ -344,6 +344,7 @@ mongo_cc_unit_test(
         "sbe_block_test_helpers.h",
         "sbe_code_fragment_test.cpp",
         "sbe_filter_test.cpp",
+        "sbe_hash_agg_accumulator_test.cpp",
         "sbe_hash_agg_test.cpp",
         "sbe_hash_join_test.cpp",
         "sbe_hash_lookup_shared_test.cpp",
