@@ -27,32 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/historical_placement_fetcher_impl.h"
+#include "mongo/s/change_streams/data_to_shards_allocation_query_service_impl.h"
 
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/placement_history_commands_gen.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/duration.h"
 
 namespace mongo {
 
-HistoricalPlacement HistoricalPlacementFetcherImpl::fetch(
-    OperationContext* opCtx, const boost::optional<NamespaceString>& nss, Timestamp atClusterTime) {
-    ConfigsvrGetHistoricalPlacement request(nss.value_or(NamespaceString::kEmpty), atClusterTime);
+AllocationToShardsStatus DataToShardsAllocationQueryServiceImpl::getAllocationToShardsStatus(
+    OperationContext* opCtx, const Timestamp& clusterTime) {
+    switch (_fetcher->fetch(opCtx, NamespaceString::kEmpty, clusterTime).getStatus()) {
+        case HistoricalPlacementStatus::OK:
+            return AllocationToShardsStatus::kOk;
+        case HistoricalPlacementStatus::FutureClusterTime:
+            return AllocationToShardsStatus::kFutureClusterTime;
+        case HistoricalPlacementStatus::NotAvailable:
+            return AllocationToShardsStatus::kNotAvailable;
+    }
 
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto remoteResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        DatabaseName::kAdmin,
-        request.toBSON(),
-        Milliseconds(defaultConfigCommandTimeoutMS.load()),
-        Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
-    uassertStatusOK(remoteResponse.commandStatus);
-
-    return ConfigsvrGetHistoricalPlacementResponse::parse(
-               IDLParserContext("HistoricalPlacementFetcherImpl"), remoteResponse.response)
-        .getHistoricalPlacement();
-}
-
+    MONGO_UNREACHABLE_TASSERT(10718905);
+}  // namespace mongo
 }  // namespace mongo

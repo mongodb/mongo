@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/data_to_shards_allocation_query_service_impl.h"
+#include "mongo/s/change_streams/data_to_shards_allocation_query_service_impl.h"
 
 #include "mongo/db/pipeline/historical_placement_fetcher_mock.h"
 #include "mongo/db/service_context_test_fixture.h"

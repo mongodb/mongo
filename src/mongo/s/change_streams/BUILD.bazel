@@ -13,14 +13,19 @@ mongo_cc_library(
     name = "change_streams",
     srcs = [
         "control_events.cpp",
+        "data_to_shards_allocation_query_service_impl.cpp",
+        "historical_placement_fetcher_impl.cpp",
     ],
     hdrs = [
         "control_events.h",
+        "data_to_shards_allocation_query_service_impl.h",
+        "historical_placement_fetcher_impl.h",
     ],
     deps = [
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db:server_base",
         "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/pipeline:change_stream_pipeline",
     ],
 )
 
@@ -28,9 +33,12 @@ mongo_cc_unit_test(
     name = "change_streams_test",
     srcs = [
         "control_events_test.cpp",
+        "data_to_shards_allocation_query_service_impl_test.cpp",
+        "//src/mongo/db/pipeline:historical_placement_fetcher_mock.h",
     ],
     tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":change_streams",
+        "//src/mongo/db:service_context_test_fixture",
     ],
 )
