@@ -66,6 +66,8 @@
 #define OPENSSL_SUPPRESS_DEPRECATED "OPENSSL_SUPPRESS_DEPRECATED"
 // libsasl2
 #define WITH_SASL_CYRUS 1
+// libzstd
+#define WITH_ZSTD 1
 // libcurl
 #define WITH_CURL 1
 // WITH_HDRHISTOGRAM
