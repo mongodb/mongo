@@ -111,6 +111,11 @@ public:
     virtual void clearFilteringMetadataOnTempReshardingCollection(
         OperationContext* opCtx, const NamespaceString& tempReshardingNss) = 0;
 
+    virtual void ensureReshardingStashCollectionsEmpty(
+        OperationContext* opCtx,
+        const UUID& sourceUUID,
+        const std::vector<DonorShardFetchTimestamp>& donorShards) = 0;
+
     /**
      * Creates the temporary resharding collection locally.
      *
@@ -170,6 +175,11 @@ public:
 
     void clearFilteringMetadataOnTempReshardingCollection(
         OperationContext* opCtx, const NamespaceString& tempReshardingNss) override;
+
+    void ensureReshardingStashCollectionsEmpty(
+        OperationContext* opCtx,
+        const UUID& sourceUUID,
+        const std::vector<DonorShardFetchTimestamp>& donorShards) override;
 };
 
 }  // namespace mongo

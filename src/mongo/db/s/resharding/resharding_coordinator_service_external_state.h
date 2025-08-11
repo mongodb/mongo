@@ -32,10 +32,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/service_context.h"
-#include "mongo/executor/async_rpc.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
 
@@ -66,23 +65,34 @@ public:
 
     bool getIsUnsplittable(OperationContext* opCtx, const NamespaceString& nss);
 
-    template <typename CommandType>
-    std::vector<AsyncRequestsSender::Response> sendCommandToShards(
-        OperationContext* opCtx,
-        std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
-        const std::vector<ShardId>& shardIds) {
-        return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
-    }
+    virtual void tellAllDonorsToRefresh(OperationContext* opCtx,
+                                        const NamespaceString& sourceNss,
+                                        const UUID& reshardingUUID,
+                                        const std::vector<mongo::DonorShardEntry>& donorShards,
+                                        const std::shared_ptr<executor::TaskExecutor>& executor,
+                                        CancellationToken token) = 0;
 
-    template <typename CommandType>
-    std::vector<AsyncRequestsSender::Response> sendCommandToShards(
+    virtual void tellAllRecipientsToRefresh(
         OperationContext* opCtx,
-        std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
-        const std::map<ShardId, ShardVersion>& shardVersions,
-        const ReadPreferenceSetting& readPref) {
-        return sharding_ddl_util::sendAuthenticatedCommandToShards(
-            opCtx, opts, shardVersions, readPref, true /* throwOnError */);
-    }
+        const NamespaceString& nssToRefresh,
+        const UUID& reshardingUUID,
+        const std::vector<mongo::RecipientShardEntry>& recipientShards,
+        const std::shared_ptr<executor::TaskExecutor>& executor,
+        CancellationToken token) = 0;
+
+    virtual void establishAllDonorsAsParticipants(
+        OperationContext* opCtx,
+        const NamespaceString& sourceNss,
+        const std::vector<mongo::DonorShardEntry>& donorShards,
+        const std::shared_ptr<executor::TaskExecutor>& executor,
+        CancellationToken token) = 0;
+
+    virtual void establishAllRecipientsAsParticipants(
+        OperationContext* opCtx,
+        const NamespaceString& tempNss,
+        const std::vector<mongo::RecipientShardEntry>& recipientShards,
+        const std::shared_ptr<executor::TaskExecutor>& executor,
+        CancellationToken token) = 0;
 
     /**
      * Returns a map from each donor shard id to the number of documents copied from that donor
@@ -138,6 +148,33 @@ public:
         OperationContext* opCtx,
         const ReshardingCoordinatorDocument& coordinatorDoc,
         std::vector<ReshardingZoneType> zones) override;
+
+    void tellAllDonorsToRefresh(OperationContext* opCtx,
+                                const NamespaceString& sourceNss,
+                                const UUID& reshardingUUID,
+                                const std::vector<mongo::DonorShardEntry>& donorShards,
+                                const std::shared_ptr<executor::TaskExecutor>& executor,
+                                CancellationToken token) override;
+
+    void tellAllRecipientsToRefresh(OperationContext* opCtx,
+                                    const NamespaceString& nssToRefresh,
+                                    const UUID& reshardingUUID,
+                                    const std::vector<mongo::RecipientShardEntry>& recipientShards,
+                                    const std::shared_ptr<executor::TaskExecutor>& executor,
+                                    CancellationToken token) override;
+
+    void establishAllDonorsAsParticipants(OperationContext* opCtx,
+                                          const NamespaceString& sourceNss,
+                                          const std::vector<mongo::DonorShardEntry>& donorShards,
+                                          const std::shared_ptr<executor::TaskExecutor>& executor,
+                                          CancellationToken token) override;
+
+    void establishAllRecipientsAsParticipants(
+        OperationContext* opCtx,
+        const NamespaceString& tempNss,
+        const std::vector<mongo::RecipientShardEntry>& recipientShards,
+        const std::shared_ptr<executor::TaskExecutor>& executor,
+        CancellationToken token) override;
 
     std::map<ShardId, int64_t> getDocumentsToCopyFromDonors(
         OperationContext* opCtx,

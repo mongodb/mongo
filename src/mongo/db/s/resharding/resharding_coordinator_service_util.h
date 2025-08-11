@@ -30,8 +30,10 @@
 #pragma once
 
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/async_rpc.h"
+#include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/uuid.h"
@@ -47,9 +49,6 @@ namespace resharding {
 
 typedef unique_function<ReshardingCoordinatorDocument(OperationContext*, TxnNumber)>
     PhaseTransitionFn;
-
-const WriteConcernOptions kMajorityWriteConcern{
-    WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
 CollectionType createTempReshardingCollectionType(
     OperationContext* opCtx,
@@ -104,10 +103,38 @@ void executeMetadataChangesInTxn(
     OperationContext* opCtx,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc);
 
-std::shared_ptr<async_rpc::AsyncRPCOptions<FlushRoutingTableCacheUpdatesWithWriteConcern>>
-makeFlushRoutingTableCacheUpdatesOptions(const NamespaceString& nss,
-                                         const std::shared_ptr<executor::TaskExecutor>& exec,
-                                         CancellationToken token);
+template <typename CommandType>
+std::vector<AsyncRequestsSender::Response> sendCommandToShards(
+    OperationContext* opCtx,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
+    const std::vector<ShardId>& shardIds) {
+    return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+}
+
+template <typename CommandType>
+std::vector<AsyncRequestsSender::Response> sendCommandToShards(
+    OperationContext* opCtx,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
+    const std::map<ShardId, ShardVersion>& shardVersions,
+    const ReadPreferenceSetting& readPref) {
+    return sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, opts, shardVersions, readPref, true /* throwOnError */);
+}
+
+void sendFlushReshardingStateChangeToShards(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const UUID& reshardingUUID,
+                                            const std::vector<ShardId>& shardIds,
+                                            const std::shared_ptr<executor::TaskExecutor>& executor,
+                                            CancellationToken token);
+
+void sendFlushRoutingTableCacheUpdatesToShards(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    CancellationToken token);
+
 TypeCollectionRecipientFields constructRecipientFields(
     const ReshardingCoordinatorDocument& coordinatorDoc);
 

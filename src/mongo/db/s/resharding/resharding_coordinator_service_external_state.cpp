@@ -33,6 +33,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/resharding/recipient_resume_document_gen.h"
+#include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/vector_clock.h"
@@ -251,6 +252,53 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
             initialChunks};
 }
 
+void ReshardingCoordinatorExternalStateImpl::tellAllDonorsToRefresh(
+    OperationContext* opCtx,
+    const NamespaceString& sourceNss,
+    const UUID& reshardingUUID,
+    const std::vector<mongo::DonorShardEntry>& donorShards,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    CancellationToken token) {
+    auto donorShardIds = resharding::extractShardIdsFromParticipantEntries(donorShards);
+    resharding::sendFlushReshardingStateChangeToShards(
+        opCtx, sourceNss, reshardingUUID, donorShardIds, executor, token);
+}
+
+void ReshardingCoordinatorExternalStateImpl::tellAllRecipientsToRefresh(
+    OperationContext* opCtx,
+    const NamespaceString& nssToRefresh,
+    const UUID& reshardingUUID,
+    const std::vector<mongo::RecipientShardEntry>& recipientShards,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    CancellationToken token) {
+    auto recipientShardIds = resharding::extractShardIdsFromParticipantEntries(recipientShards);
+    resharding::sendFlushReshardingStateChangeToShards(
+        opCtx, nssToRefresh, reshardingUUID, recipientShardIds, executor, token);
+}
+
+void ReshardingCoordinatorExternalStateImpl::establishAllDonorsAsParticipants(
+    OperationContext* opCtx,
+    const NamespaceString& sourceNss,
+    const std::vector<mongo::DonorShardEntry>& donorShards,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    CancellationToken token) {
+    auto donorShardIds = resharding::extractShardIdsFromParticipantEntries(donorShards);
+    resharding::sendFlushRoutingTableCacheUpdatesToShards(
+        opCtx, sourceNss, donorShardIds, executor, token);
+}
+
+
+void ReshardingCoordinatorExternalStateImpl::establishAllRecipientsAsParticipants(
+    OperationContext* opCtx,
+    const NamespaceString& tempNss,
+    const std::vector<mongo::RecipientShardEntry>& recipientShards,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    CancellationToken token) {
+    auto recipientShardIds = resharding::extractShardIdsFromParticipantEntries(recipientShards);
+    resharding::sendFlushRoutingTableCacheUpdatesToShards(
+        opCtx, tempNss, recipientShardIds, executor, token);
+}
+
 std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsToCopyFromDonors(
     OperationContext* opCtx,
     const std::shared_ptr<executor::TaskExecutor>& executor,
@@ -281,7 +329,7 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsT
     const auto opts = std::make_shared<async_rpc::AsyncRPCOptions<AggregateCommandRequest>>(
         executor, token, aggRequest);
     opts->cmd.setDbName(nss.dbName());
-    auto responses = sendCommandToShards(opCtx, opts, shardVersions, readPref);
+    auto responses = resharding::sendCommandToShards(opCtx, opts, shardVersions, readPref);
 
     std::map<ShardId, int64_t> docsToCopy;
 
@@ -381,7 +429,7 @@ ReshardingCoordinatorExternalStateImpl::_getDocumentsCopiedFromRecipients(
     const auto opts = std::make_shared<async_rpc::AsyncRPCOptions<AggregateCommandRequest>>(
         executor, token, aggRequest);
     opts->cmd.setDbName(DatabaseName::kConfig);
-    auto responses = sendCommandToShards(opCtx, opts, shardIds);
+    auto responses = resharding::sendCommandToShards(opCtx, opts, shardIds);
 
     std::map<ShardId, int64_t> docsCopied;
 
@@ -458,7 +506,7 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsD
         async_rpc::AsyncRPCOptions<ShardsvrReshardingDonorFetchFinalCollectionStats>>(
         executor, token, cmd);
     opts->cmd.setDbName(DatabaseName::kAdmin);
-    auto responses = sendCommandToShards(opCtx, opts, shardIds);
+    auto responses = resharding::sendCommandToShards(opCtx, opts, shardIds);
 
     std::map<ShardId, int64_t> docsDelta;
 

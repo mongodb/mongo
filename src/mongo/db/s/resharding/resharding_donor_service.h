@@ -392,8 +392,6 @@ public:
 
     virtual ShardId myShardId(ServiceContext* serviceContext) const = 0;
 
-    virtual void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) = 0;
-
     virtual void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     virtual void updateCoordinatorDocument(OperationContext* opCtx,
@@ -405,6 +403,8 @@ public:
 
     virtual void refreshCollectionPlacementInfo(OperationContext* opCtx,
                                                 const NamespaceString& sourceNss) = 0;
+
+    virtual void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) = 0;
 };
 
 }  // namespace mongo

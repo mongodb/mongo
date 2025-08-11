@@ -122,16 +122,35 @@ const long approxDocumentsToCopy = 100;
 const BSONObj sourceCollectionOptions = BSONObj();
 BSONObj tempReshardingCollectionOptions = BSONObj();
 
-class ExternalStateForTest : public ReshardingRecipientService::RecipientStateMachineExternalState {
+Atomic<bool> shouldTriggerError{false};
+void maybeThrowErrorForTest() {
+    if (shouldTriggerError.load()) {
+        uasserted(ErrorCodes::InternalError,
+                  str::stream() << "Simulating an unrecoverable error for testing");
+    }
+}
+
+class ExternalStateForTestImpl {
 public:
-    ShardId myShardId(ServiceContext* serviceContext) const override {
+    enum class ExternalFunction {
+        kRefreshCatalogCache,
+        kGetTrackedCollectionRoutingInfo,
+        kGetCollectionOptions,
+        kGetCollectionIndexes,
+        kEnsureReshardingStashCollectionsEmpty,
+    };
+
+    ShardId myShardId(ServiceContext* serviceContext) const {
         return recipientShardId;
     }
 
-    void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override {}
+    void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) {
+        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kRefreshCatalogCache);
+    }
 
     CollectionRoutingInfo getTrackedCollectionRoutingInfo(OperationContext* opCtx,
-                                                          const NamespaceString& nss) override {
+                                                          const NamespaceString& nss) {
+        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kGetTrackedCollectionRoutingInfo);
         invariant(nss == _sourceNss);
 
         const OID epoch = OID::gen();
@@ -166,7 +185,8 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         boost::optional<Timestamp> afterClusterTime,
-        StringData reason) override {
+        StringData reason) {
+        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kGetCollectionOptions);
         if (nss == _sourceNss) {
             return {sourceCollectionOptions, uuid};
         } else {
@@ -180,7 +200,8 @@ public:
         const UUID& uuid,
         boost::optional<Timestamp> afterClusterTime,
         StringData reason,
-        const ShardId& fromShardId) override {
+        const ShardId& fromShardId) {
+        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kGetCollectionOptions);
         return getCollectionOptions(opCtx, nss, uuid, afterClusterTime, reason);
     }
 
@@ -190,22 +211,23 @@ public:
         const UUID& uuid,
         Timestamp afterClusterTime,
         StringData reason,
-        bool expandSimpleCollation) override {
+        bool expandSimpleCollation) {
         invariant(nss == _sourceNss);
+        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kGetCollectionIndexes);
         return {std::vector<BSONObj>{}, BSONObj()};
     }
 
-    void route(OperationContext* opCtx,
-               const NamespaceString& nss,
-               StringData reason,
-               unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)>
-                   callback) override {
+    void route(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        StringData reason,
+        unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)> callback) {
         callback(opCtx, getTrackedCollectionRoutingInfo(opCtx, nss));
     }
 
     void updateCoordinatorDocument(OperationContext* opCtx,
                                    const BSONObj& query,
-                                   const BSONObj& update) override {
+                                   const BSONObj& update) {
         auto coll = acquireCollection(opCtx,
                                       CollectionAcquisitionRequest::fromOpCtx(
                                           opCtx,
@@ -216,7 +238,32 @@ public:
     }
 
     void clearFilteringMetadataOnTempReshardingCollection(
-        OperationContext* opCtx, const NamespaceString& tempReshardingNss) override {}
+        OperationContext* opCtx, const NamespaceString& tempReshardingNss) {}
+
+    void ensureReshardingStashCollectionsEmpty(
+        OperationContext* opCtx,
+        const UUID& sourceUUID,
+        const std::vector<DonorShardFetchTimestamp>& donorShards) {
+        _maybeThrowErrorForFunction(opCtx,
+                                    ExternalFunction::kEnsureReshardingStashCollectionsEmpty);
+
+        for (const auto& donor : donorShards) {
+            auto stashNss =
+                resharding::getLocalConflictStashNamespace(sourceUUID, donor.getShardId());
+            const auto stashColl =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx, stashNss, AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            uassert(10494621,
+                    "Resharding completed with non-empty stash collections",
+                    !stashColl.exists() || stashColl.getCollectionPtr()->isEmpty(opCtx));
+        }
+    }
+
+    void throwUnrecoverableErrorIn(RecipientStateEnum phase, ExternalFunction func) {
+        _errorFunction = std::make_tuple(phase, func);
+    }
 
 private:
     const StringData _currentShardKey = "oldKey";
@@ -226,6 +273,105 @@ private:
     const UUID _sourceUUID = UUID::gen();
 
     const ShardId _someDonorId{"myDonorId"};
+
+    boost::optional<std::tuple<RecipientStateEnum, ExternalFunction>> _errorFunction = boost::none;
+
+    RecipientStateEnum _getCurrentPhaseOnDisk(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+
+        auto doc =
+            client.findOne(NamespaceString::kRecipientReshardingOperationsNamespace, BSONObj{});
+        auto mutableState = doc.getObjectField("mutableState");
+        return RecipientState_parse(IDLParserContext{"reshardingRecipientServiceTest"},
+                                    mutableState.getStringField("state"));
+    }
+
+    void _maybeThrowErrorForFunction(OperationContext* opCtx, ExternalFunction func) {
+        if (_errorFunction) {
+            auto [expectedPhase, expectedFunction] = *_errorFunction;
+
+            if (_getCurrentPhaseOnDisk(opCtx) == expectedPhase && func == expectedFunction) {
+                uasserted(ErrorCodes::InternalError, "Simulating unrecoverable error for testing");
+            }
+        }
+    }
+};
+
+class ExternalStateForTest : public ReshardingRecipientService::RecipientStateMachineExternalState {
+public:
+    ExternalStateForTest(std::shared_ptr<ExternalStateForTestImpl> impl =
+                             std::make_shared<ExternalStateForTestImpl>())
+        : _impl(impl) {}
+
+    ShardId myShardId(ServiceContext* serviceContext) const override {
+        return _impl->myShardId(serviceContext);
+    }
+
+    void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override {
+        _impl->refreshCatalogCache(opCtx, nss);
+    }
+
+    CollectionRoutingInfo getTrackedCollectionRoutingInfo(OperationContext* opCtx,
+                                                          const NamespaceString& nss) override {
+        return _impl->getTrackedCollectionRoutingInfo(opCtx, nss);
+    }
+
+    MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        boost::optional<Timestamp> afterClusterTime,
+        StringData reason) override {
+        return _impl->getCollectionOptions(opCtx, nss, uuid, afterClusterTime, reason);
+    }
+
+    MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        boost::optional<Timestamp> afterClusterTime,
+        StringData reason,
+        const ShardId& fromShardId) override {
+        return _impl->getCollectionOptions(opCtx, nss, uuid, afterClusterTime, reason, fromShardId);
+    }
+
+    MigrationDestinationManager::IndexesAndIdIndex getCollectionIndexes(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        Timestamp afterClusterTime,
+        StringData reason,
+        bool expandSimpleCollation) override {
+        return _impl->getCollectionIndexes(
+            opCtx, nss, uuid, afterClusterTime, reason, expandSimpleCollation);
+    }
+
+    void route(OperationContext* opCtx,
+               const NamespaceString& nss,
+               StringData reason,
+               unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)>
+                   callback) override {
+        _impl->route(opCtx, nss, reason, std::move(callback));
+    }
+
+    void updateCoordinatorDocument(OperationContext* opCtx,
+                                   const BSONObj& query,
+                                   const BSONObj& update) override {
+        _impl->updateCoordinatorDocument(opCtx, query, update);
+    }
+
+    void clearFilteringMetadataOnTempReshardingCollection(
+        OperationContext* opCtx, const NamespaceString& tempReshardingNss) override {}
+
+    void ensureReshardingStashCollectionsEmpty(
+        OperationContext* opCtx,
+        const UUID& sourceUUID,
+        const std::vector<DonorShardFetchTimestamp>& donorShards) override {
+        _impl->ensureReshardingStashCollectionsEmpty(opCtx, sourceUUID, donorShards);
+    }
+
+private:
+    std::shared_ptr<ExternalStateForTestImpl> _impl;
 };
 
 class DataReplicationForTest : public ReshardingDataReplicationInterface {
@@ -263,8 +409,11 @@ public:
 
 class ReshardingRecipientServiceForTest : public ReshardingRecipientService {
 public:
-    explicit ReshardingRecipientServiceForTest(ServiceContext* serviceContext)
-        : ReshardingRecipientService(serviceContext), _serviceContext(serviceContext) {}
+    explicit ReshardingRecipientServiceForTest(
+        ServiceContext* serviceContext, std::shared_ptr<ExternalStateForTestImpl> externalStateImpl)
+        : ReshardingRecipientService(serviceContext),
+          _serviceContext(serviceContext),
+          _externalStateImpl(externalStateImpl) {}
 
     std::shared_ptr<repl::PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) override {
@@ -272,13 +421,14 @@ public:
             this,
             ReshardingRecipientDocument::parse(
                 IDLParserContext{"ReshardingRecipientServiceForTest"}, initialState),
-            std::make_unique<ExternalStateForTest>(),
+            std::make_unique<ExternalStateForTest>(_externalStateImpl),
             [](auto...) { return std::make_unique<DataReplicationForTest>(); },
             _serviceContext);
     }
 
 private:
     ServiceContext* _serviceContext;
+    std::shared_ptr<ExternalStateForTestImpl> _externalStateImpl;
 };
 
 struct TestOptions {
@@ -457,6 +607,7 @@ TestRecipientMetrics makeTestRecipientMetrics(const TestOptions& testOptions,
 class ReshardingRecipientServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
     using RecipientStateMachine = ReshardingRecipientService::RecipientStateMachine;
+    using enum ExternalStateForTestImpl::ExternalFunction;
 
     ReshardingRecipientServiceTest()
         : repl::PrimaryOnlyServiceMongoDTest(
@@ -464,10 +615,12 @@ public:
     }
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
-        return std::make_unique<ReshardingRecipientServiceForTest>(serviceContext);
+        return std::make_unique<ReshardingRecipientServiceForTest>(serviceContext,
+                                                                   _externalStateImpl);
     }
 
     void setUp() override {
+        _externalStateImpl = std::make_shared<ExternalStateForTestImpl>();
         repl::PrimaryOnlyServiceMongoDTest::setUp();
 
         auto serviceContext = getServiceContext();
@@ -485,6 +638,10 @@ public:
 
     RecipientStateTransitionController* controller() {
         return _controller.get();
+    }
+
+    ExternalStateForTestImpl* externalState() {
+        return _externalStateImpl.get();
     }
 
     BSONObj newShardKeyPattern() {
@@ -1102,6 +1259,40 @@ protected:
         }
     }
 
+    void runUnrecoverableErrorTest(const TestOptions& testOptions,
+                                   RecipientStateEnum state,
+                                   ExternalStateForTestImpl::ExternalFunction errorFunction) {
+        externalState()->throwUnrecoverableErrorIn(state, errorFunction);
+
+        auto opCtx = makeOperationContext();
+        auto doc = makeRecipientDocument(testOptions);
+        if (testOptions.isAlsoDonor) {
+            createSourceCollection(opCtx.get(), doc);
+        }
+
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+
+        ASSERT_OK(recipient->awaitInStrictConsistencyOrError().getNoThrow());
+
+        auto persistedDoc = getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
+        if ((state == RecipientStateEnum::kCloning || state == RecipientStateEnum::kApplying) &&
+            testOptions.skipCloningAndApplying) {
+            ASSERT_EQ(persistedDoc.getMutableState().getState(),
+                      RecipientStateEnum::kStrictConsistency);
+        } else {
+            ASSERT_EQ(persistedDoc.getMutableState().getState(), RecipientStateEnum::kError);
+            auto abortReason = persistedDoc.getMutableState().getAbortReason();
+            ASSERT(abortReason);
+            ASSERT_EQ(abortReason->getIntField("code"), ErrorCodes::InternalError);
+        }
+
+        recipient->abort(false);
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+        checkRecipientDocumentRemoved(opCtx.get());
+    }
+
 private:
     TypeCollectionRecipientFields _makeRecipientFields(
         const ReshardingRecipientDocument& recipientDoc) {
@@ -1140,6 +1331,8 @@ private:
     }
 
     std::shared_ptr<RecipientStateTransitionController> _controller;
+    std::shared_ptr<ExternalStateForTestImpl> _externalStateImpl;
+
     boost::optional<bool> _noChunksToCopy;
 
     // The number of default writes.
@@ -2434,6 +2627,54 @@ TEST_F(ReshardingRecipientServiceTest, VerifyRecipientRetriesOnLockTimeoutError)
 
         notifyReshardingCommitting(opCtx.get(), *recipient, doc);
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringCreatingCollection) {
+    for (const auto& testOptions : makeBasicTestOptions()) {
+        LOGV2(10494600,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = testOptions);
+
+        runUnrecoverableErrorTest(
+            testOptions, RecipientStateEnum::kCreatingCollection, kRefreshCatalogCache);
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringCloning) {
+    for (const auto& testOptions : makeBasicTestOptions()) {
+        LOGV2(10494601,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = testOptions);
+
+        runUnrecoverableErrorTest(
+            testOptions, RecipientStateEnum::kCloning, kGetTrackedCollectionRoutingInfo);
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringBuildingIndex) {
+    for (const auto& testOptions : makeBasicTestOptions()) {
+        LOGV2(10494602,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = testOptions);
+
+        runUnrecoverableErrorTest(
+            testOptions, RecipientStateEnum::kBuildingIndex, kGetCollectionIndexes);
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringApplying) {
+    for (const auto& testOptions : makeBasicTestOptions()) {
+        LOGV2(10494603,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = testOptions);
+
+        runUnrecoverableErrorTest(
+            testOptions, RecipientStateEnum::kApplying, kEnsureReshardingStashCollectionsEmpty);
     }
 }
 

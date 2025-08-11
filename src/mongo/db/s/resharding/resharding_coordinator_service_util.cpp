@@ -82,7 +82,6 @@
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"
 #include "mongo/s/request_types/drop_collection_if_uuid_not_matching_gen.h"
-#include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/request_types/update_zone_key_range_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -492,6 +491,33 @@ void removeChunkAndTagsDocs(OperationContext* opCtx,
                                                          tagsQuery,
                                                          resharding::kMajorityWriteConcern,
                                                          tagDeleteOperationHint));
+}
+
+std::shared_ptr<async_rpc::AsyncRPCOptions<_flushReshardingStateChange>>
+createFlushReshardingStateChangeOptions(const NamespaceString& nss,
+                                        const UUID& reshardingUUID,
+                                        const std::shared_ptr<executor::TaskExecutor>& exec,
+                                        CancellationToken token) {
+    _flushReshardingStateChange cmd(nss);
+    cmd.setDbName(DatabaseName::kAdmin);
+    cmd.setReshardingUUID(reshardingUUID);
+    auto opts =
+        std::make_shared<async_rpc::AsyncRPCOptions<_flushReshardingStateChange>>(exec, token, cmd);
+    return opts;
+}
+
+std::shared_ptr<async_rpc::AsyncRPCOptions<FlushRoutingTableCacheUpdatesWithWriteConcern>>
+makeFlushRoutingTableCacheUpdatesOptions(const NamespaceString& nss,
+                                         const std::shared_ptr<executor::TaskExecutor>& exec,
+                                         CancellationToken token) {
+    auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
+    cmd.setSyncFromConfig(true);
+    cmd.setDbName(nss.dbName());
+    generic_argument_util::setMajorityWriteConcern(cmd, &resharding::kMajorityWriteConcern);
+    auto opts =
+        std::make_shared<async_rpc::AsyncRPCOptions<FlushRoutingTableCacheUpdatesWithWriteConcern>>(
+            exec, token, cmd);
+    return opts;
 }
 
 }  // namespace
@@ -975,18 +1001,30 @@ void executeMetadataChangesInTxn(
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
-std::shared_ptr<async_rpc::AsyncRPCOptions<FlushRoutingTableCacheUpdatesWithWriteConcern>>
-makeFlushRoutingTableCacheUpdatesOptions(const NamespaceString& nss,
-                                         const std::shared_ptr<executor::TaskExecutor>& exec,
-                                         CancellationToken token) {
-    auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
-    cmd.setSyncFromConfig(true);
-    cmd.setDbName(nss.dbName());
-    generic_argument_util::setMajorityWriteConcern(cmd, &resharding::kMajorityWriteConcern);
-    auto opts =
-        std::make_shared<async_rpc::AsyncRPCOptions<FlushRoutingTableCacheUpdatesWithWriteConcern>>(
-            exec, token, cmd);
-    return opts;
+void sendFlushReshardingStateChangeToShards(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const UUID& reshardingUUID,
+                                            const std::vector<ShardId>& shardIds,
+                                            const std::shared_ptr<executor::TaskExecutor>& executor,
+                                            CancellationToken token) {
+    auto opts = createFlushReshardingStateChangeOptions(nss, reshardingUUID, executor, token);
+    generic_argument_util::setMajorityWriteConcern(opts->cmd, &resharding::kMajorityWriteConcern);
+    opts->cmd.setDbName(DatabaseName::kAdmin);
+
+    sendCommandToShards(opCtx, opts, {shardIds.begin(), shardIds.end()});
+}
+
+void sendFlushRoutingTableCacheUpdatesToShards(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    CancellationToken token) {
+    auto opts = makeFlushRoutingTableCacheUpdatesOptions(nss, executor, token);
+    opts->cmd.setDbName(DatabaseName::kAdmin);
+    generic_argument_util::setMajorityWriteConcern(opts->cmd, &resharding::kMajorityWriteConcern);
+
+    sendCommandToShards(opCtx, opts, {shardIds.begin(), shardIds.end()});
 }
 
 ShardOwnership computeRecipientChunkOwnership(OperationContext* opCtx,

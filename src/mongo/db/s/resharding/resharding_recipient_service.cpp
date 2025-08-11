@@ -430,7 +430,12 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                           "error while transitioning to state kError",
                           "error"_attr = redact(status));
                 })
-                .onUnrecoverableError([](const Status& status) {})
+                .onUnrecoverableError([](const Status& status) {
+                    LOGV2(10494606,
+                          "Recipient _runUntilStrictConsistencyOrErrored encountered unrecoverable "
+                          "error while transitioning to state kError",
+                          "error"_attr = redact(status));
+                })
                 .until<Status>([](const Status& retryStatus) { return retryStatus.isOK(); })
                 .on(**executor, abortToken);
         })
@@ -472,7 +477,12 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
                   "coordinator's decision",
                   "error"_attr = redact(status));
         })
-        .onUnrecoverableError([](const Status& status) {})
+        .onUnrecoverableError([](const Status& status) {
+            LOGV2(10494607,
+                  "Unrecoverable error while notifying coordinator of recipient state for the "
+                  "coordinator's decision",
+                  "error"_attr = redact(status));
+        })
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, abortToken)
         .then([this, abortToken] {
@@ -1321,18 +1331,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
             }
 
             auto opCtx = factory.makeOperationContext(&cc());
-            for (const auto& donor : _donorShards) {
-                auto stashNss = resharding::getLocalConflictStashNamespace(
-                    _metadata.getSourceUUID(), donor.getShardId());
-                const auto stashColl =
-                    acquireCollection(opCtx.get(),
-                                      CollectionAcquisitionRequest::fromOpCtx(
-                                          opCtx.get(), stashNss, AcquisitionPrerequisites::kRead),
-                                      MODE_IS);
-                uassert(5356800,
-                        "Resharding completed with non-empty stash collections",
-                        !stashColl.exists() || stashColl.getCollectionPtr()->isEmpty(opCtx.get()));
-            }
+            _externalState->ensureReshardingStashCollectionsEmpty(
+                opCtx.get(), _metadata.getSourceUUID(), _donorShards);
         })
         .then([this, &factory] {
             if (!_isAlsoDonor) {
@@ -1818,7 +1818,11 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_restore
             LOGV2(
                 5992700, "Transient error while restoring metrics", "error"_attr = redact(status));
         })
-        .onUnrecoverableError([](const Status& status) {})
+        .onUnrecoverableError([](const Status& status) {
+            LOGV2(10494608,
+                  "Unrecoverable error while restoring metrics",
+                  "error"_attr = redact(status));
+        })
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, abortToken);
 }

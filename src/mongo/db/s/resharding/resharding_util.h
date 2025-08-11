@@ -83,6 +83,9 @@ constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
 constexpr auto kReshardProgressMarkOpLogType = "reshardProgressMark"_sd;
 static const auto kReshardErrorMaxBytes = 2000;
 
+const WriteConcernOptions kMajorityWriteConcern{
+    WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
+
 struct ParticipantShardsAndChunks {
     std::vector<DonorShardEntry> donorShards;
     std::vector<RecipientShardEntry> recipientShards;

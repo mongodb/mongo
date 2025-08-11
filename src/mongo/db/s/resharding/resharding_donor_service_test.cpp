@@ -93,27 +93,101 @@ using PauseDuringStateTransitions =
 
 const ShardId donorShardId{"myShardId"};
 
-class ExternalStateForTest : public ReshardingDonorService::DonorStateMachineExternalState {
+class ExternalStateForTestImpl {
 public:
-    ShardId myShardId(ServiceContext* serviceContext) const override {
+    enum class ExternalFunction {
+        kRefreshCollectionPlacementInfo,
+        kAbortUnpreparedTransactionIfNecessary,
+    };
+
+    ShardId myShardId(ServiceContext* serviceContext) const {
         return donorShardId;
     }
 
-    void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override {}
-
-    void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override {}
+    void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) {}
 
     void updateCoordinatorDocument(OperationContext* opCtx,
                                    const BSONObj& query,
-                                   const BSONObj& update) override {}
+                                   const BSONObj& update) {}
+
+    void refreshCollectionPlacementInfo(OperationContext* opCtx, const NamespaceString& sourceNss) {
+        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kRefreshCollectionPlacementInfo);
+    }
+
+    std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
+    getOnReleaseCriticalSectionCustomAction() {
+        return std::make_unique<ShardingRecoveryService::NoCustomAction>();
+    }
+
+    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) {
+        _maybeThrowErrorForFunction(opCtx,
+                                    ExternalFunction::kAbortUnpreparedTransactionIfNecessary);
+    }
+
+    void throwUnrecoverableErrorIn(DonorStateEnum phase, ExternalFunction func) {
+        _errorFunction = std::make_tuple(phase, func);
+    }
+
+private:
+    boost::optional<std::tuple<DonorStateEnum, ExternalFunction>> _errorFunction = boost::none;
+
+    DonorStateEnum _getCurrentPhaseOnDisk(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+
+        auto doc = client.findOne(NamespaceString::kDonorReshardingOperationsNamespace, BSONObj{});
+        auto mutableState = doc.getObjectField("mutableState");
+        return DonorState_parse(IDLParserContext{"reshardingDonorServiceTest"},
+                                mutableState.getStringField("state"));
+    }
+
+    void _maybeThrowErrorForFunction(OperationContext* opCtx, ExternalFunction func) {
+        if (_errorFunction) {
+            auto [expectedPhase, expectedFunction] = *_errorFunction;
+
+            if (_getCurrentPhaseOnDisk(opCtx) == expectedPhase && func == expectedFunction) {
+                uasserted(ErrorCodes::InternalError, "Simulating unrecoverable error for testing");
+            }
+        }
+    }
+};
+
+class ExternalStateForTest : public ReshardingDonorService::DonorStateMachineExternalState {
+public:
+    ExternalStateForTest(std::shared_ptr<ExternalStateForTestImpl> impl =
+                             std::make_shared<ExternalStateForTestImpl>())
+        : _impl(impl) {}
+
+    ShardId myShardId(ServiceContext* serviceContext) const override {
+        return _impl->myShardId(serviceContext);
+    }
+
+    void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override {
+        _impl->waitForCollectionFlush(opCtx, nss);
+    }
+
+    void updateCoordinatorDocument(OperationContext* opCtx,
+                                   const BSONObj& query,
+                                   const BSONObj& update) override {
+        _impl->updateCoordinatorDocument(opCtx, query, update);
+    }
 
     void refreshCollectionPlacementInfo(OperationContext* opCtx,
-                                        const NamespaceString& sourceNss) override {}
+                                        const NamespaceString& sourceNss) override {
+
+        _impl->refreshCollectionPlacementInfo(opCtx, sourceNss);
+    }
 
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
     getOnReleaseCriticalSectionCustomAction() override {
-        return std::make_unique<ShardingRecoveryService::NoCustomAction>();
+        return _impl->getOnReleaseCriticalSectionCustomAction();
     }
+
+    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) override {
+        _impl->abortUnpreparedTransactionIfNecessary(opCtx);
+    }
+
+private:
+    std::shared_ptr<ExternalStateForTestImpl> _impl;
 };
 
 struct TestOptions {
@@ -140,31 +214,39 @@ std::vector<TestOptions> makeAllTestOptions() {
 
 class ReshardingDonorServiceForTest : public ReshardingDonorService {
 public:
-    explicit ReshardingDonorServiceForTest(ServiceContext* serviceContext)
-        : ReshardingDonorService(serviceContext), _serviceContext(serviceContext) {}
+    explicit ReshardingDonorServiceForTest(
+        ServiceContext* serviceContext,
+        std::shared_ptr<ExternalStateForTestImpl> externalStateImpl =
+            std::make_shared<ExternalStateForTestImpl>())
+        : ReshardingDonorService(serviceContext),
+          _serviceContext(serviceContext),
+          _externalStateImpl(externalStateImpl) {}
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
         return std::make_shared<DonorStateMachine>(
             this,
             ReshardingDonorDocument::parse(IDLParserContext{"ReshardingDonorServiceForTest"},
                                            initialState),
-            std::make_unique<ExternalStateForTest>(),
+            std::make_unique<ExternalStateForTest>(_externalStateImpl),
             _serviceContext);
     }
 
 private:
     ServiceContext* _serviceContext;
+    std::shared_ptr<ExternalStateForTestImpl> _externalStateImpl;
 };
 
 class ReshardingDonorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
     using DonorStateMachine = ReshardingDonorService::DonorStateMachine;
+    using enum ExternalStateForTestImpl::ExternalFunction;
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
-        return std::make_unique<ReshardingDonorServiceForTest>(serviceContext);
+        return std::make_unique<ReshardingDonorServiceForTest>(serviceContext, _externalStateImpl);
     }
 
     void setUp() override {
+        _externalStateImpl = std::make_shared<ExternalStateForTestImpl>();
         repl::PrimaryOnlyServiceMongoDTest::setUp();
 
         auto serviceContext = getServiceContext();
@@ -182,6 +264,10 @@ public:
 
     DonorStateTransitionController* controller() {
         return _controller.get();
+    }
+
+    ExternalStateForTestImpl* externalState() {
+        return _externalStateImpl.get();
     }
 
     ReshardingDonorDocument makeStateDocument(const TestOptions& testOptions) {
@@ -369,6 +455,36 @@ public:
         }
     }
 
+    void runUnrecoverableErrorTest(const TestOptions& testOptions, DonorStateEnum state) {
+        auto doc = makeStateDocument(testOptions);
+        auto instanceId =
+            BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+        createSourceCollection(opCtx.get(), doc);
+        if (testOptions.isAlsoRecipient) {
+            createTemporaryReshardingCollection(opCtx.get(), doc);
+        }
+
+        DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        _advanceDonorToState(opCtx.get(), *donor, doc, state);
+
+        ASSERT_OK(donor->awaitInBlockingWritesOrError().getNoThrow());
+
+        auto persistedDoc = getPersistedDonorDocument(opCtx.get(), doc.getReshardingUUID());
+        ASSERT_EQ(persistedDoc.getMutableState().getState(), DonorStateEnum::kError);
+
+        auto abortReason = persistedDoc.getMutableState().getAbortReason();
+        ASSERT(abortReason);
+        ASSERT_EQ(abortReason->getIntField("code"), ErrorCodes::InternalError);
+
+        donor->abort(false);
+        ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+        checkStateDocumentRemoved(opCtx.get());
+    }
+
 private:
     void _onReshardingFieldsChanges(OperationContext* opCtx,
                                     DonorStateMachine& donor,
@@ -383,7 +499,25 @@ private:
         donor.onReshardingFieldsChanges(opCtx, reshardingFields);
     }
 
+    void _advanceDonorToState(OperationContext* opCtx,
+                              DonorStateMachine& donor,
+                              const ReshardingDonorDocument& donorDoc,
+                              DonorStateEnum targetState) {
+        if (targetState >= DonorStateEnum::kDonatingInitialData) {
+            notifyToStartChangeStreamsMonitor(opCtx, donor, donorDoc);
+        }
+
+        if (targetState >= DonorStateEnum::kDonatingOplogEntries) {
+            notifyRecipientsDoneCloning(opCtx, donor, donorDoc);
+        }
+
+        if (targetState >= DonorStateEnum::kPreparingToBlockWrites) {
+            notifyToStartBlockingWritesNoWait(opCtx, donor, donorDoc);
+        }
+    }
+
     std::shared_ptr<DonorStateTransitionController> _controller;
+    std::shared_ptr<ExternalStateForTestImpl> _externalStateImpl;
 
     // The number of writes after the clone timestamp.
     const int64_t _numInserts = 5;
@@ -999,6 +1133,7 @@ TEST_F(ReshardingDonorServiceTest, TruncatesXLErrorOnDonorDocument) {
         {
             auto persistedDonorDocument =
                 getPersistedDonorDocument(opCtx.get(), doc.getReshardingUUID());
+            ASSERT_EQ(persistedDonorDocument.getMutableState().getState(), DonorStateEnum::kError);
             auto persistedAbortReasonBSON =
                 persistedDonorDocument.getMutableState().getAbortReason();
             ASSERT(persistedAbortReasonBSON);
@@ -1014,6 +1149,7 @@ TEST_F(ReshardingDonorServiceTest, TruncatesXLErrorOnDonorDocument) {
 
         donor->abort(false);
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+        checkStateDocumentRemoved(opCtx.get());
     }
 }
 
@@ -1234,6 +1370,51 @@ TEST_F(ReshardingDonorServiceTest, FailoverAfterDonorErrorsPriorToObtainingTimes
 
         donor->abort(false);
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+    }
+}
+
+TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringPreparingToDonate) {
+    externalState()->throwUnrecoverableErrorIn(DonorStateEnum::kPreparingToDonate,
+                                               kRefreshCollectionPlacementInfo);
+
+    for (auto& test : makeAllTestOptions()) {
+        LOGV2(10494604,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = test);
+
+        runUnrecoverableErrorTest(test, DonorStateEnum::kPreparingToDonate);
+    }
+}
+
+// TODO (SERVER-108852): Enable this test once the resharding donor is able to handle
+// errors from the resharding change streams monitor.
+// TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringDonatingInitialData) {
+//     for (auto& test :
+//          std::vector<TestOptions>{{.isAlsoRecipient = false}, {.isAlsoRecipient = true}}) {
+//         LOGV2(10885200,
+//               "Running case",
+//               "test"_attr = _agent.getTestName(),
+//               "testOptions"_attr = test);
+
+//         FailPointEnableBlock
+//         failpoint("reshardingDonorFailsUpdatingChangeStreamsMonitorProgress");
+
+//         runUnrecoverableErrorTest(test, DonorStateEnum::kDonatingInitialData);
+//     }
+// }
+
+TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringPreparingToBlockWrites) {
+    externalState()->throwUnrecoverableErrorIn(DonorStateEnum::kPreparingToBlockWrites,
+                                               kAbortUnpreparedTransactionIfNecessary);
+
+    for (auto& test : makeAllTestOptions()) {
+        LOGV2(10494605,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = test);
+
+        runUnrecoverableErrorTest(test, DonorStateEnum::kPreparingToBlockWrites);
     }
 }
 

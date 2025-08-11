@@ -121,12 +121,11 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseDonorAfterBlockingReads);
 MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsAfterTransitionToDonatingOplogEntries);
 MONGO_FAIL_POINT_DEFINE(removeDonorDocFailpoint);
 MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsBeforeObtainingTimestamp);
+MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsUpdatingChangeStreamsMonitorProgress);
 
 namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
-const WriteConcernOptions kMajorityWriteConcern{
-    WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
 Timestamp generateMinFetchTimestamp(OperationContext* opCtx, const NamespaceString& sourceNss) {
     // Do a no-op write and use the OpTime as the minFetchTimestamp
@@ -198,11 +197,6 @@ public:
         return ShardingState::get(serviceContext)->shardId();
     }
 
-    void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override {
-        auto catalogCache = Grid::get(opCtx)->catalogCache();
-        uassertStatusOK(catalogCache->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    }
-
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override {
         FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
     }
@@ -217,7 +211,7 @@ public:
             query,
             update,
             false, /* upsert */
-            kMajorityWriteConcern,
+            resharding::kMajorityWriteConcern,
             Milliseconds::max()));
 
         if (!docWasModified) {
@@ -240,6 +234,28 @@ public:
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
     getOnReleaseCriticalSectionCustomAction() override {
         return std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
+    }
+
+    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) override {
+        if (resharding::gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
+                .isEnabled(VersionContext::getDecoration(opCtx),
+                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+            resharding::gReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites.load()) {
+            // Unless explicitly opted out, abort any unprepared transactions that may be running on
+            // the donor shard. This helps prevent the donor from not being to acquire the critical
+            // section within the critical section timeout when there are long-running transactions.
+            //
+            // TODO (SERVER-106990): Abort unprepared transactions after enqueuing the collection
+            // lock request instead. Until we do SERVER-106990, this is best-effort only since a new
+            // transaction may start between this step and the step for acquiring the critical
+            // section. Please note that InterruptedDueToReshardingCriticalSection is a transient
+            // error code so any aborted transactions would get retried by the driver.
+
+            SessionKiller::Matcher matcherAllSessions(
+                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+            killSessionsAbortUnpreparedTransactions(
+                opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToReshardingCriticalSection);
+        }
     }
 };
 
@@ -340,7 +356,11 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                   "Donor _runUntilBlockingWritesOrErrored encountered transient error",
                   "error"_attr = status);
         })
-        .onUnrecoverableError([](const Status& status) {})
+        .onUnrecoverableError([](const Status& status) {
+            LOGV2(10494609,
+                  "Donor _runUntilBlockingWritesOrErrored encountered unrecoverable error",
+                  "error"_attr = status);
+        })
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, abortToken)
         .onError([this, executor, abortToken](Status status) {
@@ -379,7 +399,12 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                           "error while transitioning to state kError",
                           "error"_attr = status);
                 })
-                .onUnrecoverableError([](const Status& status) {})
+                .onUnrecoverableError([](const Status& status) {
+                    LOGV2(10494610,
+                          "Donor _runUntilBlockingWritesOrErrored encountered unrecoverable "
+                          "error while transitioning to state kError",
+                          "error"_attr = status);
+                })
                 .until<Status>([](const Status& status) { return status.isOK(); })
                 .on(**executor, abortToken);
         })
@@ -420,7 +445,11 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
                   "Transient error while notifying the coordinator and awaiting decision",
                   "error"_attr = status);
         })
-        .onUnrecoverableError([](const Status& status) {})
+        .onUnrecoverableError([](const Status& status) {
+            LOGV2(10494611,
+                  "Unrecoverable error while notifying the coordinator and awaiting decision",
+                  "error"_attr = status);
+        })
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, abortToken)
         .then([this, abortToken] {
@@ -864,32 +893,8 @@ void ReshardingDonorService::DonorStateMachine::
 
     {
         auto opCtx = factory.makeOperationContext(&cc());
+        _externalState->abortUnpreparedTransactionIfNecessary(opCtx.get());
 
-        if (resharding::gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
-                .isEnabled(VersionContext::getDecoration(opCtx.get()),
-                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-            resharding::gReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites.load()) {
-            // Unless explicitly opted out, abort any unprepared transactions that may be running on
-            // the donor shard. This helps prevent the donor from not being to acquire the critical
-            // section within the critical section timeout when there are long-running transactions.
-            //
-            // TODO (SERVER-106990): Abort unprepared transactions after enqueuing the collection
-            // lock request instead. Until we do SERVER-106990, this is best-effort only since a new
-            // transaction may start between this step and the step for acquiring the critical
-            // section. Please note that InterruptedDueToReshardingCriticalSection is a transient
-            // error code so any aborted transactions would get retried by the driver.
-
-            SessionKiller::Matcher matcherAllSessions(
-                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx.get())});
-            killSessionsAbortUnpreparedTransactions(
-                opCtx.get(),
-                matcherAllSessions,
-                ErrorCodes::InterruptedDueToReshardingCriticalSection);
-        }
-    }
-
-    {
-        auto opCtx = factory.makeOperationContext(&cc());
         ShardingRecoveryService::get(opCtx.get())
             ->acquireRecoverableCriticalSectionBlockWrites(
                 opCtx.get(),
@@ -1110,23 +1115,30 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
             return ExecutorFuture<void>(**executor, Status::OK());
         })
         .then([this, executor, abortToken, &factory] {
-            auto batchCallback =
-                [this, factory = factory, anchor = shared_from_this()](const auto& batch) {
-                    LOGV2(9858404,
-                          "Persisting change streams monitor's progress",
-                          "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                          "documentsDelta"_attr = batch.getDocumentsDelta(),
-                          "completed"_attr = batch.containsFinalEvent());
+            auto batchCallback = [this, factory = factory, anchor = shared_from_this()](
+                                     const auto& batch) {
+                LOGV2(9858404,
+                      "Persisting change streams monitor's progress",
+                      "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                      "documentsDelta"_attr = batch.getDocumentsDelta(),
+                      "completed"_attr = batch.containsFinalEvent());
 
-                    auto changeStreamsMonitorCtx = _changeStreamsMonitorCtx.get();
-                    changeStreamsMonitorCtx.setResumeToken(batch.getResumeToken().getOwned());
-                    changeStreamsMonitorCtx.setDocumentsDelta(
-                        changeStreamsMonitorCtx.getDocumentsDelta() + batch.getDocumentsDelta());
-                    changeStreamsMonitorCtx.setCompleted(batch.containsFinalEvent());
+                auto changeStreamsMonitorCtx = _changeStreamsMonitorCtx.get();
+                changeStreamsMonitorCtx.setResumeToken(batch.getResumeToken().getOwned());
+                changeStreamsMonitorCtx.setDocumentsDelta(
+                    changeStreamsMonitorCtx.getDocumentsDelta() + batch.getDocumentsDelta());
+                changeStreamsMonitorCtx.setCompleted(batch.containsFinalEvent());
 
-                    auto opCtx = factory.makeOperationContext(&cc());
-                    _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
-                };
+                if (MONGO_unlikely(
+                        reshardingDonorFailsUpdatingChangeStreamsMonitorProgress.shouldFail())) {
+                    uasserted(ErrorCodes::InternalError,
+                              "Simulating an unrecoverable error for testing inside the donor's "
+                              "changeStreamsMonitor callback");
+                }
+
+                auto opCtx = factory.makeOperationContext(&cc());
+                _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
+            };
 
             _changeStreamsMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
                 _metadata.getReshardingUUID(),

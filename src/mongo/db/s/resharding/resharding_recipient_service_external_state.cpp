@@ -59,12 +59,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo {
-namespace {
-
-const WriteConcernOptions kMajorityWriteConcern{
-    WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
-
-}  // namespace
 
 void ReshardingRecipientService::RecipientStateMachineExternalState::
     ensureTempReshardingCollectionExistsWithIndexes(OperationContext* opCtx,
@@ -220,7 +214,7 @@ void RecipientStateMachineExternalStateImpl::updateCoordinatorDocument(Operation
                                             query,
                                             update,
                                             false, /* upsert */
-                                            kMajorityWriteConcern,
+                                            resharding::kMajorityWriteConcern,
                                             Milliseconds::max()));
 
     if (!docWasModified) {
@@ -238,6 +232,23 @@ void RecipientStateMachineExternalStateImpl::clearFilteringMetadataOnTempReshard
     OperationContext* opCtx, const NamespaceString& tempReshardingNss) {
     stdx::unordered_set<NamespaceString> namespacesToRefresh{tempReshardingNss};
     resharding::clearFilteringMetadata(opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);
+}
+
+void RecipientStateMachineExternalStateImpl::ensureReshardingStashCollectionsEmpty(
+    OperationContext* opCtx,
+    const UUID& sourceUUID,
+    const std::vector<DonorShardFetchTimestamp>& donorShards) {
+    for (const auto& donor : donorShards) {
+        auto stashNss = resharding::getLocalConflictStashNamespace(sourceUUID, donor.getShardId());
+        const auto stashColl =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, stashNss, AcquisitionPrerequisites::kRead),
+                              MODE_IS);
+        uassert(5356800,
+                "Resharding completed with non-empty stash collections",
+                !stashColl.exists() || stashColl.getCollectionPtr()->isEmpty(opCtx));
+    }
 }
 
 }  // namespace mongo
