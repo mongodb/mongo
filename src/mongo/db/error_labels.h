@@ -53,6 +53,7 @@ constexpr inline auto kNoWritesPerformed = "NoWritesPerformed"_sd;
 constexpr inline auto kStreamProcessorRetryableError = "StreamProcessorRetryableError"_sd;
 constexpr inline auto kStreamProcessorUserError = "StreamProcessorUserError"_sd;
 constexpr inline auto kSystemOverloadedError = "SystemOverloadedError"_sd;
+constexpr inline auto kRetryableError = "RetryableError"_sd;
 
 }  // namespace ErrorLabel
 
@@ -89,6 +90,7 @@ public:
     bool isStreamProcessorUserError() const;
     bool isStreamProcessorRetryableError() const;
     bool isSystemOverloadedError() const;
+    bool isOperationIdempotent() const;
 
 private:
     bool _isCommitOrAbort() const;

@@ -760,13 +760,14 @@ DbResponse makeDbResponseErrorForRateLimiting(const Message& message, const Stat
     const auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(message));
     replyBuilder->setCommandReply(status, {});
 
-    // We only expect errors to have no error label or system overloaded error label for now
-    // As this function is only used for rate limiting at the moment, this is acceptable
-    if (isSystemOverloadedError(status.code())) {
+    // We need to add error labels manually as ErrorLabelBuilder requires an operation context and
+    // we are still before the creation of the operation context at this point.
+    if (MONGO_likely(status == ErrorCodes::IngressRequestRateLimitExceeded)) {
         auto commandBodyBob = replyBuilder->getBodyBuilder();
         {
             BSONArrayBuilder arrayBuilder(commandBodyBob.subarrayStart(kErrorLabelsFieldName));
             arrayBuilder.append(ErrorLabel::kSystemOverloadedError);
+            arrayBuilder.append(ErrorLabel::kRetryableError);
         }
     }
 

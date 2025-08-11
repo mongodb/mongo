@@ -928,6 +928,11 @@ error_codes:
       name: StreamProcessorKinesisError,
       categories: [StreamProcessorUserError],
     }
+  - {
+      code: 462,
+      name: IngressRequestRateLimitExceeded,
+      categories: [SystemOverloadedError, RetriableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 

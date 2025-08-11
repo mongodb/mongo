@@ -112,9 +112,9 @@ function testRateLimiterMetrics(conn, exemptConn) {
     // We run inserts command that will either pass or fail. When it fails, we validate the error
     // code and label.
     for (let i = 0; i < requestAmount; ++i) {
-        const assertContainSystemOverloadedErrorLabel = (res) => {
+        const assertContainsExpectedErrorLabels = (res) => {
             assert(res.hasOwnProperty("errorLabels"), res);
-            assert.sameMembers(["SystemOverloadedError"], res.errorLabels);
+            assert.sameMembers(["SystemOverloadedError", "RetryableError"], res.errorLabels);
         };
 
         const collName = `${jsTest.name()}_coll`;
@@ -123,8 +123,8 @@ function testRateLimiterMetrics(conn, exemptConn) {
         const result = db.runCommand({insert: collName, documents: [{dummy: 1}]});
 
         if (result.ok === 0) {
-            assert.commandFailedWithCode(result, ErrorCodes.RateLimitExceeded);
-            assertContainSystemOverloadedErrorLabel(result);
+            assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded);
+            assertContainsExpectedErrorLabels(result);
         }
     }
 
@@ -292,7 +292,8 @@ function runTestCompressed() {
                 for (let i = 0; i < requestAmount; ++i) {
                     const assertContainSystemOverloadedErrorLabel = (res) => {
                         assert(res.hasOwnProperty("errorLabels"), res);
-                        assert.sameMembers(["SystemOverloadedError"], res.errorLabels);
+                        assert.sameMembers(["SystemOverloadedError", "RetryableError"],
+                                           res.errorLabels);
                     };
 
                     const collName = `${jsTest.name()}_coll`;
@@ -300,7 +301,8 @@ function runTestCompressed() {
                     const result = db.runCommand({insert: collName, documents: [{dummy: 1}]});
 
                     if (result.ok === 0) {
-                        assert.commandFailedWithCode(result, ErrorCodes.RateLimitExceeded);
+                        assert.commandFailedWithCode(result,
+                                                     ErrorCodes.IngressRequestRateLimitExceeded);
                         assertContainSystemOverloadedErrorLabel(result);
                     }
                 }
