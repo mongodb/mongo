@@ -12,6 +12,7 @@ exports_files(
 mongo_cc_library(
     name = "unified_write_executor",
     srcs = [
+        "stats.cpp",
         "unified_write_executor.cpp",
         "write_batch_executor.cpp",
         "write_batch_response_processor.cpp",
@@ -21,6 +22,7 @@ mongo_cc_library(
         "write_op_producer.cpp",
     ],
     hdrs = [
+        "stats.h",
         "unified_write_executor.h",
         "write_batch_executor.h",
         "write_batch_response_processor.h",

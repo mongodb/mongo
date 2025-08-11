@@ -8,9 +8,11 @@ import {BulkWriteMetricChecker} from "jstests/libs/bulk_write_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+const uweEnabled = TestData.setParametersMongos.internalQueryUnifiedWriteExecutor;
 function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     // We are ok with the randomness here since we clearly log the state.
-    const errorsOnly = Math.random() < 0.5;
+    // TODO SERVER-105762: Remove the 'uweEnabled' check once errorsOnly is enabled.
+    const errorsOnly = uweEnabled ? false : Math.random() < 0.5;
     print(`Running on a ${isMongos ? "ShardingTest" : "ReplSetTest"} with bulkWrite = ${
         bulkWrite}, errorsOnly = ${errorsOnly} and timeseries = ${timeseries}.`);
 
@@ -97,7 +99,11 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     const retryCount = 3;
     for (const bulkWrite of [false, true]) {
         for (const timeseries of [false, true]) {
-            runTest(true /* isMongos */, st, bulkWrite, retryCount, timeseries);
+            // Skip this if we are using the UWE against a timeseries collection.
+            // TODO SERVER-104139: Add timeseries support to the UWE.
+            if (!timeseries || !uweEnabled) {
+                runTest(true /* isMongos */, st, bulkWrite, retryCount, timeseries);
+            }
         }
     }
 

@@ -34,9 +34,9 @@
 namespace mongo {
 namespace unified_write_executor {
 
-Analysis WriteOpAnalyzer::analyze(OperationContext* opCtx,
-                                  const RoutingContext& routingCtx,
-                                  const WriteOp& op) {
+Analysis WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
+                                      const RoutingContext& routingCtx,
+                                      const WriteOp& op) {
     const auto& cri = routingCtx.getCollectionRoutingInfo(op.getNss());
     // TODO SERVER-103782 Don't use CRITargeter.
     CollectionRoutingInfoTargeter targeter(op.getNss(), cri);
@@ -44,7 +44,6 @@ Analysis WriteOpAnalyzer::analyze(OperationContext* opCtx,
     // TODO SERVER-103146 Add kChangesOwnership.
     // TODO SERVER-103781 Add support for "WriteWithoutShardKeyWithId" writes.
     NSTargeter::TargetingResult tr;
-
     switch (op.getType()) {
         case WriteType::kInsert: {
             tr.endpoints.emplace_back(
@@ -63,6 +62,13 @@ Analysis WriteOpAnalyzer::analyze(OperationContext* opCtx,
             MONGO_UNREACHABLE;
         } break;
     }
+
+    size_t nsIdx = BulkWriteCRUDOp(op.getBulkWriteOp()).getNsInfoIdx();
+    _stats.recordTargetingStats(tr.endpoints,
+                                nsIdx,
+                                targeter.isTargetedCollectionSharded(),
+                                targeter.getAproxNShardsOwningChunks(),
+                                op.getType());
 
     tassert(10346500, "Expected write to affect at least one shard", !tr.endpoints.empty());
 

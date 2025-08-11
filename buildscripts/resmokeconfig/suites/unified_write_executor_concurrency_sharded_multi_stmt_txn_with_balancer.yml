@@ -53,7 +53,7 @@ selector:
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
 
     # Exclusions because of unimplemented functionalities in the unified write executor.
-    # TODO: SERVER-104136 enable when metrics are supported.
+    # TODO: SERVER-107644 enable when sample id is supported.
     - jstests/concurrency/fsm_workloads/analyze_shard_key.js
     #  TODO: SERVER-104120 try when enabling writes without shard key are fully supported.
     - jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_with_moveChunk.js

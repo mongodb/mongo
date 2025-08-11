@@ -102,7 +102,8 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
 
     processor.onWriteBatchResponse(
         opCtx,
@@ -111,7 +112,7 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
             {shard1Name, Response{rcr1, {}}},
             {shard2Name, Response{rcr2, {WriteOp(request, 0), WriteOp(request, 1)}}}});
 
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNInserted(), 2);
     ASSERT_EQ(clientReply.getNMatched(), 6);
     ASSERT_EQ(clientReply.getNModified(), 6);
@@ -138,14 +139,14 @@ TEST_F(WriteBatchResponseProcessorTest, AllStatisticsCopied) {
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
-
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
 
     processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {WriteOp(request, 0)}}}});
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNInserted(), 1);
     ASSERT_EQ(clientReply.getNMatched(), 1);
     ASSERT_EQ(clientReply.getNModified(), 1);
@@ -205,7 +206,8 @@ TEST_F(WriteBatchResponseProcessorTest, MixedErrorsAndOk) {
     RemoteCommandResponse rcr3(host3, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
 
     processor.onWriteBatchResponse(
         opCtx,
@@ -214,7 +216,7 @@ TEST_F(WriteBatchResponseProcessorTest, MixedErrorsAndOk) {
                                  {shard2Name, Response{rcr2, {op2, op3}}},
                                  {shard3Name, Response{rcr3, {op4}}}});
 
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 2);
     // Should still be able to keep processing even if we encountered an inner error.
     ASSERT_EQ(clientReply.getNInserted(), 2);
@@ -251,7 +253,8 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -273,7 +276,7 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
     // Confirm so far we've only processed one error. Copy the processor since generating a
     // response consumes the results array.
     auto tempProcessor = processor;
-    auto clientReply = tempProcessor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = tempProcessor.generateClientResponseForBulkWriteCommand(opCtx);
     // Should have 0 errors since we can retry CannotImplicitlyCreateCollection
     ASSERT_EQ(clientReply.getNErrors(), 0);
     // Should still be able to keep processing even if we encountered an inner error.
@@ -299,7 +302,7 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
     ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
     ASSERT(result.opsToRetry.empty());
     ASSERT(result.collsToCreate.empty());
-    clientReply = processor.generateClientResponseForBulkWriteCommand();
+    clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
 
     // Assert we have both ops completed now.
     ASSERT_EQ(clientReply.getNErrors(), 0);
@@ -329,7 +332,8 @@ TEST_F(WriteBatchResponseProcessorTest, SingleReplyItemForBatchOfThree) {
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -345,11 +349,12 @@ TEST_F(WriteBatchResponseProcessorTest, SingleReplyItemForBatchOfThree) {
     ASSERT_EQ(result.opsToRetry[1].getId(), 1);
     ASSERT_EQ(result.opsToRetry[2].getId(), 2);
     // Assert nss1 was flagged for creation.
+
     ASSERT_EQ(result.collsToCreate.size(), 1);
     ASSERT(result.collsToCreate.contains(nss1));
 
     // Assert the generated response is as expected.
-    auto response = processor.generateClientResponseForBulkWriteCommand();
+    auto response = processor.generateClientResponseForBulkWriteCommand(opCtx);
     // Should have 0 errors since we can retry CannotImplicitlyCreateCollection.
     ASSERT_EQ(response.getNErrors(), 0);
     ASSERT_EQ(response.getNInserted(), 0);
@@ -401,7 +406,8 @@ TEST_F(WriteBatchResponseProcessorTest, TwoShardMixedNamespaceExistence) {
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -478,7 +484,8 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{
@@ -503,7 +510,7 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
     ASSERT_EQ(result.collsToCreate.size(), 1);
     ASSERT(result.collsToCreate.contains(nss1));
 
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 3);
     ASSERT_EQ(clientReply.getNInserted(), 2);
     ASSERT_EQ(clientReply.getNModified(), 0);
@@ -553,7 +560,8 @@ TEST_F(WriteBatchResponseProcessorTest, RetryStalenessErrors) {
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -574,7 +582,7 @@ TEST_F(WriteBatchResponseProcessorTest, RetryStalenessErrors) {
     ASSERT(result.collsToCreate.empty());
 
     // Assert errors was not incremented since we can retry Staleness errors.
-    auto response = processor.generateClientResponseForBulkWriteCommand();
+    auto response = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(response.getNErrors(), 0);
     ASSERT_EQ(response.getNInserted(), 0);
 }
@@ -617,7 +625,8 @@ TEST_F(WriteBatchResponseProcessorTest, MixedStalenessErrorsAndOk) {
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
@@ -660,7 +669,8 @@ TEST_F(WriteBatchResponseProcessorTest, RetryShardsCannotRefreshDueToLocksHeldEr
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -679,7 +689,7 @@ TEST_F(WriteBatchResponseProcessorTest, RetryShardsCannotRefreshDueToLocksHeldEr
     ASSERT(result.collsToCreate.empty());
 
     // Assert errors was not incremented since we can retry ShardsCannotRefresh errors.
-    auto response = processor.generateClientResponseForBulkWriteCommand();
+    auto response = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(response.getNErrors(), 0);
     ASSERT_EQ(response.getNInserted(), 1);
 
@@ -717,7 +727,8 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesSingleWriteConcernError) {
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -734,7 +745,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesSingleWriteConcernError) {
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 0);
     ASSERT_EQ(clientReply.getNInserted(), 2);
     auto batch = clientReply.getCursor().getFirstBatch();
@@ -783,7 +794,8 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{
@@ -802,7 +814,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 0);
     ASSERT_EQ(clientReply.getNInserted(), 2);
     auto batch = clientReply.getCursor().getFirstBatch();
@@ -844,7 +856,8 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseMode) {
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef, true /*isNonVerbose*/);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats, true /*isNonVerbose*/);
     auto result = processor.onWriteBatchResponse(opCtx,
                                                  routingCtx,
                                                  SimpleWriteBatchResponse{{shard1Name,
@@ -862,7 +875,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseMode) {
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 0);
     ASSERT_EQ(clientReply.getNInserted(), 2);
     auto batch = clientReply.getCursor().getFirstBatch();
@@ -886,7 +899,8 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithErrors) {
         false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef, true /*isNonVerbose*/);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats, true /*isNonVerbose*/);
 
     auto result = processor.onWriteBatchResponse(
         opCtx, routingCtx, SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}}});
@@ -895,7 +909,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithErrors) {
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 1);
     ASSERT_EQ(clientReply.getNInserted(), 0);
     auto batch = clientReply.getCursor().getFirstBatch();
@@ -936,7 +950,8 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithMixedErrorsAndOk) {
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef, true /*isNonVerbose*/);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats, true /*isNonVerbose*/);
 
     processor.onWriteBatchResponse(
         opCtx,
@@ -944,7 +959,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithMixedErrorsAndOk) {
         SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}},
                                  {shard2Name, Response{rcr2, {op2, op3}}}});
 
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 1);
     ASSERT_EQ(clientReply.getNInserted(), 2);
     auto batch = clientReply.getCursor().getFirstBatch();
@@ -985,7 +1000,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, OKReplies) {
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,
@@ -997,7 +1013,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest, OKReplies) {
     ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
 
     // Confirm the generated bulk reply and batched command response are both correct.
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNInserted(), 2);
     ASSERT_EQ(clientReply.getNMatched(), 0);
     ASSERT_EQ(clientReply.getNModified(), 0);
@@ -1022,7 +1038,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, TransientTransactionErrorInARSAsserts
         StatusWith<executor::RemoteCommandResponse>(Status(errorCode, "CustomError"));
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
 
     ASSERT_THROWS_CODE(
         processor.onWriteBatchResponse(
@@ -1048,7 +1065,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest,
         StatusWith<executor::RemoteCommandResponse>(Status(errorCode, "CustomError"));
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
 
     auto reply = makeReply();
     reply.setNInserted(1);
@@ -1095,7 +1113,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInARSHalt
     RemoteCommandResponse rcr3(host2, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,
@@ -1109,7 +1128,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInARSHalt
     ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kStopProcessing);
 
     // Confirm the generated bulk reply and batched command response are both correct.
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNInserted(), 1);
     ASSERT_EQ(clientReply.getNMatched(), 0);
     ASSERT_EQ(clientReply.getNModified(), 0);
@@ -1153,7 +1172,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, TransientTransactionErrorInShardRespo
         false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
 
     ASSERT_THROWS_CODE(
         processor.onWriteBatchResponse(
@@ -1198,7 +1218,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest,
     RemoteCommandResponse rcr3(host2, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,
@@ -1211,7 +1232,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest,
     ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kStopProcessing);
 
     // Confirm the generated bulk reply and batched command response are both correct.
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNInserted(), 1);
     ASSERT_EQ(clientReply.getNMatched(), 0);
     ASSERT_EQ(clientReply.getNModified(), 0);
@@ -1258,7 +1279,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInReplyIt
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,
@@ -1271,7 +1293,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInReplyIt
     ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kStopProcessing);
 
     // Confirm the generated bulk reply and batched command response are both correct.
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 1);
     ASSERT_EQ(clientReply.getNInserted(), 0);
     ASSERT_EQ(clientReply.getNMatched(), 0);
@@ -1321,7 +1343,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, ProcessorSetsRetriedStmtIdsInClientRe
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
     WriteCommandRef cmdRef(request);
-    WriteBatchResponseProcessor processor(cmdRef);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,
@@ -1333,7 +1356,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest, ProcessorSetsRetriedStmtIdsInClientRe
     ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
 
     // Confirm the generated bulk reply and batched command response are both correct.
-    auto clientReply = processor.generateClientResponseForBulkWriteCommand();
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNInserted(), 2);
     ASSERT_EQ(clientReply.getNMatched(), 0);
     ASSERT_EQ(clientReply.getNModified(), 0);

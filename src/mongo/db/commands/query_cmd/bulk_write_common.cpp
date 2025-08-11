@@ -216,6 +216,9 @@ BulkWriteUpdateOp toBulkWriteUpdate(const write_ops::UpdateOpEntry& op) {
             !op.getSort() || !op.getMulti());
 
     BulkWriteUpdateOp update;
+
+    // Set 'nsInfoIdx' to 0, as there is only one namespace in a regular update.
+    update.setNsInfoIdx(0);
     update.setFilter(op.getQ());
     update.setMulti(op.getMulti());
     update.setConstants(op.getC());
@@ -234,6 +237,9 @@ BulkWriteUpdateOp toBulkWriteUpdate(const write_ops::UpdateOpEntry& op) {
 
 BulkWriteDeleteOp toBulkWriteDelete(const write_ops::DeleteOpEntry& op) {
     BulkWriteDeleteOp deleteOp;
+
+    // Set 'nsInfoIdx' to 0, as there is only one namespace in a regular delete.
+    deleteOp.setNsInfoIdx(0);
     if (op.getCollation()) {
         deleteOp.setCollation(op.getCollation());
     }

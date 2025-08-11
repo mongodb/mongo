@@ -29,6 +29,7 @@
 
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 
+#include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_scheduler.h"
@@ -62,8 +63,9 @@ bool isNonVerboseWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
 WriteCommandResponse executeWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
     const bool isNonVerbose = isNonVerboseWriteCommand(opCtx, cmdRef);
 
+    Stats stats;
     WriteOpProducer producer(cmdRef);
-    WriteOpAnalyzer analyzer;
+    WriteOpAnalyzerImpl analyzer = WriteOpAnalyzerImpl(stats);
 
     std::set<NamespaceString> nssSet = cmdRef.getNssSet();
     const bool ordered = cmdRef.getOrdered();
@@ -76,12 +78,12 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx, WriteCommandRe
     }
 
     WriteBatchExecutor executor(cmdRef);
-    WriteBatchResponseProcessor processor(cmdRef, isNonVerbose);
+    WriteBatchResponseProcessor processor(cmdRef, stats, isNonVerbose);
     WriteBatchScheduler scheduler(*batcher, executor, processor);
 
     scheduler.run(opCtx, nssSet);
-
-    return processor.generateClientResponse();
+    stats.updateMetrics(opCtx);
+    return processor.generateClientResponse(opCtx);
 }
 
 BatchedCommandResponse write(OperationContext* opCtx, const BatchedCommandRequest& request) {

@@ -456,6 +456,7 @@ buildvariants:
       idle_timeout_factor: 1.5
       exec_timeout_factor: 1.5
       test_flags: >-
+        --runAllFeatureFlagTests
         --mongodSetParameters="{internalQueryUnifiedWriteExecutor: true}"
         --mongosSetParameters="{internalQueryUnifiedWriteExecutor: true}"
     # For now just unified write executor suites but tasks will be added as development continues.

@@ -25,7 +25,7 @@ selector:
     # TODO SERVER-104139: Timeseries collection support
     # - jstests/sharding/mongos_writes_wait_for_write_concern_timeseries.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_unsharded.js
-    # TODO: SERVER-104120 try enabling when writes without shard key are fully supported.
+    # TODO SERVER-104120: Write without shard key support
     # - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     # TODO: SERVER-103781 try enabling when write without shard key with id supported.
     # - jstests/sharding/retryable_update_one_by_id_chunk_migration.js
@@ -39,6 +39,9 @@ selector:
     - jstests/sharding/updateOne_without_shard_key/dropping_collection_during_clusterQueryWithoutShardKey_errors.js
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_basic.js
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_sort.js
+    - jstests/noPassthrough/crud/bulk_write_metrics.js
+    - jstests/noPassthrough/crud/bulk_write_metrics_single_shard.js
+    # TODO SERVER-104120: Write without shard key support
     # - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
     - jstests/sharding/retryable_writes.js
     - jstests/sharding/retryable_writes_nested_shard_key.js
@@ -46,9 +49,8 @@ selector:
     - jstests/sharding/retryable_write_error_labels.js
 
     # No passthrough tests.
-    # - jstests/noPassthrough/crud/bulk_write_currentop.js
-    # - jstests/noPassthrough/crud/bulk_write_metrics.js
-    # - jstests/noPassthrough/crud/bulk_write_metrics_single_shard.js
+    - jstests/noPassthrough/crud/bulk_write_currentop.js
+
     # - jstests/noPassthrough/query/command_diagnostics_sharded.js
     # - jstests/noPassthrough/query/profile/profile_planning_time_stats.js
     # - jstests/noPassthrough/server_parameters/cluster_commands_require_cluster_node.js

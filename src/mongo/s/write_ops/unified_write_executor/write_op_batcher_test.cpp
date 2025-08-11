@@ -38,9 +38,9 @@ namespace mongo {
 namespace unified_write_executor {
 namespace {
 
-class MockWriteOpAnalyzer : public WriteOpAnalyzer {
+class WriteOpAnalyzerMock : public WriteOpAnalyzer {
 public:
-    MockWriteOpAnalyzer(std::map<WriteOpId, Analysis> opAnalysis)
+    WriteOpAnalyzerMock(std::map<WriteOpId, Analysis> opAnalysis)
         : _opAnalysis(std::move(opAnalysis)) {}
 
     Analysis analyze(OperationContext* opCtx,
@@ -181,7 +181,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest,
                                     {NamespaceInfoEntry(nss0)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kSingleShard, {nss0Shard1}}},
         {2, {kSingleShard, {nss0Shard0}}},
@@ -216,7 +216,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest,
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kSingleShard, {nss1Shard0}}},
         {2, {kSingleShard, {nss0Shard1}}},
@@ -248,7 +248,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherBatchesSingleShardO
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kSingleShard, {nss1Shard0}}},
         {2, {kMultiShard, {nss0Shard0, nss0Shard1}}},
@@ -282,7 +282,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherBatchesMultiShardOp
         {NamespaceInfoEntry(nss0)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kMultiShard, {nss0Shard0, nss0Shard1}}},
         {1, {kMultiShard, {nss0Shard0, nss0Shard1}}},
     });
@@ -315,7 +315,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherBatchesNonTargetedW
 
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kNonTargetedWrite, {nss0Shard0}}},
     });
@@ -344,7 +344,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherReprocessesWriteOps
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kSingleShard, {nss1Shard0}}},
         {2, {kSingleShard, {nss0Shard1}}},
@@ -381,7 +381,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest,
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kSingleShard, {nss1Shard0}}},
         {2, {kSingleShard, {nss0Shard1}}},
@@ -416,7 +416,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherStopsOnUnrecoverabl
         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kSingleShard, {nss1Shard1}}},
     });
@@ -443,7 +443,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kSingleShard, {nss0Shard0}}},
         {2, {kSingleShard, {nss1Shard1}}},
@@ -481,7 +481,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherBatchesMultiSha
         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kMultiShard, {nss0Shard0, nss0Shard1}}},
         {1, {kSingleShard, {nss0Shard0}}},
         {2, {kSingleShard, {nss1Shard1}}},
@@ -524,7 +524,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
 
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kNonTargetedWrite, {nss0Shard0}}},
     });
@@ -558,7 +558,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kSingleShard, {nss1Shard0}}},
         {2, {kSingleShard, {nss0Shard0VersionIgnored}}},
@@ -600,7 +600,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherReprocessesWrit
                                          {2, {kSingleShard, {nss0Shard0}}},
                                          {3, {kSingleShard, {nss1Shard1}}},
                                          {4, {kMultiShard, {nss1Shard0, nss1Shard1}}}};
-    MockWriteOpAnalyzer analyzer(ops);
+    WriteOpAnalyzerMock analyzer(ops);
 
     auto routingCtx = RoutingContext::createSynthetic({});
     auto batcher = UnorderedWriteOpBatcher(producer, analyzer);
@@ -640,7 +640,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kSingleShard, {nss1Shard0}}},
         {2, {kSingleShard, {nss0Shard0}}},
@@ -686,7 +686,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherDoesNotStopOnUn
         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     WriteOpProducer producer(request);
 
-    MockWriteOpAnalyzer analyzer({
+    WriteOpAnalyzerMock analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
         {1, {kSingleShard, {nss1Shard0}}},
         {2, {kSingleShard, {nss0Shard0VersionIgnored}}},

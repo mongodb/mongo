@@ -102,6 +102,17 @@ public:
     boost::optional<int> getNumShardsOwningChunks() const;
     bool hasTargetedShardedCollection() const;
 
+    /**
+     * Set of methods to determine whether this 'BatchWriteExecStats' object should be ignored or
+     * not (that is, whether it should not be used to update targeting or query counter stats).
+     */
+    void markIgnore() {
+        _ignore = true;
+    }
+    bool getIgnore() const {
+        return _ignore;
+    }
+
     // Expose via helpers if this gets more complex
 
     // Number of round trips required for the batch
@@ -115,6 +126,7 @@ private:
     std::set<ShardId> _targetedShards;
     boost::optional<int> _numShardsOwningChunks;
     bool _hasTargetedShardedCollection = false;
+    bool _ignore = false;
 };
 
 void updateHostsTargetedMetrics(OperationContext* opCtx,

@@ -29,53 +29,52 @@
 
 #pragma once
 
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/routing_context.h"
-#include "mongo/s/write_ops/unified_write_executor/stats.h"
-#include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op.h"
-
-#include <boost/optional.hpp>
+#include "mongo/s/write_ops/write_command_ref.h"
 
 namespace mongo {
 namespace unified_write_executor {
 
-enum BatchType {
-    kSingleShard,
-    kMultiShard,
-    kNonTargetedWrite,
-};
-
-struct Analysis {
-    BatchType type;
-    std::vector<ShardEndpoint> shardsAffected;
-};
-
-class WriteOpAnalyzer {
+/**
+ * Class which records and updates targeting statistics along with other metrics (such as op
+ * counters).
+ */
+class Stats {
 public:
     /**
-     * Analyzes the given write op to determine which shards it would affect, and if it could be
-     * combined into a batch with other writes.
+     * Struct which groups together common targeting statistcs.
      */
-    virtual Analysis analyze(OperationContext* opCtx,
-                             const RoutingContext& routingCtx,
-                             const WriteOp& op) = 0;
-};
-
-class WriteOpAnalyzerImpl : public WriteOpAnalyzer {
-public:
-    WriteOpAnalyzerImpl(Stats& stats) : _stats(stats) {}
+    struct TargetingStats {
+        int numShardsOwningChunks;
+        bool isSharded;
+        stdx::unordered_map<WriteType, stdx::unordered_set<ShardId>> targetedShardsByWriteType;
+    };
 
     /**
-     * Analyzes the given write op to determine which shards it would affect, and if it could be
-     * combined into a batch with other writes.
+     * Method to record targeting stats.
      */
-    Analysis analyze(OperationContext* opCtx,
-                     const RoutingContext& routingCtx,
-                     const WriteOp& op) override;
+    void recordTargetingStats(const std::vector<ShardEndpoint>& targetedShardEndpoints,
+                              size_t nsIdx,
+                              bool isNsSharded,
+                              int numShardsOwningChunks,
+                              WriteType writeType);
+
+    /**
+     * Method to update CurOp and NumHostsTargetedMetrics.
+     */
+    void updateMetrics(OperationContext* opCtx);
+
+    /**
+     * Helper to increment query counters for 'op'.
+     */
+    void incrementOpCounters(OperationContext* opCtx, WriteCommandRef::OpRef op);
 
 private:
-    Stats& _stats;
+    stdx::unordered_map<size_t, TargetingStats> _targetingStatsMap;
+    stdx::unordered_set<ShardId> _targetedShards;
 };
 
 }  // namespace unified_write_executor

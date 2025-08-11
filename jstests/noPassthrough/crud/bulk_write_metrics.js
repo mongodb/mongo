@@ -9,9 +9,11 @@ import {BulkWriteMetricChecker} from "jstests/libs/bulk_write_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+const uweEnabled = TestData.setParametersMongos.internalQueryUnifiedWriteExecutor;
 function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     // We are ok with the randomness here since we clearly log the state.
-    const errorsOnly = Math.random() < 0.5;
+    // TODO SERVER-105762: Remove the 'uweEnabled' check once errorsOnly is enabled.
+    const errorsOnly = uweEnabled ? false : Math.random() < 0.5;
     print(`Running on a ${isMongos ? "ShardingTest" : "ReplSetTest"} with bulkWrite = ${
         bulkWrite}, errorsOnly = ${errorsOnly} and timeseries = ${timeseries}.`);
 
@@ -133,24 +135,33 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
                                           session.getSessionId(),
                                           NumberLong(10));
 
-    metricChecker.checkMetricsWithRetries(
-        "Simple update with retry",
-        [{
-            update: 0,
-            filter: {_id: 1},
-            updateMods: {$set: {"a.$[i].b": 7}},
-            arrayFilters: [{"i.b": 6}]
-        }],
-        {
+    // TODO SERVER-104115: Enable when txn/retryable writes are supported for two phase writes.
+    if (!isMongos || !uweEnabled) {
+        metricChecker.checkMetricsWithRetries(
+            "Simple update with retry",
+            [{
+                update: 0,
+                filter: {_id: 1},
+                updateMods: {$set: {"a.$[i].b": 7}},
+                arrayFilters: [{"i.b": 6}]
+            }],
+            {
+                update: collName1,
+                updates: [{q: {_id: 1}, u: {$set: {"a.$[i].b": 7}}, arrayFilters: [{"i.b": 6}]}]
+            },
+            {
+                updated: 1,
+                updateArrayFilters: retryCount  // This is incremented even on a retry.
+            },
+            session.getSessionId(),
+            NumberLong(11));
+    } else {
+        // Execute the writes to get the same documents on Repl and Mongos for next test.
+        metricChecker.executeCommand({
             update: collName1,
             updates: [{q: {_id: 1}, u: {$set: {"a.$[i].b": 7}}, arrayFilters: [{"i.b": 6}]}]
-        },
-        {
-            updated: 1,
-            updateArrayFilters: retryCount  // This is incremented even on a retry.
-        },
-        session.getSessionId(),
-        NumberLong(11));
+        });
+    }
 
     // This one is set to have the 2 oneShard updates (each on a different shard) and 3 oneShard
     // inserts (each on a different shard). This means that the bulkWrite as a whole counts as 1 in
@@ -190,7 +201,8 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
             deleteShardField: "oneShard"
         });
 
-    if (isMongos) {
+    // TODO SERVER-104131: Enable when 'WouldChangeOwningShard' writes are supported.
+    if (isMongos && !uweEnabled) {
         // Update modifying owning shard requires a transaction or retryable write, we do not want
         // actual retries here.
         metricChecker.retryCount = 1;
@@ -204,71 +216,84 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
             session.getSessionId(),
             NumberLong(12));
     } else {
-        // To get the same documents on Repl and Mongos for next test.
+        // Execute the writes to get the same documents on Repl and Mongos for next test.
         metricChecker.executeCommand({insert: collName1, documents: [{timestamp: key4, x: 2}]});
     }
 
-    metricChecker.checkMetrics(
-        "Simple update with multi: true",
-        [{update: 0, filter: {timestamp: key4}, updateMods: {$set: {x: 3}}, multi: true}],
-        [{update: collName1, updates: [{q: {timestamp: key4}, u: {$set: {x: 3}}, multi: true}]}],
-        {updated: 2, updateCount: 1, updateManyCount: 1, updateShardField: "oneShard"});
-
-    metricChecker.checkMetrics(
-        "Multiple namespaces",
-        [
-            {insert: 0, document: {_id: 5, timestamp: key0}},
-            {insert: 1, document: {_id: 6, timestamp: key0}},
-            {update: 1, filter: {timestamp: key0}, updateMods: {$set: {x: 2}}},
-            {update: 0, filter: {timestamp: key4}, updateMods: {$set: {y: "tree"}}, multi: true},
-            {delete: 0, filter: {_id: 5, timestamp: key0}},
-        ],
-        [
-            {insert: collName1, documents: [{_id: 5, timestamp: key0}]},
-            {insert: collName2, documents: [{_id: 6, timestamp: key0}]},
-            {update: collName2, updates: [{q: {timestamp: key0}, u: {$set: {x: 2}}}]},
-            {
+    // TODO SERVER-104131: Enabled when 'multi: true' writes are supported.
+    if (!isMongos || !uweEnabled) {
+        metricChecker.checkMetrics(
+            "Simple update with multi: true",
+            [{update: 0, filter: {timestamp: key4}, updateMods: {$set: {x: 3}}, multi: true}],
+            [{
                 update: collName1,
-                updates: [{q: {timestamp: key4}, u: {$set: {y: "tree"}}, multi: true}]
+                updates: [{q: {timestamp: key4}, u: {$set: {x: 3}}, multi: true}]
+            }],
+            {updated: 2, updateCount: 1, updateManyCount: 1, updateShardField: "oneShard"});
+
+        metricChecker.checkMetrics(
+            "Multiple namespaces",
+            [
+                {insert: 0, document: {_id: 5, timestamp: key0}},
+                {insert: 1, document: {_id: 6, timestamp: key0}},
+                {update: 1, filter: {timestamp: key0}, updateMods: {$set: {x: 2}}},
+                {
+                    update: 0,
+                    filter: {timestamp: key4},
+                    updateMods: {$set: {y: "tree"}},
+                    multi: true
+                },
+                {delete: 0, filter: {_id: 5, timestamp: key0}},
+            ],
+            [
+                {insert: collName1, documents: [{_id: 5, timestamp: key0}]},
+                {insert: collName2, documents: [{_id: 6, timestamp: key0}]},
+                {update: collName2, updates: [{q: {timestamp: key0}, u: {$set: {x: 2}}}]},
+                {
+                    update: collName1,
+                    updates: [{q: {timestamp: key4}, u: {$set: {y: "tree"}}, multi: true}]
+                },
+                {delete: collName1, deletes: [{q: {_id: 5, timestamp: key0}, limit: 1}]},
+            ],
+            {
+                inserted: 2,
+                updated: 3,
+                updateManyCount: 1,
+                updateCount: 2,
+                deleted: 1,
+                updateShardField: "oneShard",
+                deleteShardField: "oneShard",
+                perNamespaceMetrics: {
+                    [namespace1]:
+                        {inserted: 1, deleted: 1, deleteCount: 1, updated: 2, updateCount: 1},
+                    [namespace2]: {inserted: 1, updateCount: 1, updated: 1}
+                }
+            });
+
+        metricChecker.checkMetrics(
+            "Simple delete with multi: true on one shard",
+            [{delete: 0, filter: {timestamp: key4}, multi: true}],
+            [{delete: collName1, deletes: [{q: {timestamp: key4}, limit: 0}]}],
+            {
+                deleted: 2,
+                deleteCount: 1,
+                deleteManyCount: 1,
+                deleteShardField: "oneShard",
+                singleDeleteForBulkWrite: true
+            });
+
+        metricChecker.checkMetrics(
+            "Simple delete with multi: true across shards",
+            [{delete: 0, filter: {_id: {$lt: 100}}, multi: true}],
+            [{delete: collName1, deletes: [{q: {_id: {$lt: 100}}, limit: 0}]}],
+            {
+                deleted: 3,
+                deleteCount: 1,
+                deleteManyCount: 1,
+                deleteShardField: "allShards",
             },
-            {delete: collName1, deletes: [{q: {_id: 5, timestamp: key0}, limit: 1}]},
-        ],
-        {
-            inserted: 2,
-            updated: 3,
-            updateManyCount: 1,
-            updateCount: 2,
-            deleted: 1,
-            updateShardField: "oneShard",
-            deleteShardField: "oneShard",
-            perNamespaceMetrics: {
-                [namespace1]: {inserted: 1, deleted: 1, deleteCount: 1, updated: 2, updateCount: 1},
-                [namespace2]: {inserted: 1, updateCount: 1, updated: 1}
-            }
-        });
-
-    metricChecker.checkMetrics("Simple delete with multi: true on one shard",
-                               [{delete: 0, filter: {timestamp: key4}, multi: true}],
-                               [{delete: collName1, deletes: [{q: {timestamp: key4}, limit: 0}]}],
-                               {
-                                   deleted: 2,
-                                   deleteCount: 1,
-                                   deleteManyCount: 1,
-                                   deleteShardField: "oneShard",
-                                   singleDeleteForBulkWrite: true
-                               });
-
-    metricChecker.checkMetrics(
-        "Simple delete with multi: true across shards",
-        [{delete: 0, filter: {_id: {$lt: 100}}, multi: true}],
-        [{delete: collName1, deletes: [{q: {_id: {$lt: 100}}, limit: 0}]}],
-        {
-            deleted: 3,
-            deleteCount: 1,
-            deleteManyCount: 1,
-            deleteShardField: "allShards",
-        },
-    );
+        );
+    }
 
     coll.drop();
     coll2.drop();
@@ -306,7 +331,11 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     const retryCount = 3;
     for (const bulkWrite of [false, true]) {
         for (const timeseries of [false, true]) {
-            runTest(true /* isMongos */, st, bulkWrite, retryCount, timeseries);
+            // Skip this if we are using the UWE against a timeseries collection.
+            // TODO SERVER-104139: Add timeseries support to the UWE.
+            if (!timeseries || !uweEnabled) {
+                runTest(true /* isMongos */, st, bulkWrite, retryCount, timeseries);
+            }
         }
     }
 

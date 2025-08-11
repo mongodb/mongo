@@ -57,7 +57,7 @@ selector:
     - jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_with_resharding.js
     # TODO: SERVER-104115 try enabling when retryable writes are implemented.
     - jstests/concurrency/fsm_workloads/query/remove/remove_single_document.js
-    # TODO: SERVER-104136 enable when metrics are supported.
+    # TODO: SERVER-107644 enable when sample id is supported.
     - jstests/concurrency/fsm_workloads/analyze_shard_key.js
 
   exclude_with_any_tags:

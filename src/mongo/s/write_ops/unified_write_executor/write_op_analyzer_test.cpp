@@ -43,8 +43,9 @@
 namespace mongo {
 namespace unified_write_executor {
 namespace {
-struct WriteOpAnalyzerTest : public ShardingTestFixture {
-    WriteOpAnalyzer analyzer;
+struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
+    Stats stats;
+    WriteOpAnalyzerImpl analyzer = WriteOpAnalyzerImpl(stats);
     const ShardId kShard1Name = ShardId("shard1");
     const ShardId kShard2Name = ShardId("shard2");
     const NamespaceString kUntrackedNss =
@@ -120,7 +121,7 @@ struct WriteOpAnalyzerTest : public ShardingTestFixture {
 };
 
 
-TEST_F(WriteOpAnalyzerTest, SingleInserts) {
+TEST_F(WriteOpAnalyzerTestImpl, SingleInserts) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -147,7 +148,7 @@ TEST_F(WriteOpAnalyzerTest, SingleInserts) {
     rtx->onRequestSentForNss(nss);
 }
 
-TEST_F(WriteOpAnalyzerTest, MultiNSSingleInserts) {
+TEST_F(WriteOpAnalyzerTestImpl, MultiNSSingleInserts) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test", "coll2");
@@ -179,7 +180,7 @@ TEST_F(WriteOpAnalyzerTest, MultiNSSingleInserts) {
     rtx->onRequestSentForNss(nss2);
 }
 
-TEST_F(WriteOpAnalyzerTest, EqUpdateOnes) {
+TEST_F(WriteOpAnalyzerTestImpl, EqUpdateOnes) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -210,7 +211,7 @@ TEST_F(WriteOpAnalyzerTest, EqUpdateOnes) {
     rtx->onRequestSentForNss(nss);
 }
 
-TEST_F(WriteOpAnalyzerTest, RangeUpdateOnes) {
+TEST_F(WriteOpAnalyzerTestImpl, RangeUpdateOnes) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -239,7 +240,7 @@ TEST_F(WriteOpAnalyzerTest, RangeUpdateOnes) {
     rtx->onRequestSentForNss(nss);
 }
 
-TEST_F(WriteOpAnalyzerTest, RangeUpdateManys) {
+TEST_F(WriteOpAnalyzerTestImpl, RangeUpdateManys) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -278,7 +279,7 @@ TEST_F(WriteOpAnalyzerTest, RangeUpdateManys) {
     rtx->onRequestSentForNss(nss);
 }
 
-TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateOnes) {
+TEST_F(WriteOpAnalyzerTestImpl, SingleShardRangeUpdateOnes) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -309,7 +310,7 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateOnes) {
     rtx->onRequestSentForNss(nss);
 }
 
-TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateManys) {
+TEST_F(WriteOpAnalyzerTestImpl, SingleShardRangeUpdateManys) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -350,7 +351,7 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateManys) {
     rtx->onRequestSentForNss(nss);
 }
 
-TEST_F(WriteOpAnalyzerTest, EqDeletes) {
+TEST_F(WriteOpAnalyzerTestImpl, EqDeletes) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -378,7 +379,7 @@ TEST_F(WriteOpAnalyzerTest, EqDeletes) {
 }
 
 
-TEST_F(WriteOpAnalyzerTest, RangeDeleteOnes) {
+TEST_F(WriteOpAnalyzerTestImpl, RangeDeleteOnes) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -403,7 +404,7 @@ TEST_F(WriteOpAnalyzerTest, RangeDeleteOnes) {
     rtx->onRequestSentForNss(nss);
 }
 
-TEST_F(WriteOpAnalyzerTest, RangeDeleteManys) {
+TEST_F(WriteOpAnalyzerTestImpl, RangeDeleteManys) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -438,7 +439,7 @@ TEST_F(WriteOpAnalyzerTest, RangeDeleteManys) {
     rtx->onRequestSentForNss(nss);
 }
 
-TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteOnes) {
+TEST_F(WriteOpAnalyzerTestImpl, SingleShardRangeDeleteOnes) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -465,7 +466,7 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteOnes) {
     rtx->onRequestSentForNss(nss);
 }
 
-TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteManys) {
+TEST_F(WriteOpAnalyzerTestImpl, SingleShardRangeDeleteManys) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -502,7 +503,7 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteManys) {
     rtx->onRequestSentForNss(nss);
 }
 
-TEST_F(WriteOpAnalyzerTest, UnshardedUntracked) {
+TEST_F(WriteOpAnalyzerTestImpl, UnshardedUntracked) {
     auto rtx = createRoutingContextUnsharded();
 
     BulkWriteCommandRequest request(
@@ -541,7 +542,7 @@ TEST_F(WriteOpAnalyzerTest, UnshardedUntracked) {
     rtx->onRequestSentForNss(kUnsplittableNss);
 }
 
-TEST_F(WriteOpAnalyzerTest, Unsplittable) {
+TEST_F(WriteOpAnalyzerTestImpl, Unsplittable) {
     auto rtx = createRoutingContextUnsharded();
 
     BulkWriteCommandRequest request(

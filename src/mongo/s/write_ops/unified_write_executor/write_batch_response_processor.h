@@ -81,16 +81,20 @@ public:
         CollectionsToCreate collsToCreate{};    // Collections to be explicitly created
     };
 
-    explicit WriteBatchResponseProcessor(WriteCommandRef cmdRef, bool isNonVerbose = false)
-        : _cmdRef(cmdRef), _isNonVerbose(isNonVerbose) {}
+    explicit WriteBatchResponseProcessor(WriteCommandRef cmdRef,
+                                         Stats& stats,
+                                         bool isNonVerbose = false)
+        : _cmdRef(cmdRef), _stats(stats), _isNonVerbose(isNonVerbose) {}
 
     explicit WriteBatchResponseProcessor(const BatchedCommandRequest& request,
+                                         Stats& stats,
                                          bool isNonVerbose = false)
-        : WriteBatchResponseProcessor(WriteCommandRef{request}, isNonVerbose) {}
+        : WriteBatchResponseProcessor(WriteCommandRef{request}, stats, isNonVerbose) {}
 
     explicit WriteBatchResponseProcessor(const BulkWriteCommandRequest& request,
+                                         Stats& stats,
                                          bool isNonVerbose = false)
-        : WriteBatchResponseProcessor(WriteCommandRef{request}, isNonVerbose) {}
+        : WriteBatchResponseProcessor(WriteCommandRef{request}, stats, isNonVerbose) {}
 
     /**
      * Process a response from each shard, handle errors, and collect statistics. Returns an
@@ -104,11 +108,11 @@ public:
      * Turns gathered statistics into a command reply for the client. Consumes any pending reply
      * items.
      */
-    WriteCommandResponse generateClientResponse();
+    WriteCommandResponse generateClientResponse(OperationContext* opCtx);
 
     BatchedCommandResponse generateClientResponseForBatchedCommand();
 
-    BulkWriteCommandReply generateClientResponseForBulkWriteCommand();
+    BulkWriteCommandReply generateClientResponseForBulkWriteCommand(OperationContext* opCtx);
 
 private:
     Result _onWriteBatchResponse(OperationContext* opCtx,
@@ -142,7 +146,6 @@ private:
                                                    const std::vector<BulkWriteReplyItem>&,
                                                    std::vector<WriteOp>&& toRetry);
 
-
     /**
      * Adds a BulkReplyItem with the opId and status to '_results' and increments '_nErrors'. Used
      * when we need to abort the whole batch due to an error when we're in a transaction.
@@ -157,7 +160,8 @@ private:
         return retriedStmtIds;
     };
 
-    const WriteCommandRef _cmdRef;
+    WriteCommandRef _cmdRef;
+    Stats& _stats;
     const bool _isNonVerbose;
     size_t _nErrors{0};
     size_t _nInserted{0};

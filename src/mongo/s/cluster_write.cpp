@@ -48,7 +48,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
 namespace cluster {
 
@@ -91,6 +90,8 @@ void write(OperationContext* opCtx,
     // TODO SERVER-104145: Enable insert/update/delete commands from internal clients.
     if (internalQueryUnifiedWriteExecutor.load()) {
         *response = unified_write_executor::write(opCtx, request);
+        // SERVER-109104 This can be removed once we delete BatchWriteExec.
+        stats->markIgnore();
     } else {
         BatchWriteExec::executeBatch(opCtx, targeter, request, response, stats);
     }
