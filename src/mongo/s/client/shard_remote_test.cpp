@@ -99,6 +99,17 @@ protected:
                               BSON("unused" << "cmd"),
                               Shard::RetryPolicy::kNoRetry));
     }
+
+    void runDummyCommandOnShardWithMaxTimeMS(ShardId shardId, Milliseconds maxTimeMS) {
+        auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), shardId));
+        uassertStatusOK(
+            shard->runCommand(operationContext(),
+                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                              DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+                              BSON("unused" << "cmd"),
+                              maxTimeMS,
+                              Shard::RetryPolicy::kNoRetry));
+    }
 };
 
 TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigStepdown) {
@@ -152,6 +163,46 @@ TEST_F(ShardRemoteTest, FindOnConfigRespectsDefaultConfigCommandTimeout) {
     onCommand([&](const executor::RemoteCommandRequest& request) {
         ASSERT(request.cmdObj.hasField("maxTimeMS")) << request;
         ASSERT_EQ(request.cmdObj["maxTimeMS"].Long(), timeoutMs);
+        return error;
+    });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::CommandFailed);
+}
+
+TEST_F(ShardRemoteTest, TimeoutCodeSetToMaxTimeMSExpiredWhenMaxTimeMSSet) {
+    auto targetedNode = ShardId("config");
+    auto timeoutMs = 100;
+
+    ASSERT_EQ(0UL, configTargeter()->getAndClearMarkedDownHosts().size());
+    auto future = launchAsync(
+        [&] { runDummyCommandOnShardWithMaxTimeMS(targetedNode, Milliseconds(timeoutMs)); });
+
+    // Assert that the timeout on the request is set to timeoutMs and the timeoutCode on the request
+    // is set to maxTimeMSExpired. We don't actually care about the response here, so use a dummy
+    // error.
+    auto error = Status(ErrorCodes::CommandFailed, "Dummy error");
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ(request.timeout, Milliseconds(timeoutMs));
+        ASSERT(request.timeoutCode);
+        ASSERT_EQ(*request.timeoutCode, ErrorCodes::MaxTimeMSExpired);
+        return error;
+    });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::CommandFailed);
+}
+
+TEST_F(ShardRemoteTest, TimeoutCodeUnsetWhenMaxTimeMSNotSet) {
+    auto targetedNode = ShardId("config");
+
+    ASSERT_EQ(0UL, configTargeter()->getAndClearMarkedDownHosts().size());
+    auto future = launchAsync([&] { runDummyCommandOnShard(targetedNode); });
+
+    // Assert that the timeout on the request is set to kNoTimeout, and the timeoutCode on the
+    // request is not set. We don't actually care about the response here, so use a dummy error.
+    auto error = Status(ErrorCodes::CommandFailed, "Dummy error");
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ(request.timeout, executor::RemoteCommandRequest::kNoTimeout);
+        ASSERT(!request.timeoutCode);
         return error;
     });
 

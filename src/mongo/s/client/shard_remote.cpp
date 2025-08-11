@@ -528,14 +528,17 @@ StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
 
     const Milliseconds requestTimeout =
         std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeMSOverride);
+    auto hasMaxTimeMS = requestTimeout < Milliseconds::max();
 
-    const RemoteCommandRequest request(
-        asyncHandle.hostTargetted,
-        dbName,
-        appendMaxTimeToCmdObj(requestTimeout, cmdObj),
-        _appendMetadataForCommand(opCtx, readPref),
-        opCtx,
-        requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
+    RemoteCommandRequest request(asyncHandle.hostTargetted,
+                                 dbName,
+                                 appendMaxTimeToCmdObj(requestTimeout, cmdObj),
+                                 _appendMetadataForCommand(opCtx, readPref),
+                                 opCtx,
+                                 hasMaxTimeMS ? requestTimeout : RemoteCommandRequest::kNoTimeout);
+
+    if (hasMaxTimeMS)
+        request.timeoutCode = boost::make_optional<ErrorCodes::Error>(ErrorCodes::MaxTimeMSExpired);
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto swHandle = executor->scheduleRemoteCommand(request, cb);
