@@ -379,6 +379,9 @@ function waitUntilRangeDeletionCompletes(shard) {
     assert.soon(() => {
         return shard.getDB("config").getCollection("rangeDeletions").find().toArray().length == 0;
     });
+
+    // Wait for the range deletion to be replicated to all the secondaries.
+    shard.rs.awaitReplication();
 }
 
 function getServerStatusCounters(donorShard, targetShard) {
