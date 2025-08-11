@@ -232,3 +232,9 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagEnableReplicasetTransitionToCSRS
         default: false
         fcv_gated: true
+    # TODO (SERVER-109004): remove feature flag once 9.0 becomes last LTS.
+    featureFlagPreventDirectShardDDLsDuringPromotion:
+        description: "Enable the prevention of direct shard connection DDL operations during addShard"
+        cpp_varname: feature_flags::gFeatureFlagPreventDirectShardDDLsDuringPromotion
+        default: false
+        fcv_gated: true
