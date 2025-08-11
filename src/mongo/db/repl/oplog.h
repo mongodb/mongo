@@ -279,6 +279,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                              bool isDataConsistent,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {});
 
+Status applyContainerOperation(OperationContext* opCtx,
+                               const ApplierOperation& op,
+                               OplogApplication::Mode oplogApplicationMode);
+
 /**
  * Take a command op and apply it locally
  * Used for applying from an oplog and for applyOps command.

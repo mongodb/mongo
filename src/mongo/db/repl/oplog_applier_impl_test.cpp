@@ -2092,6 +2092,43 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteAfterLaterRetryableUpdate
     ASSERT_BSONOBJ_EQ(updatedDoc, unittest::assertGet(collectionReader.next()));
 }
 
+TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerOperations) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    const char k1[] = "K";
+    const char v1[] = "V";
+
+    BSONArray innerOps =
+        BSON_ARRAY(BSON("op" << "ci"
+                             << "ns" << nss.ns_forTest() << "container" << "t_ident"
+                             << "o"
+                             << BSON("k" << BSONBinData(k1, 1, BinDataGeneral) << "v"
+                                         << BSONBinData(v1, 1, BinDataGeneral)))
+                   << BSON("op" << "cd"
+                                << "ns" << nss.ns_forTest() << "container" << "t_ident"
+                                << "o" << BSON("k" << BSONBinData(k1, 1, BinDataGeneral))));
+
+    BSONObj applyOpsCmd = BSON("applyOps" << innerOps);
+    auto entry = makeCommandOplogEntry(nextOpTime(), nss, applyOpsCmd, boost::none, boost::none);
+
+    ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
+}
+
+TEST_F(OplogApplierImplTest, ApplyContainerOperations) {
+    auto nss = NamespaceString::createNamespaceString_forTest("test");
+    StringData containerIdent = "test";
+    auto k = BSONBinData("K", 1, BinDataGeneral);
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+    auto insertEntry = makeContainerInsertOplogEntry(nextOpTime(), nss, containerIdent, k, v);
+    auto deleteEntry = makeContainerDeleteOplogEntry(nextOpTime(), nss, containerIdent, k);
+
+    ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), ApplierOperation{&insertEntry}, OplogApplication::Mode::kSecondary));
+
+    ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), ApplierOperation{&deleteEntry}, OplogApplication::Mode::kSecondary));
+}
+
 class MultiOplogEntryOplogApplierImplTest : public OplogApplierImplTest {
 public:
     MultiOplogEntryOplogApplierImplTest()

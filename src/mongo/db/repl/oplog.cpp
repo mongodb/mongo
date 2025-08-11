@@ -2074,6 +2074,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
     return Status::OK();
 }
 
+Status applyContainerOperation(OperationContext* opCtx,
+                               const ApplierOperation& op,
+                               OplogApplication::Mode oplogApplicationMode) {
+    // TODO (SERVER-107047): Apply the container ops. If this function assumes all necessary
+    // resources for it have been acquired, it should also be renamed to
+    // `applyContainerOperation_inlock` to conform to the existing pattern in this file.
+    return Status::OK();
+}
+
 Status applyCommand_inlock(OperationContext* opCtx,
                            const ApplierOperation& op,
                            OplogApplication::Mode mode) {

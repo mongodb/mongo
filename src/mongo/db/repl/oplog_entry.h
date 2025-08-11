@@ -441,6 +441,30 @@ public:
     ReplOperation toReplOperation() const noexcept;
 };
 
+struct DurableOplogEntryParams {
+    OpTime opTime;
+    OpTypeEnum opType;
+    NamespaceString nss;
+    boost::optional<StringData> container;
+    boost::optional<UUID> uuid;
+    boost::optional<bool> fromMigrate;
+    boost::optional<bool> checkExistenceForDiffInsert;
+    boost::optional<VersionContext> versionContext;
+    int version;
+    BSONObj oField;
+    boost::optional<BSONObj> o2Field;
+    OperationSessionInfo sessionInfo;
+    boost::optional<bool> isUpsert;
+    Date_t wallClockTime;
+    std::vector<StmtId> statementIds;
+    boost::optional<OpTime> prevWriteOpTimeInTransaction;
+    boost::optional<OpTime> preImageOpTime;
+    boost::optional<OpTime> postImageOpTime;
+    boost::optional<ShardId> destinedRecipient;
+    boost::optional<Value> idField;
+    boost::optional<RetryImageEnum> needsRetryImage;
+};
+
 /**
  * A parsed oplog entry that privately inherits from the MutableOplogEntry.
  * This class is immutable. All setters are hidden.
@@ -450,6 +474,7 @@ public:
     // Make field names accessible.
     using MutableOplogEntry::k_idFieldName;
     using MutableOplogEntry::kCheckExistenceForDiffInsertFieldName;
+    using MutableOplogEntry::kContainerFieldName;
     using MutableOplogEntry::kDestinedRecipientFieldName;
     using MutableOplogEntry::kDurableReplOperationFieldName;
     using MutableOplogEntry::kFromMigrateFieldName;
@@ -479,6 +504,7 @@ public:
     // Make serialize() and getters accessible.
     using MutableOplogEntry::get_id;
     using MutableOplogEntry::getCheckExistenceForDiffInsert;
+    using MutableOplogEntry::getContainer;
     using MutableOplogEntry::getDestinedRecipient;
     using MutableOplogEntry::getDurableReplOperation;
     using MutableOplogEntry::getFromMigrate;
@@ -537,6 +563,8 @@ public:
                       const boost::optional<ShardId>& destinedRecipient,
                       const boost::optional<Value>& idField,
                       const boost::optional<RetryImageEnum>& needsRetryImage);
+
+    explicit DurableOplogEntry(const DurableOplogEntryParams& p);
 
     // DEPRECATED: This constructor can throw. Use static parse method instead.
     explicit DurableOplogEntry(BSONObj raw);
@@ -647,6 +675,12 @@ public:
      */
     static bool isCrudOpType(OpTypeEnum opType);
     bool isCrudOpType() const;
+
+    /**
+     * Returns true if the oplog entry is for a container operation.
+     */
+    static bool isContainerOpType(OpTypeEnum opType);
+    bool isContainerOpType() const;
 
     /**
      * Returns true if the oplog entry is for an Update or Delete operation.
@@ -887,6 +921,7 @@ public:
 
 
     bool isCrudOpType() const;
+    bool isContainerOpType() const;
     bool isUpdateOrDelete() const;
     bool isIndexCommandType() const;
     bool shouldPrepare() const;

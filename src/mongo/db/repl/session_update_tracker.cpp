@@ -228,6 +228,8 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::_updateSessionInf
 std::vector<OplogEntry> SessionUpdateTracker::_flush(const OplogEntry& entry) {
     switch (entry.getOpType()) {
         case OpTypeEnum::kInsert:
+        case OpTypeEnum::kContainerInsert:
+        case OpTypeEnum::kContainerDelete:
         case OpTypeEnum::kNoop:
             // Session table is keyed by session id, so nothing to do here because
             // it would have triggered a unique index violation in the primary if

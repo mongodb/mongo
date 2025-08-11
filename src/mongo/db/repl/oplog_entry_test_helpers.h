@@ -80,6 +80,18 @@ OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToUpdate,
                                         const BSONObj& updatedDocument);
+
+OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
+                                         BSONBinData key,
+                                         BSONBinData value);
+
+OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
+                                         BSONBinData key);
+
 /**
  * Creates an index creation entry with given optime and namespace.
  */

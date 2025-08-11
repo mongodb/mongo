@@ -587,6 +587,15 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
             }
         });
         return status;
+    } else if (DurableOplogEntry::isContainerOpType(opType)) {
+        return writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_container", nss, [&] {
+            // TODO (SERVER-107047): If this function is implemented with the assumption that
+            // resources for it were acquired prior to calling it, then they will need to be
+            // acquired here.
+            Status status = applyContainerOperation(opCtx, op, oplogApplicationMode);
+            incrementOpsAppliedStats();
+            return status;
+        });
     } else if (opType == OpTypeEnum::kCommand) {
         auto status =
             writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_command", nss, [&] {

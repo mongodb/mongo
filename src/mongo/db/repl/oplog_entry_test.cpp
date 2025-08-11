@@ -80,6 +80,7 @@ TEST(OplogEntryTest, Update) {
     ASSERT_FALSE(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
     ASSERT(entry.isCrudOpType());
+    ASSERT_FALSE(entry.isContainerOpType());
     ASSERT_FALSE(entry.shouldPrepare());
     ASSERT_BSONOBJ_EQ(entry.getIdElement().wrap("_id"), doc);
     ASSERT_BSONOBJ_EQ(entry.getOperationToApply(), update);
@@ -96,6 +97,7 @@ TEST(OplogEntryTest, Insert) {
     ASSERT_FALSE(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
     ASSERT(entry.isCrudOpType());
+    ASSERT_FALSE(entry.isContainerOpType());
     ASSERT_FALSE(entry.shouldPrepare());
     ASSERT_BSONOBJ_EQ(entry.getIdElement().wrap("_id"), BSON("_id" << docId));
     ASSERT_BSONOBJ_EQ(entry.getOperationToApply(), doc);
@@ -112,6 +114,7 @@ TEST(OplogEntryTest, Delete) {
     ASSERT_FALSE(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
     ASSERT(entry.isCrudOpType());
+    ASSERT_FALSE(entry.isContainerOpType());
     ASSERT_FALSE(entry.shouldPrepare());
     ASSERT_BSONOBJ_EQ(entry.getIdElement().wrap("_id"), doc);
     ASSERT_BSONOBJ_EQ(entry.getOperationToApply(), doc);
@@ -139,6 +142,7 @@ TEST(OplogEntryTest, Create) {
     ASSERT(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
     ASSERT_FALSE(entry.isCrudOpType());
+    ASSERT_FALSE(entry.isContainerOpType());
     ASSERT_FALSE(entry.shouldPrepare());
     ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc, entry.getOperationToApply());
     ASSERT(entry.getCommandType() == OplogEntry::CommandType::kCreate);
@@ -175,6 +179,7 @@ TEST(OplogEntryTest, CreateWithCatalogIdentifier) {
     ASSERT(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
     ASSERT_FALSE(entry.isCrudOpType());
+    ASSERT_FALSE(entry.isContainerOpType());
     ASSERT_FALSE(entry.shouldPrepare());
     ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc, entry.getOperationToApply());
     ASSERT(entry.getCommandType() == OplogEntry::CommandType::kCreate);
@@ -183,6 +188,121 @@ TEST(OplogEntryTest, CreateWithCatalogIdentifier) {
     ASSERT(!entry.getTid());
     ASSERT(entry.getObject2());
     ASSERT_BSONOBJ_EQ(*entry.getObject2(), oplogEntryObject2Doc);
+}
+
+TEST(OplogEntryTest, ContainerInsert) {
+    StringData containerIdent = "container_ident";
+    auto key = BSONBinData("k", 1, BinDataType::BinDataGeneral);
+    auto value = BSONBinData("v", 1, BinDataType::BinDataGeneral);
+    auto entry = makeContainerInsertOplogEntry(entryOpTime, nss, containerIdent, key, value);
+
+    ASSERT_FALSE(entry.isCommand());
+    ASSERT_FALSE(entry.isPartialTransaction());
+    ASSERT_FALSE(entry.isCrudOpType());
+    ASSERT_TRUE(entry.isContainerOpType());
+    ASSERT_FALSE(entry.shouldPrepare());
+    ASSERT_BSONOBJ_EQ(entry.getOperationToApply(),
+                      BSON("k" << BSONBinData(key.data, key.length, key.type) << "v"
+                               << BSONBinData(value.data, value.length, value.type)));
+    ASSERT_EQ(entry.getCommandType(), OplogEntry::CommandType::kNotCommand);
+    ASSERT_EQ(entry.getOpTime(), entryOpTime);
+    ASSERT_FALSE(entry.getTid());
+}
+
+TEST(OplogEntryTest, ContainerDelete) {
+    StringData containerIdent = "container_ident";
+    auto key = BSONBinData("k", 1, BinDataType::BinDataGeneral);
+    auto entry = makeContainerDeleteOplogEntry(entryOpTime, nss, containerIdent, key);
+
+    ASSERT_FALSE(entry.isCommand());
+    ASSERT_FALSE(entry.isPartialTransaction());
+    ASSERT_FALSE(entry.isCrudOpType());
+    ASSERT_TRUE(entry.isContainerOpType());
+    ASSERT_FALSE(entry.shouldPrepare());
+    ASSERT_BSONOBJ_EQ(entry.getOperationToApply(),
+                      BSON("k" << BSONBinData(key.data, key.length, key.type)));
+    ASSERT_EQ(entry.getCommandType(), OplogEntry::CommandType::kNotCommand);
+    ASSERT_EQ(entry.getOpTime(), entryOpTime);
+    ASSERT_FALSE(entry.getTid());
+}
+
+TEST(OplogEntryTest, ContainerInsertParse) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+
+    const std::string ident = "test_ident";
+
+    const BSONObj oplogBson = [&] {
+        BSONObjBuilder bob;
+        bob.append("ts", Timestamp(1, 1));
+        bob.append("t", 1LL);
+        bob.append("op", "ci");
+        bob.append("ns", nss.ns_forTest());
+        bob.append("container", ident);
+        bob.append("wall", Date_t());
+
+        BSONObjBuilder oBuilder(bob.subobjStart("o"));
+        oBuilder.appendBinData("k", 3, BinDataGeneral, "abc");
+        oBuilder.appendBinData("v", 4, BinDataGeneral, "defg");
+        oBuilder.done();
+
+        return bob.obj();
+    }();
+
+    auto entry = unittest::assertGet(DurableOplogEntry::parse(oplogBson));
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerInsert);
+    ASSERT_EQ(entry.getNss(), nss);
+    ASSERT_TRUE(entry.getContainer());
+    ASSERT_EQ(*entry.getContainer(), ident);
+}
+
+TEST(OplogEntryTest, ContainerDeleteParse) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+
+    const std::string ident = "test_ident";
+
+    const BSONObj oplogBson = [&] {
+        BSONObjBuilder bob;
+        bob.append("ts", Timestamp(1, 1));
+        bob.append("t", 1LL);
+        bob.append("op", "cd");
+        bob.append("ns", nss.ns_forTest());
+        bob.append("container", ident);
+        bob.append("wall", Date_t());
+
+        BSONObjBuilder oBuilder(bob.subobjStart("o"));
+        oBuilder.appendBinData("k", 3, BinDataGeneral, "abc");
+        oBuilder.done();
+
+        return bob.obj();
+    }();
+
+    auto entry = unittest::assertGet(DurableOplogEntry::parse(oplogBson));
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerDelete);
+    ASSERT_EQ(entry.getNss(), nss);
+    ASSERT_TRUE(entry.getContainer());
+    ASSERT_EQ(*entry.getContainer(), ident);
+}
+
+TEST(OplogEntryTest, ContainerOpMissingContainer) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+
+    const BSONObj oplogBson = [&] {
+        BSONObjBuilder bob;
+        bob.append("ts", Timestamp(1, 1));
+        bob.append("t", 1LL);
+        bob.append("op", "ci");
+        bob.append("ns", nss.ns_forTest());
+        bob.append("wall", Date_t());
+        BSONObjBuilder oBuilder(bob.subobjStart("o"));
+        oBuilder.appendBinData("k", 3, BinDataGeneral, "abc");
+        oBuilder.appendBinData("v", 4, BinDataGeneral, "defg");
+        oBuilder.done();
+
+        return bob.obj();
+    }();
+
+    auto result = DurableOplogEntry::parse(oplogBson);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
 }
 
 TEST(OplogEntryTest, ApplyOpsNotInSession) {
@@ -391,8 +511,7 @@ TEST(OplogEntryTest, InsertIncludesTidField) {
     const BSONObj doc = BSON("_id" << docId << "a" << 5);
     TenantId tid(OID::gen());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "foo", "bar");
-    const auto entry =
-        makeOplogEntry(entryOpTime, OpTypeEnum::kInsert, nss, doc, boost::none, {}, Date_t::now());
+    const auto entry = makeInsertDocumentOplogEntry(entryOpTime, nss, doc);
 
     ASSERT(entry.getTid());
     ASSERT_EQ(*entry.getTid(), tid);
@@ -827,15 +946,8 @@ TEST(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 // The caller is expected to only call parse on command entries with a command type of
 // startIndexBuild, commitIndexBuild, or abortIndexBuild.
 DEATH_TEST(OplogEntryTest, ParseNonCommandOperation, "kCommand") {
-    auto entry = makeOplogEntry(entryOpTime,
-                                OpTypeEnum::kInsert,  // should be kCommand
-                                nss.getCommandNS(),
-                                BSONObj(),
-                                boost::none,
-                                {} /* sessionInfo */,
-                                Date_t() /* wallClockTime*/,
-                                {} /* stmtIds */,
-                                UUID::gen());
+    // Deliberately create a NON-command op in the command namespace.
+    auto entry = makeInsertDocumentOplogEntry(entryOpTime, nss.getCommandNS(), BSONObj{});
     IndexBuildOplogEntry::parse(entry).getValue();
 }
 

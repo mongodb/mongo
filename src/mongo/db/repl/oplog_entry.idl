@@ -53,6 +53,8 @@ enums:
             kInsert: "i"
             kUpdate: "u"
             kDelete: "d"
+            kContainerInsert: "ci"
+            kContainerDelete: "cd"
             kNoop: "n"
     RetryImage:
         description:
@@ -136,6 +138,13 @@ structs:
                 type: uuid
                 optional: true
                 description: "The UUID of the collection"
+            container:
+                cpp_name: container
+                type: string
+                optional: true
+                description:
+                    "The ident of the container targeted by the container op. Used for op
+                    types 'ci' and 'cd'."
             o:
                 cpp_name: object
                 type: object

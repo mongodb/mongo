@@ -260,16 +260,14 @@ OplogEntry IdempotencyTest::prepare(LogicalSessionId lsid,
     OperationSessionInfo info;
     info.setSessionId(lsid);
     info.setTxnNumber(txnNum);
-    return makeOplogEntry(nextOpTime(),
-                          OpTypeEnum::kCommand,
-                          _nss.getCommandNS(),
-                          BSON("applyOps" << ops << "prepare" << true),
-                          boost::none /* o2 */,
-                          info /* sessionInfo */,
-                          Date_t::min() /* wallClockTime -- required but not checked */,
-                          {stmtId},
-                          boost::none /* uuid */,
-                          prevOpTime);
+    return makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        nextOpTime(),
+        _nss,
+        BSON("applyOps" << ops << "prepare" << true),
+        lsid,
+        txnNum,
+        {stmtId},
+        prevOpTime);
 }
 
 OplogEntry IdempotencyTest::commitUnprepared(LogicalSessionId lsid,
@@ -314,16 +312,14 @@ OplogEntry IdempotencyTest::partialTxn(LogicalSessionId lsid,
     OperationSessionInfo info;
     info.setSessionId(lsid);
     info.setTxnNumber(txnNum);
-    return makeOplogEntry(nextOpTime(),
-                          OpTypeEnum::kCommand,
-                          _nss.getCommandNS(),
-                          BSON("applyOps" << ops << "partialTxn" << true),
-                          boost::none /* o2 */,
-                          info /* sessionInfo */,
-                          Date_t::min() /* wallClockTime -- required but not checked */,
-                          {stmtId},
-                          boost::none /* uuid */,
-                          prevOpTime);
+    return makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        nextOpTime(),
+        _nss,
+        BSON("applyOps" << ops << "partialTxn" << true),
+        lsid,
+        txnNum,
+        {stmtId},
+        prevOpTime);
 }
 
 std::string IdempotencyTest::computeDataHash(const CollectionPtr& collection) {
