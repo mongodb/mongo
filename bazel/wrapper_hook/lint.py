@@ -25,15 +25,18 @@ def create_build_files_in_new_js_dirs() -> None:
                     js_files = [f for f in os.listdir(full_dir) if f.endswith(".js")]
                     if js_files:
                         with open(build_file_path, "w", encoding="utf-8") as build_file:
-                            build_file.write("""load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
+                            build_file.write("""load("//bazel:mongo_js_rules.bzl", "mongo_js_library", "all_subpackage_javascript_files")
+
+package(default_visibility = ["//visibility:public"])
 
 mongo_js_library(
     name = "all_javascript_files",
     srcs = glob([
         "*.js",
     ]),
-    visibility = ["//visibility:public"],
 )
+
+all_subpackage_javascript_files()
 """)
                         print(f"Created BUILD.bazel in {full_dir}")
 

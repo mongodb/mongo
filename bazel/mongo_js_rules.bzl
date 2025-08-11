@@ -10,3 +10,14 @@ def mongo_js_library(*args, **kwargs):
         "//conditions:default": [],
     })
     js_library(*args, **kwargs)
+
+def all_subpackage_javascript_files(name = "all_subpackage_javascript_files"):
+    """Creates a js_library containing all .js sources from all Bazel subpackages that also contain the all_subpackage_javascript_files macro."""
+    subpackage_targets = ["//{}/{}:{}".format(native.package_name(), subpackage, name) for subpackage in native.subpackages(include = ["**"], allow_empty = True)]
+
+    mongo_js_library(
+        name = name,
+        srcs = native.glob([
+            "*.js",
+        ]) + subpackage_targets,
+    )

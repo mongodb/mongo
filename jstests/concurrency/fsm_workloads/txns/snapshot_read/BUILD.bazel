@@ -1,4 +1,4 @@
-load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
+load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files", "mongo_js_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -8,3 +8,5 @@ mongo_js_library(
         "*.js",
     ]),
 )
+
+all_subpackage_javascript_files()
