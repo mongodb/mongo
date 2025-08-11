@@ -680,6 +680,9 @@ routing_and_topology:
     - src/mongo/s/read_write_concern_defaults_cache_lookup_mongos*
     - src/mongo/s/router_uptime_reporter*
 
+    # change streams
+    - src/mongo/s/change_streams*
+
 sharding_clients:
   meta:
     slack: server-sharding

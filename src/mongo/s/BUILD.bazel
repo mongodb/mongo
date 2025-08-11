@@ -998,6 +998,7 @@ mongo_cc_library(
         "//src/mongo/util:periodic_runner_factory",
         "//src/mongo/util:signal_handlers",
         "//src/mongo/s/client:sharding_client",
+        "//src/mongo/s/change_streams",
         "//src/mongo/s/commands:cluster_commands",
         "//src/mongo/s/commands:cluster_commands_common",
         "load_balancer_support",

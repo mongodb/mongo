@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  # The files implement the Catalog and Routing responsibilites for $changeStream.
+  # TODO: SERVER-109081 Determine the ownership of s/change_streams files.
+  - "*":
+    approvers:
+      - 10gen/query-execution-change-streams
+      - 10gen/server-catalog-and-routing
