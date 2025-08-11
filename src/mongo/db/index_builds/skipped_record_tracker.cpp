@@ -73,20 +73,38 @@ namespace {
 static constexpr StringData kRecordIdField = "recordId"_sd;
 }
 
-SkippedRecordTracker::SkippedRecordTracker(
-    OperationContext* opCtx, std::unique_ptr<TemporaryRecordStore> skippedRecordsTable)
-    : _skippedRecordsTable(std::move(skippedRecordsTable)) {
-    invariant(_skippedRecordsTable);
+SkippedRecordTracker::SkippedRecordTracker(OperationContext* opCtx,
+                                           StringData ident,
+                                           bool tableExists)
+    : _ident(std::string{ident}) {
+    if (!tableExists) {
+        return;
+    }
+
+    // Only initialize the table if it already exists. Otherwise, lazily initialize table when we
+    // record the first document.
+    _skippedRecordsTable =
+        opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
+            opCtx, _ident, KeyFormat::Long);
 }
 
 void SkippedRecordTracker::keepTemporaryTable() {
-    _skippedRecordsTable->keep();
+    if (_skippedRecordsTable) {
+        _skippedRecordsTable->keep();
+    }
 }
 
 void SkippedRecordTracker::record(OperationContext* opCtx, const RecordId& recordId) {
     BSONObjBuilder builder;
     recordId.serializeToken(kRecordIdField, &builder);
     BSONObj toInsert = builder.obj();
+
+    // Lazily initialize table when we record the first document.
+    if (!_skippedRecordsTable) {
+        _skippedRecordsTable =
+            opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
+                opCtx, _ident, KeyFormat::Long);
+    }
 
     writeConflictRetry(
         opCtx, "recordSkippedRecordTracker", NamespaceString::kIndexBuildEntryNamespace, [&]() {
@@ -103,6 +121,9 @@ void SkippedRecordTracker::record(OperationContext* opCtx, const RecordId& recor
 }
 
 bool SkippedRecordTracker::areAllRecordsApplied(OperationContext* opCtx) const {
+    if (!_skippedRecordsTable) {
+        return true;
+    }
     auto cursor =
         _skippedRecordsTable->rs()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     auto record = cursor->next();
@@ -123,6 +144,10 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
 
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
         collection->ns(), keyGenerationOnly ? MODE_IX : MODE_X));
+    if (!_skippedRecordsTable) {
+        return Status::OK();
+    }
+
     InsertDeleteOptions options;
     collection->getIndexCatalog()->prepareInsertDeleteOptions(
         opCtx,

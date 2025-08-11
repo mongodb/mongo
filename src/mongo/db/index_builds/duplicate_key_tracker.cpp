@@ -66,9 +66,18 @@ static constexpr StringData kKeyField = "key"_sd;
 }
 
 DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
-                                         std::unique_ptr<TemporaryRecordStore> keyConstraintsTable,
-                                         const IndexCatalogEntry* entry)
-    : _keyConstraintsTable(std::move(keyConstraintsTable)) {
+                                         const IndexCatalogEntry* entry,
+                                         StringData ident,
+                                         bool tableExists)
+    : _keyConstraintsTable([&]() {
+          auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+          if (tableExists) {
+              return storageEngine->makeTemporaryRecordStoreFromExistingIdent(
+                  opCtx, ident, KeyFormat::Long);
+          } else {
+              return storageEngine->makeTemporaryRecordStore(opCtx, ident, KeyFormat::Long);
+          }
+      }()) {
     invariant(entry->descriptor()->unique());
 }
 

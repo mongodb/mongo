@@ -59,8 +59,9 @@ class DuplicateKeyTracker {
 
 public:
     DuplicateKeyTracker(OperationContext* opCtx,
-                        std::unique_ptr<TemporaryRecordStore> keyConstraintsTable,
-                        const IndexCatalogEntry* indexCatalogEntry);
+                        const IndexCatalogEntry* indexCatalogEntry,
+                        StringData ident,
+                        bool tableExists);
 
     /**
      * Keeps the temporary table for the duplicate key constraint violations.

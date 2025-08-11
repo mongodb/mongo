@@ -93,18 +93,14 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
           opCtx,
           opCtx->getServiceContext()->getStorageEngine()->generateNewInternalIdent(),
           KeyFormat::Long)),
-      _skippedRecordTracker([&]() {
-          auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-          auto skippedRecordsTable = storageEngine->makeTemporaryRecordStore(
-              opCtx, storageEngine->generateNewInternalIdent(), KeyFormat::Long);
-          return SkippedRecordTracker(opCtx, std::move(skippedRecordsTable));
-      }()) {
+      _skippedRecordTracker(
+          opCtx,
+          opCtx->getServiceContext()->getStorageEngine()->generateNewInternalIdent(),
+          /*tableExists=*/false) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     if (entry->descriptor()->unique()) {
-        auto keyConstraintsTable = storageEngine->makeTemporaryRecordStore(
-            opCtx, storageEngine->generateNewInternalIdent(), KeyFormat::Long);
-        _duplicateKeyTracker =
-            std::make_unique<DuplicateKeyTracker>(opCtx, std::move(keyConstraintsTable), entry);
+        _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(
+            opCtx, entry, storageEngine->generateNewInternalIdent(), /*tableExists=*/false);
     }
 }
 
@@ -118,15 +114,11 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
               opCtx, sideWritesIdent, KeyFormat::Long)),
       _skippedRecordTracker([&]() {
           auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-          std::unique_ptr<TemporaryRecordStore> skippedRecordsTable;
-          if (skippedRecordTrackerIdent) {
-              skippedRecordsTable = storageEngine->makeTemporaryRecordStoreFromExistingIdent(
-                  opCtx, skippedRecordTrackerIdent.value(), KeyFormat::Long);
-          } else {
-              skippedRecordsTable = storageEngine->makeTemporaryRecordStore(
-                  opCtx, storageEngine->generateNewInternalIdent(), KeyFormat::Long);
-          }
-          return SkippedRecordTracker(opCtx, std::move(skippedRecordsTable));
+          bool tableExists = static_cast<bool>(skippedRecordTrackerIdent);
+          std::string skippedRecordTrackerIdentStr = skippedRecordTrackerIdent
+              ? std::string{*skippedRecordTrackerIdent}
+              : storageEngine->generateNewInternalIdent();
+          return SkippedRecordTracker(opCtx, skippedRecordTrackerIdentStr, tableExists);
       }()),
       _skipNumAppliedCheck(true) {
     auto dupKeyTrackerIdentExists = duplicateKeyTrackerIdent ? true : false;
@@ -136,11 +128,8 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
                           << "] if and only if the index is unique: " << entry->descriptor(),
             entry->descriptor()->unique() == dupKeyTrackerIdentExists);
     if (duplicateKeyTrackerIdent) {
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        auto keyConstraintsTable = storageEngine->makeTemporaryRecordStoreFromExistingIdent(
-            opCtx, duplicateKeyTrackerIdent.value(), KeyFormat::Long);
-        _duplicateKeyTracker =
-            std::make_unique<DuplicateKeyTracker>(opCtx, std::move(keyConstraintsTable), entry);
+        _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(
+            opCtx, entry, *duplicateKeyTrackerIdent, /*tableExists=*/true);
     }
 }
 
