@@ -473,7 +473,6 @@ tasks:
 
   - <<: *gen_task_template
     name: multitenancy_with_atlas_proxy_jscore_passthrough_gen
-    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_security",
@@ -488,7 +487,6 @@ tasks:
 
   - <<: *gen_task_template
     name: multitenancy_with_mongoq_jscore_passthrough_gen
-    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_security",
@@ -503,7 +501,6 @@ tasks:
 
   - <<: *gen_task_template
     name: multitenancy_with_mongoq_unsigned_token_jscore_passthrough_gen
-    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_security",
@@ -601,7 +598,6 @@ tasks:
 
   - <<: *task_template
     name: serverless
-    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
         "assigned_to_jira_team_server_programmability",
