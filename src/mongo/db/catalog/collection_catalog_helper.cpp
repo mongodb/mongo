@@ -379,30 +379,39 @@ void shutDownCollectionCatalogAndGlobalStorageEngineCleanly(ServiceContext* serv
     shutdownGlobalStorageEngineCleanly(service, memLeakAllowed);
 }
 
+StorageEngine::LastShutdownState startUpStorageEngine(OperationContext* opCtx,
+                                                      StorageEngineInitFlags initFlags,
+                                                      BSONObjBuilder* startupTimeElapsedBuilder) {
+    // As the storage engine is not yet initialized, a noop recovery unit is used until the
+    // initialization is complete.
+    shard_role_details::setRecoveryUnit(opCtx,
+                                        std::make_unique<RecoveryUnitNoop>(),
+                                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+
+    return initializeStorageEngine(opCtx,
+                                   initFlags,
+                                   getGlobalReplSettings().isReplSet(),
+                                   repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
+                                   getReplSetMemberInStandaloneMode(getGlobalServiceContext()),
+                                   startupTimeElapsedBuilder);
+}
+
 StorageEngine::LastShutdownState startUpStorageEngineAndCollectionCatalog(
     ServiceContext* service,
     Client* client,
     StorageEngineInitFlags initFlags,
     BSONObjBuilder* startupTimeElapsedBuilder) {
     // Creating the operation context before initializing the storage engine allows the storage
-    // engine initialization to make use of the lock manager. As the storage engine is not yet
-    // initialized, a noop recovery unit is used until the initialization is complete.
+    // engine initialization to make use of the lock manager.
     auto initializeStorageEngineOpCtx = service->makeOperationContext(client);
-    shard_role_details::setRecoveryUnit(initializeStorageEngineOpCtx.get(),
-                                        std::make_unique<RecoveryUnitNoop>(),
-                                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
-    auto lastShutdownState =
-        initializeStorageEngine(initializeStorageEngineOpCtx.get(),
-                                initFlags,
-                                getGlobalReplSettings().isReplSet(),
-                                repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
-                                getReplSetMemberInStandaloneMode(getGlobalServiceContext()),
-                                startupTimeElapsedBuilder);
+    auto lastShutdownState = startUpStorageEngine(
+        initializeStorageEngineOpCtx.get(), initFlags, startupTimeElapsedBuilder);
 
     Lock::GlobalWrite globalLk(initializeStorageEngineOpCtx.get());
     catalog::initializeCollectionCatalog(initializeStorageEngineOpCtx.get(),
                                          service->getStorageEngine());
+
     return lastShutdownState;
 }
 }  // namespace catalog

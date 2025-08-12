@@ -140,6 +140,16 @@ void shutDownCollectionCatalogAndGlobalStorageEngineCleanly(ServiceContext* serv
                                                             bool memLeakAllowed);
 
 /**
+ * Starts up storage engine.
+ *
+ * In most scenarios, startUpStorageEngineAndCollectionCatalog() should be used instead of this
+ * function unless there is a specific reason to defer collection catalog initialization.
+ */
+StorageEngine::LastShutdownState startUpStorageEngine(OperationContext* opCtx,
+                                                      StorageEngineInitFlags initFlags,
+                                                      BSONObjBuilder* startupTimeElapsedBuilder);
+
+/**
  * Starts up storage engine and initializes the collection catalog.
  */
 StorageEngine::LastShutdownState startUpStorageEngineAndCollectionCatalog(
