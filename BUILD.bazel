@@ -1,6 +1,6 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@aspect_rules_js//npm:defs.bzl", "npm_link_package")
-load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS", "mongo_install")
+load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS", "extensions_with_config", "mongo_install")
 load("//bazel/install_rules:bolt.bzl", "bolt_instrument", "bolt_optimize")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
@@ -290,6 +290,9 @@ mongo_install(
         "@platforms//os:windows": ["@windows_sasl//:bins"],
         "//conditions:default": [],
     }) + select({
+        "//bazel/config:extensions_buildable": [":dist_test_extensions"],
+        "//conditions:default": [],
+    }) + select({
         "//bazel/config:include_mongot_enabled": ["//:mongot_folder"],
         "//conditions:default": [],
     }) + select({
@@ -418,14 +421,23 @@ mongo_install(
     ],
 )
 
-# This sets up targets for install-extensions and archive-extensions.
-# This target must be built with --shared_archive.
-mongo_install(
-    name = "extensions",
-    # All extensions that may be loaded in jstests should be built here. Extensions
-    # that are built only for unit tests should be omitted.
+# This sets up the valid extension targets to use in dist-test and extensions.
+# Using Bazel's transition system, this rule ensures that the extensions are
+# built with the correct configuration. All extensions that may be loaded in
+# jstests should be included here. Extensions that are built only for unit tests
+# should be omitted.
+extensions_with_config(
+    name = "dist_test_extensions",
     srcs = [
         "//src/mongo/db/extension/test_examples:foo_extension",
+    ],
+)
+
+# This sets up targets for install-extensions and archive-extensions.
+mongo_install(
+    name = "extensions",
+    srcs = [
+        ":dist_test_extensions",
     ],
     package_extract_name = "/",
 )

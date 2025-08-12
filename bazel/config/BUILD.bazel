@@ -2917,3 +2917,36 @@ selects.config_setting_group(
         ":build_enterprise_enabled",
     ],
 )
+
+# --------------------------------------
+# extensions
+# --------------------------------------
+
+# Extensions can only be built on Linux platforms. For now, we also
+# disable extensions from being built on UBSAN platforms due to a
+# bug (UBSAN + ASAN still works).
+# TODO SERVER-109193: Enable extension builds when UBSAN is enabled.
+selects.config_setting_group(
+    name = "linux_with_ubsan_disabled",
+    match_all = [
+        "@platforms//os:linux",
+        ":ubsan_disabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linux_with_ubsan_and_asan_enabled",
+    match_all = [
+        "@platforms//os:linux",
+        ":ubsan_enabled",
+        ":asan_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "extensions_buildable",
+    match_any = [
+        ":linux_with_ubsan_disabled",
+        ":linux_with_ubsan_and_asan_enabled",
+    ],
+)

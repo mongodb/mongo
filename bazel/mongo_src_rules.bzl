@@ -582,12 +582,21 @@ def mongo_cc_library(
         deps = [name + WITH_DEBUG_SUFFIX + "_ownership_remapped"] if linkshared else [name + WITH_DEBUG_SUFFIX],
         visibility = visibility,
         tags = tags + ["mongo_library"],
-        user_link_flags = get_linkopts(native.package_name()) + undefined_ref_flag + non_transitive_dyn_linkopts + rpath_flags + visibility_support_shared_flags,
+        user_link_flags = get_linkopts(native.package_name()) + undefined_ref_flag + non_transitive_dyn_linkopts + rpath_flags + visibility_support_shared_flags + select({
+            "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x" +
+                                                       hex32(hash(name)) +
+                                                       hex32(hash(name)) +
+                                                       hex32(hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT)))],
+            "//conditions:default": [],
+        }),
         target_compatible_with = shared_library_compatible_with + target_compatible_with + enterprise_compatible,
         dynamic_deps = dynamic_deps,
         shared_lib_name = shared_lib_name,
         features = select({
             "//bazel/config:windows_debug_symbols_enabled": ["generate_pdb_file"],
+            "//conditions:default": [],
+        }) + select({
+            "//bazel/config:simple_build_id_enabled": ["-build_id"],
             "//conditions:default": [],
         }),
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
