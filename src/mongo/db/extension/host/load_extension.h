@@ -31,9 +31,9 @@
 
 #include "mongo/db/extension/public/api.h"
 #include "mongo/platform/shared_library.h"
+#include "mongo/stdx/unordered_map.h"
 
 #include <string>
-#include <vector>
 
 namespace mongo::extension::host {
 
@@ -58,10 +58,10 @@ public:
     static void load(const std::string& extensionPath);
 
 private:
-    // Used to keep loaded extension 'SharedLibrary' objects alive for the lifetime of the server.
-    // Initialized during process initialization and const thereafter.
-    // These are intentionally "leaked" on shutdown.
-    static std::vector<std::unique_ptr<SharedLibrary>> loadedExtensions;
+    // Used to keep loaded extension 'SharedLibrary' objects alive for the lifetime of the server
+    // and track what extensions have been loaded. Initialized during process initialization and
+    // const thereafter. These are intentionally "leaked" on shutdown.
+    static stdx::unordered_map<std::string, std::unique_ptr<SharedLibrary>> loadedExtensions;
 };
 
 }  // namespace mongo::extension::host

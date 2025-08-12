@@ -53,6 +53,10 @@ mongo_cc_unit_test(
     # Data lists the targets that must be built to generate extension shared libraries, which are
     # loaded in the unit tests.
     data = [
+        # TODO SERVER-109108: Remove this entry when the bar extension is no longer needed.
+        "//src/mongo/db/extension/test_examples:bar_extension",
+        # TODO SERVER-109108: Remove this entry when the buzz extension is no longer needed.
+        "//src/mongo/db/extension/test_examples:buzz_extension",
         "//src/mongo/db/extension/test_examples:foo_extension",
         "//src/mongo/db/extension/test_examples:hostVersionFails_extension",
         "//src/mongo/db/extension/test_examples:hostVersionSucceeds_extension",
@@ -76,6 +80,7 @@ mongo_cc_unit_test(
     deps = [
         ":extension_loader",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
     ],
 )

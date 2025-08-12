@@ -50,7 +50,7 @@
 
 namespace mongo::extension::host {
 
-std::vector<std::unique_ptr<SharedLibrary>> ExtensionLoader::loadedExtensions;
+stdx::unordered_map<std::string, std::unique_ptr<SharedLibrary>> ExtensionLoader::loadedExtensions;
 
 bool loadExtensions(const std::vector<std::string>& extensionPaths) {
     if (extensionPaths.empty()) {
@@ -64,7 +64,7 @@ bool loadExtensions(const std::vector<std::string>& extensionPaths) {
         return false;
     }
 
-    for (const auto& extension : serverGlobalParams.extensions) {
+    for (const auto& extension : extensionPaths) {
         LOGV2(10668501, "Loading extension", "filePath"_attr = extension);
 
         try {
@@ -115,6 +115,11 @@ void assertVersionCompatibility(const MongoExtensionAPIVersionVector* hostVersio
 }
 
 void ExtensionLoader::load(const std::string& extensionPath) {
+    uassert(10845400,
+            str::stream() << "Loading extension '" << extensionPath
+                          << "' failed: " << "Extension has already been loaded",
+            !loadedExtensions.contains(extensionPath));
+
     StatusWith<std::unique_ptr<SharedLibrary>> swExtensionLib =
         SharedLibrary::create(extensionPath);
     uassert(10615500,
@@ -164,6 +169,6 @@ void ExtensionLoader::load(const std::string& extensionPath) {
 
     // Add the 'SharedLibrary' pointer to our loaded extensions array to keep it alive for the
     // lifetime of the server.
-    loadedExtensions.emplace_back(std::move(extensionLib));
+    loadedExtensions.emplace(extensionPath, std::move(extensionLib));
 }
 }  // namespace mongo::extension::host

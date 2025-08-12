@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -48,7 +49,20 @@ static std::filesystem::path getExtensionPath(const std::string& extensionName) 
     return runFilesDir / kExtensionDirectory / extensionName;
 }
 
-TEST(LoadExtensionsTest, LoadExtensionErrorCases) {
+class LoadExtensionsTest : public unittest::Test {
+protected:
+    static inline const std::string kTestFooStageName = "$testFoo";
+    static inline const std::string kTestFooLibExtensionPath = "libfoo_extension.so";
+    // TODO SERVER-109108: Remove this when we can use only libfoo_extension.so.
+    static inline const std::string kTestBarLibExtensionPath = "libbar_extension.so";
+    // TODO SERVER-109108: Remove this when we can use only libfoo_extension.so.
+    static inline const std::string kTestBuzzLibExtensionPath = "libbuzz_extension.so";
+
+private:
+    RAIIServerParameterControllerForTest _featureFlag{"featureFlagExtensionsAPI", true};
+};
+
+TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
     // Ensure that the RUNFILES_DIR environment variable is set, which is required for this test.
     // This variable is typically set by the Bazel build system, so this test must be run using
     // Bazel.
@@ -94,13 +108,33 @@ TEST(LoadExtensionsTest, LoadExtensionErrorCases) {
                        10615506);
 }
 
+// TODO SERVER-109108: Switch this to use the foo extension once we can reset state in between
+// tests.
+TEST_F(LoadExtensionsTest, RepetitivelyLoadingTheSameExtensionFails) {
+    // We should be able to load the extension once.
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load(getExtensionPath(kTestBuzzLibExtensionPath)));
+
+    // We should not be able to load the extension twice.
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath(kTestBuzzLibExtensionPath)),
+                       AssertionException,
+                       10845400);
+}
+
+// TODO SERVER-109108: Switch this to use the foo extension once we can reset state in between
+// tests.
+TEST_F(LoadExtensionsTest, RepetitivelyLoadingTheSameExtensionViaLoadExtensionsFails) {
+    // The following should return failure when trying to load the extension the second time.
+    ASSERT_FALSE(loadExtensions(
+        std::vector<std::string>{kTestBarLibExtensionPath, kTestBarLibExtensionPath}));
+}
+
 // Tests successful extension loading and verifies stage registration works in pipelines.
 // The libfoo_extension.so adds a "$testFoo" stage for testing.
-TEST(LoadExtensionTest, LoadExtensionSucceeds) {
-    ASSERT_DOES_NOT_THROW(ExtensionLoader::load(getExtensionPath("libfoo_extension.so")));
+TEST_F(LoadExtensionsTest, LoadExtensionSucceeds) {
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load(getExtensionPath(kTestFooLibExtensionPath)));
 
     // Verify the initialization function registered a stage.
-    BSONObj stageSpec = BSON("$testFoo" << BSONObj());
+    BSONObj stageSpec = BSON(kTestFooStageName << BSONObj());
     auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     auto sourceList = DocumentSource::parse(expCtx, stageSpec);
@@ -108,10 +142,10 @@ TEST(LoadExtensionTest, LoadExtensionSucceeds) {
 
     auto extensionStage = dynamic_cast<DocumentSourceExtension*>(sourceList.front().get());
     ASSERT_TRUE(extensionStage != nullptr);
-    ASSERT_EQUALS(std::string(extensionStage->getSourceName()), std::string("$testFoo"));
+    ASSERT_EQUALS(std::string(extensionStage->getSourceName()), kTestFooStageName);
 
     // Verify the stage can be used in a pipeline with other existing stages.
-    std::vector<BSONObj> pipeline = {BSON("$testFoo" << BSONObj()), BSON("$limit" << 1)};
+    std::vector<BSONObj> pipeline = {BSON(kTestFooStageName << BSONObj()), BSON("$limit" << 1)};
 
     auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
     ASSERT_TRUE(parsedPipeline != nullptr);
@@ -120,13 +154,13 @@ TEST(LoadExtensionTest, LoadExtensionSucceeds) {
     auto firstStage =
         dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
     ASSERT_TRUE(firstStage != nullptr);
-    ASSERT_EQUALS(std::string(firstStage->getSourceName()), std::string("$testFoo"));
+    ASSERT_EQUALS(std::string(firstStage->getSourceName()), std::string(kTestFooStageName));
 }
 
 // Tests that extension initialization properly populates the parser map before and after loading.
-TEST(LoadExtensionTest, InitializationFunctionPopulatesParserMap) {
+TEST_F(LoadExtensionsTest, InitializationFunctionPopulatesParserMap) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    BSONObj stageSpec = BSON("$testFoo" << BSONObj());
+    BSONObj stageSpec = BSON(kTestFooStageName << BSONObj());
 
     // Since the extension might already be loaded by previous tests, just verify it works.
     ASSERT_DOES_NOT_THROW({
@@ -135,29 +169,29 @@ TEST(LoadExtensionTest, InitializationFunctionPopulatesParserMap) {
 
         auto extensionStage = dynamic_cast<DocumentSourceExtension*>(sourceList.front().get());
         ASSERT_TRUE(extensionStage != nullptr);
-        ASSERT_EQUALS(std::string(extensionStage->getSourceName()), std::string("$testFoo"));
+        ASSERT_EQUALS(std::string(extensionStage->getSourceName()), std::string(kTestFooStageName));
     });
 }
 
-TEST(LoadExtensionTest, LoadExtensionHostVersionParameterSucceeds) {
+TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterSucceeds) {
     ASSERT_DOES_NOT_THROW(
         ExtensionLoader::load(getExtensionPath("libhostVersionSucceeds_extension.so")));
 }
 
-TEST(LoadExtensionTest, LoadExtensionHostVersionParameterFails) {
+TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterFails) {
     ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libhostVersionFails_extension.so")),
                        AssertionException,
                        10615503);
 }
 
-TEST(LoadExtensionTest, LoadExtensionInitializeVersionFails) {
+TEST_F(LoadExtensionsTest, LoadExtensionInitializeVersionFails) {
     ASSERT_THROWS_CODE(
         ExtensionLoader::load(getExtensionPath("libinitializeVersionFails_extension.so")),
         AssertionException,
         10726600);
 }
 
-DEATH_TEST(LoadExtensionTest, LoadExtensionNullStageDescriptor, "10596400") {
+DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullStageDescriptor, "10596400") {
     ExtensionLoader::load(getExtensionPath("libnullStageDescriptor_extension.so"));
 }
 }  // namespace mongo::extension::host
