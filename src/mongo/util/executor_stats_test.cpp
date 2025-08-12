@@ -229,16 +229,15 @@ TEST_F(ExecutorStatsTest, RunTime) {
 TEST_F(ExecutorStatsTest, SlowTaskExecutorWaitTimeProfilingLog) {
     // Make the tasks wait time 51 Millis exceed the default slow wait time threshold of 50 Millis
     Milliseconds delay = Milliseconds{51};
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     auto task = wrapTask([](Status) {});
     advanceTime(delay);
     task(Status::OK());
 
-    stopCapturingLogMessages();
+    logs.stop();
     // Check for the slow wait time log message
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining("Task exceeded the slow wait time threshold"));
+    ASSERT_EQUALS(1, logs.countTextContaining("Task exceeded the slow wait time threshold"));
 }
 
 }  // namespace mongo

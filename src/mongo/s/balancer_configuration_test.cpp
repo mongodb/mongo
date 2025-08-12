@@ -204,12 +204,12 @@ TEST_F(BalancerSettingsTypeTestFixture, AllValidBalancerModeOptions) {
 }
 
 TEST_F(BalancerSettingsTypeTestFixture, InvalidBalancerModeOption) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_EQ(BalancerSettingsType::kOff,
               assertGet(BalancerSettingsType::fromBSON(opCtx(), BSON("mode" << "BAD"))).getMode());
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQ(1,
-              countTextFormatLogLinesContaining(
+              logs.countTextContaining(
                   "Balancer turned off because currently set balancing mode is not valid"));
 }
 
@@ -697,7 +697,7 @@ TEST_F(BalancerSettingsTypeTestFixture, ActiveWindowAndActiveWindowDOWPrecedence
 
 // ===== Feature Flag Disabled Tests =====
 TEST_F(BalancerSettingsTypeTestFixture, BalancingWindowDOWDisabled_IgnoresActiveWindowDOW) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     BalancerSettingsType settings = assertGet(BalancerSettingsType::fromBSON(
         opCtx(),
         BSON("activeWindowDOW" << BSON_ARRAY(BSON("day" << "Monday"
@@ -706,15 +706,14 @@ TEST_F(BalancerSettingsTypeTestFixture, BalancingWindowDOWDisabled_IgnoresActive
                                                         << "stop"
                                                         << "17:00")))));
 
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQ(1,
-              countTextFormatLogLinesContaining(
-                  "Ignoring activeWindowDOW settings for versions under 8.3"));
+              logs.countTextContaining("Ignoring activeWindowDOW settings for versions under 8.3"));
 }
 
 
 TEST_F(BalancerSettingsTypeTestFixture, BalancingWindowDOWDisabled_FallsBackToActiveWindow) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     BalancerSettingsType settings = assertGet(
         BalancerSettingsType::fromBSON(opCtx(),
@@ -728,11 +727,10 @@ TEST_F(BalancerSettingsTypeTestFixture, BalancingWindowDOWDisabled_FallsBackToAc
                                                                                     << "stop"
                                                                                     << "23:00")))));
 
-    stopCapturingLogMessages();
+    logs.stop();
 
     ASSERT_EQ(1,
-              countTextFormatLogLinesContaining(
-                  "Ignoring activeWindowDOW settings for versions under 8.3"));
+              logs.countTextContaining("Ignoring activeWindowDOW settings for versions under 8.3"));
 
     ASSERT(settings.isTimeInBalancingWindow(
         opCtx(),
@@ -755,7 +753,7 @@ TEST_F(BalancerSettingsTypeTestFixture, BalancingWindowDOWDisabled_FallsBackToAc
 }
 
 TEST_F(BalancerSettingsTypeTestFixture, BalancingWindowDOWDisabled_InvalidDayNamesAccepted) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     BalancerSettingsType settings = assertGet(BalancerSettingsType::fromBSON(
         opCtx(),
@@ -765,11 +763,10 @@ TEST_F(BalancerSettingsTypeTestFixture, BalancingWindowDOWDisabled_InvalidDayNam
                                                         << "stop"
                                                         << "17:00")))));
 
-    stopCapturingLogMessages();
+    logs.stop();
 
     ASSERT_EQ(1,
-              countTextFormatLogLinesContaining(
-                  "Ignoring activeWindowDOW settings for versions under 8.3"));
+              logs.countTextContaining("Ignoring activeWindowDOW settings for versions under 8.3"));
 
     ASSERT(settings.isTimeInBalancingWindow(
         opCtx(),
@@ -778,7 +775,7 @@ TEST_F(BalancerSettingsTypeTestFixture, BalancingWindowDOWDisabled_InvalidDayNam
 }
 
 TEST_F(BalancerSettingsTypeTestFixture, BalancingWindowDOWDisabled_MalformedDataAccepted) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     BalancerSettingsType settings = assertGet(BalancerSettingsType::fromBSON(
         opCtx(),
@@ -788,11 +785,10 @@ TEST_F(BalancerSettingsTypeTestFixture, BalancingWindowDOWDisabled_MalformedData
                                                                  << "wrongStop"
                                                                  << "17:00")))));
 
-    stopCapturingLogMessages();
+    logs.stop();
 
     ASSERT_EQ(1,
-              countTextFormatLogLinesContaining(
-                  "Ignoring activeWindowDOW settings for versions under 8.3"));
+              logs.countTextContaining("Ignoring activeWindowDOW settings for versions under 8.3"));
 
     ASSERT(settings.isTimeInBalancingWindow(
         opCtx(),

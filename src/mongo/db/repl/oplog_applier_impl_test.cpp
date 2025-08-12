@@ -4648,13 +4648,13 @@ TEST_F(OplogApplierImplWithFastAutoAdvancingClockTest, LogSlowOpApplicationWhenS
     repl::createCollection(_opCtx.get(), nss, {});
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
 
     ASSERT_EQUALS(
         1,
-        countBSONFormatLogLinesIsSubset(BSON(
+        logs.countBSONContainingSubset(BSON(
             "attr" << BSON("CRUD" << BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "v" << 2 << "op"
                                                << "i"
                                                << "ns"
@@ -4671,7 +4671,7 @@ TEST_F(OplogApplierImplWithFastAutoAdvancingClockTest, DoNotLogSlowOpApplication
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_THROWS(_applyOplogEntryOrGroupedInsertsWrapper(
                       _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary),
                   ExceptionFor<ErrorCodes::NamespaceNotFound>);
@@ -4682,7 +4682,7 @@ TEST_F(OplogApplierImplWithFastAutoAdvancingClockTest, DoNotLogSlowOpApplication
     expected << "applied op: CRUD { op: \"i\", ns: \"test.t\", o: { _id: 0 }, ts: Timestamp(1, 1), "
                 "t: 1, h: 1, v: 2 }, took "
              << applyDuration << "ms";
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining(expected.str()));
+    ASSERT_EQUALS(0, logs.countTextContaining(expected.str()));
 }
 
 TEST_F(OplogApplierImplWithSlowAutoAdvancingClockTest, DoNotLogNonSlowOpApplicationWhenSuccessful) {
@@ -4694,7 +4694,7 @@ TEST_F(OplogApplierImplWithSlowAutoAdvancingClockTest, DoNotLogNonSlowOpApplicat
     repl::createCollection(_opCtx.get(), nss, {});
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
 
@@ -4704,7 +4704,7 @@ TEST_F(OplogApplierImplWithSlowAutoAdvancingClockTest, DoNotLogNonSlowOpApplicat
     expected << "applied op: CRUD { op: \"i\", ns: \"test.t\", o: { _id: 0 }, ts: Timestamp(1, 1), "
                 "t: 1, h: 1, v: 2 }, took "
              << applyDuration << "ms";
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining(expected.str()));
+    ASSERT_EQUALS(0, logs.countTextContaining(expected.str()));
 }
 
 class OplogApplierImplTxnTableTest : public OplogApplierImplTest {

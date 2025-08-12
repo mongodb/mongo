@@ -150,16 +150,15 @@ public:
                     logv2::LogComponent::kNetwork,
                     logv2::LogSeverity::Debug(logv2::LogSeverity::kMaxDebugLevel)};
 
-                startCapturingLogMessages();
+                unittest::LogCaptureGuard logs;
                 for (size_t i = 0; i < nStreamsToCreate; i++) {
                     ::grpc::ClientContext ctx;
                     initContext(ctx);
                     auto stream = streamFactory(ctx, stub);
                     ASSERT_EQ(stream->Finish().error_code(), ::grpc::OK);
                 }
-                stopCapturingLogMessages();
-
-                auto logLines = getCapturedBSONFormatLogMessages();
+                logs.stop();
+                auto logLines = logs.getBSON();
                 auto observed =
                     std::count_if(logLines.cbegin(), logLines.cend(), [&](const BSONObj& line) {
                         return line.getStringField(logv2::constants::kSeverityFieldName) ==

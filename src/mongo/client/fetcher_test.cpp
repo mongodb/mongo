@@ -966,7 +966,7 @@ TEST_F(FetcherTest, ScheduleGetMoreButShutdown) {
 
 
 TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKillsCursor) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     callbackHook = [](const StatusWith<Fetcher::QueryResponse>& fetchResult,
                       Fetcher::NextAction* nextAction,
@@ -1012,8 +1012,8 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
 
     // killCursors command request will be canceled by executor on shutdown.
     tearDown();
-    ASSERT_EQUALS(
-        1, countBSONFormatLogLinesIsSubset(BSON("msg" << "killCursors command task failed")));
+    ASSERT_EQUALS(1,
+                  logs.countBSONContainingSubset(BSON("msg" << "killCursors command task failed")));
 }
 
 void setNextActionToNoAction(const StatusWith<Fetcher::QueryResponse>& fetchResult,
@@ -1023,7 +1023,7 @@ void setNextActionToNoAction(const StatusWith<Fetcher::QueryResponse>& fetchResu
 }
 
 TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     callbackHook = appendGetMoreRequest;
 
@@ -1086,10 +1086,10 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
         getNet()->runReadyNetworkOperations();
     }
 
-    ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
-                      BSON("msg" << "killCursors command failed"
-                                 << "attr" << BSON("error" << "UnknownError: "))));
+    ASSERT_EQUALS(
+        1,
+        logs.countBSONContainingSubset(BSON("msg" << "killCursors command failed"
+                                                  << "attr" << BSON("error" << "UnknownError: "))));
 }
 
 /**
@@ -1120,7 +1120,7 @@ void shutdownDuringSecondBatch(const StatusWith<Fetcher::QueryResponse>& fetchRe
 }
 
 TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     callbackHook = appendGetMoreRequest;
 
@@ -1161,7 +1161,7 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
     // Fetcher should attempt (unsuccessfully) to schedule a killCursors command.
     ASSERT_EQUALS(
         1,
-        countBSONFormatLogLinesIsSubset(BSON(
+        logs.countBSONContainingSubset(BSON(
             "msg" << "Failed to schedule killCursors command"
                   << "attr"
                   << BSON("error" << "ShutdownInProgress: TaskExecutor shutdown in progress"))));

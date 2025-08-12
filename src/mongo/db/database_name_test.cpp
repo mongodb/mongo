@@ -192,18 +192,17 @@ TEST(DatabaseNameTest, DatabaseValidNames) {
 TEST(DatabaseNameTest, CheckDatabaseNameLogAttrs) {
     TenantId tenantId(OID::gen());
     DatabaseName dbWithTenant = DatabaseName::createDatabaseName_forTest(tenantId, "myLongDbName");
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     LOGV2(7448500, "Msg db:", logAttrs(dbWithTenant));
 
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
+                  logs.countBSONContainingSubset(
                       BSON("attr" << BSON("db" << dbWithTenant.toStringWithTenantId_forTest()))));
 
     LOGV2(7448501, "Msg database:", "database"_attr = dbWithTenant);
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON(
+                  logs.countBSONContainingSubset(BSON(
                       "attr" << BSON("database" << dbWithTenant.toStringWithTenantId_forTest()))));
-    stopCapturingLogMessages();
 }
 
 TEST(DatabaseNameTest, EmptyDbString) {

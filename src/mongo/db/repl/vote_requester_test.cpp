@@ -127,12 +127,6 @@ public:
     }
 
 protected:
-    int64_t countLogLinesContaining(const std::string& needle) {
-        const auto& msgs = getCapturedTextFormatLogMessages();
-        return std::count_if(
-            msgs.begin(), msgs.end(), [&](const auto& s) { return stringContains(s, needle); });
-    }
-
     bool hasReceivedSufficientResponses() {
         return _requester->hasReceivedSufficientResponses();
     }
@@ -313,13 +307,13 @@ TEST_F(VoteRequesterTest, ImmediateGoodResponseWinElection) {
 }
 
 TEST_F(VoteRequesterTest, VoterFailedToStoreLastVote) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedYesStatusNotOkBecauseFailedToStoreLastVote());
     ASSERT_FALSE(hasReceivedSufficientResponses());
 
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
+                  logs.countBSONContainingSubset(
                       BSON("attr" << BSON("failReason" << "received an invalid response"
                                                        << "from"
                                                        << "host1:27017"))));
@@ -327,66 +321,62 @@ TEST_F(VoteRequesterTest, VoterFailedToStoreLastVote) {
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
     ASSERT_EQUALS(2, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterTest, BadConfigVersionWinElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseConfigVersionDoesNotMatch());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
     ASSERT_EQUALS(2, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterTest, SetNameDiffersWinElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseSetNameDiffers());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
     ASSERT_EQUALS(2, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterTest, LastOpTimeIsGreaterWinElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseLastOpTimeIsGreater());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
 
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
     ASSERT_EQUALS(2, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterTest, FailedToContactWinElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), badRemoteCommandResponse());
     ASSERT_FALSE(hasReceivedSufficientResponses());
 
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
+                  logs.countBSONContainingSubset(
                       BSON("attr" << BSON("failReason" << "failed to receive response"
                                                        << "from"
                                                        << "host1:27017"))));
@@ -394,73 +384,69 @@ TEST_F(VoteRequesterTest, FailedToContactWinElection) {
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
     ASSERT_EQUALS(1, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterTest, AlreadyVotedWinElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseAlreadyVoted());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
     ASSERT_EQUALS(2, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterTest, StaleTermLoseElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseTermIsGreater());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kStaleTerm == getResult());
     ASSERT_EQUALS(1, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterTest, NotEnoughVotesLoseElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseSetNameDiffers());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     processResponse(requestFrom("host2"), badRemoteCommandResponse());
 
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
+                  logs.countBSONContainingSubset(
                       BSON("attr" << BSON("failReason" << "failed to receive response"
                                                        << "from"
                                                        << "host2:27017"))));
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kInsufficientVotes == getResult());
     ASSERT_EQUALS(1, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterTest, CallbackCanceledNotEnoughVotesLoseElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseAlreadyVoted());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     processResponse(requestFrom("host2"), callbackCanceledCommandResponse());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
+                  logs.countBSONContainingSubset(
                       BSON("attr" << BSON("failReason" << "failed to receive response"
                                                        << "from"
                                                        << "host2:27017"))));
@@ -469,7 +455,6 @@ TEST_F(VoteRequesterTest, CallbackCanceledNotEnoughVotesLoseElection) {
     // Because of the CallbackCanceled Response, host2 doesn't count as a responder.
     ASSERT_EQUALS(1, getNumResponders());
     ASSERT(VoteRequester::Result::kInsufficientVotes == getResult());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterDryRunTest, ImmediateGoodResponseWinElection) {
@@ -481,55 +466,51 @@ TEST_F(VoteRequesterDryRunTest, ImmediateGoodResponseWinElection) {
 }
 
 TEST_F(VoteRequesterDryRunTest, BadConfigVersionWinElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseConfigVersionDoesNotMatch());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
     ASSERT_EQUALS(2, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterDryRunTest, SetNameDiffersWinElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseSetNameDiffers());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
     ASSERT_EQUALS(2, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterDryRunTest, LastOpTimeIsGreaterWinElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseLastOpTimeIsGreater());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
     ASSERT_EQUALS(2, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterDryRunTest, FailedToContactWinElection) {
-    startCapturingLogMessages();
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), badRemoteCommandResponse());
     ASSERT_FALSE(hasReceivedSufficientResponses());
@@ -537,58 +518,54 @@ TEST_F(VoteRequesterDryRunTest, FailedToContactWinElection) {
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
     ASSERT_EQUALS(1, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterDryRunTest, AlreadyVotedWinElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseAlreadyVoted());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kSuccessfullyElected == getResult());
     ASSERT_EQUALS(2, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterDryRunTest, StaleTermLoseElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseTermIsGreater());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kStaleTerm == getResult());
     ASSERT_EQUALS(1, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterDryRunTest, NotEnoughVotesLoseElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host1"), votedNoBecauseSetNameDiffers());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     processResponse(requestFrom("host2"), badRemoteCommandResponse());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
+                  logs.countBSONContainingSubset(
                       BSON("attr" << BSON("failReason" << "failed to receive response"
                                                        << "from"
                                                        << "host2:27017"))));
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kInsufficientVotes == getResult());
     ASSERT_EQUALS(1, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterCatchupTakeoverDryRunTest, CatchupTakeoverPrimarySaysYesWinElection) {
@@ -613,7 +590,7 @@ TEST_F(VoteRequesterCatchupTakeoverDryRunTest, CatchupTakeoverPrimarySaysYesButN
 }
 
 TEST_F(VoteRequesterCatchupTakeoverDryRunTest, CatchupTakeoverPrimarySaysNoLoseElection) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
     processResponse(requestFrom("host2"), votedYes());
     processResponse(requestFrom("host3"), votedYes());
@@ -628,18 +605,17 @@ TEST_F(VoteRequesterCatchupTakeoverDryRunTest, CatchupTakeoverPrimarySaysNoLoseE
 
     processResponse(requestFrom("host1"), votedNoBecauseLastOpTimeIsGreater());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("vote" << "no"
-                                                                             << "from"
-                                                                             << "host1:27017"))));
+                  logs.countBSONContainingSubset(BSON("attr" << BSON("vote" << "no"
+                                                                            << "from"
+                                                                            << "host1:27017"))));
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kPrimaryRespondedNo == getResult());
     ASSERT_EQUALS(3, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 TEST_F(VoteRequesterCatchupTakeoverDryRunTest,
        CatchupTakeoverAllNodesRespondedMeansSufficientResponses) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_FALSE(hasReceivedSufficientResponses());
 
     // Getting a good response from the other secondaries is insufficient.
@@ -652,7 +628,7 @@ TEST_F(VoteRequesterCatchupTakeoverDryRunTest,
     // received sufficient responses.
     processResponse(requestFrom("host1"), badRemoteCommandResponse());
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
+                  logs.countBSONContainingSubset(
                       BSON("attr" << BSON("failReason" << "failed to receive response"
                                                        << "from"
                                                        << "host1:27017"))));
@@ -664,7 +640,6 @@ TEST_F(VoteRequesterCatchupTakeoverDryRunTest,
     // Only the secondaries are counted; the primary is excluded from the responders since it gave a
     // bad response.
     ASSERT_EQUALS(3, getNumResponders());
-    stopCapturingLogMessages();
 }
 
 }  // namespace

@@ -720,7 +720,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpochNoRWCChan
     newDefaults2.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(5678));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults2));
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ReadWriteConcernDefaults::get(getService()).refreshIfNecessary(_opCtx);
 
     ASSERT(!isCWWCSet());
@@ -729,8 +729,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpochNoRWCChan
     ASSERT_EQ(5678, defaults2.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Refreshed RWC defaults"));
+    logs.stop();
+    ASSERT_EQUALS(0, logs.countTextContaining("Refreshed RWC defaults"));
 }
 
 /**

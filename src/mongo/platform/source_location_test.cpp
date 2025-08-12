@@ -172,11 +172,11 @@ TEST(SourceLocation, Formatting) {
 TEST(SourceLocation, Logging) {
     auto loc = MONGO_SOURCE_LOCATION();
     auto s = toString(loc);
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     LOGV2(9922300, "", "location"_attr = loc);
-    auto logs = getCapturedBSONFormatLogMessages();
-    ASSERT_EQ(logs.size(), 1);
-    ASSERT_STRING_CONTAINS(logs.front()["attr"]["location"].String(), s);
+    auto lines = logs.getBSON();
+    ASSERT_EQ(lines.size(), 1);
+    ASSERT_STRING_CONTAINS(lines.front()["attr"]["location"].String(), s);
 }
 
 }  // namespace

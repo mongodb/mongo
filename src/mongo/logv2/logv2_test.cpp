@@ -2513,7 +2513,7 @@ TEST_F(UnstructuredLoggingTest, Args) {
 
 TEST_F(UnstructuredLoggingTest, ArgsLikeFormatSpecifier) {
     // Ensure the plain formatter does not process the formatted string
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     std::string format_str = "format {} str {} fields";
     logd(format_str, 1, "{ x : 1}");  // NOLINT
