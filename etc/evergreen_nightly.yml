@@ -58,6 +58,8 @@ include:
   ### Uncomment when using this file for a LTS or Rapid release branch. ###
   # - filename: etc/evergreen_yml_components/variants/release/release.yml
 
+  - filename: src/mongo/db/modules/atlas/atlas_release.yml
+
 parameters:
   - key: evergreen_config_file_path
     value: "etc/evergreen_nightly.yml"

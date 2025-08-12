@@ -209,6 +209,7 @@ tasks:
             - "src/poetry_requirements.txt"
             - "src/pyproject.toml"
             - "src/src/**.idl"
+            - "src/src/**.yml"
             - "src/src/mongo/client/sdam/json_tests/sdam_tests/**"
             - "src/src/mongo/client/sdam/json_tests/server_selection_tests/**"
             - "src/src/mongo/db/modules/enterprise/docs/**"
