@@ -106,6 +106,11 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
     ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed6_extension.so")),
                        AssertionException,
                        10615506);
+
+    // malformed7_extension has the maximum uint32_t value as its major version.
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed7_extension.so")),
+                       AssertionException,
+                       10615504);
 }
 
 // TODO SERVER-109108: Switch this to use the foo extension once we can reset state in between

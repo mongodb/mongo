@@ -67,6 +67,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/test_examples:malformed4_extension",
         "//src/mongo/db/extension/test_examples:malformed5_extension",
         "//src/mongo/db/extension/test_examples:malformed6_extension",
+        "//src/mongo/db/extension/test_examples:malformed7_extension",
         "//src/mongo/db/extension/test_examples:nullStageDescriptor_extension",
     ],
     tags = ["mongo_unittest_seventh_group"],
