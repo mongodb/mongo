@@ -2,7 +2,7 @@
  * Tests simultaneous upgrade from noauth/no-ssl to x509/requireTLS on a sharded cluster.
  * The purpose is to verify the connectivity between mongos, config server, and the shards
  *
- * NOTE: This test is similar to the mixed_mode_sharded_transition.js in the ssl
+ * NOTE: This test is similar to mixed_mode_sharded_transition_part_1/2.js in the ssl_x509
  * test suite. This suite does not use ssl so it cannot test modes with ssl.
  */
 
