@@ -80,8 +80,13 @@ private:
                                 RoutingContext& routingCtx,
                                 const NonTargetedWriteBatch& batch);
 
-    std::vector<AsyncRequestsSender::Request> buildBulkWriteRequests(
-        OperationContext* opCtx, const SimpleWriteBatch& batch) const;
+    BSONObj buildBulkWriteRequest(
+        OperationContext* opCtx,
+        const std::vector<WriteOp>& ops,
+        const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+        bool shouldAppendLsidAndTxnNumber,
+        bool shouldAppendWriteConcern,
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none) const;
 
     const WriteCommandRef _cmdRef;
 };

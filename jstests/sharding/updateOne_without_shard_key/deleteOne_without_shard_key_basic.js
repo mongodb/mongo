@@ -26,10 +26,6 @@ const xFieldValShard0_2 = xFieldValShard0_1 - 1;  // A different shard key on sh
 const xFieldValShard1_1 = splitPoint + 1;
 const yFieldVal = 2;
 
-const isUnifiedWriteExecutor =
-    st.s.adminCommand({getParameter: 1, internalQueryUnifiedWriteExecutor: 1})
-        .internalQueryUnifiedWriteExecutor;
-
 // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
 // splitPoint and Shard 1 splitPoint >= 5.
 WriteWithoutShardKeyTestUtil.setupShardedCollection(
@@ -146,23 +142,12 @@ const testCases = [
     },
 ];
 
-let configurations = [
+const configurations = [
     WriteWithoutShardKeyTestUtil.Configurations.noSession,
     WriteWithoutShardKeyTestUtil.Configurations.sessionNotRetryableWrite,
     WriteWithoutShardKeyTestUtil.Configurations.sessionRetryableWrite,
     WriteWithoutShardKeyTestUtil.Configurations.transaction
 ];
-
-// Don't run the testcases under the 'sessionRetryableWrite' and 'transaction' configurations when
-// the unified write executor is enabled.
-// TODO SERVER-104115 SERVER-104131: Once the unified write executor supports retryable writes and
-// transactions, re-enable all configurations for the unified write executor.
-if (isUnifiedWriteExecutor) {
-    configurations = [
-        WriteWithoutShardKeyTestUtil.Configurations.noSession,
-        WriteWithoutShardKeyTestUtil.Configurations.sessionNotRetryableWrite,
-    ];
-}
 
 configurations.forEach(config => {
     let conn = WriteWithoutShardKeyTestUtil.getClusterConnection(st, config);

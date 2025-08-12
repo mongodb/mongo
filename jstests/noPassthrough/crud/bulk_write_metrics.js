@@ -135,8 +135,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
                                           session.getSessionId(),
                                           NumberLong(10));
 
-    // TODO SERVER-104115: Enable when txn/retryable writes are supported for two phase writes.
-    if (!isMongos || !uweEnabled) {
+    if (!isMongos) {
         metricChecker.checkMetricsWithRetries(
             "Simple update with retry",
             [{

@@ -48,70 +48,101 @@ WriteBatchResponse WriteBatchExecutor::execute(OperationContext* opCtx,
                       batch.data);
 }
 
-std::vector<AsyncRequestsSender::Request> WriteBatchExecutor::buildBulkWriteRequests(
-    OperationContext* opCtx, const SimpleWriteBatch& batch) const {
-    std::vector<AsyncRequestsSender::Request> requestsToSend;
-    for (auto& [shardId, shardRequest] : batch.requestByShardId) {
-        std::vector<BulkWriteOpVariant> bulkOps;
-        std::vector<NamespaceInfoEntry> nsInfos;
-        std::map<NamespaceString, int> nsIndexMap;
-        const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
-        const bool isRetryableWrite = opCtx->isRetryableWrite();
-        std::vector<int> stmtIds;
-        if (isRetryableWrite) {
-            stmtIds.reserve(shardRequest.ops.size());
-        }
-        for (auto& op : shardRequest.ops) {
-            auto& nss = op.getNss();
-            auto versionIt = shardRequest.versionByNss.find(nss);
+BSONObj WriteBatchExecutor::buildBulkWriteRequest(
+    OperationContext* opCtx,
+    const std::vector<WriteOp>& ops,
+    const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    bool shouldAppendLsidAndTxnNumber,
+    bool shouldAppendWriteConcern,
+    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) const {
+    std::vector<BulkWriteOpVariant> bulkOps;
+    std::vector<NamespaceInfoEntry> nsInfos;
+    std::map<NamespaceString, int> nsIndexMap;
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+    const bool isRetryableWrite = opCtx->isRetryableWrite();
+    std::vector<int> stmtIds;
+    if (isRetryableWrite) {
+        stmtIds.reserve(ops.size());
+    }
+    for (auto& op : ops) {
+        auto bulkOp = op.getBulkWriteOp();
+        auto& nss = op.getNss();
+
+        NamespaceInfoEntry nsInfo(nss);
+        if (!versionByNss.empty()) {
+            auto versionIt = versionByNss.find(nss);
             tassert(10346801,
                     "The shard version info should be present in the batch",
-                    versionIt != shardRequest.versionByNss.end());
+                    versionIt != versionByNss.end());
             auto& version = versionIt->second;
 
-            NamespaceInfoEntry nsInfo(nss);
             nsInfo.setShardVersion(version.shardVersion);
             nsInfo.setDatabaseVersion(version.databaseVersion);
-            if (nsIndexMap.find(nsInfo.getNs()) == nsIndexMap.end()) {
-                nsIndexMap[nsInfo.getNs()] = nsInfos.size();
-                nsInfos.push_back(nsInfo);
-            }
-            auto nsIndex = nsIndexMap[nsInfo.getNs()];
-
-            // Reassigns the namespace index for the list of ops.
-            auto bulkOp = op.getBulkWriteOp();
-            visit([&](auto& value) { return value.setNsInfoIdx(nsIndex); }, bulkOp);
-            bulkOps.emplace_back(bulkOp);
-
-            if (isRetryableWrite) {
-                stmtIds.push_back(op.getEffectiveStmtId());
-            }
         }
 
-        auto bulkRequest = BulkWriteCommandRequest(std::move(bulkOps), std::move(nsInfos));
-        bulkRequest.setOrdered(_cmdRef.getOrdered());
-        bulkRequest.setBypassDocumentValidation(_cmdRef.getBypassDocumentValidation());
-        bulkRequest.setBypassEmptyTsReplacement(_cmdRef.getBypassEmptyTsReplacement());
-        bulkRequest.setLet(_cmdRef.getLet());
-        if (_cmdRef.isBulkWriteCommand()) {
-            bulkRequest.setErrorsOnly(_cmdRef.getErrorsOnly().value_or(false));
-            bulkRequest.setComment(_cmdRef.getComment());
-            bulkRequest.setMaxTimeMS(_cmdRef.getMaxTimeMS());
+        // Reassigns the namespace index for the list of ops.
+        if (nsIndexMap.find(nss) == nsIndexMap.end()) {
+            nsIndexMap[nss] = nsInfos.size();
+            nsInfos.push_back(nsInfo);
         }
+        auto nsIndex = nsIndexMap[nss];
+        visit([&](auto& value) { return value.setNsInfoIdx(nsIndex); }, bulkOp);
+
+        if (op.getType() == WriteType::kUpdate &&
+            allowShardKeyUpdatesWithoutFullShardKeyInQuery.has_value()) {
+            get_if<BulkWriteUpdateOp>(&bulkOp)->setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
+                *allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+        }
+
+        bulkOps.emplace_back(bulkOp);
 
         if (isRetryableWrite) {
-            bulkRequest.setStmtIds(stmtIds);
+            stmtIds.push_back(op.getEffectiveStmtId());
         }
-        BSONObjBuilder builder;
-        bulkRequest.serialize(&builder);
-        logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
-        auto writeConcern = getWriteConcernForShardRequest(opCtx);
+    }
 
+    auto bulkRequest = BulkWriteCommandRequest(std::move(bulkOps), std::move(nsInfos));
+    bulkRequest.setOrdered(_cmdRef.getOrdered());
+    bulkRequest.setBypassDocumentValidation(_cmdRef.getBypassDocumentValidation());
+    bulkRequest.setBypassEmptyTsReplacement(_cmdRef.getBypassEmptyTsReplacement());
+    bulkRequest.setLet(_cmdRef.getLet());
+    if (_cmdRef.isBulkWriteCommand()) {
+        bulkRequest.setErrorsOnly(_cmdRef.getErrorsOnly().value_or(false));
+        bulkRequest.setComment(_cmdRef.getComment());
+        bulkRequest.setMaxTimeMS(_cmdRef.getMaxTimeMS());
+    }
+
+    if (isRetryableWrite) {
+        bulkRequest.setStmtIds(stmtIds);
+    }
+    BSONObjBuilder builder;
+    bulkRequest.serialize(&builder);
+
+    if (shouldAppendLsidAndTxnNumber) {
+        logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
+    }
+
+    if (shouldAppendWriteConcern) {
+        auto writeConcern = getWriteConcernForShardRequest(opCtx);
         // We don't append write concern in a transaction.
         if (writeConcern && !inTransaction) {
             builder.append(WriteConcernOptions::kWriteConcernField, writeConcern->toBSON());
         }
-        auto bulkRequestObj = builder.obj();
+    }
+
+    return builder.obj();
+}
+
+WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
+                                                RoutingContext& routingCtx,
+                                                const SimpleWriteBatch& batch) {
+    std::vector<AsyncRequestsSender::Request> requestsToSend;
+    for (auto& [shardId, shardRequest] : batch.requestByShardId) {
+        auto bulkRequestObj = buildBulkWriteRequest(opCtx,
+                                                    shardRequest.ops,
+                                                    shardRequest.versionByNss,
+                                                    true /* shouldAppendLsidAndTxnNumber */,
+                                                    true /* shouldAppendWriteConcern */);
         LOGV2_DEBUG(10605503,
                     4,
                     "Constructed request for shard",
@@ -119,13 +150,6 @@ std::vector<AsyncRequestsSender::Request> WriteBatchExecutor::buildBulkWriteRequ
                     "shardId"_attr = shardId);
         requestsToSend.emplace_back(shardId, std::move(bulkRequestObj));
     }
-    return requestsToSend;
-}
-
-WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
-                                                RoutingContext& routingCtx,
-                                                const SimpleWriteBatch& batch) {
-    std::vector<AsyncRequestsSender::Request> requestsToSend = buildBulkWriteRequests(opCtx, batch);
 
     // Note we check this rather than `isRetryableWrite()` because we do not want to retry
     // commands within retryable internal transactions.
@@ -160,35 +184,19 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
                                                 const NonTargetedWriteBatch& batch) {
     const WriteOp& writeOp = batch.op;
+    const auto& nss = writeOp.getNss();
     // TODO SERVER-108144 maybe we shouldn't call release here or maybe we should acknowledge a
     // write based on the swRes.
-    routingCtx.release(writeOp.getNss());
-    auto bulkOp = writeOp.getBulkWriteOp();
-    const auto& nss = writeOp.getNss();
+    routingCtx.release(nss);
 
-    NamespaceInfoEntry nsInfo(nss);
-    const int32_t nsIndex = 0;
-
-    visit([&](auto& value) { return value.setNsInfoIdx(nsIndex); }, bulkOp);
-
-    if (BulkWriteCRUDOp(bulkOp).getType() == BulkWriteCRUDOp::OpType::kUpdate) {
-        const bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
-            opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
-
-        get_if<BulkWriteUpdateOp>(&bulkOp)->setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
-            allowShardKeyUpdatesWithoutFullShardKeyInQuery);
-    }
-
-    std::vector<BulkWriteOpVariant> bulkOps;
-    std::vector<NamespaceInfoEntry> nsInfos;
-    bulkOps.emplace_back(std::move(bulkOp));
-    nsInfos.push_back(std::move(nsInfo));
-
-    auto bulkRequest = BulkWriteCommandRequest(std::move(bulkOps), std::move(nsInfos));
-
-    BSONObjBuilder builder;
-    bulkRequest.serialize(&builder);
-    BSONObj cmdObj = builder.obj();
+    bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
+        opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
+    auto cmdObj = buildBulkWriteRequest(opCtx,
+                                        {writeOp},
+                                        {},    /* versionByNss*/
+                                        false, /* shouldAppendLsidAndTxnNumber */
+                                        false, /* shouldAppendWriteConcern */
+                                        allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
     boost::optional<WriteConcernErrorDetail> wce;
     auto swRes =

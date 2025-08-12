@@ -146,6 +146,15 @@ private:
                                                    const std::vector<BulkWriteReplyItem>&,
                                                    std::vector<WriteOp>&& toRetry);
 
+
+    /**
+     * Handle errors when we do not have responses from the remote shards.
+     */
+    Result handleLocalError(OperationContext* opCtx,
+                            Status status,
+                            WriteOp op,
+                            boost::optional<const ShardId&> shardId);
+
     /**
      * Adds a BulkReplyItem with the opId and status to '_results' and increments '_nErrors'. Used
      * when we need to abort the whole batch due to an error when we're in a transaction.

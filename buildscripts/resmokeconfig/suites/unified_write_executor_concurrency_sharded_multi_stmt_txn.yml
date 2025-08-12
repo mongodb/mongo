@@ -55,8 +55,6 @@ selector:
     # TODO: SERVER-104120 try enabling when writes without shard key are fully supported.
     - jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_with_refine_collection_shard_key.js
     - jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_with_resharding.js
-    # TODO: SERVER-104115 try enabling when retryable writes are implemented.
-    - jstests/concurrency/fsm_workloads/query/remove/remove_single_document.js
     # TODO: SERVER-107644 enable when sample id is supported.
     - jstests/concurrency/fsm_workloads/analyze_shard_key.js
 

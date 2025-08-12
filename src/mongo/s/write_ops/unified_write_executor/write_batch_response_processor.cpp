@@ -81,12 +81,14 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     OperationContext* opCtx,
     RoutingContext& routingCtx,
     const NonTargetedWriteBatchResponse& response) {
-    // TODO SERVER-104115 retried stmts.
     // TODO SERVER-104535 cursor support for UnifiedWriteExec.
     // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
     // TODO SERVER-105762 Add support for errorsOnly: true.
     const auto& swRes = response.swResponse;
     const auto& op = response.op;
+    if (!swRes.getStatus().isOK()) {
+        return handleLocalError(opCtx, swRes.getStatus(), op, boost::none /* shardId */);
+    }
 
     // Extract the reply item from the ClusterWriteWithoutShardKeyResponse if possible, otherwise
     // create a reply item.
@@ -154,37 +156,44 @@ void WriteBatchResponseProcessor::noteErrorResponseOnAbort(int opId, const Statu
     _nErrors++;
 }
 
+Result WriteBatchResponseProcessor::handleLocalError(OperationContext* opCtx,
+                                                     Status status,
+                                                     WriteOp op,
+                                                     boost::optional<const ShardId&> shardId) {
+    // TODO SERVER-105303 Handle interruption/shutdown.
+    // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
+    // If we are in a transaction, we stop processing and return the first error.
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+    if (inTransaction) {
+        auto newStatus = status.withContext(
+            str::stream() << "Encountered error from " << (shardId ? shardId->toString() : "shards")
+                          << " during a transaction");
+        // Transient transaction errors should be returned directly as top level errors to allow
+        // the client to retry.
+        if (isTransientTransactionError(
+                status.code(), /*hasWriteConcernError*/ false, /*isCommitOrAbort*/ false)) {
+            uassertStatusOK(newStatus);
+        }
+        // TODO SERVER-105762 Figure out what opId to use here in case we don't return any.
+        LOGV2_DEBUG(10413100,
+                    4,
+                    "Aborting batch due to error in transaction",
+                    "error"_attr = redact(newStatus));
+        noteErrorResponseOnAbort(op.getId(), status);
+        return {ErrorType::kStopProcessing, {}, {}};
+    }
+    noteErrorResponseOnAbort(op.getId(), status);
+    return {};
+}
+
 Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
                                                     RoutingContext& routingCtx,
                                                     const ShardId& shardId,
                                                     const ShardResponse& response) {
     const Status& status = response.swResponse.getStatus();
     const auto& ops = response.ops;
-    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
-    // Handle local errors, not from a shardResponse.
     if (!status.isOK()) {
-        // TODO SERVER-105303 Handle interruption/shutdown.
-        // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
-        // If we are in a transaction, we stop processing and return the first error.
-        if (inTransaction) {
-            auto newStatus = status.withContext(str::stream() << "Encountered error from" << shardId
-                                                              << "during a transaction");
-            // Transient transaction errors should be returned directly as top level errors to allow
-            // the client to retry.
-            if (isTransientTransactionError(
-                    status.code(), /*hasWriteConcernError*/ false, /*isCommitOrAbort*/ false)) {
-                uassertStatusOK(newStatus);
-            }
-            // TODO SERVER-105762 Figure out what opId to use here in case we don't return any.
-            LOGV2_DEBUG(10413100,
-                        4,
-                        "Aborting batch due to error in transaction",
-                        "error"_attr = redact(newStatus));
-            noteErrorResponseOnAbort(ops.front().getId(), status);
-            return {ErrorType::kStopProcessing, {}, {}};
-        }
-        noteErrorResponseOnAbort(ops.front().getId(), status);
-        return {};
+        return handleLocalError(opCtx, status, ops.front(), shardId);
     }
 
     auto shardResponse = response.swResponse.getValue();
@@ -201,6 +210,7 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
         auto status = shardResponseStatus.withContext(
             str::stream() << "cluster write results unavailable from " << shardResponse.target);
 
+        const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
         if (inTransaction) {
             auto errorReply = ErrorReply::parse(IDLParserContext("ErrorReply"), shardResponse.data);
             // Transient transaction errors should be returned directly as top level errors to allow
