@@ -41,6 +41,9 @@ using namespace mongo;
 namespace {
 
 class RecordIdDeduplicatorTest : public SpillingTestFixture {
+public:
+    SpillingStats spillingStats;
+
 protected:
     void assertInsertNew(RecordIdDeduplicator& recordIdDeduplicator, RecordId recordId) {
         ASSERT_FALSE(recordIdDeduplicator.contains(recordId));
@@ -85,7 +88,7 @@ TEST_F(RecordIdDeduplicatorTest, spillNoDiskUsageTest) {
 
     assertInsertNew(recordIdDeduplicator, longRecordId);
     assertInsertNew(recordIdDeduplicator, stringRecordId);
-    ASSERT_THROWS_CODE(recordIdDeduplicator.spill(),
+    ASSERT_THROWS_CODE(recordIdDeduplicator.spill(spillingStats),
                        DBException,
                        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
@@ -107,13 +110,13 @@ TEST_F(RecordIdDeduplicatorTest, basicHashSpillTest) {
     assertInsertNew(recordIdDeduplicator, longRecordId);
     assertInsertNew(recordIdDeduplicator, stringRecordId);
 
-    recordIdDeduplicator.spill();
+    recordIdDeduplicator.spill(spillingStats);
 
     // At this point it should have spilled.
     ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
-    ASSERT_EQ(expectedSpills, recordIdDeduplicator.getSpillingStats().getSpills());
-    ASSERT_EQ(expectedSpilledBytes, recordIdDeduplicator.getSpillingStats().getSpilledBytes());
-    ASSERT_EQ(expectedSpilledRecords, recordIdDeduplicator.getSpillingStats().getSpilledRecords());
+    ASSERT_EQ(expectedSpills, spillingStats.getSpills());
+    ASSERT_EQ(expectedSpilledBytes, spillingStats.getSpilledBytes());
+    ASSERT_EQ(expectedSpilledRecords, spillingStats.getSpilledRecords());
 
     // Insert the same records.
     assertInsertExisting(recordIdDeduplicator, stringRecordId);
@@ -129,9 +132,9 @@ TEST_F(RecordIdDeduplicatorTest, basicHashSpillTest) {
 
     // The spills should not have changed.
     ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
-    ASSERT_EQ(expectedSpills, recordIdDeduplicator.getSpillingStats().getSpills());
-    ASSERT_EQ(expectedSpilledBytes, recordIdDeduplicator.getSpillingStats().getSpilledBytes());
-    ASSERT_EQ(expectedSpilledRecords, recordIdDeduplicator.getSpillingStats().getSpilledRecords());
+    ASSERT_EQ(expectedSpills, spillingStats.getSpills());
+    ASSERT_EQ(expectedSpilledBytes, spillingStats.getSpilledBytes());
+    ASSERT_EQ(expectedSpilledRecords, spillingStats.getSpilledRecords());
 }
 
 TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
@@ -169,13 +172,13 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
         ++expectedSpilledRecords;
     }
 
-    recordIdDeduplicator.spill();
+    recordIdDeduplicator.spill(spillingStats);
 
     // At this point it should have spilled.
     ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
-    ASSERT_EQ(expectedSpills, recordIdDeduplicator.getSpillingStats().getSpills());
-    ASSERT_EQ(expectedSpilledBytes, recordIdDeduplicator.getSpillingStats().getSpilledBytes());
-    ASSERT_EQ(expectedSpilledRecords, recordIdDeduplicator.getSpillingStats().getSpilledRecords());
+    ASSERT_EQ(expectedSpills, spillingStats.getSpills());
+    ASSERT_EQ(expectedSpilledBytes, spillingStats.getSpilledBytes());
+    ASSERT_EQ(expectedSpilledRecords, spillingStats.getSpilledRecords());
 
     // Insert the same records.
     assertInsertExisting(recordIdDeduplicator, stringRecordId);

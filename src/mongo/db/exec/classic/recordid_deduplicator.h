@@ -62,6 +62,11 @@ public:
                                                      internalRoaringBitmapsMinimalDensity.load())) {
     }
 
+    bool hasSpilled() const {
+        return (_diskStorageString || _diskStorageLong);
+    }
+
+
     /**
      * Return true if the RecordId has been seen.
      */
@@ -72,21 +77,14 @@ public:
      */
     bool insert(const RecordId& recordId);
 
-    bool hasSpilled() const {
-        return _stats.getSpills() > 0;
-    }
-
-    const SpillingStats& getSpillingStats() const {
-        return _stats;
-    }
-
     /**
-     * Spills to disk until the memory usage does not exceed maximumMemoryUsageBytes. If no value
-     * is provided for maximumMemoryUsageBytes then it spills everything.
+     * Spills to disk until the memory usage does not exceed maximumMemoryUsageBytes and updates the
+     * provided SpillingStats. If no value is provided for maximumMemoryUsageBytes then it spills
+     * everything.
      */
-    void spill(uint64_t maximumMemoryUsageBytes = 0);
+    void spill(SpillingStats& stats, uint64_t maximumMemoryUsageBytes = 0);
 
-    uint64_t getApproximateSize() {
+    uint64_t getApproximateSize() const {
         return _hashset.size() + _roaring.getApproximateSize();
     }
 
@@ -101,7 +99,5 @@ private:
 
     std::unique_ptr<SpillTable> _diskStorageString;
     std::unique_ptr<SpillTable> _diskStorageLong;
-
-    SpillingStats _stats;
 };
 }  // namespace mongo

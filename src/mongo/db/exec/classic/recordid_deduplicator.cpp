@@ -86,7 +86,7 @@ bool RecordIdDeduplicator::insert(const RecordId& recordId) {
     return true;
 }
 
-void RecordIdDeduplicator::spill(uint64_t maximumMemoryUsageBytes) {
+void RecordIdDeduplicator::spill(SpillingStats& stats, uint64_t maximumMemoryUsageBytes) {
     uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
             str::stream() << "Exceeded memory limit of " << maximumMemoryUsageBytes
                           << ", but didn't allow external sort."
@@ -154,7 +154,7 @@ void RecordIdDeduplicator::spill(uint64_t maximumMemoryUsageBytes) {
             *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()));
     };
 
-    _stats.updateSpillingStats(
+    stats.updateSpillingStats(
         1, additionalSpilledBytes, additionalSpilledRecords, currentSpilledDataStorageSize);
 }
 
