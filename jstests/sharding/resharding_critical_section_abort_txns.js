@@ -131,19 +131,34 @@ function assertInterruptedWithRetryableWriteErrorLabel(res) {
     assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 }
 
-const st = new ShardingTest({shards: 2});
+// TODO (SERVER-109184): When featureFlagReshardingVerification is enabled, resharding could hang
+// if the critical section times out while donors are still trying to acquire critical section.
+// This is what one of test cases below is testing. Re-enable the feature flag after the fix.
+const featureFlagReshardingVerification = false;
+const reshardingCriticalSectionTimeoutMillisForTimeoutTest = 5000;
+
+const st = new ShardingTest({
+    shards: 2,
+    rs: {
+        nodes: 3,
+        setParameter: {
+            featureFlagReshardingVerification,
+        }
+    },
+    other: {
+        configOptions: {
+            setParameter: {
+                featureFlagReshardingVerification,
+            }
+        }
+    }
+});
 const configPrimary = st.configRS.getPrimary();
 const shard1Primary = st.rs1.getPrimary();
 
 let testNum = 0;
 const dbName = "testDb";
 const testDB = st.s.getDB(dbName);
-
-const reshardingCriticalSectionTimeoutMillis = 5000;
-assert.commandWorked(configPrimary.adminCommand({
-    setParameter: 1,
-    reshardingCriticalSectionTimeoutMillis,
-}));
 
 // Make shard0 the primary shard for the test database.
 assert.commandWorked(
@@ -183,15 +198,20 @@ function testPreparingToBlockWritesWhileSessionCheckedIn(testOptions) {
     assert.eq(testColl0.find().itcount(), 1);
     assert.eq(testColl1.find().itcount(), 1);
 
-    let setParameterRes;
+    let setParameterResAbortUnpreparedTxns;
     if (!testOptions.enableAbortUnpreparedTxns) {
         // 'reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites' defaults to true. So
         // only set it when it needs to be set to false.
-        setParameterRes = assert.commandWorked(shard1Primary.adminCommand({
+        setParameterResAbortUnpreparedTxns = assert.commandWorked(shard1Primary.adminCommand({
             setParameter: 1,
             reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites: false,
         }));
     }
+    const setParameterResCriticalSectionTimeout = assert.commandWorked(configPrimary.adminCommand({
+        setParameter: 1,
+        reshardingCriticalSectionTimeoutMillis:
+            reshardingCriticalSectionTimeoutMillisForTimeoutTest,
+    }));
 
     let beforeBlockingFp =
         configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
@@ -248,24 +268,14 @@ function testPreparingToBlockWritesWhileSessionCheckedIn(testOptions) {
         // transactions, instead it should get stuck waiting for them to complete until the critical
         // section timeout is reached.
 
-        // TODO (SERVER-106862): Currently, upon aborting resharding, a donor would try to release
-        // the critical section regardless of whether it had successfully acquired it. Releasing the
-        // critical section involves taking an X lock on the collection being resharded. So in this
-        // case, the lock acquisition or the abort itself is expected to block until we commit or
-        // abort the transactions. After SERVER-106862, commit the transactions after joining the
-        // moveCollection thread instead and assert that moveCollection command always fails with
-        // ReshardingCriticalSectionTimeout.
-        sleep(100);  // Sleep for a while to verify the transactions do not get aborted.
-
         jsTest.log("Verifying that neither of the transactions got aborted");
+        const moveCollRes = moveCollThread.returnData();
+        assert.commandFailedWithCode(moveCollRes, ErrorCodes.ReshardingCriticalSectionTimeout);
+
         assert.commandWorked(
             shard1Primary.adminCommand(makeCommitTxnCmdObj(lsid0, txnNumber0, prepareRes0)));
         assert.commandWorked(
             shard1Primary.adminCommand(makeCommitTxnCmdObj(lsid1, txnNumber1, prepareRes1)));
-
-        const moveCollRes = moveCollThread.returnData();
-        assert.commandWorkedOrFailedWithCode(moveCollRes,
-                                             ErrorCodes.ReshardingCriticalSectionTimeout);
 
         assert.eq(testColl0.find({x: 1}).itcount(), 1);
         assert.eq(testColl1.find({x: 1}).itcount(), 1);
@@ -274,11 +284,17 @@ function testPreparingToBlockWritesWhileSessionCheckedIn(testOptions) {
     if (!testOptions.enableAbortUnpreparedTxns) {
         // Restore the original 'reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites'
         // value.
-        setParameterRes = assert.commandWorked(shard1Primary.adminCommand({
+        setParameterResAbortUnpreparedTxns = assert.commandWorked(shard1Primary.adminCommand({
             setParameter: 1,
-            reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites: setParameterRes.was,
+            reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites:
+                setParameterResAbortUnpreparedTxns.was,
         }));
     }
+    // Restore the original 'reshardingCriticalSectionTimeoutMillis' value.
+    assert.commandWorked(configPrimary.adminCommand({
+        setParameter: 1,
+        reshardingCriticalSectionTimeoutMillis: setParameterResCriticalSectionTimeout.was,
+    }));
 }
 
 /**
