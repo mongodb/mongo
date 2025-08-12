@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -41,10 +40,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_list_sessions_gen.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -61,21 +60,6 @@ REGISTER_DOCUMENT_SOURCE(listLocalSessions,
                          AllowedWithApiStrict::kNeverInVersion1);
 ALLOCATE_DOCUMENT_SOURCE_ID(listLocalSessions, DocumentSourceListLocalSessions::id)
 
-DocumentSource::GetNextResult DocumentSourceListLocalSessions::doGetNext() {
-    while (!_ids.empty()) {
-        const auto& id = _ids.back();
-        const auto record = _cache->peekCached(id);
-        _ids.pop_back();
-        if (!record) {
-            // It's possible for SessionRecords to have expired while we're walking
-            continue;
-        }
-        return Document(record->toBSON());
-    }
-
-    return GetNextResult::makeEOF();
-}
-
 boost::intrusive_ptr<DocumentSource> DocumentSourceListLocalSessions::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
 
@@ -90,16 +74,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListLocalSessions::createFrom
 
 DocumentSourceListLocalSessions::DocumentSourceListLocalSessions(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx, const ListSessionsSpec& spec)
-    : DocumentSource(kStageName, pExpCtx), exec::agg::Stage(kStageName, pExpCtx), _spec(spec) {
-    const auto& opCtx = pExpCtx->getOperationContext();
-    _cache = LogicalSessionCache::get(opCtx);
-    if (_spec.getAllUsers()) {
-        invariant(!_spec.getUsers() || _spec.getUsers()->empty());
-        _ids = _cache->listIds();
-    } else {
-        _ids = _cache->listIds(listSessionsUsersToDigests(_spec.getUsers().value()));
-    }
-}
+    : DocumentSource(kStageName, pExpCtx), _spec(spec) {}
 
 namespace {
 ListSessionsUser getUserNameForLoggedInUser(const OperationContext* opCtx) {

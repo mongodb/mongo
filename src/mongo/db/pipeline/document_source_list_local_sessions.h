@@ -31,8 +31,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -42,14 +40,11 @@
 #include "mongo/db/pipeline/document_source_list_sessions_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/session/logical_session_cache.h"
-#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -75,7 +70,7 @@ std::vector<SHA256Block> listSessionsUsersToDigests(const std::vector<ListSessio
  * as true, and returns just sessions for the currently logged in user if
  * 'allUsers' is specified as false, or not specified at all.
  */
-class DocumentSourceListLocalSessions final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceListLocalSessions final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$listLocalSessions"_sd;
 
@@ -167,15 +162,14 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    const ListSessionsSpec& getSpec() const {
+        return _spec;
+    }
+
 private:
     DocumentSourceListLocalSessions(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                     const ListSessionsSpec& spec);
-
-    GetNextResult doGetNext() final;
-
     const ListSessionsSpec _spec;
-    const LogicalSessionCache* _cache;
-    std::vector<LogicalSessionId> _ids;
 };
 
 }  // namespace mongo
