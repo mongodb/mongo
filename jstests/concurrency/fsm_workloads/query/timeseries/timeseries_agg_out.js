@@ -16,7 +16,7 @@
  *   command_not_supported_in_serverless,
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
- *   # TODO SERVER-104916 review the following tag
+ *   # TODO SERVER-102039 $out is not yet supported for viewless timeseries collections
  *   does_not_support_viewless_timeseries_yet,
  * ]
  */
@@ -120,6 +120,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 ErrorCodes.NamespaceNotFound,
                 ErrorCodes.NamespaceCannotBeSharded,
                 // Can't convert a timeseries collection to a capped collection
+                ErrorCodes.IllegalOperation,
+                // TODO(SERVER-108560): Remove CommandNotSupportedOnView after 9.0 becomes last LTS
                 ErrorCodes.CommandNotSupportedOnView,
             ]);
     };
