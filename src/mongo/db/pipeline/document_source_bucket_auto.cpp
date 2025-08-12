@@ -160,11 +160,10 @@ void DocumentSourceBucketAuto::addVariableRefs(std::set<Variables::Id>* refs) co
 
 SortOptions DocumentSourceBucketAuto::makeSortOptions() {
     SortOptions opts;
-    opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
+    opts.MaxMemoryUsageBytes(_maxMemoryUsageBytes);
     if (pExpCtx->getAllowDiskUse() && !pExpCtx->getInRouter()) {
-        opts.extSortAllowed = true;
-        opts.tempDir = pExpCtx->getTempDir();
-        opts.sorterFileStats = &_sorterFileStats;
+        opts.TempDir(pExpCtx->getTempDir());
+        opts.FileStats(&_sorterFileStats);
     }
     return opts;
 }

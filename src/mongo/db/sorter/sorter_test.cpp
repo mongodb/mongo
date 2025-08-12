@@ -114,11 +114,8 @@ TEST_F(InMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
     unittest::TempDir tempDir("InMemIterTests");
     SorterTracker sorterTracker;
     SorterFileStats sorterFileStats(&sorterTracker);
-    const SortOptions opts = SortOptions()
-                                 .TempDir(tempDir.path())
-                                 .FileStats(&sorterFileStats)
-                                 .Tracker(&sorterTracker)
-                                 .ExtSortAllowed(true);
+    const SortOptions opts =
+        SortOptions().TempDir(tempDir.path()).FileStats(&sorterFileStats).Tracker(&sorterTracker);
 
     ASSERT_TRUE(iteratorToSpill->spillable());
     auto spilledIterator = iteratorToSpill->spill(opts, IWSorter::Settings{});
@@ -168,7 +165,7 @@ private:
     int _appendToFile(const SortOptions* opts, int currentFileSize, int range) {
         auto makeFile = [&] {
             return std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
-                sorter::nextFileName(opts->tempDir), opts->sorterFileStats);
+                sorter::nextFileName(*(opts->tempDir)), opts->sorterFileStats);
         };
 
         int currentBufSize = 0;
@@ -290,28 +287,16 @@ DEATH_TEST_F(
     IWSorter::makeFromExistingRanges("", {}, opts, IWComparator(ASC));
 }
 
-DEATH_TEST_F(SorterMakeFromExistingRangesTest, ExtSortNotAllowed, "opts.extSortAllowed") {
-    auto opts = SortOptions();
-    ASSERT_FALSE(opts.extSortAllowed);
-    IWSorter::makeFromExistingRanges("", {}, opts, IWComparator(ASC));
-}
-
-DEATH_TEST_F(SorterMakeFromExistingRangesTest, EmptyTempDir, "!opts.tempDir.empty()") {
-    auto opts = SortOptions().ExtSortAllowed();
-    ASSERT_EQUALS("", opts.tempDir);
-    IWSorter::makeFromExistingRanges("", {}, opts, IWComparator(ASC));
-}
-
 DEATH_TEST_F(SorterMakeFromExistingRangesTest, EmptyFileName, "!fileName.empty()") {
     std::string fileName;
-    auto opts = SortOptions().ExtSortAllowed().TempDir("unused_temp_dir");
+    auto opts = SortOptions().TempDir("unused_temp_dir");
     IWSorter::makeFromExistingRanges(fileName, {}, opts, IWComparator(ASC));
 }
 
 TEST_F(SorterMakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
     auto fileName = "unused_sorter_file";
     SorterTracker sorterTracker;
-    auto opts = SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").Tracker(&sorterTracker);
+    auto opts = SortOptions().TempDir("unused_temp_dir").Tracker(&sorterTracker);
     auto sorter = IWSorter::makeFromExistingRanges(fileName, {}, opts, IWComparator(ASC));
 
     ASSERT_EQ(0, sorter->stats().spilledRanges());
@@ -325,7 +310,7 @@ TEST_F(SorterMakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
 TEST_F(SorterMakeFromExistingRangesTest, MissingFile) {
     auto fileName = "unused_sorter_file";
     auto tempDir = "unused_temp_dir";
-    auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir);
+    auto opts = SortOptions().TempDir(tempDir);
     ASSERT_THROWS_WITH_CHECK(
         IWSorter::makeFromExistingRanges(fileName, makeSampleRanges(), opts, IWComparator(ASC)),
         std::exception,
@@ -341,7 +326,7 @@ TEST_F(SorterMakeFromExistingRangesTest, EmptyFile) {
     ASSERT(std::ofstream(tempFilePath.string()))
         << "failed to create empty temporary file: " << tempFilePath.string();
     auto fileName = tempFilePath.filename().string();
-    auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path());
+    auto opts = SortOptions().TempDir(tempDir.path());
     // 16815 - unexpected empty file.
     ASSERT_THROWS_CODE(
         IWSorter::makeFromExistingRanges(fileName, makeSampleRanges(), opts, IWComparator(ASC)),
@@ -359,7 +344,7 @@ TEST_F(SorterMakeFromExistingRangesTest, CorruptedFile) {
     }
     auto fileName = tempFilePath.filename().string();
     SorterTracker sorterTracker;
-    auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path()).Tracker(&sorterTracker);
+    auto opts = SortOptions().TempDir(tempDir.path()).Tracker(&sorterTracker);
     auto sorter =
         IWSorter::makeFromExistingRanges(fileName, makeSampleRanges(), opts, IWComparator(ASC));
 
@@ -376,7 +361,6 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
     SorterTracker sorterTracker;
 
     auto opts = SortOptions()
-                    .ExtSortAllowed()
                     .TempDir(tempDir.path())
                     .MaxMemoryUsageBytes(
                         sizeof(IWSorter::Data) +
@@ -437,12 +421,12 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
 
 TEST_F(SorterMakeFromExistingRangesTest, NextWithDeferredValues) {
     unittest::TempDir tempDir = makeTempDir();
-    auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path());
+    auto opts = SortOptions().TempDir(tempDir.path());
 
     IWPair pair1(1, 100);
     IWPair pair2(2, 200);
     auto spillFile = std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
-        sorter::nextFileName(opts.tempDir), opts.sorterFileStats);
+        sorter::nextFileName(*(opts.tempDir)), opts.sorterFileStats);
     SortedFileWriter<IntWrapper, IntWrapper> writer(opts, std::move(spillFile));
     writer.addAlreadySorted(pair1.first, pair1.second);
     writer.addAlreadySorted(pair2.first, pair2.second);
@@ -465,7 +449,7 @@ TEST_F(SorterMakeFromExistingRangesTest, NextWithDeferredValues) {
 
 TEST_F(SorterMakeFromExistingRangesTest, ChecksumVersion) {
     unittest::TempDir tempDir = makeTempDir();
-    auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path());
+    auto opts = SortOptions().TempDir(tempDir.path());
 
     // By default checksum version should be v2
     {
@@ -497,7 +481,7 @@ struct SpillFileState {
 
 SpillFileState makeSpillFile(unittest::TempDir& tempDir) {
     SpillFileState ret;
-    ret.opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path());
+    ret.opts = SortOptions().TempDir(tempDir.path());
 
     auto sorter = IWSorter::make(ret.opts, ret.comp);
     for (int i = 0; i < 10; ++i)
@@ -766,11 +750,8 @@ TEST_F(BoundedSorterTest, MemoryLimitsNoExtSortAllowed) {
 }
 
 TEST_F(BoundedSorterTest, SpillSorted) {
-    auto options = SortOptions()
-                       .ExtSortAllowed()
-                       .TempDir("unused_temp_dir")
-                       .MaxMemoryUsageBytes(16)
-                       .Tracker(&sorterTracker);
+    auto options =
+        SortOptions().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
     sorter = makeAsc(options);
 
     auto output = sort({
@@ -790,8 +771,7 @@ TEST_F(BoundedSorterTest, SpillSorted) {
 }
 
 TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
-    auto options =
-        SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
+    auto options = SortOptions().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
     sorter = makeAsc(options);
 
     auto output = sort({
@@ -812,11 +792,8 @@ TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
 }
 
 TEST_F(BoundedSorterTest, SpillAlmostSorted) {
-    auto options = SortOptions()
-                       .ExtSortAllowed()
-                       .TempDir("unused_temp_dir")
-                       .MaxMemoryUsageBytes(16)
-                       .Tracker(&sorterTracker);
+    auto options =
+        SortOptions().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
     sorter = makeAsc(options);
 
     auto output = sort({
@@ -838,8 +815,7 @@ TEST_F(BoundedSorterTest, SpillAlmostSorted) {
 }
 
 TEST_F(BoundedSorterTest, SpillWrongInput) {
-    auto options =
-        SortOptions().ExtSortAllowed().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
+    auto options = SortOptions().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
 
     std::vector<Doc> input = {
         {3},
@@ -878,7 +854,6 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
 
 TEST_F(BoundedSorterTest, LimitNoSpill) {
     auto options = SortOptions()
-                       .ExtSortAllowed()
                        .TempDir("unused_temp_dir")
                        .MaxMemoryUsageBytes(40)
                        .Tracker(&sorterTracker)
@@ -910,7 +885,6 @@ TEST_F(BoundedSorterTest, LimitNoSpill) {
 
 TEST_F(BoundedSorterTest, LimitSpill) {
     auto options = SortOptions()
-                       .ExtSortAllowed()
                        .TempDir("unused_temp_dir")
                        .MaxMemoryUsageBytes(40)
                        .Tracker(&sorterTracker)
@@ -944,7 +918,6 @@ TEST_F(BoundedSorterTest, LimitSpill) {
 TEST_F(BoundedSorterTest, ForceSpill) {
     SorterFileStats fileStats(&sorterTracker);
     auto options = SortOptions()
-                       .ExtSortAllowed()
                        .TempDir("unused_temp_dir")
                        .MaxMemoryUsageBytes(100 * 1024 * 1024)
                        .Tracker(&sorterTracker)
@@ -1244,11 +1217,8 @@ TEST_F(BoundedSorterTest, CompoundLimit) {
 }
 
 TEST_F(BoundedSorterTest, CompoundSpill) {
-    auto options = SortOptions()
-                       .ExtSortAllowed()
-                       .TempDir("unused_temp_dir")
-                       .Tracker(&sorterTracker)
-                       .MaxMemoryUsageBytes(40);
+    auto options =
+        SortOptions().TempDir("unused_temp_dir").Tracker(&sorterTracker).MaxMemoryUsageBytes(40);
     sorter = makeAsc(options);
 
     // When each partition is small enough, we don't spill.

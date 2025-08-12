@@ -252,7 +252,7 @@ std::shared_ptr<IWIterator> spillToFile(IteratorPtr inputIter, const unittest::T
     SorterFileStats sorterFileStats(nullptr /* sorterTracker */);
     const SortOptions opts = SortOptions().TempDir(tempDir.path());
     auto spillFile = std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
-        sorter::nextFileName(opts.tempDir), opts.sorterFileStats);
+        sorter::nextFileName(*(opts.tempDir)), opts.sorterFileStats);
     SortedFileWriter<IntWrapper, IntWrapper> writer(opts, spillFile);
     while (inputIter->more()) {
         auto pair = inputIter->next();
@@ -266,7 +266,7 @@ std::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
                                            const unittest::TempDir& tempDir,
                                            Direction Dir = ASC,
                                            const SortOptions& opts = SortOptions()) {
-    invariant(!opts.extSortAllowed);
+    invariant(!opts.tempDir);
     std::vector<std::shared_ptr<IWIterator>> vec;
     for (auto& it : array) {
         // Spill iterator outputs to a file and obtain a new iterator for it.
