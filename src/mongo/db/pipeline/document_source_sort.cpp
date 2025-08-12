@@ -205,8 +205,8 @@ void DocumentSourceSort::serializeForBoundedSort(std::vector<Value>& array,
         mutDoc["spilledDataStorageSize"] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            mutDoc["maxUsedMemBytes"] =
-                opts.serializeLiteral(static_cast<long long>(_memoryTracker->maxMemoryBytes()));
+            mutDoc["peakTrackedMemBytes"] = opts.serializeLiteral(
+                static_cast<long long>(_memoryTracker->peakTrackedMemoryBytes()));
         }
     }
 
@@ -260,8 +260,8 @@ void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
         mutDoc["spilledDataStorageSize"] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            mutDoc["maxUsedMemBytes"] =
-                opts.serializeLiteral(static_cast<long long>(_memoryTracker->maxMemoryBytes()));
+            mutDoc["peakTrackedMemBytes"] = opts.serializeLiteral(
+                static_cast<long long>(_memoryTracker->peakTrackedMemoryBytes()));
         }
     }
     array.push_back(Value(mutDoc.freeze()));

@@ -67,7 +67,8 @@ public:
                              std::move(value));
         uassert(ErrorCodes::ExceededMemoryLimit,
                 str::stream() << "$push used too much memory and cannot spill to disk. Used: "
-                              << _memUsageTracker.currentMemoryBytes() << "bytes. Memory limit: "
+                              << _memUsageTracker.inUseTrackedMemoryBytes()
+                              << "bytes. Memory limit: "
                               << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
                 _memUsageTracker.withinMemoryLimit());
     }

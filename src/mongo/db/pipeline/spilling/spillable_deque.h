@@ -105,7 +105,7 @@ public:
     }
 
     size_t getApproximateSize() const {
-        return _memTracker.currentMemoryBytes();
+        return _memTracker.inUseTrackedMemoryBytes();
     }
 
     int getNumDocs() const {

@@ -66,12 +66,12 @@ void SpillableDeque::addDocument(Document input) {
     if (!_memTracker.withinMemoryLimit() && _expCtx->getAllowDiskUse()) {
         spillToDisk();
     }
-    uassert(
-        5643011,
-        str::stream() << "Exceeded max memory. Current memory: " << _memTracker.currentMemoryBytes()
-                      << " bytes. Max allowed memory: " << _memTracker.maxAllowedMemoryUsageBytes()
-                      << " bytes. Set 'allowDiskUse: true' to spill to disk",
-        _memTracker.withinMemoryLimit());
+    uassert(5643011,
+            str::stream() << "Exceeded max memory. Current memory: "
+                          << _memTracker.inUseTrackedMemoryBytes() << " bytes. Max allowed memory: "
+                          << _memTracker.maxAllowedMemoryUsageBytes()
+                          << " bytes. Set 'allowDiskUse: true' to spill to disk",
+            _memTracker.withinMemoryLimit());
     ++_nextIndex;
 }
 Document SpillableDeque::getDocumentById(int id) {

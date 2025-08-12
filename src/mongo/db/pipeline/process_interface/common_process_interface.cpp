@@ -182,11 +182,11 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
             if (auto planSummaryData = cursor.getPlanSummary()) {  // Not present on mongos.
                 cursorObj.append("planSummary", *planSummaryData);
             }
-            if (auto inUseMemBytes = cursor.getInUseMemBytes()) {
-                cursorObj.append("inUseMemBytes", *inUseMemBytes);
+            if (auto inUseTrackedMemBytes = cursor.getInUseTrackedMemBytes()) {
+                cursorObj.append("inUseTrackedMemBytes", *inUseTrackedMemBytes);
             }
-            if (auto maxUsedMemBytes = cursor.getMaxUsedMemBytes()) {
-                cursorObj.append("maxUsedMemBytes", *maxUsedMemBytes);
+            if (auto peakTrackedMemBytes = cursor.getPeakTrackedMemBytes()) {
+                cursorObj.append("peakTrackedMemBytes", *peakTrackedMemBytes);
             }
 
             // Next, append the stripped-down version of the generic cursor. This will avoid

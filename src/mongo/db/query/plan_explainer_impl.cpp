@@ -488,7 +488,8 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
             if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-                bob->appendNumber("maxUsedMemBytes", static_cast<long long>(spec->maxUsedMemBytes));
+                bob->appendNumber("peakTrackedMemBytes",
+                                  static_cast<long long>(spec->peakTrackedMemBytes));
             }
         }
     } else if (STAGE_OR == stats.stageType) {
@@ -498,7 +499,8 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
             if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-                bob->appendNumber("maxUsedMemBytes", static_cast<long long>(spec->maxUsedMemBytes));
+                bob->appendNumber("peakTrackedMemBytes",
+                                  static_cast<long long>(spec->peakTrackedMemBytes));
             }
         }
     } else if (STAGE_LIMIT == stats.stageType) {
@@ -556,7 +558,8 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                 "spilledDataStorageSize",
                 static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
             if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-                bob->appendNumber("maxUsedMemBytes", static_cast<long long>(spec->maxUsedMemBytes));
+                bob->appendNumber("peakTrackedMemBytes",
+                                  static_cast<long long>(spec->peakTrackedMemBytes));
             }
         }
     } else if (STAGE_SORT_MERGE == stats.stageType) {
@@ -567,7 +570,8 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
             if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-                bob->appendNumber("maxUsedMemBytes", static_cast<long long>(spec->maxUsedMemBytes));
+                bob->appendNumber("peakTrackedMemBytes",
+                                  static_cast<long long>(spec->peakTrackedMemBytes));
             }
         }
     } else if (STAGE_TEXT_MATCH == stats.stageType) {
@@ -596,8 +600,8 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                 "spilledDataStorageSize",
                 static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
             if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-                bob->appendNumber("maxUsedMemBytes",
-                                  static_cast<long long>(spec->maxUsedMemoryBytes));
+                bob->appendNumber("peakTrackedMemBytes",
+                                  static_cast<long long>(spec->peakTrackedMemBytes));
             }
         }
     } else if (STAGE_TIMESERIES_MODIFY == stats.stageType) {
@@ -656,7 +660,8 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber("spilledUncompressedDataSize",
                               static_cast<long long>(spec->spillingStats.getSpilledBytes()));
             if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-                bob->appendNumber("maxUsedMemBytes", static_cast<long long>(spec->maxUsedMemBytes));
+                bob->appendNumber("peakTrackedMemBytes",
+                                  static_cast<long long>(spec->peakTrackedMemBytes));
             }
         }
     } else if (STAGE_EOF == stats.stageType) {

@@ -223,7 +223,7 @@ PlanStage::StageState TextOrStage::readFromChildren(WorkingSetID* out) {
 }
 
 PlanStage::StageState TextOrStage::returnResults(WorkingSetID* out) {
-    _specificStats.maxUsedMemoryBytes = _memoryTracker.maxMemoryBytes();
+    _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
 
     if (_sorter) {
         return returnResultsSpilled(out);
@@ -417,11 +417,11 @@ void TextOrStage::doForceSpill() {
 
     auto spilledDataStorageIncrease =
         _specificStats.spillingStats.updateSpillingStats(1 /*spills*/,
-                                                         _memoryTracker.currentMemoryBytes(),
+                                                         _memoryTracker.inUseTrackedMemoryBytes(),
                                                          recordsToSpill,
                                                          _sorterStats->bytesSpilled());
     textOrCounters.incrementPerSpilling(1 /*spills*/,
-                                        _memoryTracker.currentMemoryBytes(),
+                                        _memoryTracker.inUseTrackedMemoryBytes(),
                                         recordsToSpill,
                                         spilledDataStorageIncrease);
     _memoryTracker.set(0);

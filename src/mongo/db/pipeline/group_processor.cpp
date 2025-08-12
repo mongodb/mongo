@@ -184,7 +184,7 @@ void GroupProcessor::readyGroups() {
 
     // Update GroupStats here when reading groups in case the query finishes early without resetting
     // the GroupProcessor. This guarantees we have $group-level statistics for explain.
-    _stats.maxUsedMemoryBytes = _memoryTracker.maxMemoryBytes();
+    _stats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
 
     _groupsReady = true;
 }
@@ -283,9 +283,9 @@ void GroupProcessor::spill() {
     _sortedFiles.emplace_back(writer.done());
 
     auto spilledDataStorageIncrease = _stats.spillingStats.updateSpillingStats(
-        1, _memoryTracker.currentMemoryBytes(), spilledRecords, _spillStats->bytesSpilled());
+        1, _memoryTracker.inUseTrackedMemoryBytes(), spilledRecords, _spillStats->bytesSpilled());
     groupCounters.incrementPerSpilling(1 /* spills */,
-                                       _memoryTracker.currentMemoryBytes(),
+                                       _memoryTracker.inUseTrackedMemoryBytes(),
                                        spilledRecords,
                                        spilledDataStorageIncrease);
 

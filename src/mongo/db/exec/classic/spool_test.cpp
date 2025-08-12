@@ -174,8 +174,8 @@ TEST_F(SpoolStageTest, eof) {
 
     auto spool = makeSpool(std::move(mock));
     assertEofState(spool);
-    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(SpoolStageTest, basic) {
@@ -192,8 +192,8 @@ TEST_F(SpoolStageTest, basic) {
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 2);
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 3);
     assertEofState(spool);
-    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(SpoolStageTest, propagatesNeedTime) {
@@ -219,8 +219,8 @@ TEST_F(SpoolStageTest, propagatesNeedTime) {
 
     assertEofState(spool);
 
-    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(SpoolStageTest, propagatesNeedYield) {
@@ -245,8 +245,8 @@ TEST_F(SpoolStageTest, propagatesNeedYield) {
     }
 
     assertEofState(spool);
-    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(SpoolStageTest, onlyNeedYieldAndNeedTime) {
@@ -264,8 +264,8 @@ TEST_F(SpoolStageTest, onlyNeedYieldAndNeedTime) {
         spool, PlanStage::NEED_YIELD, std::monostate{}, false /* childHasMoreRecords */);
 
     assertEofState(spool);
-    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(SpoolStageTest, spillEveryRecordId) {
@@ -288,8 +288,8 @@ TEST_F(SpoolStageTest, spillEveryRecordId) {
     ASSERT_EQUALS(stats->spillingStats.getSpills(), 3);
     ASSERT_GREATER_THAN(stats->spillingStats.getSpilledDataStorageSize(), 0);
     ASSERT_EQUALS(stats->maxMemoryUsageBytes, maxAllowedMemoryUsageBytes);
-    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(SpoolStageTest, spillEveryOtherRecordId) {
@@ -319,8 +319,8 @@ TEST_F(SpoolStageTest, spillEveryOtherRecordId) {
     ASSERT_GREATER_THAN(stats->spillingStats.getSpilledDataStorageSize(), 0);
     ASSERT_EQUALS(stats->maxMemoryUsageBytes, maxAllowedMemoryUsageBytes);
 
-    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(SpoolStageTest, spillStringRecordId) {
@@ -350,8 +350,8 @@ TEST_F(SpoolStageTest, spillStringRecordId) {
     ASSERT_GREATER_THAN(stats->spillingStats.getSpilledDataStorageSize(), 0);
     ASSERT_EQUALS(stats->maxMemoryUsageBytes, maxAllowedMemoryUsageBytes);
 
-    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(SpoolStageTest, forceSpill) {
@@ -382,8 +382,8 @@ TEST_F(SpoolStageTest, forceSpill) {
     ASSERT_GREATER_THAN(stats->spillingStats.getSpilledDataStorageSize(), 0);
     ASSERT_EQUALS(stats->maxMemoryUsageBytes, maxAllowedMemoryUsageBytes);
 
-    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(spool.getMemoryUsageTracker_forTest()->peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(SpoolStageTest, spillingDisabled) {

@@ -118,7 +118,7 @@ try {
             },
             stageName,
             expectedNumGetMores: 1,
-            skipInUseMemBytesCheck: true,  // $limit will force execution to stop early
+            skipInUseTrackedMemBytesCheck: true,  // $limit will force execution to stop early
         });
     }
 
@@ -153,7 +153,8 @@ try {
             },
             stageName,
             expectedNumGetMores: 8,
-            skipInUseMemBytesCheck: true,  // Since we spill, we don't expect to see inUseMemBytes
+            skipInUseTrackedMemBytesCheck:
+                true,  // Since we spill, we don't expect to see inUseTrackedMemBytes
             // populated, as it should be 0 on each operation.
         });
     }

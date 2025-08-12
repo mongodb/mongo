@@ -53,7 +53,7 @@ runMemoryStatsTest({
     stageName,
     expectedNumGetMores: 10,
     // This stage does not release memory on EOF.
-    checkInUseMemBytesResets: false,
+    checkInUseTrackedMemBytesResets: false,
 });
 
 // Clean up.

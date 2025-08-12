@@ -65,7 +65,8 @@ public:
         uassert(ErrorCodes::ExceededMemoryLimit,
                 str::stream() << "$concatArrays used too much memory and spilling to disk will not "
                                  "reduce memory usage. Used: "
-                              << _memUsageTracker.currentMemoryBytes() << " bytes. Memory limit: "
+                              << _memUsageTracker.inUseTrackedMemoryBytes()
+                              << " bytes. Memory limit: "
                               << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
                 _memUsageTracker.withinMemoryLimit());
     }

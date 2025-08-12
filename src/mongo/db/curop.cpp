@@ -496,21 +496,21 @@ void CurOp::updateStatsOnTransactionStash(ClientLock&) {
     _resourceStatsBase->subtractForStash(getAdditiveResourceStats(boost::none));
 }
 
-void CurOp::setMemoryTrackingStats(const int64_t inUseMemoryBytes,
-                                   const int64_t maxUsedMemoryBytes) {
+void CurOp::setMemoryTrackingStats(const int64_t inUseTrackedMemoryBytes,
+                                   const int64_t peakTrackedMemoryBytes) {
     tassert(9897000,
             "featureFlagQueryMemoryTracking must be turned on before writing memory stats to CurOp",
             feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled());
-    // We recompute the max here (the memory tracker that calls this method will already computing
-    // the max) in order to avoid writing to the atomic if the max does not change.
+    // We recompute the peak here (the memory tracker that calls this method will already computing
+    // the peak) in order to avoid writing to the atomic if the peak does not change.
     //
-    // Set the max first, so that we can maintain the invariant that the max is always equal to or
-    // greater than the current in-use tally.
-    if (maxUsedMemoryBytes > _maxUsedMemoryBytes.load()) {
-        _maxUsedMemoryBytes.store(maxUsedMemoryBytes);
+    // Set peak memory first, so that we can maintain the invariant that the peak is always
+    // equal to or greater than the current in-use tally.
+    if (peakTrackedMemoryBytes > _peakTrackedMemoryBytes.load()) {
+        _peakTrackedMemoryBytes.store(peakTrackedMemoryBytes);
     }
 
-    _inUseMemoryBytes.store(inUseMemoryBytes);
+    _inUseTrackedMemoryBytes.store(inUseTrackedMemoryBytes);
 }
 
 void CurOp::setNS(WithLock, NamespaceString nss) {
@@ -856,8 +856,8 @@ BSONObj CurOp::truncateAndSerializeGenericCursor(GenericCursor cursor,
     cursor.setLsid(boost::none);
     cursor.setNs(boost::none);
     cursor.setPlanSummary(boost::none);
-    cursor.setInUseMemBytes(boost::none);
-    cursor.setMaxUsedMemBytes(boost::none);
+    cursor.setInUseTrackedMemBytes(boost::none);
+    cursor.setPeakTrackedMemBytes(boost::none);
     return cursor.toBSON();
 }
 
@@ -941,12 +941,12 @@ void CurOp::reportState(BSONObjBuilder* builder,
         builder->append("planSummary", _planSummary);
     }
 
-    if (int64_t inUseMemBytes = getInUseMemoryBytes()) {
-        builder->append("inUseMemBytes", inUseMemBytes);
+    if (int64_t inUseTrackedMemoryBytes = getInUseTrackedMemoryBytes()) {
+        builder->append("inUseTrackedMemBytes", inUseTrackedMemoryBytes);
     }
 
-    if (int64_t maxUsedMemBytes = getMaxUsedMemoryBytes()) {
-        builder->append("maxUsedMemBytes", maxUsedMemBytes);
+    if (int64_t peakTrackedMemoryBytes = getPeakTrackedMemoryBytes()) {
+        builder->append("peakTrackedMemBytes", peakTrackedMemoryBytes);
     }
 
     if (_genericCursor) {

@@ -114,7 +114,7 @@ void SpoolStage::spill() {
     _spillFileIters.emplace_back(writer.done());
 
     _specificStats.spillingStats.updateSpillingStats(1 /* spills */,
-                                                     _memTracker.currentMemoryBytes(),
+                                                     _memTracker.inUseTrackedMemoryBytes(),
                                                      _buffer.size() - (_nextIndex + 1),
                                                      _spillStats->bytesSpilled());
     std::vector<RecordId>().swap(_buffer);
@@ -124,7 +124,7 @@ void SpoolStage::spill() {
 
 PlanStage::StageState SpoolStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
-        _specificStats.maxUsedMemBytes = _memTracker.maxMemoryBytes();
+        _specificStats.peakTrackedMemBytes = _memTracker.peakTrackedMemoryBytes();
         _memTracker.resetCurrent();
         return PlanStage::IS_EOF;
     }
@@ -183,7 +183,7 @@ PlanStage::StageState SpoolStage::doWork(WorkingSetID* out) {
     if (++_nextIndex == static_cast<int>(_buffer.size())) {
         std::vector<RecordId>().swap(_buffer);
         _nextIndex = 0;
-        _specificStats.maxUsedMemBytes = _memTracker.maxMemoryBytes();
+        _specificStats.peakTrackedMemBytes = _memTracker.peakTrackedMemoryBytes();
         _memTracker.resetCurrent();
         return PlanStage::IS_EOF;
     }

@@ -62,8 +62,8 @@ runShardedMemoryStatsTest({
     numShards: 2,
     skipExplain: true,  // graphLookup will execute on the merging part of the pipeline and will not
                         // appear in the shards' explain output.
-    skipInUseMemBytesCheck: true,  // Because we run $graphLookup in a sub-pipeline, we compute the
-                                   // result in one shot, and don't have in-use memory hanging
-                                   // around between requests.
+    skipInUseTrackedMemBytesCheck: true,  // Because we run $graphLookup in a sub-pipeline, we
+                                          // compute the result in one shot, and don't have in-use
+                                          // memory hanging around between requests.
 });
 st.stop();

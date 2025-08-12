@@ -58,7 +58,7 @@ void AccumulatorSetUnion::addValues(const std::vector<Value>& values) {
             uassert(ErrorCodes::ExceededMemoryLimit,
                     str::stream() << "$setUnion used too much memory and spilling to disk will not "
                                      "reduce memory usage. Used: "
-                                  << _memUsageTracker.currentMemoryBytes()
+                                  << _memUsageTracker.inUseTrackedMemoryBytes()
                                   << "bytes. Memory limit: "
                                   << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
                     _memUsageTracker.withinMemoryLimit());

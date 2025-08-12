@@ -280,12 +280,12 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
         return;
     }
 
-    const long lastEstimatedMemoryUsage = _memoryTracker.value().currentMemoryBytes();
+    const long lastEstimatedMemoryUsage = _memoryTracker.value().inUseTrackedMemoryBytes();
     const long estimatedRowSize =
         _htIt->first.memUsageForSorter() + _htIt->second.memUsageForSorter();
     _memoryTracker.value().set(_ht->size() * estimatedRowSize);
-    static_cast<Derived*>(this)->getHashAggStats()->maxUsedMemBytes =
-        _memoryTracker.value().maxMemoryBytes();
+    static_cast<Derived*>(this)->getHashAggStats()->peakTrackedMemBytes =
+        _memoryTracker.value().peakTrackedMemoryBytes();
 
     if (!_memoryTracker.value().withinMemoryLimit()) {
         // It is safe to set this to the begining because spilling outside the releaseMemory only
@@ -302,14 +302,14 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
         // 'estimatedGainPerChildAdvance' close to zero indicates a stable hash stable size, in
         // which case we can delay the next check progressively.
         const double estimatedGainPerChildAdvance =
-            (static_cast<double>(_memoryTracker.value().currentMemoryBytes() -
+            (static_cast<double>(_memoryTracker.value().inUseTrackedMemoryBytes() -
                                  lastEstimatedMemoryUsage) /
              mcd.memoryCheckpointCounter);
 
         const long nextCheckpointCandidate = (estimatedGainPerChildAdvance > 0.1)
             ? mcd.checkpointMargin *
                 (_memoryTracker.value().maxAllowedMemoryUsageBytes() -
-                 _memoryTracker.value().currentMemoryBytes()) /
+                 _memoryTracker.value().inUseTrackedMemoryBytes()) /
                 estimatedGainPerChildAdvance
             : mcd.nextMemoryCheckpoint * 2;
 

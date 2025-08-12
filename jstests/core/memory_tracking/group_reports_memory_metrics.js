@@ -47,11 +47,13 @@ const configs = [
         name: "DocumentSourceGroup",
         framework: "forceClassicEngine",
         stageName: "$group",
+        knobName: "internalDocumentSourceGroupMaxMemoryBytes",
     },
     {
         name: "SBE Group",
         framework: "trySbeEngine",
         stageName: "group",  // SBE group stage appears without the dollar sign
+        knobName: "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill",
     },
 ];
 
@@ -94,11 +96,10 @@ try {
 
         {
             const lowMaxMemoryLimit = 100;
+            const memoryLimitKnob = config.knobName;
             // Set maxMemory low to force spill to disk.
-            const originalMemoryLimit = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit
-            }));
+            const originalMemoryLimit = assert.commandWorked(
+                db.adminCommand({setParameter: 1, [memoryLimitKnob]: lowMaxMemoryLimit}));
 
             try {
                 runMemoryStatsTest({
@@ -114,15 +115,13 @@ try {
                     stageName: config.stageName,
                     expectedNumGetMores: 2,
                     // Since we spill, we don't expect to see
-                    // inUseMemBytes populated as it should be 0 on each operation.
-                    skipInUseMemBytesCheck: true,
+                    // inUseTrackedMemBytes populated as it should be 0 on each operation.
+                    skipInUseTrackedMemBytesCheck: true,
                 });
             } finally {
                 // Set maxMemory back to the original value.
-                assert.commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was
-                }));
+                assert.commandWorked(
+                    db.adminCommand({setParameter: 1, [memoryLimitKnob]: originalMemoryLimit.was}));
             }
         }
     }

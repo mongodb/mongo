@@ -94,7 +94,7 @@ public:
         if (result.isAdvanced()) {
             _tracker.add(result.getDocument().getApproximateSize());
         } else if (result.isEOF()) {
-            _tracker.add(-_tracker.currentMemoryBytes());
+            _tracker.add(-_tracker.inUseTrackedMemoryBytes());
         }
 
         return result;
@@ -179,10 +179,10 @@ TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
             ASSERT_EQ(getTrackerOpCtx(tracker.get()), nullptr);
             // $trackingMock will always be increasing memory count with each document returned, so
             // the max will always be the same as the current.
-            ASSERT_GT(tracker->currentMemoryBytes(), prevMemoryInUse);
-            ASSERT_EQ(tracker->maxMemoryBytes(), tracker->currentMemoryBytes());
+            ASSERT_GT(tracker->inUseTrackedMemoryBytes(), prevMemoryInUse);
+            ASSERT_EQ(tracker->peakTrackedMemoryBytes(), tracker->inUseTrackedMemoryBytes());
 
-            prevMemoryInUse = tracker->currentMemoryBytes();
+            prevMemoryInUse = tracker->inUseTrackedMemoryBytes();
 
             OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(tracker));
         }

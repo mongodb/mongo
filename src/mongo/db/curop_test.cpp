@@ -478,22 +478,22 @@ TEST(CurOpTest, ShouldUpdateMemoryStats) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
                                                                true);
 
-    ASSERT_EQ(0, curop->getInUseMemoryBytes());
-    ASSERT_EQ(0, curop->getMaxUsedMemoryBytes());
+    ASSERT_EQ(0, curop->getInUseTrackedMemoryBytes());
+    ASSERT_EQ(0, curop->getPeakTrackedMemoryBytes());
 
-    curop->setMemoryTrackingStats(10 /*inUseMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
-    ASSERT_EQ(10, curop->getInUseMemoryBytes());
-    ASSERT_EQ(15, curop->getMaxUsedMemoryBytes());
+    curop->setMemoryTrackingStats(10 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
+    ASSERT_EQ(10, curop->getInUseTrackedMemoryBytes());
+    ASSERT_EQ(15, curop->getPeakTrackedMemoryBytes());
 
     // The max memory usage is updated if the new max is greater than the current max.
-    curop->setMemoryTrackingStats(21 /*inUseMemoryBytes*/, 20 /*maxUsedMemoryBytes*/);
-    ASSERT_EQ(21, curop->getInUseMemoryBytes());
-    ASSERT_EQ(20, curop->getMaxUsedMemoryBytes());
+    curop->setMemoryTrackingStats(21 /*inUseTrackedMemoryBytes*/, 20 /*peakTrackedMemoryBytes*/);
+    ASSERT_EQ(21, curop->getInUseTrackedMemoryBytes());
+    ASSERT_EQ(20, curop->getPeakTrackedMemoryBytes());
 
     // The max memory usage is not updated if the new max is not greater than the current max.
-    curop->setMemoryTrackingStats(31 /*inUseMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
-    ASSERT_EQ(31, curop->getInUseMemoryBytes());
-    ASSERT_EQ(20, curop->getMaxUsedMemoryBytes());
+    curop->setMemoryTrackingStats(31 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
+    ASSERT_EQ(31, curop->getInUseTrackedMemoryBytes());
+    ASSERT_EQ(20, curop->getPeakTrackedMemoryBytes());
 }
 
 DEATH_TEST(CurOpTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "tassert") {
@@ -503,9 +503,9 @@ DEATH_TEST(CurOpTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "tassert") {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
                                                                false);
 
-    ASSERT_EQ(0, curop->getInUseMemoryBytes());
-    ASSERT_EQ(0, curop->getMaxUsedMemoryBytes());
-    curop->setMemoryTrackingStats(10 /*inUseMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
+    ASSERT_EQ(0, curop->getInUseTrackedMemoryBytes());
+    ASSERT_EQ(0, curop->getPeakTrackedMemoryBytes());
+    curop->setMemoryTrackingStats(10 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
 }
 
 /**
@@ -529,16 +529,16 @@ TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
     // If the memory tracker has not updated CurOp, the memory tracking stat should not appear in
     // the profiler output.
     auto res = bob.done();
-    ASSERT_EQ(0, curop->getMaxUsedMemoryBytes());
-    ASSERT_FALSE(res.hasField("maxUsedMemBytes"));
+    ASSERT_EQ(0, curop->getPeakTrackedMemoryBytes());
+    ASSERT_FALSE(res.hasField("peakTrackedMemBytes"));
 
-    curop->setMemoryTrackingStats(10 /*inUseMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
+    curop->setMemoryTrackingStats(10 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
     BSONObjBuilder bobWithMemStats;
     opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bobWithMemStats);
     res = bobWithMemStats.done();
 
-    ASSERT_EQ(15, curop->getMaxUsedMemoryBytes());
-    ASSERT_EQ(15, res.getIntField("maxUsedMemBytes"));
+    ASSERT_EQ(15, curop->getPeakTrackedMemoryBytes());
+    ASSERT_EQ(15, res.getIntField("peakTrackedMemBytes"));
 }
 
 TEST(CurOpTest, ReportStateIncludesMemoryStatsIfNonZero) {
@@ -553,8 +553,8 @@ TEST(CurOpTest, ReportStateIncludesMemoryStatsIfNonZero) {
         BSONObjBuilder bob;
         curOp->reportState(&bob, SerializationContext{});
         BSONObj state = bob.obj();
-        ASSERT_FALSE(state.hasField("inUseMemBytes"));
-        ASSERT_FALSE(state.hasField("maxUsedMemBytes"));
+        ASSERT_FALSE(state.hasField("inUseTrackedMemBytes"));
+        ASSERT_FALSE(state.hasField("peakTrackedMemBytes"));
     }
 
     // If the memory stats are not zero, they *are* included in the state.
@@ -563,10 +563,10 @@ TEST(CurOpTest, ReportStateIncludesMemoryStatsIfNonZero) {
         curOp->setMemoryTrackingStats(128, 256);
         curOp->reportState(&bob, SerializationContext{});
         BSONObj state = bob.obj();
-        ASSERT_TRUE(state.hasField("inUseMemBytes"));
-        ASSERT_EQ(state["inUseMemBytes"].Long(), 128);
-        ASSERT_TRUE(state.hasField("maxUsedMemBytes"));
-        ASSERT_EQ(state["maxUsedMemBytes"].Long(), 256);
+        ASSERT_TRUE(state.hasField("inUseTrackedMemBytes"));
+        ASSERT_EQ(state["inUseTrackedMemBytes"].Long(), 128);
+        ASSERT_TRUE(state.hasField("peakTrackedMemBytes"));
+        ASSERT_EQ(state["peakTrackedMemBytes"].Long(), 256);
     }
 }
 

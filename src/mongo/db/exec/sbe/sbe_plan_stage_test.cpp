@@ -217,7 +217,7 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
             // check the forceSpill stage
             stage->forceSpill(nullptr /*yieldPolicy*/);
             if (stage->getMemoryTracker()) {
-                ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+                ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
             }
         }
     }

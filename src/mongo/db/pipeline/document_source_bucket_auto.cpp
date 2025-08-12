@@ -512,8 +512,8 @@ Value DocumentSourceBucketAuto::serialize(const SerializationOptions& opts) cons
         out["spilledRecords"] =
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            out["maxUsedMemBytes"] =
-                opts.serializeLiteral(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
+            out["peakTrackedMemBytes"] = opts.serializeLiteral(
+                static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
         }
     }
 

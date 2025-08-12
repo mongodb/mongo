@@ -127,7 +127,7 @@ boost::intrusive_ptr<Expression> GroupProcessorBase::getIdExpression() const {
 
 void GroupProcessorBase::reset() {
     // Before we clear the memory tracker, update GroupStats so explain has $group-level statistics.
-    _stats.maxUsedMemoryBytes = _memoryTracker.maxMemoryBytes();
+    _stats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
 
     // Free our resources.
     _groups = _expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();

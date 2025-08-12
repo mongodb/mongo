@@ -63,7 +63,7 @@ public:
     void dispose();
 
     size_t getApproximateSize() const {
-        return _memTracker.currentMemoryBytes();
+        return _memTracker.inUseTrackedMemoryBytes();
     }
 
     size_t size() const {

@@ -360,8 +360,8 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
             ASSERT_FALSE(stats->usedDisk);
             ASSERT_EQ(0, totalSpillingStats.getSpills());
             ASSERT_EQ(0, totalSpillingStats.getSpilledRecords());
-            ASSERT_GT(lookupStage->getMemoryTracker()->currentMemoryBytes(), 0);
-            ASSERT_GT(stats->maxUsedMemBytes, 0);
+            ASSERT_GT(lookupStage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
+            ASSERT_GT(stats->peakTrackedMemBytes, 0);
 
             // Get ready to yield.
             lookupStage->saveState();
@@ -375,8 +375,8 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
             ASSERT_TRUE(stats->usedDisk);
             ASSERT_EQ(7, totalSpillingStats.getSpills());
             ASSERT_EQ(7, totalSpillingStats.getSpilledRecords());
-            ASSERT_EQ(0, lookupStage->getMemoryTracker()->currentMemoryBytes());
-            ASSERT_GT(stats->maxUsedMemBytes, 0);
+            ASSERT_EQ(0, lookupStage->getMemoryTracker()->inUseTrackedMemoryBytes());
+            ASSERT_GT(stats->peakTrackedMemBytes, 0);
 
             // Get ready to retrieve more records.
             lookupStage->restoreState();

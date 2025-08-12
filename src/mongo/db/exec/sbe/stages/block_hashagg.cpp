@@ -978,8 +978,8 @@ std::unique_ptr<PlanStageStats> BlockHashAggStage::getStats(bool includeDebugInf
         bob.appendNumber("elementWiseAccumulations", _specificStats.elementWiseAccumulations);
 
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            bob.appendNumber("maxUsedMemBytes",
-                             static_cast<long long>(_specificStats.maxUsedMemBytes));
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(_specificStats.peakTrackedMemBytes));
         }
 
         ret->debugInfo = bob.obj();
@@ -1021,7 +1021,7 @@ void BlockHashAggStage::close() {
 
     _children[0]->close();
 
-    _specificStats.maxUsedMemBytes = _memoryTracker.value().maxMemoryBytes();
+    _specificStats.peakTrackedMemBytes = _memoryTracker.value().peakTrackedMemoryBytes();
     _memoryTracker.value().set(0);
 }
 

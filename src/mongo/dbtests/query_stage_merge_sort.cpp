@@ -159,12 +159,12 @@ public:
 
     uint64_t checkMemoryTracking(const SimpleMemoryUsageTracker& tracker,
                                  uint64_t oldPeakMemBytes) {
-        uint64_t currentMemoryBytes = tracker.currentMemoryBytes();
+        uint64_t inUseTrackedMemoryBytes = tracker.inUseTrackedMemoryBytes();
 
-        ASSERT_GT(currentMemoryBytes, 0);
+        ASSERT_GT(inUseTrackedMemoryBytes, 0);
 
-        uint64_t actualPeakMemBytes = tracker.maxMemoryBytes();
-        ASSERT_GTE(actualPeakMemBytes, currentMemoryBytes);
+        uint64_t actualPeakMemBytes = tracker.peakTrackedMemoryBytes();
+        ASSERT_GTE(actualPeakMemBytes, inUseTrackedMemoryBytes);
         ASSERT_GTE(actualPeakMemBytes, oldPeakMemBytes);
         return actualPeakMemBytes;
     }
@@ -323,8 +323,8 @@ public:
         // Should be done now.
         BSONObj foo;
         ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, nullptr));
-        ASSERT_EQUALS(memoryTracker.maxMemoryBytes(), peakMemoryBytes);
-        ASSERT_EQUALS(stats->maxUsedMemBytes, peakMemoryBytes);
+        ASSERT_EQUALS(memoryTracker.peakTrackedMemoryBytes(), peakMemoryBytes);
+        ASSERT_EQUALS(stats->peakTrackedMemBytes, peakMemoryBytes);
     }
 };
 

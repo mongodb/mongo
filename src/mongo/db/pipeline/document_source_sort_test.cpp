@@ -321,8 +321,8 @@ public:
         }
 
         if (expectMemUse) {
-            ASSERT_EQ(_sortStage->getMemoryTracker_forTest().currentMemoryBytes(), 0);
-            ASSERT_GT(_sortStage->getMemoryTracker_forTest().maxMemoryBytes(), 0);
+            ASSERT_EQ(_sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+            ASSERT_GT(_sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
         }
         // Check the result set.
         ASSERT_BSONOBJ_EQ(expectedResultSet(expectedResultSetString), bsonResultSet.arr());
@@ -552,8 +552,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldPauseWhenAskedTo) {
     auto result = sortStage->getNext();
     ASSERT_TRUE(result.isAdvanced());
     ASSERT_DOCUMENT_EQ(result.releaseDocument(), (Document{{"a", 0}}));
-    ASSERT_GT(sortStage->getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(sortStage->getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_GT(sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldResumePopulationBetweenPauses) {
@@ -581,8 +581,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldResumePopulationBetweenPauses) {
     ASSERT_TRUE(sortStage->getNext().isEOF());
     ASSERT_TRUE(sortStage->getNext().isEOF());
     ASSERT_TRUE(sortStage->getNext().isEOF());
-    ASSERT_EQ(sortStage->getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(sortStage->getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_EQ(sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 }
 
 std::tuple<boost::intrusive_ptr<DocumentSourceMock>,
@@ -673,8 +673,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) 
 
     assertSpillingTestReturn(sort, sortStage);
 
-    ASSERT_EQ(sortStage->getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_EQ(sortStage->getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_EQ(sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 
     const auto* sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
     ASSERT_EQ(sortStats->spillingStats.getSpills(), 3);
@@ -694,8 +694,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillBeforeReturni
     sortStage->forceSpill();
     assertSpillingTestReturn(sort, sortStage);
 
-    ASSERT_EQ(sortStage->getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(sortStage->getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_EQ(sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 
     const auto* sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
     ASSERT_EQ(sortStats->spillingStats.getSpills(), 2);
@@ -728,8 +728,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillAfterReturnin
 
     ASSERT_TRUE(sortStage->getNext().isEOF());
 
-    ASSERT_EQ(sortStage->getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(sortStage->getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_EQ(sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 
     const auto* sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
     ASSERT_EQ(sortStats->spillingStats.getSpills(), 1);
@@ -760,8 +760,8 @@ TEST_F(DocumentSourceSortExecutionTest,
 
     ASSERT_TRUE(sortStage->getNext().isEOF());
 
-    ASSERT_EQ(sortStage->getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(sortStage->getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_EQ(sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(DocumentSourceSortExecutionTest,
@@ -786,8 +786,8 @@ TEST_F(DocumentSourceSortExecutionTest,
 
     ASSERT_TRUE(sortStage->getNext().isEOF());
 
-    ASSERT_EQ(sortStage->getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(sortStage->getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_EQ(sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBoundedSort) {
@@ -903,8 +903,8 @@ TEST_F(DocumentSourceSortExecutionTest,
 
     ASSERT_TRUE(sortStage->getNext().isEOF());
 
-    ASSERT_EQ(sortStage->getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(sortStage->getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_EQ(sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 
     const auto* sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
     ASSERT_EQ(sortStats->spillingStats.getSpills(), 2);
@@ -961,8 +961,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
                        AssertionException,
                        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 
-    ASSERT_GT(sortStage->getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(sortStage->getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_GT(sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(DocumentSourceSortTest, RedactionWithoutMemoryTracking) {
@@ -1182,7 +1182,7 @@ TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
             "spilledBytes": "?number",
             "spilledRecords": "?number",
             "spilledDataStorageSize": "?number",
-            "maxUsedMemBytes": "?number"
+            "peakTrackedMemBytes": "?number"
         })",
         redact(*sort(), true, ExplainOptions::Verbosity::kExecStats));
 
@@ -1204,7 +1204,7 @@ TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
             "spilledBytes": "?number",
             "spilledRecords": "?number",
             "spilledDataStorageSize": "?number",
-            "maxUsedMemBytes": "?number"
+            "peakTrackedMemBytes": "?number"
         })",
         redact(*boundedSort, true, ExplainOptions::Verbosity::kExecStats));
 }
@@ -1221,8 +1221,8 @@ void assertProducesSortKeyMetadata(auto expCtx, auto sort) {
     ASSERT(output2.isAdvanced());
     ASSERT(output2.getDocument().metadata().hasSortKey());
     ASSERT(sortStage->getNext().isEOF());
-    ASSERT_EQ(sortStage->getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(sortStage->getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_EQ(sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldOutputSortKeyMetadataIfRequested) {

@@ -68,8 +68,8 @@ public:
     size_t getApproximateSize() {
         tassert(5414200,
                 "_memUsageTracker is not set for function",
-                _memUsageTracker.currentMemoryBytes() != 0);
-        return _memUsageTracker.currentMemoryBytes();
+                _memUsageTracker.inUseTrackedMemoryBytes() != 0);
+        return _memUsageTracker.inUseTrackedMemoryBytes();
     }
 
 protected:

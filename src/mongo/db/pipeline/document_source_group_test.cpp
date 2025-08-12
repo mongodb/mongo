@@ -139,7 +139,7 @@ public:
     std::pair<int64_t, int64_t> getCurOpMemoryStats() {
         OperationContext* opCtx = getExpCtx()->getOperationContext();
         CurOp* curOp = CurOp::get(opCtx);
-        return {curOp->getInUseMemoryBytes(), curOp->getMaxUsedMemoryBytes()};
+        return {curOp->getInUseTrackedMemoryBytes(), curOp->getPeakTrackedMemoryBytes()};
     }
 };
 
@@ -588,7 +588,7 @@ TEST_F(DocumentSourceGroupTest, CanOutputExecutionStatsExplainWithoutProcessingD
         })"));
 
         if (flagStatus) {
-            bob.append("maxUsedMemBytes", 0);
+            bob.append("peakTrackedMemBytes", 0);
         }
 
         ASSERT_DOCUMENT_EQ(Document(bob.obj()), group->serialize(explainOpts).getDocument());
@@ -742,7 +742,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
 
         GroupProcessor* groupProcessor = group->getGroupProcessor();
         const MemoryUsageTracker& memTracker = groupProcessor->getMemoryTracker();
-        ASSERT_EQUALS(memTracker.currentMemoryBytes(), 0);
+        ASSERT_EQUALS(memTracker.inUseTrackedMemoryBytes(), 0);
 
         auto groupStage = exec::agg::buildStage(group);
         groupStage->setSource(mock.get());
@@ -750,29 +750,29 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
         // Tracked memory increases as rows are processed. Different platforms have different
         // amounts of memory here, so just show that the amount is increasing.
         ASSERT_TRUE(groupStage->getNext().isPaused());
-        int64_t curBytes1 = memTracker.currentMemoryBytes();
+        int64_t curBytes1 = memTracker.inUseTrackedMemoryBytes();
         ASSERT_GREATER_THAN(curBytes1, 0);
 
         ASSERT_TRUE(groupStage->getNext().isPaused());
-        int64_t curBytes2 = memTracker.currentMemoryBytes();
+        int64_t curBytes2 = memTracker.inUseTrackedMemoryBytes();
         ASSERT_GREATER_THAN(curBytes2, curBytes1);
 
         ASSERT_TRUE(groupStage->getNext().isPaused());
-        int64_t curBytes3 = memTracker.currentMemoryBytes();
+        int64_t curBytes3 = memTracker.inUseTrackedMemoryBytes();
         ASSERT_GREATER_THAN(curBytes3, curBytes2);
 
         std::vector<Document> outDocs;
         {
             auto result = groupStage->getNext();
             ASSERT_TRUE(result.isAdvanced());
-            int64_t curBytes4 = memTracker.currentMemoryBytes();
+            int64_t curBytes4 = memTracker.inUseTrackedMemoryBytes();
             ASSERT_GREATER_THAN(curBytes4, curBytes3);
             outDocs.push_back(result.releaseDocument());
 
             // There are no more input documents, so memory usage stays the same here.
             result = groupStage->getNext();
             ASSERT_TRUE(result.isAdvanced());
-            int64_t curBytes5 = memTracker.currentMemoryBytes();
+            int64_t curBytes5 = memTracker.inUseTrackedMemoryBytes();
             ASSERT_EQUALS(curBytes4, curBytes5);
             outDocs.push_back(result.releaseDocument());
         }
@@ -790,7 +790,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
 
         ASSERT_TRUE(groupStage->getNext().isEOF());
         // Tracked memory goes back to zero once all output has been produced.
-        ASSERT_EQUALS(memTracker.currentMemoryBytes(), 0);
+        ASSERT_EQUALS(memTracker.inUseTrackedMemoryBytes(), 0);
     }
 }
 
@@ -832,53 +832,53 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
     auto groupStage = exec::agg::buildStage(group);
     groupStage->setSource(mock.get());
 
-    int64_t inUseMemoryBytes, maxUsedMemoryBytes;
-    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
-    ASSERT_EQ(inUseMemoryBytes, 0);
-    ASSERT_EQ(maxUsedMemoryBytes, 0);
+    int64_t inUseTrackedMemoryBytes, peakTrackedMemoryBytes;
+    std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_EQ(inUseTrackedMemoryBytes, 0);
+    ASSERT_EQ(peakTrackedMemoryBytes, 0);
 
     // Tracked memory increases as rows are processed. Different platforms have different
     // amounts of memory here, so just show that the amount is increasing.
     ASSERT_TRUE(groupStage->getNext().isPaused());
-    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
-    ASSERT_GREATER_THAN(inUseMemoryBytes, 0);
-    ASSERT_GREATER_THAN(maxUsedMemoryBytes, 0);
+    std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_GREATER_THAN(inUseTrackedMemoryBytes, 0);
+    ASSERT_GREATER_THAN(peakTrackedMemoryBytes, 0);
 
     ASSERT_TRUE(groupStage->getNext().isPaused());
-    int64_t prevInUseMemoryBytes, prevMaxUsedMemoryBytes;
-    prevInUseMemoryBytes = inUseMemoryBytes;
-    prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
-    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
-    ASSERT_GREATER_THAN(inUseMemoryBytes, prevInUseMemoryBytes);
-    ASSERT_GREATER_THAN_OR_EQUALS(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
+    int64_t prevTrackedMemBytes, prevMaxUsedMemoryBytes;
+    prevTrackedMemBytes = inUseTrackedMemoryBytes;
+    prevMaxUsedMemoryBytes = peakTrackedMemoryBytes;
+    std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_GREATER_THAN(inUseTrackedMemoryBytes, prevTrackedMemBytes);
+    ASSERT_GREATER_THAN_OR_EQUALS(peakTrackedMemoryBytes, prevMaxUsedMemoryBytes);
 
     ASSERT_TRUE(groupStage->getNext().isPaused());
-    prevInUseMemoryBytes = inUseMemoryBytes;
-    prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
-    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
-    ASSERT_GREATER_THAN(inUseMemoryBytes, prevInUseMemoryBytes);
-    ASSERT_GREATER_THAN(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
+    prevTrackedMemBytes = inUseTrackedMemoryBytes;
+    prevMaxUsedMemoryBytes = peakTrackedMemoryBytes;
+    std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_GREATER_THAN(inUseTrackedMemoryBytes, prevTrackedMemBytes);
+    ASSERT_GREATER_THAN(peakTrackedMemoryBytes, prevMaxUsedMemoryBytes);
 
     std::vector<Document> outDocs;
     {
         auto result = groupStage->getNext();
         ASSERT_TRUE(result.isAdvanced());
-        prevInUseMemoryBytes = inUseMemoryBytes;
-        prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
-        std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
-        ASSERT_GREATER_THAN(inUseMemoryBytes, prevInUseMemoryBytes);
-        ASSERT_GREATER_THAN(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
+        prevTrackedMemBytes = inUseTrackedMemoryBytes;
+        prevMaxUsedMemoryBytes = peakTrackedMemoryBytes;
+        std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
+        ASSERT_GREATER_THAN(inUseTrackedMemoryBytes, prevTrackedMemBytes);
+        ASSERT_GREATER_THAN(peakTrackedMemoryBytes, prevMaxUsedMemoryBytes);
 
         outDocs.push_back(result.releaseDocument());
 
         // There are no more input documents, so memory usage stays the same here.
         result = groupStage->getNext();
         ASSERT_TRUE(result.isAdvanced());
-        prevInUseMemoryBytes = inUseMemoryBytes;
-        prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
-        std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
-        ASSERT_EQ(inUseMemoryBytes, prevInUseMemoryBytes);
-        ASSERT_EQ(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
+        prevTrackedMemBytes = inUseTrackedMemoryBytes;
+        prevMaxUsedMemoryBytes = peakTrackedMemoryBytes;
+        std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
+        ASSERT_EQ(inUseTrackedMemoryBytes, prevTrackedMemBytes);
+        ASSERT_EQ(peakTrackedMemoryBytes, prevMaxUsedMemoryBytes);
         outDocs.push_back(result.releaseDocument());
     }
 
@@ -895,9 +895,9 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
     // When we reach the end of the documents, current memory goes to zero, while the max used
     // remains the same.
     ASSERT_TRUE(groupStage->getNext().isEOF());
-    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
-    ASSERT_EQUALS(inUseMemoryBytes, 0);
-    ASSERT_EQ(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
+    std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_EQUALS(inUseTrackedMemoryBytes, 0);
+    ASSERT_EQ(peakTrackedMemoryBytes, prevMaxUsedMemoryBytes);
 }
 
 /**
@@ -934,27 +934,27 @@ TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
     auto groupStage = exec::agg::buildStage(group);
     groupStage->setSource(mock.get());
 
-    int64_t inUseMemoryBytes, maxUsedMemoryBytes;
-    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
-    ASSERT_EQ(inUseMemoryBytes, 0);
-    ASSERT_EQ(maxUsedMemoryBytes, 0);
+    int64_t inUseTrackedMemoryBytes, peakTrackedMemoryBytes;
+    std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_EQ(inUseTrackedMemoryBytes, 0);
+    ASSERT_EQ(peakTrackedMemoryBytes, 0);
 
     std::vector<Document> outDocs;
     {
         auto result = groupStage->getNext();
         ASSERT_TRUE(result.isAdvanced());
-        std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
-        ASSERT_EQ(inUseMemoryBytes, 0);
-        ASSERT_EQ(maxUsedMemoryBytes, 0);
+        std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
+        ASSERT_EQ(inUseTrackedMemoryBytes, 0);
+        ASSERT_EQ(peakTrackedMemoryBytes, 0);
 
         outDocs.push_back(result.releaseDocument());
 
         // There are no more input documents, so memory usage stays the same here.
         result = groupStage->getNext();
         ASSERT_TRUE(result.isAdvanced());
-        std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
-        ASSERT_EQ(inUseMemoryBytes, 0);
-        ASSERT_EQ(maxUsedMemoryBytes, 0);
+        std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
+        ASSERT_EQ(inUseTrackedMemoryBytes, 0);
+        ASSERT_EQ(peakTrackedMemoryBytes, 0);
         outDocs.push_back(result.releaseDocument());
     }
 
@@ -970,9 +970,9 @@ TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
 
     // All output has been produced.
     ASSERT_TRUE(groupStage->getNext().isEOF());
-    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
-    ASSERT_EQ(inUseMemoryBytes, 0);
-    ASSERT_EQ(maxUsedMemoryBytes, 0);
+    std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_EQ(inUseTrackedMemoryBytes, 0);
+    ASSERT_EQ(peakTrackedMemoryBytes, 0);
 }
 
 BSONObj toBson(const boost::intrusive_ptr<DocumentSource>& source) {

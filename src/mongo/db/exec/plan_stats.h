@@ -684,7 +684,7 @@ struct IndexScanStats : public SpecificStats {
     // Number of times the index cursor is re-positioned during the execution of the scan.
     size_t seeks;
 
-    uint64_t maxUsedMemBytes = 0u;
+    uint64_t peakTrackedMemBytes = 0u;
 };
 
 struct LimitStats : public SpecificStats {
@@ -773,7 +773,7 @@ struct OrStats : public SpecificStats {
     size_t dupsTested = 0u;
     size_t dupsDropped = 0u;
 
-    uint64_t maxUsedMemBytes = 0;
+    uint64_t peakTrackedMemBytes = 0;
 };
 
 struct ProjectionStats : public SpecificStats {
@@ -840,7 +840,7 @@ struct SortStats : public SpecificStats {
     uint64_t memoryUsageBytes = 0u;
 
     // The maximum amount of memory that was used.
-    uint64_t maxUsedMemBytes = 0u;
+    uint64_t peakTrackedMemBytes = 0u;
 
     // The number of keys that we've sorted.
     uint64_t keysSorted = 0u;
@@ -873,7 +873,7 @@ struct MergeSortStats : public SpecificStats {
     // The pattern according to which we are sorting.
     BSONObj sortPattern;
 
-    uint64_t maxUsedMemBytes = 0u;
+    uint64_t peakTrackedMemBytes = 0u;
 };
 
 struct ShardingFilterStats : public SpecificStats {
@@ -1049,7 +1049,7 @@ struct TextOrStats : public SpecificStats {
     size_t fetches;
     SpillingStats spillingStats;
 
-    int64_t maxUsedMemoryBytes = 0;
+    int64_t peakTrackedMemBytes = 0;
 };
 
 struct TrialStats : public SpecificStats {
@@ -1101,7 +1101,7 @@ struct GroupStats : public SpecificStats {
 
     SpillingStats spillingStats;
 
-    int64_t maxUsedMemoryBytes = 0;
+    int64_t peakTrackedMemBytes = 0;
 };
 
 struct DocumentSourceCursorStats : public SpecificStats {
@@ -1319,7 +1319,7 @@ struct SpoolStats : public SpecificStats {
     uint64_t totalDataSizeBytes = 0u;
 
     // The maximum amount of memory that was used.
-    uint64_t maxUsedMemBytes = 0u;
+    uint64_t peakTrackedMemBytes = 0u;
 
     SpillingStats spillingStats;
 };
@@ -1434,7 +1434,7 @@ struct DocumentSourceSetWindowFieldsStats : public SpecificStats {
 
     SpillingStats spillingStats;
 
-    int64_t maxUsedMemoryBytes = 0;
+    int64_t peakTrackedMemBytes = 0;
 };
 
 }  // namespace mongo

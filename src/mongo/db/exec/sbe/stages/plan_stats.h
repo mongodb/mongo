@@ -292,7 +292,7 @@ struct HashAggStats : public SpecificStats {
     SpillingStats spillingStats;
 
     // The maximum amount of memory that was used.
-    uint64_t maxUsedMemBytes = 0u;
+    uint64_t peakTrackedMemBytes = 0u;
 };
 
 struct BlockHashAggStats : public HashAggStats {
@@ -356,7 +356,7 @@ struct HashLookupStats : public SpecificStats {
     SpillingStats spillingBuffStats;
 
     // The maximum amount of memory that was used.
-    uint64_t maxUsedMemBytes = 0u;
+    uint64_t peakTrackedMemBytes = 0u;
 };
 
 struct WindowStats : public SpecificStats {

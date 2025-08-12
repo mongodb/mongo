@@ -198,12 +198,12 @@ public:
      */
     uint64_t checkMemoryTracking(const SimpleMemoryUsageTracker& tracker,
                                  uint64_t oldPeakMemBytes) {
-        uint64_t currentMemBytes = tracker.currentMemoryBytes();
+        uint64_t inUseTrackedMemBytes = tracker.inUseTrackedMemoryBytes();
         // If we have processed any rows, we should have seen some memory usage.
-        ASSERT_GT(currentMemBytes, 0);
+        ASSERT_GT(inUseTrackedMemBytes, 0);
 
-        uint64_t actualPeakMemBytes = tracker.maxMemoryBytes();
-        ASSERT_GTE(actualPeakMemBytes, currentMemBytes);
+        uint64_t actualPeakMemBytes = tracker.peakTrackedMemoryBytes();
+        ASSERT_GTE(actualPeakMemBytes, inUseTrackedMemBytes);
         ASSERT_GTE(actualPeakMemBytes, oldPeakMemBytes);
         return actualPeakMemBytes;
     }
@@ -297,7 +297,7 @@ public:
         ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
         checkCount(count);
 
-        ASSERT_EQUALS(memoryTracker.currentMemoryBytes(), 0);
+        ASSERT_EQUALS(memoryTracker.inUseTrackedMemoryBytes(), 0);
     }
 
     /**

@@ -75,9 +75,9 @@ void generateQueryShapeHash(const OperationContext* opCtx, BSONObjBuilder* out) 
     }
 }
 
-void generateMaxUsedMemBytes(const OperationContext* opCtx, BSONObjBuilder* out) {
-    if (int64_t maxUsedMemBytes = mongo::CurOp::get(opCtx)->getMaxUsedMemoryBytes()) {
-        out->append("maxUsedMemBytes", maxUsedMemBytes);
+void generatePeakTrackedMemBytes(const OperationContext* opCtx, BSONObjBuilder* out) {
+    if (int64_t peakTrackedMemBytes = mongo::CurOp::get(opCtx)->getPeakTrackedMemoryBytes()) {
+        out->append("peakTrackedMemBytes", peakTrackedMemBytes);
     }
 }
 

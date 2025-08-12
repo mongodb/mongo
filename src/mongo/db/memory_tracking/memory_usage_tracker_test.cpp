@@ -51,11 +51,11 @@ TEST_F(MemoryUsageTrackerTest, FreshMemoryUsageTrackerInitializedCorrectly) {
 
     MemoryUsageTracker freshMemoryUsageTracker = _tracker.makeFreshMemoryUsageTracker();
 
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 50LL);
 
-    ASSERT_EQ(freshMemoryUsageTracker.currentMemoryBytes(), 0);
-    ASSERT_EQ(freshMemoryUsageTracker.maxMemoryBytes(), 0);
+    ASSERT_EQ(freshMemoryUsageTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(freshMemoryUsageTracker.peakTrackedMemoryBytes(), 0);
     ASSERT_EQ(freshMemoryUsageTracker.maxAllowedMemoryUsageBytes(),
               _tracker.maxAllowedMemoryUsageBytes());
 }
@@ -66,11 +66,11 @@ TEST_F(MemoryUsageTrackerTest, FreshSimpleMemoryUsageTrackerInitializedCorrectly
     SimpleMemoryUsageTracker freshSimpleMemoryUsageTracker =
         _funcTracker.makeFreshSimpleMemoryUsageTracker();
 
-    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(_funcTracker.maxMemoryBytes(), 50LL);
+    ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 50LL);
+    ASSERT_EQ(_funcTracker.peakTrackedMemoryBytes(), 50LL);
 
-    ASSERT_EQ(freshSimpleMemoryUsageTracker.currentMemoryBytes(), 0);
-    ASSERT_EQ(freshSimpleMemoryUsageTracker.maxMemoryBytes(), 0);
+    ASSERT_EQ(freshSimpleMemoryUsageTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(freshSimpleMemoryUsageTracker.peakTrackedMemoryBytes(), 0);
     ASSERT_EQ(freshSimpleMemoryUsageTracker.maxAllowedMemoryUsageBytes(),
               _funcTracker.maxAllowedMemoryUsageBytes());
 }
@@ -84,58 +84,58 @@ TEST_F(MemoryUsageTrackerTest, FreshMemoryUsageTrackerCopiesBaseCorrectly) {
     memTrackerB.add(50LL);
     memTrackerC.add(50LL);
 
-    ASSERT_EQ(memTrackerA.currentMemoryBytes(), 100LL);
-    ASSERT_EQ(memTrackerA.maxMemoryBytes(), 100LL);
+    ASSERT_EQ(memTrackerA.inUseTrackedMemoryBytes(), 100LL);
+    ASSERT_EQ(memTrackerA.peakTrackedMemoryBytes(), 100LL);
 
-    ASSERT_EQ(memTrackerB.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(memTrackerB.maxMemoryBytes(), 50LL);
+    ASSERT_EQ(memTrackerB.inUseTrackedMemoryBytes(), 50LL);
+    ASSERT_EQ(memTrackerB.peakTrackedMemoryBytes(), 50LL);
 
-    ASSERT_EQ(memTrackerC.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(memTrackerC.maxMemoryBytes(), 50LL);
+    ASSERT_EQ(memTrackerC.inUseTrackedMemoryBytes(), 50LL);
+    ASSERT_EQ(memTrackerC.peakTrackedMemoryBytes(), 50LL);
 }
 
 TEST_F(MemoryUsageTrackerTest, SetFunctionUsageUpdatesGlobal) {
     _tracker.add(50LL);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 50LL);
 
     // 50 global + 50 _funcTracker.
     _funcTracker.set(50);
-    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(_funcTracker.maxMemoryBytes(), 50LL);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 100LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 100LL);
+    ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 50LL);
+    ASSERT_EQ(_funcTracker.peakTrackedMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 100LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 100LL);
 
     // New tracker adds another 50, 150 total.
     _tracker.set("newTracker", 50);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 150LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 150LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
 
     // Lower usage of function tracker is reflected in global.
     _tracker.set("newTracker", 0);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 100LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 100LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
 }
 
 TEST_F(MemoryUsageTrackerTest, UpdateUsageUpdatesGlobal) {
     _tracker.add(50LL);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 50LL);
 
     // Add another 50 to the global, 100 total.
     _tracker.add(50);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 100LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 100LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 100LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 100LL);
 
     // Function tracker adds another 50, 150 total.
     _funcTracker.add(50);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 150LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 150LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
 
     // Lower usage of function tracker is reflected in global.
     _funcTracker.add(-25);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 125LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 125LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
 }
 
 DEATH_TEST_F(MemoryUsageTrackerTest,
@@ -155,88 +155,88 @@ DEATH_TEST_F(MemoryUsageTrackerTest,
 TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenUpdatesCurrentAndMax) {
     {
         MemoryUsageToken token{50LL, &_tracker["subTracker"]};
-        ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-        ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 50LL);
         {
             MemoryUsageToken funcToken{100LL, &_funcTracker};
-            ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
-            ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+            ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 100LL);
+            ASSERT_EQ(_funcTracker.peakTrackedMemoryBytes(), 100LL);
 
-            ASSERT_EQ(_tracker.currentMemoryBytes(), 150LL);
-            ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+            ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 150LL);
+            ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
         }
-        ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-        ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+        ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
     }
-    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 0);
-    ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+    ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(_funcTracker.peakTrackedMemoryBytes(), 100LL);
 
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 0);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
 }
 
 TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenCanBeMoved) {
     {
         MemoryUsageToken token{50LL, &_tracker["subTracker"]};
-        ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-        ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 50LL);
 
         MemoryUsageToken token2(std::move(token));
-        ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-        ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 50LL);
     }
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 0);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 50LL);
 }
 
 TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenCanBeMoveAssigned) {
     {
         MemoryUsageToken token{50LL, &_tracker["subTracker"]};
-        ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-        ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 50LL);
         {
             MemoryUsageToken token2{100LL, &_funcTracker};
-            ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
-            ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+            ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 100LL);
+            ASSERT_EQ(_funcTracker.peakTrackedMemoryBytes(), 100LL);
 
-            ASSERT_EQ(_tracker.currentMemoryBytes(), 150LL);
-            ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+            ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 150LL);
+            ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
 
             token = std::move(token2);
-            ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
-            ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+            ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 100LL);
+            ASSERT_EQ(_funcTracker.peakTrackedMemoryBytes(), 100LL);
 
-            ASSERT_EQ(_tracker.currentMemoryBytes(), 100LL);
-            ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+            ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 100LL);
+            ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
         }
-        ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
-        ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+        ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 100LL);
+        ASSERT_EQ(_funcTracker.peakTrackedMemoryBytes(), 100LL);
 
-        ASSERT_EQ(_tracker.currentMemoryBytes(), 100LL);
-        ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+        ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 100LL);
+        ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
     }
-    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 0);
-    ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+    ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(_funcTracker.peakTrackedMemoryBytes(), 100LL);
 
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 0);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
 }
 
 TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenCanBeStoredInVector) {
     auto assertMemory = [this]() {
-        ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
-        ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+        ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 100LL);
+        ASSERT_EQ(_funcTracker.peakTrackedMemoryBytes(), 100LL);
 
-        ASSERT_EQ(_tracker.currentMemoryBytes(), 150LL);
-        ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+        ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 150LL);
+        ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
     };
 
     auto assertZeroMemory = [this]() {
-        ASSERT_EQ(_funcTracker.currentMemoryBytes(), 0);
-        ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+        ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 0);
+        ASSERT_EQ(_funcTracker.peakTrackedMemoryBytes(), 100LL);
 
-        ASSERT_EQ(_tracker.currentMemoryBytes(), 0);
-        ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+        ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 0);
+        ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
     };
 
     {
@@ -273,16 +273,16 @@ TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenWith) {
         memory_tracked_vector.emplace_back(MemoryUsageToken{line.size(), &_tracker["subTracker"]},
                                            line);
         total_size += line.size();
-        ASSERT_EQ(total_size, _tracker.currentMemoryBytes());
-        ASSERT_EQ(total_size, _tracker.maxMemoryBytes());
+        ASSERT_EQ(total_size, _tracker.inUseTrackedMemoryBytes());
+        ASSERT_EQ(total_size, _tracker.peakTrackedMemoryBytes());
     }
 
     int64_t max_size = total_size;
     while (!memory_tracked_vector.empty()) {
         total_size -= memory_tracked_vector.back().value().size();
         memory_tracked_vector.pop_back();
-        ASSERT_EQ(total_size, _tracker.currentMemoryBytes());
-        ASSERT_EQ(max_size, _tracker.maxMemoryBytes());
+        ASSERT_EQ(total_size, _tracker.inUseTrackedMemoryBytes());
+        ASSERT_EQ(max_size, _tracker.peakTrackedMemoryBytes());
     }
 }
 

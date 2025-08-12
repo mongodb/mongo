@@ -372,13 +372,14 @@ Value DocumentSourceInternalSetWindowFields::serialize(const SerializationOption
 
         for (auto&& [fieldName, function] : _executableOutputs) {
             md[opts.serializeFieldPathFromString(fieldName)] = opts.serializeLiteral(
-                static_cast<long long>(_memoryTracker.maxMemoryBytes(fieldName)));
+                static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes(fieldName)));
         }
 
         out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
-        // TODO SERVER-106308 Investigate if we can delete maxTotalMemoryUsageBytes.
+        // TODO SERVER-88298 Remove maxTotalMemoryUsageBytes when we enable feature flag as
+        // peakTrackedMemBytes reports the same value.
         out["maxTotalMemoryUsageBytes"] =
-            opts.serializeLiteral(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
+            opts.serializeLiteral(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
         out["usedDisk"] = opts.serializeLiteral(_iterator.usedDisk());
         out["spills"] =
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));
@@ -389,8 +390,8 @@ Value DocumentSourceInternalSetWindowFields::serialize(const SerializationOption
         out["spilledRecords"] =
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            out["maxUsedMemBytes"] =
-                opts.serializeLiteral(static_cast<long long>(_stats.maxUsedMemoryBytes));
+            out["peakTrackedMemBytes"] =
+                opts.serializeLiteral(static_cast<long long>(_stats.peakTrackedMemBytes));
         }
     }
 
@@ -537,7 +538,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
     if (_eof) {
         // On EOF, update SetWindowFieldStats so explain has $_internalSetWindowFields-level
         // statistics.
-        _stats.maxUsedMemoryBytes = _memoryTracker.maxMemoryBytes();
+        _stats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         return DocumentSource::GetNextResult::makeEOF();
     }
 
@@ -585,7 +586,8 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             uasserted(5414201,
                       str::stream()
                           << "Exceeded memory limit in DocumentSourceSetWindowFields, used "
-                          << _memoryTracker.currentMemoryBytes() << " bytes but max allowed is "
+                          << _memoryTracker.inUseTrackedMemoryBytes()
+                          << " bytes but max allowed is "
                           << _memoryTracker.maxAllowedMemoryUsageBytes());
         }
     }
@@ -617,7 +619,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
 void DocumentSourceInternalSetWindowFields::doDispose() {
     // Before we clear the memory tracker, update SetWindowFieldStats so explain has
     // $_internalSetWindowFields-level statistics.
-    _stats.maxUsedMemoryBytes = _memoryTracker.maxMemoryBytes();
+    _stats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
 
     _iterator.finalize();
     _stats.spillingStats = _iterator.getSpillingStats();

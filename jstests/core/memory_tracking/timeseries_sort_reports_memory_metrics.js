@@ -101,7 +101,7 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
         },
         stageName: "$sort",
         expectedNumGetMores: 5,
-        skipInUseMemBytesCheck: true,
+        skipInUseTrackedMemBytesCheck: true,
     });
     // Restore memory limit.
     assert.commandWorked(db.adminCommand(

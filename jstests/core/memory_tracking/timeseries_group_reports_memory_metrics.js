@@ -98,8 +98,10 @@ try {
 
     {
         // Set maxMemory low to force spill to disk.
-        const originalMemoryLimit = assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 1000}));
+        const originalMemoryLimit = assert.commandWorked(db.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1000
+        }));
         // This parameter is generally true for debug builds, but we would like to turn it off
         // for this test.
         const originalForceSpilling = assert.commandWorked(db.adminCommand(
@@ -119,14 +121,15 @@ try {
                 stageName: stageName,
                 expectedNumGetMores: 4,
                 // Since we spill, we don't expect to see
-                // inUseMemBytes populated as it should be 0 on each operation.
-                skipInUseMemBytesCheck: true,
+                // inUseTrackedMemBytes populated as it should be 0 on each operation.
+                skipInUseTrackedMemBytesCheck: true,
             });
         } finally {
             // Set maxMemory back to the original value.
             assert.commandWorked(db.adminCommand({
                 setParameter: 1,
-                internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was
+                internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
+                    originalMemoryLimit.was
             }));
             assert.commandWorked(db.adminCommand({
                 setParameter: 1,

@@ -69,13 +69,13 @@ function runTest(conn, db, coll) {
 
 function assertCurrentOpOutput(memoryTrackingEnabled, curOpDoc) {
     if (memoryTrackingEnabled) {
-        assert(curOpDoc.hasOwnProperty("inUseMemBytes"), tojson(curOpDoc));
-        assert.gt(curOpDoc.inUseMemBytes, 0);
-        assert(curOpDoc.hasOwnProperty("maxUsedMemBytes"), tojson(curOpDoc));
-        assert.gt(curOpDoc.maxUsedMemBytes, 0);
+        assert(curOpDoc.hasOwnProperty("inUseTrackedMemBytes"), tojson(curOpDoc));
+        assert.gt(curOpDoc.inUseTrackedMemBytes, 0);
+        assert(curOpDoc.hasOwnProperty("peakTrackedMemBytes"), tojson(curOpDoc));
+        assert.gt(curOpDoc.peakTrackedMemBytes, 0);
     } else {
-        assert(!curOpDoc.hasOwnProperty("inUseMemBytes"), tojson(curOpDoc));
-        assert(!curOpDoc.hasOwnProperty("maxUsedMemBytes"), tojson(curOpDoc));
+        assert(!curOpDoc.hasOwnProperty("inUseTrackedMemBytes"), tojson(curOpDoc));
+        assert(!curOpDoc.hasOwnProperty("peakTrackedMemBytes"), tojson(curOpDoc));
     }
 }
 

@@ -57,5 +57,5 @@ runMemoryStatsTest({
     stageName: "OR",
     expectedNumGetMores: 3,
     // This stage does not release memory on EOF.
-    checkInUseMemBytesResets: false,
+    checkInUseTrackedMemBytesResets: false,
 });

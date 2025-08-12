@@ -248,8 +248,8 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
             _memoryHt->erase(htIt);
         }
     }
-    _hashLookupStats.maxUsedMemBytes =
-        std::max(_hashLookupStats.maxUsedMemBytes, static_cast<uint64_t>(_computedTotalMemUsage));
+    _hashLookupStats.peakTrackedMemBytes = std::max(_hashLookupStats.peakTrackedMemBytes,
+                                                    static_cast<uint64_t>(_computedTotalMemUsage));
 }  // LookupHashTable::addHashTableEntry
 
 void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
@@ -286,8 +286,8 @@ size_t LookupHashTable::bufferValueOrSpill(value::MaterializedRow& value) {
     if (!hasSpilledBufToDisk() && newMemUsage <= _memoryUseInBytesBeforeSpill) {
         _buffer.emplace_back(std::move(value));
         _computedTotalMemUsage = newMemUsage;
-        _hashLookupStats.maxUsedMemBytes = std::max(_hashLookupStats.maxUsedMemBytes,
-                                                    static_cast<uint64_t>(_computedTotalMemUsage));
+        _hashLookupStats.peakTrackedMemBytes = std::max(
+            _hashLookupStats.peakTrackedMemBytes, static_cast<uint64_t>(_computedTotalMemUsage));
     } else {
         if (!hasSpilledBufToDisk()) {
             makeTemporaryRecordStore();

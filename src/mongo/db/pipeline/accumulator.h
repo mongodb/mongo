@@ -118,7 +118,7 @@ public:
     virtual const char* getOpName() const = 0;
 
     int64_t getMemUsage() const {
-        return _memUsageTracker.currentMemoryBytes();
+        return _memUsageTracker.inUseTrackedMemoryBytes();
     }
 
     /// Reset this accumulator to a fresh state, ready for a new call to startNewGroup.
@@ -191,7 +191,8 @@ protected:
                 str::stream() << getOpName()
                               << " used too much memory and spilling to disk cannot reduce memory "
                                  "consumption any further. Used: "
-                              << _memUsageTracker.currentMemoryBytes() << " bytes. Memory limit: "
+                              << _memUsageTracker.inUseTrackedMemoryBytes()
+                              << " bytes. Memory limit: "
                               << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
                 _memUsageTracker.withinMemoryLimit());
     }

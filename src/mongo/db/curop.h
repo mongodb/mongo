@@ -596,14 +596,14 @@ public:
      * must hold the client lock, but updates to memory usage may be frequent and cause contention
      * on the client lock.
      */
-    void setMemoryTrackingStats(int64_t inUseMemoryBytes, int64_t maxUsedMemoryBytes);
+    void setMemoryTrackingStats(int64_t inUseTrackedMemBytes, int64_t peakTrackedMemBytes);
 
-    int64_t getInUseMemoryBytes() const {
-        return _inUseMemoryBytes.load();
+    int64_t getInUseTrackedMemoryBytes() const {
+        return _inUseTrackedMemoryBytes.load();
     }
 
-    int64_t getMaxUsedMemoryBytes() const {
-        return _maxUsedMemoryBytes.load();
+    int64_t getPeakTrackedMemoryBytes() const {
+        return _peakTrackedMemoryBytes.load();
     }
 
     /*
@@ -889,8 +889,8 @@ private:
     // from the operation context and curop::reportState.
     // These metrics refer to local memory use, i.e. on a mongos process, as opposed to rolling up
     // memory from shards.
-    AtomicWord<int64_t> _inUseMemoryBytes{0};
-    AtomicWord<int64_t> _maxUsedMemoryBytes{0};
+    AtomicWord<int64_t> _inUseTrackedMemoryBytes{0};
+    AtomicWord<int64_t> _peakTrackedMemoryBytes{0};
 };
 
 }  // namespace mongo

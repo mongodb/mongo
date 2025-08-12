@@ -111,7 +111,8 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
                         _noResultToMerge.pop();
                         uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
                         _memoryTracker.add(dedupBytes - dedupBytesPrev);
-                        _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
+                        _specificStats.peakTrackedMemBytes =
+                            _memoryTracker.peakTrackedMemoryBytes();
                     }
                 }
             } else {
@@ -127,7 +128,7 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
             // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
             member->makeObjOwnedIfNeeded();
             _memoryTracker.add(member->getMemUsage());
-            _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
+            _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
             _mergingData.push_front(value);
 
             // Insert the result (indirectly) into our priority queue.
@@ -163,7 +164,7 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
     WorkingSetMember* member = _ws->get(idToTest);
     _mergingData.erase(top);
     _memoryTracker.add(-1 * member->getMemUsage());
-    _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
+    _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
     // Return the min.
     *out = idToTest;
 

@@ -75,7 +75,7 @@ const pipeline = [
         stageName: "$_internalSetWindowFields",
         expectedNumGetMores: 10,
         // This stage does not release memory on EOF.
-        checkInUseMemBytesResets: false
+        checkInUseTrackedMemBytesResets: false
     });
 }
 
@@ -100,7 +100,7 @@ const pipeline = [
         stageName: "$_internalSetWindowFields",
         expectedNumGetMores: 3,
         // This stage does not release memory on EOF.
-        checkInUseMemBytesResets: false
+        checkInUseTrackedMemBytesResets: false
     });
 }
 
@@ -128,7 +128,7 @@ const pipeline = [
         },
         stageName: "$_internalSetWindowFields",
         expectedNumGetMores: 10,
-        skipInUseMemBytesCheck: true,
+        skipInUseTrackedMemBytesCheck: true,
     });
 
     // Restore the original memory limit.

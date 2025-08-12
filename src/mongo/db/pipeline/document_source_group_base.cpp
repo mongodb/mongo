@@ -119,7 +119,7 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
         for (size_t i = 0; i < accumulatedFields.size(); i++) {
             md[opts.serializeFieldPathFromString(accumulatedFields[i].fieldName)] =
                 opts.serializeLiteral(static_cast<long long>(
-                    memoryTracker.maxMemoryBytes(accumulatedFields[i].fieldName)));
+                    memoryTracker.peakTrackedMemoryBytes(accumulatedFields[i].fieldName)));
         }
 
         out["maxAccumulatorMemoryUsageBytes"] = Value(md.freezeToValue());
@@ -137,8 +137,8 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
         out["spilledRecords"] =
             opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledRecords()));
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            out["maxUsedMemBytes"] =
-                opts.serializeLiteral(static_cast<long long>(stats.maxUsedMemoryBytes));
+            out["peakTrackedMemBytes"] =
+                opts.serializeLiteral(static_cast<long long>(stats.peakTrackedMemBytes));
         }
     }
 

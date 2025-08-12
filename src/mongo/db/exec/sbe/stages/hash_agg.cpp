@@ -520,8 +520,8 @@ std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) co
             static_cast<long long>(_specificStats.spillingStats.getSpilledDataStorageSize()));
 
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            bob.appendNumber("maxUsedMemBytes",
-                             static_cast<long long>(_specificStats.maxUsedMemBytes));
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(_specificStats.peakTrackedMemBytes));
         }
 
         ret->debugInfo = bob.obj();
@@ -560,7 +560,7 @@ void HashAggStage::close() {
     }
 
     _memoryTracker.value().set(0);
-    _specificStats.maxUsedMemBytes = _memoryTracker.value().maxMemoryBytes();
+    _specificStats.peakTrackedMemBytes = _memoryTracker.value().peakTrackedMemoryBytes();
 }
 
 std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {

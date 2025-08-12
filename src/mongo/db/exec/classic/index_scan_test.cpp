@@ -95,22 +95,24 @@ public:
         std::vector<BSONObj> results;
         WorkingSetID wsid = WorkingSet::INVALID_ID;
 
-        uint64_t peakMemoryBytes = 0;
+        uint64_t peakTrackedMemoryBytes = 0;
         PlanStage::StageState state = PlanStage::NEED_TIME;
         while (state != PlanStage::IS_EOF) {
             state = indexScan.work(&wsid);
 
             if (state == PlanStage::ADVANCED) {
                 const auto& tracker = indexScan.getMemoryTracker_forTest();
-                uint64_t currentMemoryBytes = tracker.currentMemoryBytes();
+                uint64_t inUseTrackedMemoryBytes = tracker.inUseTrackedMemoryBytes();
                 if (expectMemoryUsage) {
-                    peakMemoryBytes = std::max(currentMemoryBytes, peakMemoryBytes);
+                    peakTrackedMemoryBytes =
+                        std::max(inUseTrackedMemoryBytes, peakTrackedMemoryBytes);
                     // If we are deduping and we have processed a record, there should be non-zero
                     // memory usage.
-                    ASSERT_GT(currentMemoryBytes, 0);
-                    ASSERT_GTE(static_cast<uint64_t>(tracker.maxMemoryBytes()), peakMemoryBytes);
+                    ASSERT_GT(inUseTrackedMemoryBytes, 0);
+                    ASSERT_GTE(static_cast<uint64_t>(tracker.peakTrackedMemoryBytes()),
+                               peakTrackedMemoryBytes);
                 } else {
-                    ASSERT_EQ(0, currentMemoryBytes);
+                    ASSERT_EQ(0, inUseTrackedMemoryBytes);
                 }
 
                 WorkingSetMember* member = _ws.get(wsid);

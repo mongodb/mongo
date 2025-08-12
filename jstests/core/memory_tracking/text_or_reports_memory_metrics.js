@@ -85,7 +85,7 @@ const predicate = {
         stageName: "TEXT_OR",
         expectedNumGetMores: 2,
         // This stage does not release memory on EOF.
-        checkInUseMemBytesResets: false,
+        checkInUseTrackedMemBytesResets: false,
     });
 }
 
@@ -107,7 +107,7 @@ const predicate = {
         stageName: "TEXT_OR",
         expectedNumGetMores: 1,
         // This stage does not release memory on EOF.
-        checkInUseMemBytesResets: false,
+        checkInUseTrackedMemBytesResets: false,
     });
 }
 
@@ -135,7 +135,7 @@ const predicate = {
         },
         stageName: "TEXT_OR",
         expectedNumGetMores: 2,
-        skipInUseMemBytesCheck: true,
+        skipInUseTrackedMemBytesCheck: true,
     });
 
     assert.commandWorked(

@@ -232,7 +232,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         _scanState = HIT_END;
         _commonStats.isEOF = true;
         _indexCursor.reset();
-        _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
+        _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         return PlanStage::IS_EOF;
     }
 
@@ -250,7 +250,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
                                             : _recordIdDeduplicator.contains(kv->loc);
         uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
         _memoryTracker.add(dedupBytes - dedupBytesPrev);
-        _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
+        _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
 
         // If we've seen the RecordId before
         if (duplicate) {
@@ -271,7 +271,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         _recordIdDeduplicator.insert(kv->loc);
         uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
         _memoryTracker.add(dedupBytes - dedupBytesPrev);
-        _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
+        _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
     }
 
     if (!kv->key.isOwned())

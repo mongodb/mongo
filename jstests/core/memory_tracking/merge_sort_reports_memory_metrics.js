@@ -56,7 +56,7 @@ assert.commandWorked(coll.createIndex({b: 1, c: 1}));
         // each document sequentially.
         expectedNumGetMores: 5,
         // This stage does not release memory on EOF.
-        checkInUseMemBytesResets: false,
+        checkInUseTrackedMemBytesResets: false,
     });
 }
 
@@ -74,6 +74,6 @@ assert.commandWorked(coll.createIndex({b: 1, c: 1}));
         },
         stageName: "SORT_MERGE",
         expectedNumGetMores: 2,
-        checkInUseMemBytesResets: false,
+        checkInUseTrackedMemBytesResets: false,
     });
 }

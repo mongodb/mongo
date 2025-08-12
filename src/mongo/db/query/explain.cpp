@@ -380,7 +380,7 @@ void Explain::explainStages(PlanExecutor* exec,
     }
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
-    explain_common::generateMaxUsedMemBytes(exec->getOpCtx(), out);
+    explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
     explain_common::appendIfRoom(command, "command", out);
 }
 
@@ -407,7 +407,7 @@ void Explain::explainPipeline(PlanExecutor* exec,
     *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
-    explain_common::generateMaxUsedMemBytes(exec->getOpCtx(), out);
+    explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
     explain_common::generateServerInfo(out);
 
     auto* cq = pipelineExec->getCanonicalQuery();

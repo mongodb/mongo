@@ -323,14 +323,14 @@ public:
         [](const SpecificStats* statsGeneric) {
             const auto* stats = static_cast<const BlockHashAggStats*>(statsGeneric);
             ASSERT_NE(stats, nullptr);
-            ASSERT_GT(stats->maxUsedMemBytes, 0);
+            ASSERT_GT(stats->peakTrackedMemBytes, 0);
         };
 
     static inline const AssertStageStatsFn assertPeakMemIsZero =
         [](const SpecificStats* statsGeneric) {
             const auto* stats = static_cast<const BlockHashAggStats*>(statsGeneric);
             ASSERT_NE(stats, nullptr);
-            ASSERT_EQ(stats->maxUsedMemBytes, 0);
+            ASSERT_EQ(stats->peakTrackedMemBytes, 0);
         };
 
     /**
@@ -491,7 +491,7 @@ TEST_F(BlockHashAggStageTest, ScalarKeySingleAccumulatorMinForceSpill) {
         ASSERT_EQ(stats->spillingStats.getSpilledBytes(),
                   14 * BlockHashAggStage::kBlockOutSize * 5);
         // Since forceIncreasedSpilling is true, we spill without using any memory.
-        ASSERT_EQ(stats->maxUsedMemBytes, 0);
+        ASSERT_EQ(stats->peakTrackedMemBytes, 0);
     };
     auto assertForceSpillingStageStats = [](const SpecificStats* statsGeneric) {
         const auto* stats = dynamic_cast<const BlockHashAggStats*>(statsGeneric);
@@ -504,7 +504,7 @@ TEST_F(BlockHashAggStageTest, ScalarKeySingleAccumulatorMinForceSpill) {
                            // been consumed.
         ASSERT_EQ(stats->spillingStats.getSpilledBytes(),
                   14 * BlockHashAggStage::kBlockOutSize * 2);
-        ASSERT_GT(stats->maxUsedMemBytes, 0);
+        ASSERT_GT(stats->peakTrackedMemBytes, 0);
     };
 
     TestResultType expected;

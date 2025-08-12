@@ -87,8 +87,8 @@ assert.commandWorked(coll.insertMany(docs));
         },
         stageName,
         expectedNumGetMores: 1,
-        skipInUseMemBytesCheck: true,  // $limit will force execution to stop early, so
-                                       // inUseMemBytes may not appear in CurOp.
+        skipInUseTrackedMemBytesCheck: true,  // $limit will force execution to stop early, so
+                                              // inUseTrackedMemBytes may not appear in CurOp.
     });
 }
 

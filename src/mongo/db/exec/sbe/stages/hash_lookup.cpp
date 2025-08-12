@@ -274,8 +274,8 @@ std::unique_ptr<PlanStageStats> HashLookupStage::getStats(bool includeDebugInfo)
             .appendNumber("spilledDataStorageSize",
                           static_cast<long long>(spillingStats.getSpilledDataStorageSize()));
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            bob.appendNumber("maxUsedMemBytes",
-                             static_cast<long long>(specificStats->maxUsedMemBytes));
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(specificStats->peakTrackedMemBytes));
         }
         ret->debugInfo = bob.obj();
     }

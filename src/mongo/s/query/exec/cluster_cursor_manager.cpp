@@ -104,11 +104,11 @@ GenericCursor cursorToGenericCursor(ClusterClientCursor* cursor,
     gc.setCreatedDate(cursor->getCreatedDate());
     gc.setNBatchesReturned(cursor->getNBatches());
     if (auto memoryTracker = cursor->getMemoryUsageTracker()) {
-        if (auto inUseMemBytes = memoryTracker->currentMemoryBytes()) {
-            gc.setInUseMemBytes(inUseMemBytes);
+        if (auto inUseTrackedMemBytes = memoryTracker->inUseTrackedMemoryBytes()) {
+            gc.setInUseTrackedMemBytes(inUseTrackedMemBytes);
         }
-        if (auto maxUsedMemBytes = memoryTracker->maxMemoryBytes()) {
-            gc.setMaxUsedMemBytes(maxUsedMemBytes);
+        if (auto peakTrackedMemBytes = memoryTracker->peakTrackedMemoryBytes()) {
+            gc.setPeakTrackedMemBytes(peakTrackedMemBytes);
         }
     }
     return gc;

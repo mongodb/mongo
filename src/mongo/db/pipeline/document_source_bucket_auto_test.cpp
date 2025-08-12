@@ -101,7 +101,7 @@ public:
         }
 
         if (expectedMemUse) {
-            ASSERT_GT(bucketAutoPtr->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
+            ASSERT_GT(bucketAutoPtr->getMemoryTracker_forTest()->peakTrackedMemoryBytes(), 0);
         }
 
         return results;
@@ -434,8 +434,8 @@ TEST_F(BucketAutoTests, ShouldBeAbleToCorrectlySpillToDisk) {
     ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
     ASSERT_TRUE(bucketAutoStage->usedDisk());
 
-    ASSERT_EQ(bucketAutoStage->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(bucketAutoStage->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(bucketAutoStage->getMemoryTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(bucketAutoStage->getMemoryTracker_forTest()->peakTrackedMemoryBytes(), 0);
 
     auto stats =
         dynamic_cast<const DocumentSourceBucketAutoStats*>(bucketAutoStage->getSpecificStats());
@@ -538,8 +538,8 @@ TEST_F(BucketAutoTests, ShouldBeAbleToForceSpillWhileLoadingDocuments) {
     ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
     ASSERT_TRUE(bucketAutoStage->usedDisk());
 
-    ASSERT_EQ(bucketAutoStage->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(bucketAutoStage->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(bucketAutoStage->getMemoryTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(bucketAutoStage->getMemoryTracker_forTest()->peakTrackedMemoryBytes(), 0);
 
     auto stats =
         dynamic_cast<const DocumentSourceBucketAutoStats*>(bucketAutoStage->getSpecificStats());
@@ -592,8 +592,8 @@ TEST_F(BucketAutoTests, ShouldBeAbleToForceSpillWhileReturningDocuments) {
     ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
     ASSERT_TRUE(bucketAutoStage->usedDisk());
 
-    ASSERT_EQ(bucketAutoStage->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(bucketAutoStage->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
+    ASSERT_EQ(bucketAutoStage->getMemoryTracker_forTest()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(bucketAutoStage->getMemoryTracker_forTest()->peakTrackedMemoryBytes(), 0);
 
     auto stats =
         dynamic_cast<const DocumentSourceBucketAutoStats*>(bucketAutoStage->getSpecificStats());

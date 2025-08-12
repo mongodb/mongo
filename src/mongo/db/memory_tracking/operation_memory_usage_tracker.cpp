@@ -53,10 +53,10 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
         auto uniqueTracker = std::make_unique<OperationMemoryUsageTracker>(opCtx);
         opTracker = uniqueTracker.get();
         opTracker->setDoExtraBookkeeping(
-            [opTracker](int64_t currentMemoryBytes, int64_t maxUsedMemoryBytes) {
+            [opTracker](int64_t inUseTrackedMemoryBytes, int64_t peakTrackedMemBytes) {
                 if (opTracker->_opCtx) {
                     CurOp::get(opTracker->_opCtx)
-                        ->setMemoryTrackingStats(currentMemoryBytes, maxUsedMemoryBytes);
+                        ->setMemoryTrackingStats(inUseTrackedMemoryBytes, peakTrackedMemBytes);
                 } else {
                     LOGV2_DEBUG(10430900, 3, "No OperationContext on OperationMemoryUsageTracker");
                 }
@@ -114,8 +114,8 @@ void OperationMemoryUsageTracker::moveToOpCtxIfAvailable(
     invariant(opCtx);
     if (tracker) {
         tracker->_opCtx = opCtx;
-        CurOp::get(opCtx)->setMemoryTrackingStats(tracker->currentMemoryBytes(),
-                                                  tracker->maxMemoryBytes());
+        CurOp::get(opCtx)->setMemoryTrackingStats(tracker->inUseTrackedMemoryBytes(),
+                                                  tracker->peakTrackedMemoryBytes());
     }
     _getFromOpCtx(opCtx) = std::move(tracker);
 }

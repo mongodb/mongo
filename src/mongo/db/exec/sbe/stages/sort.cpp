@@ -127,8 +127,8 @@ std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const
         bob.appendNumber("spilledRecords",
                          static_cast<long long>(_specificStats.spillingStats.getSpilledRecords()));
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            bob.appendNumber("maxUsedMemBytes",
-                             static_cast<long long>(_specificStats.maxUsedMemBytes));
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(_specificStats.peakTrackedMemBytes));
         }
 
         BSONObjBuilder childrenBob(bob.subobjStart("orderBySlots"));

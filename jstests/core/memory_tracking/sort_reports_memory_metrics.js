@@ -139,8 +139,8 @@ for (const config of configs) {
                     stageName: config.stageName,
                     expectedNumGetMores: 5,
                     // Since we spill to disk when adding to the sorter, we don't expect to see
-                    // inUseMemBytes populated as it should be 0 on each operation.
-                    skipInUseMemBytesCheck: true,
+                    // inUseTrackedMemBytes populated as it should be 0 on each operation.
+                    skipInUseTrackedMemBytesCheck: true,
                 });
             } finally {
                 // Set maxMemory back to the original value.

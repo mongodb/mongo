@@ -259,7 +259,7 @@ protected:
      * After an aggregate() request has been issued but its cursor hasn't been exhausted, get the
      * memory tracker stashed on the cursor and return the metrics that it contains.
      *
-     * Returns a tuple of (currentMemoryBytes, maxMemoryBytes).
+     * Returns a tuple of (inUseTrackedMemoryBytes, maxMemoryBytes).
      */
     std::pair<int64_t, int64_t> getRouterMemoryUsage(int64_t cursorId) {
         auto client = getServiceContext()->getService()->makeClient("ClusterCmdClient");
@@ -279,8 +279,8 @@ protected:
         ASSERT_NE(nullptr, memoryUsageTracker);
         // Since we took the tracker off of the opCtx, the tracker's opCtx pointer will be null.
         ASSERT_EQ(nullptr, memoryUsageTracker->_opCtx);
-        return std::make_pair(memoryUsageTracker->currentMemoryBytes(),
-                              memoryUsageTracker->maxMemoryBytes());
+        return std::make_pair(memoryUsageTracker->inUseTrackedMemoryBytes(),
+                              memoryUsageTracker->peakTrackedMemoryBytes());
     }
 
 private:

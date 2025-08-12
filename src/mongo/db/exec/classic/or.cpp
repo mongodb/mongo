@@ -100,7 +100,7 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
             } else {
                 uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
                 _memoryTracker.add(dedupBytes - dedupBytesPrev);
-                _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
+                _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
             }
         }
 

@@ -66,37 +66,37 @@ public:
     SimpleMemoryUsageTracker() : SimpleMemoryUsageTracker(std::numeric_limits<int64_t>::max()) {}
 
     void add(int64_t diff) {
-        _currentMemoryBytes += diff;
+        _inUseTrackedMemoryBytes += diff;
         tassert(6128100,
                 str::stream() << "Underflow in memory tracking, attempting to add " << diff
-                              << " but only " << _currentMemoryBytes - diff << " available",
-                _currentMemoryBytes >= 0);
-        if (_currentMemoryBytes > _maxMemoryBytes) {
-            _maxMemoryBytes = _currentMemoryBytes;
+                              << " but only " << _inUseTrackedMemoryBytes - diff << " available",
+                _inUseTrackedMemoryBytes >= 0);
+        if (_inUseTrackedMemoryBytes > _peakTrackedMemoryBytes) {
+            _peakTrackedMemoryBytes = _inUseTrackedMemoryBytes;
         }
         if (_base) {
             _base->add(diff);
         }
 
         if (_doExtraBookkeeping) {
-            _doExtraBookkeeping(_currentMemoryBytes, _maxMemoryBytes);
+            _doExtraBookkeeping(_inUseTrackedMemoryBytes, _peakTrackedMemoryBytes);
         }
     }
 
     void set(int64_t total) {
-        add(total - _currentMemoryBytes);
+        add(total - _inUseTrackedMemoryBytes);
     }
 
-    int64_t currentMemoryBytes() const {
-        return _currentMemoryBytes;
+    int64_t inUseTrackedMemoryBytes() const {
+        return _inUseTrackedMemoryBytes;
     }
 
-    int64_t maxMemoryBytes() const {
-        return _maxMemoryBytes;
+    int64_t peakTrackedMemoryBytes() const {
+        return _peakTrackedMemoryBytes;
     }
 
     bool withinMemoryLimit() const {
-        return _currentMemoryBytes <= _maxAllowedMemoryUsageBytes;
+        return _inUseTrackedMemoryBytes <= _maxAllowedMemoryUsageBytes;
     }
 
     int64_t maxAllowedMemoryUsageBytes() const {
@@ -105,8 +105,8 @@ public:
 
     /**
      * Returns a new SimpleMemoryUsageTracker. The copy constructor for this class is purposefully
-     * deleted - use this method instead. Note that the members _maxMemoryBytes and
-     * _currentMemoryBytes will be initialized to zero.
+     * deleted - use this method instead. Note that the members _peakTrackedMemoryBytes and
+     * _inUseTrackedMemoryBytes will be initialized to zero.
      */
     SimpleMemoryUsageTracker makeFreshSimpleMemoryUsageTracker() const {
         SimpleMemoryUsageTracker memTracker =
@@ -130,15 +130,16 @@ private:
     SimpleMemoryUsageTracker* _base = nullptr;
 
     // Maximum memory consumption thus far observed for this function.
-    int64_t _maxMemoryBytes = 0;
+    int64_t _peakTrackedMemoryBytes = 0;
     // Tracks the current memory footprint.
-    int64_t _currentMemoryBytes = 0;
+    int64_t _inUseTrackedMemoryBytes = 0;
 
     int64_t _maxAllowedMemoryUsageBytes;
 
     // Allow for some extra bookkeeping to be done when add() is called. If set, this function will
-    // be invoked with _currentMemoryBytes and _maxMemoryBytes. This mechanism exists to avoid
-    // making add() virtual, since it has been shown to have an effect on performance in some cases.
+    // be invoked with _inUseTrackedMemoryBytes and _peakTrackedMemoryBytes. This mechanism exists
+    // to avoid making add() virtual, since it has been shown to have an effect on performance in
+    // some cases.
     std::function<void(int64_t, int64_t)> _doExtraBookkeeping;
 };
 
@@ -225,16 +226,16 @@ public:
         _baseTracker.add(diff);
     }
 
-    auto currentMemoryBytes() const {
-        return _baseTracker.currentMemoryBytes();
+    auto inUseTrackedMemoryBytes() const {
+        return _baseTracker.inUseTrackedMemoryBytes();
     }
-    auto maxMemoryBytes() const {
-        return _baseTracker.maxMemoryBytes();
+    auto peakTrackedMemoryBytes() const {
+        return _baseTracker.peakTrackedMemoryBytes();
     }
 
-    auto maxMemoryBytes(StringData name) const {
+    auto peakTrackedMemoryBytes(StringData name) const {
         const auto it = _functionMemoryTracker.find(_key(name));
-        return it == _functionMemoryTracker.end() ? 0 : it->second.maxMemoryBytes();
+        return it == _functionMemoryTracker.end() ? 0 : it->second.peakTrackedMemoryBytes();
     }
 
     bool withinMemoryLimit() const {

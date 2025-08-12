@@ -235,10 +235,10 @@ TEST_F(TextOrStageTest, EmptyChildren) {
     };
     executeTextOrAndCollectResults(textOr, expectedStates);
 
-    ASSERT_EQ(textOr.getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_EQ(textOr.getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_EQ(textOr.getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(textOr.getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
     auto stats = static_cast<const TextOrStats*>(textOr.getSpecificStats());
-    ASSERT_EQUALS(stats->maxUsedMemoryBytes, 0);
+    ASSERT_EQUALS(stats->peakTrackedMemBytes, 0);
 }
 
 TEST_F(TextOrStageTest, OneChild) {
@@ -260,9 +260,9 @@ TEST_F(TextOrStageTest, OneChild) {
 
     auto* stats = static_cast<const TextOrStats*>(textOr.getSpecificStats());
     ASSERT_EQUALS(1, stats->fetches);
-    ASSERT_GT(stats->maxUsedMemoryBytes, 0);
-    ASSERT_GT(textOr.getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(textOr.getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_GT(stats->peakTrackedMemBytes, 0);
+    ASSERT_GT(textOr.getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(textOr.getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(TextOrStageTest, ChildrenNoResults) {
@@ -285,9 +285,9 @@ TEST_F(TextOrStageTest, ChildrenNoResults) {
     ASSERT_EQ(results.size(), 0);
 
     auto stats = static_cast<const TextOrStats*>(textOr.getSpecificStats());
-    ASSERT_EQ(stats->maxUsedMemoryBytes, 0);
-    ASSERT_EQ(textOr.getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_EQ(textOr.getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_EQ(stats->peakTrackedMemBytes, 0);
+    ASSERT_EQ(textOr.getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(textOr.getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(TextOrStageTest, MultipleChildren) {
@@ -320,9 +320,9 @@ TEST_F(TextOrStageTest, MultipleChildren) {
 
     auto stats = static_cast<const TextOrStats*>(textOr.getSpecificStats());
     ASSERT_EQ(stats->fetches, 2);
-    ASSERT_GT(stats->maxUsedMemoryBytes, 0);
-    ASSERT_GT(textOr.getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(textOr.getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_GT(stats->peakTrackedMemBytes, 0);
+    ASSERT_GT(textOr.getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(textOr.getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 }
 
 TEST_F(TextOrStageTest, SameDocumentMultipleTerms) {
@@ -349,9 +349,9 @@ TEST_F(TextOrStageTest, SameDocumentMultipleTerms) {
 
     auto stats = static_cast<const TextOrStats*>(textOr.getSpecificStats());
     ASSERT_EQ(stats->fetches, 1);  // Only one fetch occurs since it's the same document.
-    ASSERT_GT(stats->maxUsedMemoryBytes, 0);
-    ASSERT_GT(textOr.getMemoryTracker_forTest().currentMemoryBytes(), 0);
-    ASSERT_GT(textOr.getMemoryTracker_forTest().maxMemoryBytes(), 0);
+    ASSERT_GT(stats->peakTrackedMemBytes, 0);
+    ASSERT_GT(textOr.getMemoryTracker_forTest().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(textOr.getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 }
 }  // namespace
 }  // namespace mongo
