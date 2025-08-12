@@ -265,35 +265,40 @@ CurlEasyHandle createCurlEasyHandle(Protocols protocol) {
     CurlEasyHandle handle(curl_easy_init());
     uassert(ErrorCodes::InternalError, "Curl initialization failed", handle);
 
-    curl_easy_setopt(handle.get(), CURLOPT_CONNECTTIMEOUT, longSeconds(kConnectionTimeout));
-    curl_easy_setopt(handle.get(), CURLOPT_FOLLOWLOCATION, 0);
-    curl_easy_setopt(handle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-    curl_easy_setopt(handle.get(), CURLOPT_NOSIGNAL, 1);
-    curl_easy_setopt(handle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+    const auto setOption = [&](CURLoption option, auto value) {
+        // Ignore the error code, if any.
+        (void)curl_easy_setopt(handle.get(), option, value);
+    };
+
+    setOption(CURLOPT_CONNECTTIMEOUT, longSeconds(kConnectionTimeout));
+    setOption(CURLOPT_FOLLOWLOCATION, 0);
+    setOption(CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+    setOption(CURLOPT_NOSIGNAL, 1);
+    setOption(CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
 #ifdef CURLOPT_TCP_KEEPALIVE
-    curl_easy_setopt(handle.get(), CURLOPT_TCP_KEEPALIVE, 1);
+    setOption(CURLOPT_TCP_KEEPALIVE, 1);
 #endif
-    curl_easy_setopt(handle.get(), CURLOPT_TIMEOUT, longSeconds(kTotalRequestTimeout));
+    setOption(CURLOPT_TIMEOUT, longSeconds(kTotalRequestTimeout));
 
 #if LIBCURL_VERSION_NUM > 0x072200
     // Requires >= 7.34.0
-    curl_easy_setopt(handle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
+    setOption(CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 #endif
 
 
-    curl_easy_setopt(handle.get(), CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-    curl_easy_setopt(handle.get(), CURLOPT_HEADERFUNCTION, WriteMemoryCallback);
+    setOption(CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+    setOption(CURLOPT_HEADERFUNCTION, WriteMemoryCallback);
 
     if (protocol == Protocols::kHttpOrHttps) {
-        curl_easy_setopt(handle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS | CURLPROTO_HTTP);
+        setOption(CURLOPT_PROTOCOLS, CURLPROTO_HTTPS | CURLPROTO_HTTP);
     } else {
-        curl_easy_setopt(handle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+        setOption(CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
     }
 
     // TODO: CURLOPT_EXPECT_100_TIMEOUT_MS?
     if (httpClientOptions.verboseLogging.loadRelaxed()) {
-        curl_easy_setopt(handle.get(), CURLOPT_VERBOSE, 1);
-        curl_easy_setopt(handle.get(), CURLOPT_DEBUGFUNCTION, curlDebugCallback);
+        setOption(CURLOPT_VERBOSE, 1);
+        setOption(CURLOPT_DEBUGFUNCTION, curlDebugCallback);
     }
 
     return handle;
