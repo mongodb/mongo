@@ -1,7 +1,8 @@
 /**
  * Tests that an applyOps command with a container insert and delete can be applied.
  *
- * @tags: [requires_replication]
+ * TODO: (SERVER-109148): Fix the primary driven index build suite so that this test runs.
+ * @tags: [requires_replication, featureFlagPrimaryDrivenIndexBuilds]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
