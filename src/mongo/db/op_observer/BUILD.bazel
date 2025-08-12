@@ -141,6 +141,7 @@ mongo_cc_library(
         "//src/mongo/bson/dotted_path:dotted_path_support",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/disagg_storage:server_parameters",
     ],
 )
 

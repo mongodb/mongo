@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
+#include "mongo/db/disagg_storage/server_parameters_gen.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/duration.h"
@@ -53,6 +54,11 @@ MONGO_FAIL_POINT_DEFINE(addDestinedRecipient);
 MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 
 bool shouldReplicateLocalCatalogIdentifers(OperationContext* opCtx) {
+    if (disagg::gDisaggregatedStorageEnabled) {
+        // Disaggregated storage relies on consistent catalog storage. Safe-guard if FCV is not yet
+        // initialized despite the feature being enabled.
+        return true;
+    }
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     return fcvSnapshot.isVersionInitialized() &&
         feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(
