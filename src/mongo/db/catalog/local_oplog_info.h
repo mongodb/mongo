@@ -140,6 +140,11 @@ public:
      */
     std::shared_ptr<OplogTruncateMarkers> getTruncateMarkers() const;
 
+    /**
+     * Sets the truncate markers once the initial markers have been created.
+     */
+    void setTruncateMarkers(std::shared_ptr<OplogTruncateMarkers> markers);
+
 private:
     // The "oplog" record store pointer is always valid (or null) because an operation must take
     // the global exclusive lock to set the pointer to null when the RecordStore instance is
