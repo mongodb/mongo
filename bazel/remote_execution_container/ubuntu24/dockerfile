@@ -9,18 +9,19 @@
 #       //bazel/remote_execution_container:repin_dockerfiles \
 #       --config=local
 
-FROM ubuntu:24.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30
+FROM ubuntu:24.04@sha256:a08e551cb33850e4740772b38217fc1796a66da2506d312abe51acda354ff061
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         build-essential=12.10ubuntu1 \
-        libcurl4-openssl-dev=8.5.0-2ubuntu10.2 \
-        libgssapi-krb5-2=1.20.1-6ubuntu2.1 \
-        libkrb5-dev=1.20.1-6ubuntu2.1 \
-        libldap2-dev=2.6.7+dfsg-1~exp1ubuntu8 \
-        libsasl2-dev=2.1.28+dfsg1-5ubuntu3 \
-        libssl-dev=3.0.13-0ubuntu3.2 \
-        libxml2-dev=2.9.14+dfsg-1.3ubuntu3 \
+        libcurl4-openssl-dev=8.5.0-2ubuntu10.6 \
+        libgssapi-krb5-2=1.20.1-6ubuntu2.6 \
+        libkrb5-dev=1.20.1-6ubuntu2.6 \
+        libldap2-dev=2.6.7+dfsg-1~exp1ubuntu8.2 \
+        libncurses-dev=6.4+20240113-1ubuntu2 \
+        libsasl2-dev=2.1.28+dfsg1-5ubuntu3.1 \
+        libssl-dev=3.0.13-0ubuntu3.5 \
+        libxml2-dev=2.9.14+dfsg-1.3ubuntu3.3 \
         systemtap-sdt-dev=5.0-2ubuntu1 \
     && rm -rf /var/lib/apt/lists/*
 

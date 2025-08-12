@@ -93,6 +93,7 @@ systemtap-sdt-dev
 
 ADDITIONAL_PACKAGES["ubuntu:24.04"]="
 systemtap-sdt-dev
+libncurses-dev
 "
 
 # This maps container images to the output locations for the generated
