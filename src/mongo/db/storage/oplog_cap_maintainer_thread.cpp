@@ -34,19 +34,23 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/oplog_truncation.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 
@@ -215,6 +219,52 @@ void OplogCapMaintainerThread::_run() {
                     ClientOperationKillableByStepdown{false});
 
     ServiceContext::UniqueOperationContext opCtx;
+
+    if (feature_flags::gOplogSamplingAsyncEnabled.isEnabled() && gOplogSamplingAsyncEnabled) {
+        try {
+            opCtx = tc->makeOperationContext();
+            boost::optional<AutoGetOplogFastPath> oplogRead;
+            RecordStore* rs = nullptr;
+            // Need the oplog to have been created first before we proceed.
+            do {
+                // Create the initial set of truncate markers as part of this thread before we
+                // attempt to delete excess markers. Ensure that the oplog has been created as part
+                // of restart before we attempt to create markers.
+                oplogRead.emplace(
+                    opCtx.get(),
+                    OplogAccessMode::kRead,
+                    Date_t::max(),
+                    AutoGetOplogFastPathOptions{.skipRSTLLock = true,
+                                                .explicitIntent =
+                                                    rss::consensus::IntentRegistry::Intent::Read});
+                const auto& oplogCollection = oplogRead->getCollection();
+                rs = oplogCollection->getRecordStore();
+                if (rs) {
+                    return;
+                }
+                // Wait a bit to give the oplog a chance to be created.
+                MONGO_IDLE_THREAD_BLOCK;
+                // Reset the oplogRead so we don't hold a lock while we sleep.
+                oplogRead.reset();
+                sleepFor(Milliseconds(100));
+            } while (!rs);
+
+            // Initial sampling and marker creation.
+            auto oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(opCtx.get(), *rs);
+            invariant(oplogTruncateMarkers);
+            LocalOplogInfo::get(opCtx.get())->setTruncateMarkers(std::move(oplogTruncateMarkers));
+
+        } catch (const ExceptionFor<ErrorCategory::ShutdownError>& e) {
+            LOGV2_DEBUG(9468100,
+                        1,
+                        "Interrupted due to shutdown. OplogCapMaintainerThread Exiting!",
+                        "error"_attr = e.what());
+            return;
+        }
+    }
+
+    opCtx.reset();
+
     while (true) {
         // It's illegal to create a new opCtx while a thread already has one, so we reset the opCtx.
         // Otherwise, it could lead to deadlocks in the production setup.

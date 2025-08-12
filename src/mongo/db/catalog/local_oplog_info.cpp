@@ -107,6 +107,11 @@ std::shared_ptr<OplogTruncateMarkers> LocalOplogInfo::getTruncateMarkers() const
     return _truncateMarkers;
 }
 
+void LocalOplogInfo::setTruncateMarkers(std::shared_ptr<OplogTruncateMarkers> markers) {
+    stdx::lock_guard<stdx::mutex> lk(_rsMutex);
+    _truncateMarkers = std::move(markers);
+}
+
 void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
     VectorClockMutable::get(service)->tickClusterTimeTo(LogicalTime(newTime));
 }
