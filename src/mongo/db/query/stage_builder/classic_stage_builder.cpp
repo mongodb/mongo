@@ -220,10 +220,12 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             case STAGE_PROJECTION_SIMPLE: {
                 auto pn = static_cast<const ProjectionNodeSimple*>(root);
                 auto childStage = build(pn->children[0].get());
+                auto* proj = _cq.getProj();
+                tassert(10853300, "'getProj()' must not return null", proj);
                 return std::make_unique<ProjectionStageSimple>(
                     _cq.getExpCtxRaw(),
                     _cq.getFindCommandRequest().getProjection(),
-                    _cq.getProj(),
+                    proj,
                     _ws,
                     std::move(childStage));
             }
@@ -336,7 +338,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 tassert(5432202,
                         str::stream() << "no index named '" << node->index.identifier.catalogName
                                       << "' found in catalog",
-                        catalog);
+                        desc);
                 auto fam =
                     static_cast<const FTSAccessMethod*>(catalog->getEntry(desc)->accessMethod());
                 tassert(5432203, "access method for index is not defined", fam);
