@@ -449,7 +449,14 @@ acquireLocksForRenameCollectionWithinDBForApplyOps(OperationContext* opCtx,
 
     boost::optional<NamespaceString> nsForRenameOutOfTheWay;
     if (needsRenameOutOfTheWay) {
-        auto tmpNameResult = makeUniqueCollectionName(opCtx, target.dbName(), "tmp%%%%%.rename");
+        auto tmpNameResult = [&]() {
+            std::string collectionNameModel = "tmp%%%%%.renameCollection";
+            if (source.isTimeseriesBucketsCollection()) {
+                collectionNameModel =
+                    NamespaceString::kTimeseriesBucketsCollectionPrefix + collectionNameModel;
+            }
+            return makeUniqueCollectionName(opCtx, target.dbName(), collectionNameModel);
+        }();
         if (!tmpNameResult.isOK()) {
             return tmpNameResult.getStatus().withContext(
                 getCanNotCreateTemporaryCollectionErrorMsg());
@@ -729,8 +736,14 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
 
     // Note that this temporary collection name is used by MongoMirror and thus must not be changed
     // without consultation.
-    auto tmpNameResult =
-        makeUniqueCollectionName(opCtx, target.dbName(), "tmp%%%%%.renameCollection");
+    auto tmpNameResult = [&]() {
+        std::string collectionNameModel = "tmp%%%%%.renameCollection";
+        if (source.isTimeseriesBucketsCollection()) {
+            collectionNameModel =
+                NamespaceString::kTimeseriesBucketsCollectionPrefix + collectionNameModel;
+        }
+        return makeUniqueCollectionName(opCtx, target.dbName(), collectionNameModel);
+    }();
     if (!tmpNameResult.isOK()) {
         return tmpNameResult.getStatus().withContext(
             str::stream() << "Cannot generate temporary collection name to rename "
