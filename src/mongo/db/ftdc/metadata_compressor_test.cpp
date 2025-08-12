@@ -37,7 +37,7 @@
 namespace mongo {
 
 #define TEST_BEGIN auto runTest = [this](bool multiservice) { \
-    std::cout << "Running " << _testInfo.testName() <<" with multiservice=" << \
+    std::cout << "Running " << unittest::getTestName() << " with multiservice=" << \
     multiservice << std::endl
 
 #define TEST_END                          \

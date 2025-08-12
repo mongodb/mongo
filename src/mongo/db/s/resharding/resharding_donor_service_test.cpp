@@ -1380,7 +1380,7 @@ TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringPreparingToDonate) {
     for (auto& test : makeAllTestOptions()) {
         LOGV2(10494604,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = test);
 
         runUnrecoverableErrorTest(test, DonorStateEnum::kPreparingToDonate);
@@ -1394,7 +1394,7 @@ TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringPreparingToDonate) {
 //          std::vector<TestOptions>{{.isAlsoRecipient = false}, {.isAlsoRecipient = true}}) {
 //         LOGV2(10885200,
 //               "Running case",
-//               "test"_attr = _agent.getTestName(),
+//               "test"_attr = unittest::getTestName(),
 //               "testOptions"_attr = test);
 
 //         FailPointEnableBlock
@@ -1411,7 +1411,7 @@ TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringPreparingToBlockWrite
     for (auto& test : makeAllTestOptions()) {
         LOGV2(10494605,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = test);
 
         runUnrecoverableErrorTest(test, DonorStateEnum::kPreparingToBlockWrites);

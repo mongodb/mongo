@@ -2634,7 +2634,7 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringCreatingCollectio
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(10494600,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         runUnrecoverableErrorTest(
@@ -2646,7 +2646,7 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringCloning) {
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(10494601,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         runUnrecoverableErrorTest(
@@ -2658,7 +2658,7 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringBuildingIndex) {
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(10494602,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         runUnrecoverableErrorTest(
@@ -2670,7 +2670,7 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringApplying) {
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(10494603,
               "Running case",
-              "test"_attr = _agent.getTestName(),
+              "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
         runUnrecoverableErrorTest(
