@@ -358,3 +358,74 @@ Enterprise test> db.Uncorrelated.aggregate([{ $group: { _id: {field1: "$field1",
 
 > [!WARNING]
 > Do not instantiate `Faker` objects manually as they will not be seeded with a fixed seed if one was provided on the command line.
+
+## Generating objects
+
+There are two ways to generate objects -- either directly from a Python dict or from a class that is defined in the spec.
+
+### Generating from a python dict
+
+```python
+@dataclasses.dataclass
+class DictSpec:
+    dict_field: Specification(dict, source=lambda fkr: {'a': fkr.random_int(1, 10)})
+```
+
+In the output `.schema` file, this is going to look as follows:
+
+```
+"dict_field": {
+    ...
+    "types": {
+        "obj": {
+            "min": {
+                "a": 1
+            },
+            "max": {
+                "a": 10
+            },
+            "unique": [
+                {
+                    "a": 1
+                }
+            ...
+            ]
+        }
+    }
+}
+```
+
+### Generating using a child class
+
+```python
+
+@dataclasses.dataclass
+class ChildObject:
+    str_field: Specification(str, source=lambda fkr: "A")
+
+@dataclasses.dataclass
+class ParentObject:
+    child_field: Specification(ChildObject)
+```
+
+produces the following `.schema` fragment:
+
+```
+"obj_field": {
+    ...
+    "nested_object": {
+        "str_field": {
+            ...
+            "types": {
+                "str": {
+                    "min": "A",
+                    "max": "A",
+                    "unique": [
+                        "A"
+                    ]
+                }
+            }
+        }
+    }
+},
+```

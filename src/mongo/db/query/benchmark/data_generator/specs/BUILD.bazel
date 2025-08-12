@@ -16,6 +16,11 @@ py_library(
 )
 
 py_library(
+    name = "test_types",
+    srcs = ["test_types.py"],
+)
+
+py_library(
     name = "uncorrelated",
     srcs = ["uncorrelated.py"],
 )

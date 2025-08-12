@@ -29,6 +29,7 @@
 
 import contextlib
 import datetime
+import decimal
 from enum import Enum
 
 import bson
@@ -89,18 +90,44 @@ class FieldStatistic:
 
 
 class FieldStatisticByScalarType:
+
     def __init__(self):
         self.min = None
         self.max = None
+        # Representations used for comparison purposes
+        # in case the original type does not suport
+        # proper comparisons.
+        self.min_cmp = None
+        self.max_cmp = None
         self.unique = set()
 
     def register(self, field_value):
-        if self.min is None or field_value < self.min:
+        if isinstance(field_value, bson.decimal128.Decimal128):
+            # Python does not consider Decimal128 hashable or comparable, so
+            # we can not add it to a set() or find the min/max without converting
+            # it to decimal.Decimal.
+            field_value = field_cmp = field_value.to_decimal()
+        elif isinstance(field_value, dict):
+            # dicts not support comparison, so compare sorted(.items()) instead.
+            field_cmp = sorted(field_value.items())
+        else:
+            field_cmp = field_value
+
+        if self.min is None or field_cmp < self.min_cmp:
             self.min = field_value
-        if self.max is None or field_value > self.max:
+            self.min_cmp = field_cmp
+        if self.max is None or field_cmp > self.max_cmp:
             self.max = field_value
+            self.max_cmp = field_cmp
+
         if len(self.unique) < SAMPLE_LIMIT:
-            self.unique.add(field_value)
+            if isinstance(field_value, dict):
+                # dicts are not hashable/comparable, so
+                # temporarily convert them to a frozenset
+                # in order to be able to insert them in a set()
+                self.unique.add(frozenset(field_value.items()))
+            else:
+                self.unique.add(field_value)
 
 
 SAMPLE_LIMIT = 1000
@@ -110,16 +137,26 @@ SUPPORTED_SCALAR_TYPES = {
     str.__name__: "str",
     bson.objectid.ObjectId.__name__: "oid",
     bool.__name__: "bool",
-    datetime.date.__name__: "dt",
+    datetime.datetime.__name__: "dt",
+    bson.datetime_ms.DatetimeMS.__name__: "dt_ms",
+    bson.timestamp.Timestamp.__name__: "ts",
     int.__name__: "int",
-    datetime.time.__name__: "ts",
     bson.decimal128.Decimal128.__name__: "dec",
+    dict.__name__: "obj",
+    frozenset.__name__: "obj",
 }
 
 
 def serialize_supported(v):
-    if isinstance(v, datetime.date):
+    if isinstance(v, datetime.datetime):
+        return v.isoformat()
+    elif isinstance(v, (bson.decimal128.Decimal128, decimal.Decimal)):
         return str(v)
-    if issubclass(type(v), Enum):
+    elif isinstance(v,
+                    (bson.datetime_ms.DatetimeMS, bson.timestamp.Timestamp)):
+        return v.as_datetime().timestamp()
+    elif issubclass(type(v), Enum):
+        # We expect that the Enum will have a __repr__ method that returns
+        # something that can be inserted into MongoDB
         return repr(v)
     return None

@@ -28,6 +28,7 @@
 """Utilities for serializing generated documents."""
 
 import json
+from enum import Enum
 
 from datagen.statistics import *
 from datagen.util import MISSING
@@ -42,8 +43,11 @@ def serialize_doc(obj: dict):
 def serialize(v):
     if isinstance(v, dict):
         return serialize_doc(v)
-    elif result := serialize_supported(v):
-        return result
+    elif isinstance(v, frozenset):
+        # Some dicts arrive here as frozensets, so convert them back to dicts
+        return serialize_doc(dict(v))
+    elif isinstance(v, Enum):
+        return repr(v)
     else:
         return v
 
