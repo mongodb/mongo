@@ -246,6 +246,9 @@ generate_dockerfile() {
 #   bazel run \\
 #       //bazel/remote_execution_container:repin_dockerfiles \\
 #       --config=local
+#
+# To update the docker images, follow the instructions in the
+# confluence page: go/devprod-build-update-rbe-containers.
 
 FROM $image_with_sha
 
