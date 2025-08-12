@@ -45,6 +45,27 @@ Stage::Stage(StringData stageName, const boost::intrusive_ptr<ExpressionContext>
     }
 }
 
+Document Stage::getExplainOutput() const {
+    MutableDocument doc;
+    doc.addField("nReturned", Value(static_cast<long long>(_commonStats.advanced)));
+
+    if (_commonStats.executionTime.precision == QueryExecTimerPrecision::kMillis) {
+        doc.addField(
+            "executionTimeMillisEstimate",
+            Value(durationCount<Milliseconds>(_commonStats.executionTime.executionTimeEstimate)));
+    } else if (_commonStats.executionTime.precision == QueryExecTimerPrecision::kNanos) {
+        doc.addField(
+            "executionTimeMillisEstimate",
+            Value(durationCount<Milliseconds>(_commonStats.executionTime.executionTimeEstimate)));
+        doc.addField(
+            "executionTimeMicros",
+            Value(durationCount<Microseconds>(_commonStats.executionTime.executionTimeEstimate)));
+        doc.addField(
+            "executionTimeNanos",
+            Value(durationCount<Nanoseconds>(_commonStats.executionTime.executionTimeEstimate)));
+    }
+    return doc.freeze();
+}
 
 }  // namespace agg
 }  // namespace exec

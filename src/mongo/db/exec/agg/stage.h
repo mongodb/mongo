@@ -246,6 +246,8 @@ public:
         return false;
     }
 
+    virtual Document getExplainOutput() const;
+
 protected:
     /**
      * The main execution API of a Stage. Returns an intermediate query result

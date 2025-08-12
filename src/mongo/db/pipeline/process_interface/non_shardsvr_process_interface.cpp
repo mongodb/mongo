@@ -360,8 +360,13 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
         // Managed pipeline goes out of scope at the end of this else block, but we've already
         // extracted the necessary information and won't need it again.
         std::unique_ptr<Pipeline> managedPipeline(ownedPipeline);
-        auto managedExecPipeline = exec::agg::buildPipeline(managedPipeline->freeze());
-        pipelineVec = mergeExplains(*managedPipeline, *managedExecPipeline, opts);
+        // If we need execution stats, this runs the plan in order to gather the stats.
+        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            auto managedExecPipeline = exec::agg::buildPipeline(managedPipeline->freeze());
+            pipelineVec = mergeExplains(*managedPipeline, *managedExecPipeline, opts);
+        } else {
+            pipelineVec = managedPipeline->writeExplainOps(opts);
+        }
         ownedPipeline = nullptr;
     } else {
         auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);

@@ -116,35 +116,14 @@ void Pipeline::forceSpill() {
 }
 
 std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
-    if (*opts.verbosity < ExplainOptions::Verbosity::kExecStats) {
-        auto emptyDoc = Value(Document());
-        return std::vector<Value>(_stages.size(), emptyDoc);
-    }
+    tassert(10908500,
+            "this method should not be called with explain verbosity below 'executionStats'",
+            *opts.verbosity >= ExplainOptions::Verbosity::kExecStats);
 
     std::vector<Value> execArray;
     execArray.reserve(_stages.size());
     for (auto&& stage : _stages) {
-        auto& stats = stage->getCommonStats();
-        MutableDocument doc;
-        auto nReturned = static_cast<long long>(stats.advanced);
-        doc.addField("nReturned", Value(nReturned));
-
-        if (stats.executionTime.precision == QueryExecTimerPrecision::kMillis) {
-            doc.addField(
-                "executionTimeMillisEstimate",
-                Value(durationCount<Milliseconds>(stats.executionTime.executionTimeEstimate)));
-        } else if (stats.executionTime.precision == QueryExecTimerPrecision::kNanos) {
-            doc.addField(
-                "executionTimeMillisEstimate",
-                Value(durationCount<Milliseconds>(stats.executionTime.executionTimeEstimate)));
-            doc.addField(
-                "executionTimeMicros",
-                Value(durationCount<Microseconds>(stats.executionTime.executionTimeEstimate)));
-            doc.addField(
-                "executionTimeNanos",
-                Value(durationCount<Nanoseconds>(stats.executionTime.executionTimeEstimate)));
-        }
-        execArray.emplace_back(doc.freeze());
+        execArray.emplace_back(stage->getExplainOutput());
     }
 
     return execArray;

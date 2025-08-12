@@ -192,7 +192,9 @@ public:
      */
     std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const {
         auto opts = SerializationOptions{.verbosity = verbosity};
-        return mergeExplains(*_pipeline, *_execPipeline, opts);
+        return (verbosity >= ExplainOptions::Verbosity::kExecStats)
+            ? mergeExplains(*_pipeline, *_execPipeline, opts)
+            : _pipeline->writeExplainOps(opts);
     }
 
     boost::optional<StringData> getExecutorType() const override {
