@@ -74,9 +74,11 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-using std::string;
-using std::unique_ptr;
-using std::vector;
+
+namespace {
+const BSONObj kEmptyPBRT;
+const std::vector<NamespaceStringOrUUID> kEmptyNssVector;
+}  // namespace
 
 const OperationContext::Decoration<boost::optional<repl::OpTime>> clientsLastKnownCommittedOpTime =
     OperationContext::declareDecoration<boost::optional<repl::OpTime>>();
@@ -86,10 +88,10 @@ const OperationContext::Decoration<boost::optional<repl::OpTime>> clientsLastKno
 MONGO_FAIL_POINT_DEFINE(planExecutorHangBeforeShouldWaitForInserts);
 
 PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
-                                   unique_ptr<WorkingSet> ws,
-                                   unique_ptr<PlanStage> rt,
-                                   unique_ptr<QuerySolution> qs,
-                                   unique_ptr<CanonicalQuery> cq,
+                                   std::unique_ptr<WorkingSet> ws,
+                                   std::unique_ptr<PlanStage> rt,
+                                   std::unique_ptr<QuerySolution> qs,
+                                   std::unique_ptr<CanonicalQuery> cq,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    VariantCollectionPtrOrAcquisition collection,
                                    bool returnOwnedBson,
@@ -197,8 +199,7 @@ const std::vector<NamespaceStringOrUUID>& PlanExecutorImpl::getSecondaryNamespac
     // Return a reference to an empty static array. This array will never contain any elements
     // because a PlanExecutorImpl is only capable of executing against a single namespace. As
     // such, it will never lock more than one namespace.
-    const static std::vector<NamespaceStringOrUUID> emptyNssVector;
-    return emptyNssVector;
+    return kEmptyNssVector;
 }
 
 OperationContext* PlanExecutorImpl::getOpCtx() const {
@@ -543,8 +544,6 @@ bool PlanExecutorImpl::_handleEOFAndExit(PlanStage::StageState code,
 }
 
 size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) {
-    const bool includeMetadata = _expCtx && _expCtx->getNeedsMerge();
-    const bool hasAppendFn = static_cast<bool>(append);
     if (batchSize == 0) {
         return 0;
     }
@@ -552,14 +551,15 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
     checkFailPointPlanExecAlwaysFails();
     _checkIfKilled();
 
+    const bool includeMetadata = _expCtx && _expCtx->getNeedsMerge();
+    const bool hasAppendFn = static_cast<bool>(append);
+
     const auto whileYieldingFn = [opCtx = _opCtx]() {
         return doYield(opCtx);
     };
     auto notifier = makeNotifier();
 
     WorkingSetID id = WorkingSet::INVALID_ID;
-    WorkingSetMember* member;
-    PlanStage::StageState code;
 
     // The below are incremented on every WriteConflict or TemporarilyUnavailable error
     // accordingly, and reset to 0 on any successful call to _root->work.
@@ -582,7 +582,7 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
     for (;;) {
         _checkIfMustYield(whileYieldingFn);
 
-        code = _root->work(&id);
+        PlanStage::StageState code = _root->work(&id);
 
         if (code != PlanStage::NEED_YIELD) {
             writeConflictsInARow = 0;
@@ -591,7 +591,8 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
 
         if (code == PlanStage::ADVANCED) {
             // Process working set member.
-            member = _workingSet->get(id);
+            WorkingSetMember* member = _workingSet->get(id);
+
             if (MONGO_likely(member->hasObj())) {
                 if (includeMetadata) {
                     objOut = makeBsonWithMetadata(member->doc.value(), member);
@@ -622,8 +623,8 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
             numResults++;
 
             // Only check if the query has been killed or if we've filled up the batch once a result
-            // has been produced. Doing these checks every loop can impact the performace of queries
-            // that repeatedly return NEED_TIME.
+            // has been produced. Doing these checks every loop can impact the performance of
+            // queries that repeatedly return NEED_TIME.
             if (MONGO_unlikely(numResults >= batchSize)) {
                 break;
             }
@@ -818,7 +819,6 @@ Timestamp PlanExecutorImpl::getLatestOplogTimestamp() const {
 }
 
 BSONObj PlanExecutorImpl::getPostBatchResumeToken() const {
-    static const BSONObj kEmptyPBRT;
     return _collScanStage ? _collScanStage->getPostBatchResumeToken() : kEmptyPBRT;
 }
 

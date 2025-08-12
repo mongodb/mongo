@@ -33,7 +33,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
@@ -61,7 +60,6 @@ struct AwaitDataState {
 
 extern const OperationContext::Decoration<AwaitDataState> awaitDataState;
 
-class BSONObj;
 class CanonicalQuery;
 class FindCommandRequest;
 
@@ -126,7 +124,7 @@ public:
      */
     class BSONObjCursorAppender {
     public:
-        BSONObjCursorAppender(const bool alwaysAcceptFirstDoc,
+        BSONObjCursorAppender(bool alwaysAcceptFirstDoc,
                               CursorResponseBuilder* builder,
                               BSONObj& pbrt,
                               bool& failedToAppend)
@@ -141,7 +139,7 @@ public:
 
         MONGO_COMPILER_ALWAYS_INLINE bool operator()(const BSONObj& obj,
                                                      const BSONObj& nextPostBatchResumeToken,
-                                                     const size_t numAppended) {
+                                                     size_t numAppended) {
             objSize = obj.objsize();
 
             if (MONGO_unlikely(
@@ -163,8 +161,9 @@ public:
         }
 
     private:
-        // State not owned by us.
         const bool _alwaysAcceptFirstDoc;
+
+        // State not owned by us.
         CursorResponseBuilder* _builder;
         BSONObj& _pbrt;
         bool& _failedToAppend;

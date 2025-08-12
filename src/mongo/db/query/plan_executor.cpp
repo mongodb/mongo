@@ -85,17 +85,16 @@ void PlanExecutor::checkFailPointPlanExecAlwaysFails() {
     }
 }
 
-size_t PlanExecutor::getNextBatch(const size_t batchSize, AppendBSONObjFn append) {
+size_t PlanExecutor::getNextBatch(size_t batchSize, AppendBSONObjFn append) {
     // Subclasses may override this in order to provide a more optimized loop.
-    uint64_t numResults = 0;
-    BSONObj obj;
-    PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
     const bool hasAppendFn = static_cast<bool>(append);
+    BSONObj obj;
     BSONObj* objPtr = hasAppendFn ? &obj : nullptr;
 
+    size_t numResults = 0;
+
     while (numResults < batchSize) {
-        state = getNext(objPtr, nullptr);
-        if (state == PlanExecutor::IS_EOF) {
+        if (PlanExecutor::IS_EOF == getNext(objPtr, nullptr)) {
             break;
         }
 

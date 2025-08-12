@@ -220,7 +220,7 @@ public:
     bool usesCollectionAcquisitions() const final;
 
     /**
-     * It is used to detect if the plan excutor obtained after multiplanning is using a distinct
+     * It is used to detect if the plan executor obtained after multiplanning is using a distinct
      * scan stage. That's because in this scenario modifications to the pipeline in the context of
      * aggregation need to be made.
      */
@@ -268,7 +268,7 @@ private:
         }
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void _checkIfKilled() {
+    MONGO_COMPILER_ALWAYS_INLINE void _checkIfKilled() const {
         if (MONGO_unlikely(isMarkedAsKilled())) {
             uassertStatusOK(_killStatus);
         }

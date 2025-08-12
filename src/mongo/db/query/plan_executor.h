@@ -368,7 +368,7 @@ public:
      * See getNextBatch() below for use.
      */
     using AppendBSONObjFn =
-        std::function<bool(const BSONObj& obj, const BSONObj& pbrt, const size_t numAppended)>;
+        std::function<bool(const BSONObj& obj, const BSONObj& pbrt, size_t numAppended)>;
 
     /**
      * Looping version of getNext() which appends BSONObjs produced by the execution plan up to the
