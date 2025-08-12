@@ -2351,7 +2351,7 @@ TEST_F(ConnectionPoolTest, EnsureReasonIsLogged) {
     options.minConnections = 0;
     auto pool = makePool(options);
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
 
     HostAndPort hap("a");
 
@@ -2369,10 +2369,10 @@ TEST_F(ConnectionPoolTest, EnsureReasonIsLogged) {
     pool->dropConnections(hap, Status(ErrorCodes::PooledConnectionsDropped, reason));
     ASSERT_EQ(0ul, pool->getNumConnectionsPerHost(hap));
 
-    logs.stop();
+    stopCapturingLogMessages();
 
     // Check the BSON format for the specific log message.
-    auto msgCounter = logs.countBSONContainingSubset(
+    auto msgCounter = countBSONFormatLogLinesIsSubset(
         BSON("attr" << BSON("error" << "PooledConnectionsDropped: " + reason)));
     ASSERT_EQ(1ul, msgCounter);
 }

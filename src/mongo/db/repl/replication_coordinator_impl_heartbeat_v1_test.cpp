@@ -1017,10 +1017,11 @@ TEST_F(ReplCoordHBV1ReconfigTest, FindOwnHostForHeartbeatReconfigQuick) {
         auto response = makePrimaryHeartbeatResponseFrom(newConfig);
         getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(response));
 
-        unittest::LogCaptureGuard logs;
+        startCapturingLogMessages();
         getNet()->runReadyNetworkOperations();
-        logs.stop();
-        ASSERT_EQUALS(1, logs.countTextContaining("Was able to quickly find new index in config"));
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(
+            1, countTextFormatLogLinesContaining("Was able to quickly find new index in config"));
     }
 }
 
@@ -1053,15 +1054,15 @@ TEST_F(ReplCoordHBV1Test, RejectHeartbeatReconfigDuringElection) {
     hbResp.setDurableOpTimeAndWallTime({time1, getNet()->now()});
     auto hbRespObj = (BSONObjBuilder(hbResp.toBSON()) << "ok" << 1).obj();
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     getReplCoord()->handleHeartbeatResponse_forTest(hbRespObj, 1);
     getNet()->enterNetwork();
     getNet()->runReadyNetworkOperations();
     getNet()->exitNetwork();
-    logs.stop();
-    ASSERT_EQUALS(
-        1,
-        logs.countTextContaining("Not scheduling a heartbeat reconfig when running for election"));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Not scheduling a heartbeat reconfig when running for election"));
 
     auto net = getNet();
     net->enterNetwork();

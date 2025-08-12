@@ -732,13 +732,13 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
         ASSERT_OK(_helper.getWiredTigerKVEngine()->reconfigureLogging());
         // Perform a checkpoint. The goal here is create some activity in WiredTiger in order
         // to generate verbose messages (we don't really care about the checkpoint itself).
-        unittest::LogCaptureGuard logs;
+        startCapturingLogMessages();
         _helper.getWiredTigerKVEngine()->checkpoint();
-        logs.stop();
+        stopCapturingLogMessages();
         // In this initial case, we don't expect to capture any debug checkpoint messages. The
         // base severity for the checkpoint component should be at Log().
         bool foundWTCheckpointMessage = false;
-        for (auto&& bson : logs.getBSON()) {
+        for (auto&& bson : getCapturedBSONFormatLogMessages()) {
             if (bson["c"].String() == "WTCHKPT" &&
                 bson["attr"]["message"]["verbose_level"].String() == "DEBUG_1" &&
                 bson["attr"]["message"]["category"].String() == "WT_VERB_CHECKPOINT") {
@@ -757,13 +757,13 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
                   unittest::getMinimumLogSeverity(logv2::LogComponent::kWiredTigerCheckpoint));
 
         // Perform another checkpoint.
-        unittest::LogCaptureGuard logs;
+        startCapturingLogMessages();
         _helper.getWiredTigerKVEngine()->checkpoint();
-        logs.stop();
+        stopCapturingLogMessages();
 
         // This time we expect to detect WiredTiger checkpoint Debug() messages.
         bool foundWTCheckpointMessage = false;
-        for (auto&& bson : logs.getBSON()) {
+        for (auto&& bson : getCapturedBSONFormatLogMessages()) {
             if (bson["c"].String() == "WTCHKPT" &&
                 bson["attr"]["message"]["verbose_level"].String() == "DEBUG_1" &&
                 bson["attr"]["message"]["category"].String() == "WT_VERB_CHECKPOINT") {

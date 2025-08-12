@@ -99,13 +99,14 @@ TEST_F(NamespaceStringTest, CheckNamespaceStringLogAttrs) {
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
     NamespaceString nss = makeNamespaceString(dbName, "bar");
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     LOGV2(7311500, "Msg nss:", logAttrs(nss));
 
     std::string nssAsString = str::stream() << *(nss.tenantId()) << '_' << nss.ns_forTest();
 
-    ASSERT_EQUALS(1,
-                  logs.countBSONContainingSubset(BSON("attr" << BSON("namespace" << nssAsString))));
+    ASSERT_EQUALS(
+        1, countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("namespace" << nssAsString))));
+    stopCapturingLogMessages();
 }
 
 TEST_F(NamespaceStringTest, Oplog) {

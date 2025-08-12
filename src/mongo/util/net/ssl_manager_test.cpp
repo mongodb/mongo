@@ -1040,15 +1040,15 @@ TEST(SSLManager, InitContextSanWarning) {
     params.sslCAFile = "jstests/libs/ca.pem";
     params.sslPEMKeyFile = "jstests/libs/server_no_SAN.pem";
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     auto manager = SSLManagerInterface::create(params, true);
     auto egress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
 
     uassertStatusOK(manager->initSSLContext(
         egress->native_handle(), params, SSLManagerInterface::ConnectionDirection::kIncoming));
-    logs.stop();
+    stopCapturingLogMessages();
 
-    ASSERT_TRUE(isSanWarningWritten(logs.getText()));
+    ASSERT_TRUE(isSanWarningWritten(getCapturedTextFormatLogMessages()));
 }
 
 // This test verifies there is no startup warning if Subject Alternative Name is present
@@ -1058,15 +1058,15 @@ TEST(SSLManager, InitContextNoSanWarning) {
     params.sslCAFile = "jstests/libs/ca.pem";
     params.sslPEMKeyFile = "jstests/libs/server.pem";
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     auto manager = SSLManagerInterface::create(params, true);
     auto egress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
 
     uassertStatusOK(manager->initSSLContext(
         egress->native_handle(), params, SSLManagerInterface::ConnectionDirection::kIncoming));
-    logs.stop();
+    stopCapturingLogMessages();
 
-    ASSERT_FALSE(isSanWarningWritten(logs.getText()));
+    ASSERT_FALSE(isSanWarningWritten(getCapturedTextFormatLogMessages()));
 }
 
 class SSLTestFixture {

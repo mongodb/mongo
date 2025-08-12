@@ -118,7 +118,7 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;
 }
 
-class TopoCoordTest : public unittest::Test {
+class TopoCoordTest : public mongo::unittest::Test {
 public:
     void setUp() override {
         _options = TopologyCoordinator::Options{};
@@ -159,14 +159,14 @@ protected:
         _topo.reset(new TopologyCoordinator(_options));
     }
 
-    int64_t countLogLinesContaining(unittest::LogCaptureGuard& logs, const std::string& needle) {
-        const auto& msgs = logs.getText();
+    int64_t countLogLinesContaining(const std::string& needle) {
+        const auto& msgs = getCapturedTextFormatLogMessages();
         return std::count_if(
             msgs.begin(), msgs.end(), [&](const auto& s) { return stringContains(s, needle); });
     }
 
-    int64_t countLogLinesWithId(unittest::LogCaptureGuard& logs, int32_t id) {
-        return logs.countBSONContainingSubset(BSON("id" << id));
+    int64_t countLogLinesWithId(int32_t id) {
+        return countBSONFormatLogLinesIsSubset(BSON("id" << id));
     }
 
     void makeSelfPrimary(const Timestamp& electionTimestamp = Timestamp(0, 0)) {
@@ -2466,13 +2466,13 @@ TEST_F(PrepareHeartbeatResponseV1Test,
     ReplSetHeartbeatResponse response;
     Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     prepareHeartbeatResponseV1(args, &response, &result);
-    logs.stop();
+    stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::InconsistentReplicaSetNames, result);
     ASSERT(result.reason().find("repl set names do not match"))
         << "Actual string was \"" << result.reason() << '"';
-    ASSERT_EQUALS(1, countLogLinesContaining(logs, "replSet set names do not match"));
+    ASSERT_EQUALS(1, countLogLinesContaining("replSet set names do not match"));
     // only protocolVersion should be set in this failure case
     ASSERT_EQUALS("", response.getReplicaSetName());
 }
@@ -3904,7 +3904,7 @@ TEST_F(HeartbeatResponseTestV1,
     ASSERT_NO_ACTION(nextAction.getAction());
 
     // set up complete, time for actual check
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"),
         makeReplSetMetadata(),
@@ -3912,9 +3912,9 @@ TEST_F(HeartbeatResponseTestV1,
             staleOpTime, staleOpTime, -1 /* primaryIndex */, 1 /* syncSourceIndex */),
         staleOpTime,
         now()));
-    logs.stop();
-    ASSERT_EQUALS(1, countLogLinesContaining(logs, "Choosing new sync source"));
-    ASSERT_EQUALS(1, countLogLinesWithId(logs, 21834));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(21834));
 }
 
 TEST_F(HeartbeatResponseTestV1,
@@ -4120,15 +4120,15 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsDen
 
     // undenylist and it should succeed
     getTopoCoord().undenylistSyncSource(HostAndPort("host3"), now() + Milliseconds(100));
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
                                                       makeReplSetMetadata(),
                                                       makeOplogQueryMetadata(syncSourceOpTime),
                                                       lastOpTimeFetched,
                                                       now()));
-    logs.stop();
-    ASSERT_EQUALS(1, countLogLinesContaining(logs, "Choosing new sync source"));
-    ASSERT_EQUALS(1, countLogLinesWithId(logs, 21834));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(21834));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsFreshByHeartbeatButNotMetadata) {
@@ -4149,7 +4149,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsFreshByHeartbea
     ASSERT_NO_ACTION(nextAction.getAction());
 
     // set up complete, time for actual check
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"),
         makeReplSetMetadata(),
@@ -4157,8 +4157,8 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsFreshByHeartbea
             staleOpTime, staleOpTime, -1 /* primaryIndex */, 1 /* syncSourceIndex */),
         staleOpTime,
         now()));
-    logs.stop();
-    ASSERT_EQUALS(0, countLogLinesContaining(logs, "Choosing new sync source"));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(0, countLogLinesContaining("Choosing new sync source"));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsStaleByHeartbeatButNotMetadata) {
@@ -4179,14 +4179,14 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsStaleByHeartbea
     ASSERT_NO_ACTION(nextAction.getAction());
 
     // set up complete, time for actual check
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
                                                        makeReplSetMetadata(),
                                                        makeOplogQueryMetadata(freshOpTime),
                                                        staleOpTime,
                                                        now()));
-    logs.stop();
-    ASSERT_EQUALS(0, countLogLinesContaining(logs, "Choosing new sync source"));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(0, countLogLinesContaining("Choosing new sync source"));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenFresherMemberExists) {
@@ -4206,7 +4206,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenFresherMemberExists) {
     ASSERT_NO_ACTION(nextAction.getAction());
 
     // set up complete, time for actual check
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"),
         makeReplSetMetadata(),
@@ -4214,9 +4214,9 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenFresherMemberExists) {
             staleOpTime, staleOpTime, -1 /* primaryIndex */, 1 /* syncSourceIndex */),
         staleOpTime,
         now()));
-    logs.stop();
-    ASSERT_EQUALS(1, countLogLinesContaining(logs, "Choosing new sync source"));
-    ASSERT_EQUALS(1, countLogLinesWithId(logs, 21834));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(21834));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceIsDown) {
@@ -4235,7 +4235,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceIsDown) {
     ASSERT_NO_ACTION(nextAction.getAction());
 
     // set up complete, time for actual check
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_TRUE(
         getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
                                               makeReplSetMetadata(),
@@ -4245,9 +4245,9 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceIsDown) {
                                                                      1 /* syncSourceIndex */),
                                               oldSyncSourceOpTime,
                                               now()));
-    logs.stop();
-    ASSERT_EQUALS(1, countLogLinesContaining(logs, "Choosing new sync source"));
-    ASSERT_EQUALS(1, countLogLinesWithId(logs, 5929000));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(5929000));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceOnErrorWhenSyncSourceIsDown) {
@@ -4266,12 +4266,12 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceOnErrorWhenSyncSourceIsDow
     ASSERT_NO_ACTION(nextAction.getAction());
 
     // set up complete, time for actual check
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSourceOnError(
         HostAndPort("host2"), oldSyncSourceOpTime, now()));
-    logs.stop();
-    ASSERT_EQUALS(1, countLogLinesContaining(logs, "Choosing new sync source"));
-    ASSERT_EQUALS(1, countLogLinesWithId(logs, 5929000));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(5929000));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceFromStalePrimary) {
@@ -4318,12 +4318,12 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenMemberNotInConfig) {
     // "host4" since "host4" is absent from the config of version 10.
     ReplSetMetadata replMetadata(0, {OpTime(), Date_t()}, OpTime(), 10, 0, OID(), -1, false);
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host4"), replMetadata, makeOplogQueryMetadata(), OpTime(), now()));
-    logs.stop();
-    ASSERT_EQUALS(1, countLogLinesContaining(logs, "Choosing new sync source"));
-    ASSERT_EQUALS(1, countLogLinesWithId(logs, 21831));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(21831));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceOnErrorWhenMemberNotInConfig) {
@@ -4331,12 +4331,12 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceOnErrorWhenMemberNotInConf
     // "host4" since "host4" is absent from the config of version 10.
     ReplSetMetadata replMetadata(0, {OpTime(), Date_t()}, OpTime(), 10, 0, OID(), -1, false);
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_TRUE(
         getTopoCoord().shouldChangeSyncSourceOnError(HostAndPort("host4"), OpTime(), now()));
-    logs.stop();
-    ASSERT_EQUALS(1, countLogLinesContaining(logs, "Choosing new sync source"));
-    ASSERT_EQUALS(1, countLogLinesWithId(logs, 21831));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(21831));
 }
 
 TEST_F(HeartbeatResponseTestV1,
@@ -4404,7 +4404,7 @@ TEST_F(HeartbeatResponseTestV1,
         HostAndPort("host3"), "rs0", MemberState::RS_PRIMARY, curElection, freshOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"),
         makeReplSetMetadata(),
@@ -4412,9 +4412,9 @@ TEST_F(HeartbeatResponseTestV1,
             freshOpTime, freshOpTime, -1 /* primaryIndex */, 2 /* syncSourceIndex */),
         staleOpTime,  // lastOpTimeFetched so that we are behind host2 and host3
         now()));
-    logs.stop();
-    ASSERT_EQUALS(1, countLogLinesContaining(logs, "Choosing new sync source"));
-    ASSERT_EQUALS(1, countLogLinesWithId(logs, 3962100));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(3962100));
 }
 
 TEST_F(HeartbeatResponseTestV1,
@@ -4479,14 +4479,14 @@ TEST_F(HeartbeatResponseTestV1,
         HostAndPort("host3"), "rs0", MemberState::RS_PRIMARY, curElection, freshOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT(getTopoCoord().shouldChangeSyncSourceOnError(
         HostAndPort("host2"),
         staleOpTime,  // lastOpTimeFetched so that we are behind host2 and host3
         now()));
-    logs.stop();
-    ASSERT_EQUALS(1, countLogLinesContaining(logs, "Choosing new sync source"));
-    ASSERT_EQUALS(1, countLogLinesWithId(logs, 3962100));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+    ASSERT_EQUALS(1, countLogLinesWithId(3962100));
 }
 
 TEST_F(HeartbeatResponseTestV1,
@@ -8230,18 +8230,17 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1, UpdateHeartbeatDataSameConfig) {
     sameConfigResponse.setState(MemberState::RS_SECONDARY);
     sameConfigResponse.setConfigVersion(2);
     sameConfigResponse.setConfig(originalConfig);
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     topoCoordSetMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
         now()++,            // Time is left.
         Milliseconds(400),  // Spent 0.4 of the 0.5 second in the network.
         HostAndPort("host2"),
         StatusWith<ReplSetHeartbeatResponse>(sameConfigResponse));
-    logs.stop();
+    stopCapturingLogMessages();
     ASSERT_NO_ACTION(action.getAction());
     ASSERT_EQUALS(1,
-                  countLogLinesContaining(logs,
-                                          "Config from heartbeat response was "
+                  countLogLinesContaining("Config from heartbeat response was "
                                           "same as ours"));
 }
 
@@ -8256,16 +8255,16 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1,
     ReplSetHeartbeatResponse memberMissingResponse;
     memberMissingResponse.setSetName("rs0");
     memberMissingResponse.setState(MemberState::RS_SECONDARY);
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     topoCoordSetMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
         now()++,            // Time is left.
         Milliseconds(400),  // Spent 0.4 of the 0.5 second in the network.
         HostAndPort("host5"),
         StatusWith<ReplSetHeartbeatResponse>(memberMissingResponse));
-    logs.stop();
+    stopCapturingLogMessages();
     ASSERT_NO_ACTION(action.getAction());
-    ASSERT_EQUALS(1, countLogLinesContaining(logs, "Could not find target in current config"));
+    ASSERT_EQUALS(1, countLogLinesContaining("Could not find target in current config"));
 }
 
 }  // namespace

@@ -45,9 +45,14 @@ namespace {
 
 class HookTest : public unittest::Test {
 public:
+    HookTest() {
+        startCapturingLogMessages();
+    }
+
     ~HookTest() override {
         gThrowLoggingEnabled = true;
         gThrowLoggingExceptionName.clear();
+        stopCapturingLogMessages();
     }
 
     static void throwSystemError() {
@@ -69,11 +74,8 @@ public:
     }
 
     bool didLog() {
-        return !_logs.getText().empty();
+        return !getCapturedTextFormatLogMessages().empty();
     }
-
-private:
-    unittest::LogCaptureGuard _logs;
 };
 
 TEST_F(HookTest, HookDisabledSystemError) {

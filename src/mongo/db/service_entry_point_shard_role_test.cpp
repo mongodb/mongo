@@ -100,12 +100,10 @@ void ServiceEntryPointShardRoleTest::testCommandFailsRunInvocationWithCloseConne
     auto opCtx = makeOperationContext();
     auto msg = constructMessage(
         BSON(TestCmdFailsRunInvocationWithCloseConnectionError::kCommandName << 1), opCtx.get());
-    unittest::LogCaptureGuard logs;
     auto swDbResponse = handleRequest(msg, opCtx.get());
-    logs.stop();
     ASSERT_NOT_OK(swDbResponse);
     ASSERT_EQ(swDbResponse.getStatus().code(), ErrorCodes::SplitHorizonChange);
-    ASSERT_EQ(logs.countTextContaining("Failed to handle request"), 1);
+    ASSERT_EQ(countTextFormatLogLinesContaining("Failed to handle request"), 1);
 }
 
 void ServiceEntryPointShardRoleTest::testCommandMaxTimeMSOpOnly() {
@@ -213,10 +211,8 @@ TEST_F(ServiceEntryPointShardServerTest, TestHelpField) {
 }
 
 TEST_F(ServiceEntryPointShardServerTest, TestCommandAdminOnlyLog) {
-    unittest::LogCaptureGuard logs;
     runCommandTestWithResponse(BSON(TestCmdSucceedsAdminOnly::kCommandName << 1));
-    logs.stop();
-    ASSERT_EQ(logs.countTextContaining("Admin only command"), 1);
+    ASSERT_EQ(countTextFormatLogLinesContaining("Admin only command"), 1);
 }
 
 TEST_F(ServiceEntryPointShardServerTest, TestCommandServiceCounters) {
@@ -327,10 +323,8 @@ TEST_F(ServiceEntryPointReplicaSetTest, TestHelpField) {
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestCommandAdminOnlyLog) {
-    unittest::LogCaptureGuard logs;
     runCommandTestWithResponse(BSON(TestCmdSucceedsAdminOnly::kCommandName << 1));
-    logs.stop();
-    ASSERT_EQ(logs.countTextContaining("Admin only command"), 1);
+    ASSERT_EQ(countTextFormatLogLinesContaining("Admin only command"), 1);
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestCommandServiceCounters) {

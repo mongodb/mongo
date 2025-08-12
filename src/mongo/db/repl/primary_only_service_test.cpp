@@ -1221,11 +1221,11 @@ TEST_F(PrimaryOnlyServiceTest, PrimaryOnlyServiceLogSlowServices) {
     stepDown();
 
     // First test a stepUp with no hanging. We shouldn't log anything.
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     stepUp();
-    logs.stop();
-    ASSERT_EQ(0, logs.countTextContaining(slowSingleServiceStepUpCompleteMsg));
-    ASSERT_EQ(0, logs.countTextContaining(slowTotalTimeStepUpCompleteMsg));
+    stopCapturingLogMessages();
+    ASSERT_EQ(0, countTextFormatLogLinesContaining(slowSingleServiceStepUpCompleteMsg));
+    ASSERT_EQ(0, countTextFormatLogLinesContaining(slowTotalTimeStepUpCompleteMsg));
 
     // Reset thresholds.
     repl::slowServiceOnStepUpCompleteThresholdMS.store(oldSlowServiceOnStepUpCompleteThresholdMS);
@@ -1252,16 +1252,16 @@ TEST_F(PrimaryOnlyServiceTest, PrimaryOnlyServiceLogSlowServices) {
     };
 
     // Hang for long enough to generate a message about the single service being slow.
-    logs.start();
+    startCapturingLogMessages();
     doStepUpWithHang(repl::slowServiceOnStepUpCompleteThresholdMS.load() + 1);
-    logs.stop();
-    ASSERT_EQ(1, logs.countTextContaining(slowSingleServiceStepUpCompleteMsg));
+    stopCapturingLogMessages();
+    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowSingleServiceStepUpCompleteMsg));
 
     // Hang for long enough to generate a message about the total time being slow.
-    logs.start();
+    startCapturingLogMessages();
     doStepUpWithHang(repl::slowTotalOnStepUpCompleteThresholdMS.load() + 1);
-    logs.stop();
-    ASSERT_EQ(1, logs.countTextContaining(slowTotalTimeStepUpCompleteMsg));
+    stopCapturingLogMessages();
+    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowTotalTimeStepUpCompleteMsg));
 }
 
 TEST_F(PrimaryOnlyServiceTest, RebuildServiceFailsShouldSetStateFromRebuilding) {

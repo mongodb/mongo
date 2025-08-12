@@ -1376,11 +1376,12 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithEmptyOplog) {
     _setUpOplog(opCtx, getStorageInterface(), {2});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5));
-    logs.stop();
+    stopCapturingLogMessages();
 
-    ASSERT_EQUALS(1, logs.countTextContaining("No stored oplog entries to apply for recovery"));
+    ASSERT_EQUALS(
+        1, countTextFormatLogLinesContaining("No stored oplog entries to apply for recovery"));
     _assertDocsInTestCollection(opCtx, {});
 }
 
@@ -1413,12 +1414,13 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithNoOperationsToRecover) {
     _setUpOplog(opCtx, getStorageInterface(), {1, 1580148188, std::numeric_limits<int>::max()});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(1580148188, 1580148188));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(1580148193, 1));
-    logs.stop();
+    stopCapturingLogMessages();
 
     ASSERT_EQUALS(
-        1, logs.countTextContaining("No stored oplog entries to apply for recovery between"));
+        1,
+        countTextFormatLogLinesContaining("No stored oplog entries to apply for recovery between"));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToReconstructsPreparedTransactions) {
@@ -1506,12 +1508,13 @@ TEST_F(ReplicationRecoveryTest,
             opCtx, NamespaceString::kSessionTransactionsTableNamespace, {doc, Timestamp(1, 1)}, 1));
     }
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 1));
-    logs.stop();
+    stopCapturingLogMessages();
 
     ASSERT_EQUALS(
-        1, logs.countTextContaining("No stored oplog entries to apply for recovery between"));
+        1,
+        countTextFormatLogLinesContaining("No stored oplog entries to apply for recovery between"));
 
     {
         auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
@@ -1708,12 +1711,13 @@ TEST_F(ReplicationRecoveryTest, StartupRecoveryRunsCompletionHook) {
 
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kSharding,
                                                               logv2::LogSeverity::Debug(2)};
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     recovery.recoverFromOplog(opCtx, boost::none);
-    logs.stop();
+    stopCapturingLogMessages();
 
-    ASSERT_EQUALS(
-        1, logs.countTextContaining("Recovering all user writes recoverable critical sections"));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Recovering all user writes recoverable critical sections"));
 
     _assertDocsInOplog(opCtx, {1, 2, 3, 4});
     _assertDocsInTestCollection(opCtx, {});
@@ -1914,13 +1918,13 @@ TEST_F(ReplicationRecoveryTest, ApplyOplogEntriesForRestoreStartPointIsAfterOplo
     _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(7, 7));
     // The function will adjust the Timestamp(7, 7) start point to the top of the oplog.
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_DOES_NOT_THROW(recovery.applyOplogEntriesForRestore(opCtx, Timestamp(7, 7)));
-    logs.stop();
+    stopCapturingLogMessages();
     ASSERT_EQUALS(
         1,
-        logs.countTextContaining("Start point for recovery oplog application not found in "
-                                 "oplog. Adjusting start point to earlier entry"));
+        countTextFormatLogLinesContaining("Start point for recovery oplog application not found in "
+                                          "oplog. Adjusting start point to earlier entry"));
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime());
     ASSERT_EQ(getStorageInterface()->getInitialDataTimestamp(opCtx->getServiceContext()),
               Timestamp::kAllowUnstableCheckpointsSentinel);

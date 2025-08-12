@@ -83,10 +83,10 @@ TEST_F(CreateIndexesTest, CreateIndexesFailsWhenIndexBuildsCollectionIsMissing) 
             "createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index) << "commitQuorum" << 0);
         BSONObj result;
         // This should fail since config.system.indexBuilds does not exist.
-        unittest::LogCaptureGuard logs;
+        startCapturingLogMessages();
         ASSERT_FALSE(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
-        logs.stop();
-        ASSERT_EQ(1, logs.countBSONContainingSubset(BSON("id" << 7564400)));
+        stopCapturingLogMessages();
+        ASSERT_EQ(1, countBSONFormatLogLinesIsSubset(BSON("id" << 7564400)));
         ASSERT(result.hasField("code"));
         ASSERT_EQ(result.getIntField("code"), 6325700);
     }

@@ -511,7 +511,7 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
 
     TickSourceMock mockTickSource;
     mockTickSource.setAdvanceOnRead(Milliseconds{500});
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     CollectionTruncateMarkers::createMarkersBySampling(
         opCtx.get(),
         iterator,
@@ -521,8 +521,8 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
             return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
         },
         &mockTickSource);
-    logs.stop();
-    ASSERT_GT(logs.countTextContaining("Collection sampling progress"), 0);
-    ASSERT_EQUALS(logs.countTextContaining("Collection sampling complete"), 1);
+    stopCapturingLogMessages();
+    ASSERT_GT(countTextFormatLogLinesContaining("Collection sampling progress"), 0);
+    ASSERT_EQUALS(countTextFormatLogLinesContaining("Collection sampling complete"), 1);
 }
 }  // namespace mongo

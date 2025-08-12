@@ -805,15 +805,16 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
 
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kDefault,
                                                               logv2::LogSeverity::Debug(1)};
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     // execute hb reconfig, which should fail with a log message; confirmed at end of test
     net->runReadyNetworkOperations();
     // respond to reconfig's quorum check so that we can join that thread and exit cleanly
     net->exitNetwork();
-    logs.stop();
-    ASSERT_EQUALS(1,
-                  logs.countTextContaining("Ignoring new configuration because we are already in "
-                                           "the midst of a configuration process"));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(
+        1,
+        countTextFormatLogLinesContaining("Ignoring new configuration because we are already in "
+                                          "the midst of a configuration process"));
     shutdown(opCtx.get());
     reconfigThread.join();
 }
@@ -1901,10 +1902,10 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsTrueForNewMembersInReconfig) {
     // Do a reconfig that adds new nodes to the repl set.
     const auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     Status status = doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */);
     ASSERT_OK(status);
-    logs.stop();
+    stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
 
@@ -1914,9 +1915,9 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsTrueForNewMembersInReconfig) {
     ASSERT_TRUE(rsConfig.findMemberByID(3)->isNewlyAdded());
 
     // Verify that a log message was created for adding the 'newlyAdded' field.
-    ASSERT_EQUALS(
-        1,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
 TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithVotesZero) {
@@ -1930,9 +1931,9 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithVotesZero) 
                                                    << "n3:1"
                                                    << "votes" << 0 << "priority" << 0));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
-    logs.stop();
+    stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
 
@@ -1943,9 +1944,9 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithVotesZero) 
     ASSERT_FALSE(rsConfig.findMemberByID(3)->isNewlyAdded());
 
     // Verify that a log message was not created, since we did not add a 'newlyAdded' field.
-    ASSERT_EQUALS(
-        0,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(0,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
 TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithModifiedHostName) {
@@ -1954,10 +1955,10 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithModifiedHos
     auto opCtx = makeOperationContext();
     const auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "newHostName:12345"));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
 
-    logs.stop();
+    stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
 
@@ -1967,9 +1968,9 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithModifiedHos
     ASSERT_FALSE(rsConfig.findMemberByID(2)->isNewlyAdded());
 
     // Verify that a log message was not created, since we did not add a 'newlyAdded' field.
-    ASSERT_EQUALS(
-        0,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(0,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
 TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithDifferentIndexButSameID) {
@@ -1979,9 +1980,9 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithDifferentIn
     // Do a reconfig that changes the order but not the ids of the members.
     const auto members = BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1"));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
-    logs.stop();
+    stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
 
@@ -1990,9 +1991,9 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithDifferentIn
     ASSERT_FALSE(rsConfig.findMemberByID(2)->isNewlyAdded());
 
     // Verify that a log message was not created, since we did not add a 'newlyAdded' field.
-    ASSERT_EQUALS(
-        0,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(0,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
 TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotPersistNewlyAddedFieldFromOldNodes) {
@@ -2002,9 +2003,9 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotPersistNewlyAddedFieldFromOldN
     // Do a reconfig that adds a new member, giving it the 'newlyAdded' field.
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
-    logs.stop();
+    stopCapturingLogMessages();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
     auto newMember = rsConfig.findMemberByID(3);
@@ -2016,9 +2017,9 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotPersistNewlyAddedFieldFromOldN
     ASSERT_FALSE(newMember->isVoter());
 
     // Verify that a log message was created for adding the 'newlyAdded' field.
-    ASSERT_EQUALS(
-        1,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 
     // Advance the commit point on all nodes.
     const auto commitPoint = OpTime(Timestamp(3, 1), 1);
@@ -2034,9 +2035,9 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotPersistNewlyAddedFieldFromOldN
     args.newConfigObj = configWithMembers(
         2, 0, BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1") << member(3, "n3:1")));
 
-    logs.start();
+    startCapturingLogMessages();
     ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
-    logs.stop();
+    stopCapturingLogMessages();
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
     newMember = rsConfig.findMemberByID(3);
@@ -2048,9 +2049,9 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotPersistNewlyAddedFieldFromOldN
     ASSERT_TRUE(newMember->isVoter());
 
     // Verify that a log message was not created for adding the 'newlyAdded' field.
-    ASSERT_EQUALS(
-        0,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(0,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
 TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotAppendNewlyAddedFieldToNewNodes) {
@@ -2064,9 +2065,9 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotAppendNewlyAddedFieldToNewNode
     args.newConfigObj = configWithMembers(
         2, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
-    logs.stop();
+    stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
 
@@ -2074,9 +2075,9 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotAppendNewlyAddedFieldToNewNode
     ASSERT_FALSE(rsConfig.findMemberByID(3)->isNewlyAdded());
 
     // Verify that a log message was not created for adding the 'newlyAdded' field.
-    ASSERT_EQUALS(
-        0,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(0,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
 TEST_F(ReplCoordReconfigTest, ForceReconfigFailsWhenNewlyAddedFieldIsSetToTrue) {
@@ -2129,23 +2130,23 @@ TEST_F(ReplCoordReconfigTest, ParseFailedIfUserProvidesNewlyAddedFieldDuringSafe
                                                                     << "n3:1"
                                                                     << "newlyAdded" << true));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     Status status = doSafeReconfig(opCtx.get(), 2, members, 0 /* quorumHbs */);
-    logs.stop();
+    stopCapturingLogMessages();
 
     ASSERT_EQ(ErrorCodes::InvalidReplicaSetConfig, status);
 
     // Verify that an error message was created when the user provides a 'newlyAdded' field during a
     // non-force reconfig.
     ASSERT_EQUALS(1,
-                  logs.countTextContaining(
+                  countTextFormatLogLinesContaining(
                       "Initializing 'newlyAdded' field to member has failed with bad status."));
 
     // Verify that a log message was not created for rewritting the new config, since we did not add
     // a 'newlyAdded' field.
-    ASSERT_EQUALS(
-        0,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(0,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
 TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMember) {
@@ -2156,18 +2157,18 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMem
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
-    logs.stop();
+    stopCapturingLogMessages();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
 
     // Verify that the 'newlyAdded' field was added to the node.
     ASSERT_TRUE(rsConfig.findMemberByID(3)->isNewlyAdded());
 
-    ASSERT_EQUALS(
-        1,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 
     // Advance the commit point on all nodes.
     const auto commitPoint = OpTime(Timestamp(3, 1), 1);
@@ -2179,9 +2180,9 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMem
     // Do a reconfig that only changes the order of the nodes.
     members = BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1") << member(3, "n3:1"));
 
-    logs.start();
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
-    logs.stop();
+    stopCapturingLogMessages();
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
 
@@ -2189,9 +2190,9 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMem
     ASSERT_TRUE(rsConfig.findMemberByID(3)->isNewlyAdded());
 
     // Verify that a log message was created for adding the 'newlyAdded' field.
-    ASSERT_EQUALS(
-        1,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
 TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPreviouslyAddedNodes) {
@@ -2202,18 +2203,18 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
-    logs.stop();
+    stopCapturingLogMessages();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
 
     // Verify that the 'newlyAdded' field was added to the node.
     ASSERT_TRUE(rsConfig.findMemberByID(3)->isNewlyAdded());
 
-    ASSERT_EQUALS(
-        1,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 
     // Advance the commit point on all nodes.
     const auto commitPoint = OpTime(Timestamp(3, 1), 1);
@@ -2227,9 +2228,9 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
                          << member(2, "n2:1") << member(3, "n3:1") << member(4, "n4:1"));
     initialSyncNodes.emplace_back(HostAndPort("n4:1"));
 
-    logs.start();
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 3 /* quorumHbs */));
-    logs.stop();
+    stopCapturingLogMessages();
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
 
@@ -2239,9 +2240,9 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
     ASSERT_TRUE(rsConfig.findMemberByID(4)->isNewlyAdded());
 
     // Verify that a log message was created for adding the 'newlyAdded' field.
-    ASSERT_EQUALS(
-        1,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
 TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetAreTreatedAsVotesZero) {
@@ -2251,17 +2252,17 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetAreTreatedAsVotesZero) 
     // Do a reconfig that adds a new member.
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
-    logs.stop();
+    stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
 
     ASSERT_TRUE(rsConfig.findMemberByID(3)->isNewlyAdded());
 
-    ASSERT_EQUALS(
-        1,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 
     // Verify that the newly added node is not considered a voting node.
     ASSERT_EQUALS(2, rsConfig.getTotalVotingMembers());
@@ -2283,13 +2284,13 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
                                                               << "priority" << 3));
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
-    logs.stop();
+    stopCapturingLogMessages();
 
-    ASSERT_EQUALS(
-        1,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
     auto firstNewMember = rsConfig.findMemberByID(3);
@@ -2315,13 +2316,13 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
                                                          << "priority" << 4));
     initialSyncNodes.emplace_back(HostAndPort("n4:1"));
 
-    logs.start();
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 3 /* quorumHbs */));
-    logs.stop();
+    stopCapturingLogMessages();
 
-    ASSERT_EQUALS(
-        1,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
     firstNewMember = rsConfig.findMemberByID(3);
@@ -2352,9 +2353,9 @@ TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
                                                               << "n3:1"
                                                               << "arbiterOnly" << true));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
-    logs.stop();
+    stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
     const auto arbiterNode = rsConfig.findMemberByID(3);
@@ -2366,9 +2367,9 @@ TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
     ASSERT_TRUE(arbiterNode->isVoter());
 
     // Verify that a log message was not created for adding the 'newlyAdded' field.
-    ASSERT_EQUALS(
-        0,
-        logs.countTextContaining("Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(0,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
 TEST_F(ReplCoordReconfigTest, ForceReconfigShouldThrowIfArbiterNodesHaveNewlyAddedField) {
@@ -2473,7 +2474,7 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithHeartbeatReconfig) {
     ReplSetHeartbeatArgsV1 args;
     ASSERT_OK(args.initialize(request.cmdObj));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     OpTime lastApplied(Timestamp(100, 1), 0);
     ReplSetHeartbeatResponse hbResp;
     rsConfig = ReplSetConfig::parse(newerConfig);
@@ -2488,10 +2489,10 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithHeartbeatReconfig) {
     net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
     net->runReadyNetworkOperations();
     net->exitNetwork();
-    logs.stop();
+    stopCapturingLogMessages();
 
     // Make sure the heartbeat reconfig has not been scheduled.
-    ASSERT_EQUALS(1, logs.countTextContaining("Not scheduling a heartbeat reconfig"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Not scheduling a heartbeat reconfig"));
 
     // Let drain mode complete.
     signalWriterDrainComplete(opCtx.get());
@@ -2625,7 +2626,7 @@ TEST_F(ReplCoordReconfigTest, FindOwnHostForCommandReconfigQuick) {
                                                  << BSON("_id" << 3 << "host"
                                                                << "node3:12345")));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
 
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
@@ -2645,8 +2646,9 @@ TEST_F(ReplCoordReconfigTest, FindOwnHostForCommandReconfigQuick) {
     reconfigThread.join();
     ASSERT_OK(status);
 
-    logs.stop();
-    ASSERT_EQUALS(1, logs.countTextContaining("Was able to quickly find new index in config"));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(
+        1, countTextFormatLogLinesContaining("Was able to quickly find new index in config"));
 }
 
 TEST_F(ReplCoordReconfigTest, FindOwnHostForCommandReconfigQuickUnelectableError) {
@@ -2708,7 +2710,7 @@ TEST_F(ReplCoordReconfigTest, FindOwnHostForCommandReconfigQuickUnelectableButFo
                                                  << BSON("_id" << 3 << "host"
                                                                << "node3:12345")));
 
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
 
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
@@ -2728,8 +2730,9 @@ TEST_F(ReplCoordReconfigTest, FindOwnHostForCommandReconfigQuickUnelectableButFo
     reconfigThread.join();
     ASSERT_OK(status);
 
-    logs.stop();
-    ASSERT_EQUALS(1, logs.countTextContaining("Was able to quickly find new index in config"));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(
+        1, countTextFormatLogLinesContaining("Was able to quickly find new index in config"));
 }
 
 }  // anonymous namespace

@@ -350,13 +350,13 @@ TEST_F(WiredTigerUtilTest, ParseAPIMessages) {
     WiredTigerSession session(harnessHelper.getConnection());
 
     // Perform simple WiredTiger operations while capturing the generated logs.
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(wtRCToStatus(session.create("table:ev_api", nullptr), session));
-    logs.stop();
+    stopCapturingLogMessages();
 
     // Verify there is at least one message from WiredTiger and their content.
     bool foundWTMessage = false;
-    for (auto&& bson : logs.getBSON()) {
+    for (auto&& bson : getCapturedBSONFormatLogMessages()) {
         if (bson["c"].String() == "WT") {
             foundWTMessage = true;
             ASSERT_EQUALS(bson["attr"]["message"]["category"].String(), "WT_VERB_API");
@@ -382,14 +382,14 @@ TEST_F(WiredTigerUtilTest, ParseCompactMessages) {
 
     // Perform simple WiredTiger operations while capturing the generated logs.
     const std::string uri = "table:ev_compact";
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     ASSERT_OK(wtRCToStatus(wtSession.create(uri.c_str(), nullptr), wtSession));
     ASSERT_OK(wtRCToStatus(wtSession.compact(uri.c_str(), nullptr), wtSession));
-    logs.stop();
+    stopCapturingLogMessages();
 
     // Verify there is at least one message from WiredTiger and their content.
     bool foundWTMessage = false;
-    for (auto&& bson : logs.getBSON()) {
+    for (auto&& bson : getCapturedBSONFormatLogMessages()) {
         if (bson["c"].String() == "WTCMPCT") {
             foundWTMessage = true;
             ASSERT_EQUALS(bson["attr"]["message"]["category"].String(), "WT_VERB_COMPACT");
@@ -830,6 +830,7 @@ TEST_F(WiredTigerUtilTest, ReconfigureBackgroundCompaction) {
 
     // Turn on background compaction.
     const std::string uri = "table:ev_compact";
+    startCapturingLogMessages();
     ASSERT_OK(wtRCToStatus(wtSession.create(uri.c_str(), nullptr), wtSession));
     ASSERT_OK(wtRCToStatus(wtSession.compact(nullptr, "background=true,timeout=0"), wtSession));
 
@@ -860,6 +861,8 @@ TEST_F(WiredTigerUtilTest, ReconfigureBackgroundCompaction) {
     ASSERT_EQUALS(WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err.sub_level_err);
     ASSERT_EQUALS("Cannot reconfigure background compaction while it's already running."_sd,
                   StringData(err.err_msg));
+
+    stopCapturingLogMessages();
 }
 
 TEST_F(WiredTigerUtilTest, GetLastErrorFromSuccessfulCall) {
@@ -1081,6 +1084,7 @@ TEST_F(WiredTigerUtilTest, DropWithConflictingDHandle) {
     WiredTigerSession wtSession = harnessHelper.openSession();
 
     const std::string uri = "table:conflicting_dhandle";
+    startCapturingLogMessages();
     ASSERT_OK(wtRCToStatus(wtSession.create(uri.c_str(), nullptr), wtSession));
 
     // Open and don't close the cursor.
@@ -1111,6 +1115,7 @@ TEST_F(WiredTigerUtilTest, DropWithUncommittedData) {
     WiredTigerSession wtSession = harnessHelper.openSession();
 
     const std::string uri = "table:conflicting_dhandle";
+    startCapturingLogMessages();
     ASSERT_OK(
         wtRCToStatus(wtSession.create(uri.c_str(), "key_format=S,value_format=S"), wtSession));
 
@@ -1149,6 +1154,7 @@ TEST_F(WiredTigerUtilTest, DropWithDirtyData) {
     WiredTigerSession wtSession = harnessHelper.openSession();
 
     const std::string uri = "table:dirty_data";
+    startCapturingLogMessages();
     ASSERT_OK(
         wtRCToStatus(wtSession.create(uri.c_str(), "key_format=S,value_format=S"), wtSession));
 

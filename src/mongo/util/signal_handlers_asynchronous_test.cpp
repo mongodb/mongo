@@ -71,7 +71,8 @@ public:
         });
     }
 
-    bool checkLinesContains(auto&& logs, std::string substr) const {
+    bool checkCapturedTextFormatLogMessagesForSubstr(std::string substr) const {
+        auto logs = getCapturedTextFormatLogMessages();
         return std::count_if(logs.begin(), logs.end(), [&](const auto& log) {
             return log.find(substr) != std::string::npos;
         });
@@ -88,13 +89,12 @@ private:
 // We use a death test here because the asynchronous signal processing thread runs as detached
 // thread, so we kill the process in which it spawns so the thread doesn't live in other tests.
 DEATH_TEST_F(LogRotateSignalTest, LogRotateSignal, "Ending LogRotateSignalTest") {
-    unittest::LogCaptureGuard logs;
+    startCapturingLogMessages();
     kill(getpid(), SIGUSR1);
     waitUntilLogRotatorCalled();
-    logs.stop();
-    auto&& lines = logs.getText();
-    ASSERT(checkLinesContains(lines, "Log rotation initiated"));
-    ASSERT(checkLinesContains(lines, "Test log rotator called"));
+    stopCapturingLogMessages();
+    ASSERT(checkCapturedTextFormatLogMessagesForSubstr("Log rotation initiated"));
+    ASSERT(checkCapturedTextFormatLogMessagesForSubstr("Test log rotator called"));
     LOGV2_FATAL(9706300, "Ending LogRotateSignalTest");
 }
 
