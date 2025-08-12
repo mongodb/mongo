@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/densify_stage.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/expression/evaluate.h"
@@ -51,7 +52,8 @@ namespace {
 
 using ExplicitBounds = RangeStatement::ExplicitBounds;
 using Full = RangeStatement::Full;
-using GenClass = DocumentSourceInternalDensify::DocGenerator;
+using GenClass = exec::agg::InternalDensifyStage::DocGenerator;
+using InternalDensifyStage = exec::agg::InternalDensifyStage;
 using DensifyFullNumericTest = AggregationContextFixture;
 using DensifyExplicitNumericTest = AggregationContextFixture;
 using DensifyMonthStepTest = AggregationContextFixture;
@@ -567,8 +569,11 @@ TEST(DensifyGeneratorTest, GeneratesDatesByMonthCorrectly) {
     ASSERT_TRUE(generator.done());
 }
 TEST_F(DensifyFullNumericTest, DensifySingleValue) {
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(2), Full(), boost::none));
+    auto densify = InternalDensifyStage(DocumentSourceInternalDensify::kStageName,
+                                        getExpCtx(),
+                                        "a",
+                                        std::list<FieldPath>(),
+                                        RangeStatement(Value(2), Full(), boost::none));
     auto source = DocumentSourceMock::createForTest({"{a: 1}"}, getExpCtx());
     densify.setSource(source.get());
 
@@ -580,8 +585,11 @@ TEST_F(DensifyFullNumericTest, DensifySingleValue) {
 }
 
 TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyWithDuplicates) {
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(2), Full(), boost::none));
+    auto densify = InternalDensifyStage(DocumentSourceInternalDensify::kStageName,
+                                        getExpCtx(),
+                                        "a",
+                                        std::list<FieldPath>(),
+                                        RangeStatement(Value(2), Full(), boost::none));
     auto source = DocumentSourceMock::createForTest(
         {"{a: 1}", "{a: 1}", "{a: 1}", "{a: 3}", "{a: 7}", "{a: 7}", "{a: 7}"}, getExpCtx());
     densify.setSource(source.get());
@@ -621,8 +629,11 @@ TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyWithDuplicates) {
 }
 
 TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyOffStep) {
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(3), Full(), boost::none));
+    auto densify = InternalDensifyStage("",
+                                        getExpCtx(),
+                                        "a",
+                                        std::list<FieldPath>(),
+                                        RangeStatement(Value(3), Full(), boost::none));
     auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
     densify.setSource(source.get());
 
@@ -649,8 +660,11 @@ TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyOffStep) {
 }
 
 TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyOnStep) {
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(2), Full(), boost::none));
+    auto densify = InternalDensifyStage(DocumentSourceInternalDensify::kStageName,
+                                        getExpCtx(),
+                                        "a",
+                                        std::list<FieldPath>(),
+                                        RangeStatement(Value(2), Full(), boost::none));
     auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
     densify.setSource(source.get());
 
@@ -683,8 +697,11 @@ TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyOnStep) {
 
 TEST_F(DensifyFullNumericTest,
        NoDensificationIfStepIsGreaterThanDocumentDifferenceMultipleDocuments) {
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(2), Full(), boost::none));
+    auto densify = InternalDensifyStage(DocumentSourceInternalDensify::kStageName,
+                                        getExpCtx(),
+                                        "a",
+                                        std::list<FieldPath>(),
+                                        RangeStatement(Value(2), Full(), boost::none));
     auto source =
         DocumentSourceMock::createForTest({"{a: 1}", "{a : 2}", "{a: 3}", "{a: 4}"}, getExpCtx());
     densify.setSource(source.get());
@@ -709,8 +726,11 @@ TEST_F(DensifyFullNumericTest,
 }
 
 TEST_F(DensifyFullNumericTest, DensificationFieldMissing) {
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(10), Full(), boost::none));
+    auto densify = InternalDensifyStage(DocumentSourceInternalDensify::kStageName,
+                                        getExpCtx(),
+                                        "a",
+                                        std::list<FieldPath>(),
+                                        RangeStatement(Value(10), Full(), boost::none));
     auto source = DocumentSourceMock::createForTest(
         {"{b: 1}", "{a: 1}", "{a: 20}", "{b: 2}", "{b: 3}"}, getExpCtx());
     densify.setSource(source.get());
@@ -742,8 +762,11 @@ TEST_F(DensifyFullNumericTest, DensificationFieldMissing) {
 }
 
 TEST_F(DensifyFullNumericTest, NoDensificationIfStepGreaterThanDocumentDifference) {
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(10), Full(), boost::none));
+    auto densify = InternalDensifyStage(DocumentSourceInternalDensify::kStageName,
+                                        getExpCtx(),
+                                        "a",
+                                        std::list<FieldPath>(),
+                                        RangeStatement(Value(10), Full(), boost::none));
     auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
     densify.setSource(source.get());
 
@@ -758,8 +781,11 @@ TEST_F(DensifyFullNumericTest, NoDensificationIfStepGreaterThanDocumentDifferenc
 }
 
 TEST_F(DensifyFullNumericTest, DensifyOverDocumentsWithGaps) {
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(3), Full(), boost::none));
+    auto densify = InternalDensifyStage(DocumentSourceInternalDensify::kStageName,
+                                        getExpCtx(),
+                                        "a",
+                                        std::list<FieldPath>(),
+                                        RangeStatement(Value(3), Full(), boost::none));
     auto source = DocumentSourceMock::createForTest(
         {"{a: 1}", "{a: 2}", "{a : 3}", "{a : 4}", "{a : 9}", "{a : 10}", "{a : 15}"}, getExpCtx());
     densify.setSource(source.get());
@@ -803,7 +829,8 @@ TEST_F(DensifyFullNumericTest, DensifyOverDocumentsWithGaps) {
 }
 
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStartingBelowRange) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -858,7 +885,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
 
 TEST_F(DensifyExplicitNumericTest,
        CorrectlyDensifiesForNumericExplicitRangeStepStartingOnMinRange) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -907,7 +935,8 @@ TEST_F(DensifyExplicitNumericTest,
 }
 
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStartingInsideRange) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -949,7 +978,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
 
 TEST_F(DensifyExplicitNumericTest,
        CorrectlyDensifiesForPartionedRangeStartingBeforeBoundsRangeWithDocMatchingBoundsStart) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        "$_internalDensify",
         getExpCtx(),
         "b",
         std::list<FieldPath>({"a"}),
@@ -986,7 +1016,8 @@ TEST_F(DensifyExplicitNumericTest,
 }
 
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForPartionedRangeAcrossTwoPartitions) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        "$_internalDensify",
         getExpCtx(),
         "b",
         std::list<FieldPath>({"a"}),
@@ -1103,7 +1134,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForPartionedRangeAcrossTwoP
 }
 
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeOnlyInsideRange) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -1135,7 +1167,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeOnly
 }
 
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStartingAboveRange) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -1179,7 +1212,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
 }
 
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStartingInsideOffStep) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -1212,7 +1246,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
 
 TEST_F(DensifyExplicitNumericTest,
        CorrectlyDensifiesForNumericExplicitRangeStartingInsideWithDupes) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -1252,7 +1287,8 @@ TEST_F(DensifyExplicitNumericTest,
 }
 
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeWithDupesWithinSource) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -1297,7 +1333,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeWith
 }
 
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeAfterHitsEOF) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -1333,7 +1370,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeAfte
 }
 
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeWhenFieldIsMissing) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -1377,7 +1415,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeWhen
 }
 
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStepLargerThanRange) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -1405,7 +1444,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStep
 }
 
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeHitEOFNearMax) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -1429,7 +1469,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeHitE
 }
 
 TEST_F(DensifyExplicitNumericTest, DensificationForNumericValuesErrorsIfFieldIsNotNumeric) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -1441,7 +1482,8 @@ TEST_F(DensifyExplicitNumericTest, DensificationForNumericValuesErrorsIfFieldIsN
 }
 
 TEST_F(DensifyExplicitNumericTest, DensifiesOnImmediateEOFExplictRange) {
-    auto densify = DocumentSourceInternalDensify(
+    auto densify = InternalDensifyStage(
+        DocumentSourceInternalDensify::kStageName,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
@@ -1459,8 +1501,11 @@ TEST_F(DensifyExplicitNumericTest, DensifiesOnImmediateEOFExplictRange) {
 }
 
 TEST_F(DensifyFullNumericTest, DensifiesOnImmediateEOFExplicitRange) {
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(3), Full(), boost::none));
+    auto densify = InternalDensifyStage(DocumentSourceInternalDensify::kStageName,
+                                        getExpCtx(),
+                                        "a",
+                                        std::list<FieldPath>(),
+                                        RangeStatement(Value(3), Full(), boost::none));
     auto source = DocumentSourceMock::createForTest({}, getExpCtx());
     densify.setSource(source.get());
     auto next = densify.getNext();
@@ -1468,8 +1513,11 @@ TEST_F(DensifyFullNumericTest, DensifiesOnImmediateEOFExplicitRange) {
 }
 
 TEST_F(DensifyPartitionNumericTest, DensifiesOnImmediateEOFExplicitRange) {
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(3), Full(), boost::none));
+    auto densify = InternalDensifyStage(DocumentSourceInternalDensify::kStageName,
+                                        getExpCtx(),
+                                        "a",
+                                        std::list<FieldPath>(),
+                                        RangeStatement(Value(3), Full(), boost::none));
     auto source = DocumentSourceMock::createForTest({}, getExpCtx());
     densify.setSource(source.get());
     auto next = densify.getNext();
@@ -1777,14 +1825,15 @@ TEST_F(DensifyMonthStepTest, CorrectlyDensifiesForDateExplicitRangeStartingInsid
     // Starting at January 31, with a step of 9 Months, densify steps back initially to April 30th
     // before starting with generation. This test ensures that when the step is added back we don't
     // generate January 30th which is outside of the range.
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(),
-        "a",
-        std::list<FieldPath>(),
-        RangeStatement(Value(9),
-                       ExplicitBounds(makeDate("2019-01-31T21:53:45.323Z"),
-                                      makeDate("2020-06-02T10:40:15.842Z")),
-                       TimeUnit::month));
+    auto densify =
+        InternalDensifyStage(DocumentSourceInternalDensify::kStageName,
+                             getExpCtx(),
+                             "a",
+                             std::list<FieldPath>(),
+                             RangeStatement(Value(9),
+                                            ExplicitBounds(makeDate("2019-01-31T21:53:45.323Z"),
+                                                           makeDate("2020-06-02T10:40:15.842Z")),
+                                            TimeUnit::month));
 
     Document doc{{"a", makeDate("2019-10-01T00:00:00.000Z")}};
     auto source = DocumentSourceMock::createForTest({doc}, getExpCtx());
