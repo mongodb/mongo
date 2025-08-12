@@ -156,6 +156,9 @@ filters:
   - "sharding_auth.yml":
     approvers:
       - 10gen/server-security
+  - "concurrency_replication_maintenance.yml":
+    approvers:
+      - 10gen/server-jstest-infra
   - "identity_views_passthrough.yml":
     approvers:
       - 10gen/query-optimization

@@ -1,0 +1,59 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    ##
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+    ##
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - does_not_support_causal_consistency
+    - uses_transactions
+    # collStats is not causally consistent
+    - requires_collstats
+    - requires_dbstats
+    - requires_sharding
+    # Tests which use $currentOp. Running an aggregation with $currentOp and read preference
+    # secondary doesn't make much sense, since there's no guarantee *which* secondary you get results
+    # from.
+    - uses_curop_agg_stage
+    # The system.profile collection is not replicated, so these tests are incompatible with
+    # readPreference secondary.
+    - requires_profiling
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
+    tests: true
+  config: {}
+  hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    #
+    # TODO SERVER-26466: Add CheckReplOplogs hook to the concurrency suite.
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
+    - class: ContinuousMaintenance
+      is_fsm_workload: true
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 1024
+      set_parameters:
+        enableTestCommands: 1
+        # Allow many initial sync attempts. Initial sync may fail if the sync source does not have
+        # an oplog yet because it has not conducted its own initial sync yet.
+        numInitialSyncAttempts: 10000000
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
+        roleGraphInvalidationIsFatal: 1
+    num_nodes: 5
+    linear_chain: true

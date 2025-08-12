@@ -318,6 +318,26 @@ tasks:
           use_large_distro: "true"
 
   - <<: *gen_task_template
+    name: concurrency_replication_maintenance_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "concurrency",
+        "repl",
+        "large",
+        "non_live_record",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          resmoke_jobs_max: 1
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
     name: concurrency_replication_gen
     tags:
       [

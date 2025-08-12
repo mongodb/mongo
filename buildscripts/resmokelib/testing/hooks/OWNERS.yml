@@ -30,6 +30,9 @@ filters:
   - "magic_restore.py":
     approvers:
       - 10gen/server-recovery
+  - "maintenance.py":
+    approvers:
+      - 10gen/server-jstest-infra
   - "oplog.py":
     approvers:
       - 10gen/server-jstest-infra
