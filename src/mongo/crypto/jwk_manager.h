@@ -114,6 +114,16 @@ private:
     // If an existing key got deleted or modified while doing a just in time refresh, we activate
     // this flag to indicate that a refresh occurred during this JWKManager's lifetime.
     bool _isKeyModified;
+
+    /**
+     * Helper function to load and validate an RSA key and return a key ID
+     */
+    std::string _loadAndValidateRSAKey(const JWKRSA& RSAkey);
+
+    /**
+     * Helper function to load and validate an EC key and return a key ID
+     */
+    std::string _loadAndValidateECKey(const JWKEC& ECkey);
 };
 
 }  // namespace mongo::crypto
