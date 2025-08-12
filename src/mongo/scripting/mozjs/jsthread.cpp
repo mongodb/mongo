@@ -76,11 +76,12 @@ namespace mozjs {
 
 // These are all executed on some object that owns a js thread, rather than a
 // jsthread itself, so CONSTRAINED_METHOD doesn't do the job here.
-const JSFunctionSpec JSThreadInfo::threadMethods[6] = {
+const JSFunctionSpec JSThreadInfo::threadMethods[7] = {
     MONGO_ATTACH_JS_FUNCTION(init),
     MONGO_ATTACH_JS_FUNCTION(start),
     MONGO_ATTACH_JS_FUNCTION(join),
     MONGO_ATTACH_JS_FUNCTION(hasFailed),
+    MONGO_ATTACH_JS_FUNCTION(currentStatus),
     MONGO_ATTACH_JS_FUNCTION(returnData),
     JS_FS_END,
 };
@@ -98,14 +99,17 @@ const char* const JSThreadInfo::className = "JSThread";
  *
  * The idea here is that we create a jsthread by taking a js function and its
  * parameters and encoding them into a single bson object. Then we spawn a
- * thread, have that thread do the work and join() it before checking it's
+ * thread, have that thread do the work and join() it before checking its
  * result (serialized through bson). We can check errors at any time by
  * checking a mutex guarded hasError().
  */
 class JSThreadConfig {
 public:
     JSThreadConfig(JSContext* cx, JS::CallArgs args)
-        : _started(false), _done(false), _sharedData(new SharedData()), _jsthread(*this) {
+        : _started(false),
+          _done(false),
+          _sharedData(std::make_shared<SharedData>()),
+          _jsthread(*this) {
         auto scope = getScope(cx);
 
         uassert(ErrorCodes::JSInterpreterFailure, "need at least one argument", args.length() > 0);
@@ -146,12 +150,23 @@ public:
     /**
      * Returns true if the JSThread terminated as a result of an error
      * during its execution, and false otherwise. This operation does
-     * not block, nor does it require join() to have been called.
+     * not wait for the thread to terminate, nor does it require join()
+     * to have been called.
      */
     bool hasFailed() const {
+        return !currentStatus().isOK();
+    }
+
+    /**
+     * Returns the current error status of the thread, which may
+     * change as it is running. This operation does not wait for the
+     * thread to terminate, nor does it require join() to have been
+     * called.
+     */
+    Status currentStatus() const {
         uassert(ErrorCodes::JSInterpreterFailure, "Thread not started", _started);
 
-        return !_sharedData->getErrorStatus().isOK();
+        return _sharedData->getErrorStatus();
     }
 
     BSONObj returnData() {
@@ -288,6 +303,14 @@ void JSThreadInfo::Functions::join::call(JSContext* cx, JS::CallArgs args) {
 
 void JSThreadInfo::Functions::hasFailed::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setBoolean(getConfig(cx, args)->hasFailed());
+}
+
+void JSThreadInfo::Functions::currentStatus::call(JSContext* cx, JS::CallArgs args) {
+    BSONObjBuilder bob;
+    getConfig(cx, args)->currentStatus().serialize(&bob);
+    const BSONObj* parent = nullptr;
+    const bool readOnly = true;
+    ValueReader(cx, args.rval()).fromBSON(bob.obj(), parent, readOnly);
 }
 
 void JSThreadInfo::Functions::returnData::call(JSContext* cx, JS::CallArgs args) {

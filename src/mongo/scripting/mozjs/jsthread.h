@@ -60,6 +60,7 @@ struct JSThreadInfo : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(start);
         MONGO_DECLARE_JS_FUNCTION(join);
         MONGO_DECLARE_JS_FUNCTION(hasFailed);
+        MONGO_DECLARE_JS_FUNCTION(currentStatus);
         MONGO_DECLARE_JS_FUNCTION(returnData);
 
         MONGO_DECLARE_JS_FUNCTION(_threadInject);
@@ -70,7 +71,7 @@ struct JSThreadInfo : public BaseInfo {
      * Note that this isn't meant to supply methods for JSThread, it's just
      * there to work with _threadInject. So the name isn't a mistake
      */
-    static const JSFunctionSpec threadMethods[6];
+    static const JSFunctionSpec threadMethods[7];
     static const JSFunctionSpec freeFunctions[3];
 
     static const char* const className;
