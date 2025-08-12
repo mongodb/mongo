@@ -38,6 +38,7 @@
 
 #include <fcntl.h>
 
+#include <boost/iostreams/device/mapped_file.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -83,6 +84,18 @@ const long long unixToInternal =
 
 namespace mongo {
 
+TrafficReaderPacket readPacket(ConstDataRangeCursor cdr) {
+    // Read the packet
+    cdr.skip<LittleEndian<uint32_t>>();
+    uint64_t id = cdr.readAndAdvance<LittleEndian<uint64_t>>();
+    StringData session = cdr.readAndAdvance<Terminated<'\0', StringData>>();
+    uint64_t date = cdr.readAndAdvance<LittleEndian<uint64_t>>();
+    uint64_t order = cdr.readAndAdvance<LittleEndian<uint64_t>>();
+    MsgData::ConstView message(cdr.data());
+
+    return TrafficReaderPacket{id, session, Date_t::fromMillisSinceEpoch(date), order, message};
+}
+
 namespace {
 
 bool readBytes(size_t toRead, char* buf, int fd) {
@@ -110,18 +123,6 @@ bool readBytes(size_t toRead, char* buf, int fd) {
     }
 
     return true;
-}
-
-TrafficReaderPacket readPacket(ConstDataRangeCursor cdr) {
-    // Read the packet
-    cdr.skip<LittleEndian<uint32_t>>();
-    uint64_t id = cdr.readAndAdvance<LittleEndian<uint64_t>>();
-    StringData session = cdr.readAndAdvance<Terminated<'\0', StringData>>();
-    uint64_t date = cdr.readAndAdvance<LittleEndian<uint64_t>>();
-    uint64_t order = cdr.readAndAdvance<LittleEndian<uint64_t>>();
-    MsgData::ConstView message(cdr.data());
-
-    return TrafficReaderPacket{id, session, Date_t::fromMillisSinceEpoch(date), order, message};
 }
 
 boost::optional<TrafficReaderPacket> readPacket(char* buf, int fd) {
@@ -192,6 +193,14 @@ void addOpType(TrafficReaderPacket& packet, BSONObjBuilder* builder) {
 
 }  // namespace
 
+bool operator==(const TrafficReaderPacket& read, const TrafficRecordingPacket& recorded) {
+    std::string_view readData(read.message.data(), read.message.dataLen());
+    MsgData::ConstView recordedView(recorded.message.buf());
+    std::string_view recordedData(recordedView.data(), recordedView.dataLen());
+    return std::tie(read.id, read.session, read.date, read.order, readData) ==
+        std::tie(recorded.id, recorded.session, recorded.now, recorded.order, recordedData);
+}
+
 BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile) {
     BSONArrayBuilder builder{};
 
@@ -261,19 +270,6 @@ void trafficRecordingFileToMongoReplayFile(int inputFd, std::ostream& outputStre
 
         bob.resetToEmpty();
     }
-}
-
-boost::optional<TrafficReaderPacket> maybeReadPacket(ConstDataRangeCursor& cdr) {
-    if (cdr.length() < 4) {
-        return {};
-    }
-    auto len = cdr.read<LittleEndian<uint32_t>>().value;
-
-    uassert(ErrorCodes::FailedToParse, "packet too large", len < MaxMessageSizeBytes);
-    uassert(ErrorCodes::FailedToParse, "could not read full packet", cdr.length() >= len);
-    auto packet = mongo::readPacket(cdr.slice(size_t(len)));
-    cdr.advance(len);
-    return packet;
 }
 
 }  // namespace mongo

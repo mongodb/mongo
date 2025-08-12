@@ -42,29 +42,27 @@
 
 namespace mongo {
 
-std::vector<TrafficReaderPacket> RecordingReader::processRecording() {
-    size_t size = 0;
-    std::ifstream f;
-
-    try {
-        size = std::filesystem::file_size(filename);
-        f.exceptions(std::ifstream::badbit | std::ifstream::failbit);
-        f.open(filename, std::ios_base::in | std::ios_base::binary);
-    } catch (const std::exception&) {
-        uasserted(ErrorCodes::FileOpenFailed, "Couldn't open recording file");
-    }
-
-    buffer = std::make_unique<char[]>(size);
-    f.read(buffer.get(), size);
-
-    std::vector<TrafficReaderPacket> res;
-
-    ConstDataRangeCursor cdr(buffer.get(), size);
-
-    while (auto packet = maybeReadPacket(cdr)) {
-        res.push_back(*packet);
-    }
-
-    return res;
+RecordingReader::RecordingReader(std::filesystem::path file)
+    // Explicit boost::iostreams::detail::path required for MSVC and current version of boost to
+    // compile.
+    : RecordingReader(
+          boost::iostreams::mapped_file_source(boost::iostreams::detail::path(file.string()))) {}
+RecordingReader::RecordingReader(boost::iostreams::mapped_file_source mappedFile)
+    : _mappedFile(mappedFile), _cdr(mappedFile.data(), mappedFile.size()) {
+    invariant(_mappedFile.is_open());
 }
+
+boost::optional<TrafficReaderPacket> RecordingReader::readPacket() {
+    if (_cdr.length() < 4) {
+        return {};
+    }
+    auto len = _cdr.read<LittleEndian<uint32_t>>().value;
+
+    uassert(ErrorCodes::FailedToParse, "packet too large", len < MaxMessageSizeBytes);
+    uassert(ErrorCodes::FailedToParse, "could not read full packet", _cdr.length() >= len);
+    auto packet = mongo::readPacket(_cdr.slice(size_t(len)));
+    _cdr.advance(len);
+    return packet;
+}
+
 }  // namespace mongo

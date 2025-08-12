@@ -99,6 +99,8 @@ public:
         invariant(end >= begin);
     }
 
+    ConstDataRange() = default;
+
     // Constructing from nullptr, nullptr initializes an empty ConstDataRange.
     ConstDataRange(std::nullptr_t, std::nullptr_t, std::ptrdiff_t debug_offset = 0)
         : _begin(nullptr), _end(nullptr), _debug_offset(debug_offset) {}
@@ -233,9 +235,9 @@ protected:
     }
 
 protected:
-    const byte_type* _begin;
-    const byte_type* _end;
-    std::ptrdiff_t _debug_offset;
+    const byte_type* _begin = nullptr;
+    const byte_type* _end = nullptr;
+    std::ptrdiff_t _debug_offset = 0;
 
     Status makeOffsetStatus(size_t offset) const;
 };

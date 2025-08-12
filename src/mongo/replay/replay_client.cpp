@@ -30,14 +30,15 @@
 #include "mongo/replay/replay_client.h"
 
 #include "mongo/db/query/util/stop_token.h"
-#include "mongo/replay/recording_reader.h"
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_config.h"
 #include "mongo/replay/session_handler.h"
+#include "mongo/replay/traffic_recording_iterator.h"
 #include "mongo/util/assert_util.h"
 
 #include <condition_variable>
 #include <exception>
+#include <memory>
 #include <mutex>
 #include <string>
 
@@ -171,33 +172,40 @@ bool isReplayable(const std::string& commandType) {
  * Handles creation of threads to replay individual sessions contained within.
  */
 void recordingDispatcher(mongo::stop_token stop, const ReplayConfig& replayConfig) {
-    RecordingReader reader{replayConfig.recordingPath};
-    const auto bsonRecordedCommands = reader.processRecording();
-
-    uassert(ErrorCodes::ReplayClientInternalError,
-            "The list of recorded commands cannot be empty",
-            !bsonRecordedCommands.empty());
-
-    // create a new session handler for mananging the recording.
-    SessionHandler sessionHandler;
-
-    // setup recording and replaying starting time
-    auto firstCommand = bsonRecordedCommands[0];
-    sessionHandler.setStartTime(ReplayCommand{firstCommand}.fetchRequestTimestamp());
+    std::shared_ptr<FileSet> files;
+    try {
+        files = FileSet::from_directory(replayConfig.recordingPath);
+    } catch (const std::exception& e) {
+        tasserted(ErrorCodes::FileOpenFailed, e.what());
+    }
 
     try {
-        for (const auto& bsonCommand : bsonRecordedCommands) {
+        auto iter = RecordingSetIterator(files);
+
+        if (iter == end(iter)) {
+            // There are no events in the recording.
+            return;
+        }
+
+        // setup recording and replaying starting time
+        auto firstCommand = *iter;
+        // create a new session handler for mananging the recording.
+        SessionHandler sessionHandler;
+        sessionHandler.setStartTime(ReplayCommand{firstCommand}.fetchRequestTimestamp());
+
+        for (const auto& packet : iter) {
             if (stop.stop_requested()) {
                 return;
             }
-            ReplayCommand command{bsonCommand};
+            ReplayCommand command{packet};
             if (!isReplayable(command.parseOpType())) {
                 continue;
             }
             if (command.isStartRecording()) {
                 // will associated the URI to a session task and run all the commands associated
                 // with this session id.
-                sessionHandler.onSessionStart(replayConfig.mongoURI, command);
+                const auto& [timestamp, sessionId] = extractTimeStampAndSessionFromCommand(command);
+                sessionHandler.onSessionStart(replayConfig.mongoURI, timestamp, sessionId);
             } else if (command.isStopRecording()) {
                 // stop commad will reset the complete the simulation and reset the connection.
                 sessionHandler.onSessionStop(command);

@@ -28,8 +28,10 @@
  */
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/traffic_recorder.h"
 #include "mongo/rpc/op_msg.h"
 
+#include <filesystem>
 #include <iosfwd>
 #include <string>
 
@@ -46,11 +48,15 @@ struct TrafficReaderPacket {
     MsgData::ConstView message;
 };
 
+// Comparator for round-trip testing that a packet read from disk is equal to the value written to
+// disk originally.
+bool operator==(const TrafficReaderPacket& read, const TrafficRecordingPacket& recorded);
+
 // Method for testing, takes the recorded traffic and returns a BSONArray
 BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile);
 
 // This is the function that traffic_reader_main.cpp calls
 void trafficRecordingFileToMongoReplayFile(int inFile, std::ostream& outFile);
 
-boost::optional<TrafficReaderPacket> maybeReadPacket(ConstDataRangeCursor& cdr);
+TrafficReaderPacket readPacket(ConstDataRangeCursor cdr);
 }  // namespace mongo
