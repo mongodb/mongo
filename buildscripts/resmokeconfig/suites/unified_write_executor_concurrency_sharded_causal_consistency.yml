@@ -1,0 +1,110 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+
+    # uses >100MB of data, which can overwhelm test hosts
+
+    # compact can only be run against a standalone mongod
+
+    # can cause OOM kills on test hosts
+
+    # cannot createIndex after dropDatabase without sharding first
+
+    # The WTWriteConflictException failpoint is not supported on mongos.
+
+    # Exclusions because of unimplemented functionalities in the unified write executor.
+    # TODO: SERVER-108068 Support passing expected collection uuid in UWE.
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/collection_uuid_sharded.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/collection_uuid.js
+
+    # TODO: SERVER-104139 Support write commands against timeseries collections in UWE.
+    - jstests/concurrency/fsm_workloads/timeseries/**/*.js
+    - jstests/concurrency/fsm_workloads/query/timeseries/**/*.js
+    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_arbitrary_updates.js
+    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_deletes.js
+    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_findAndModify_remove.js
+    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_findAndModify_update.js
+    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_insert_many.js
+    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_inserts.js
+    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_meta_updates.js
+
+    # TODO: SERVER-104123 Support for 'multi: true' writes.
+    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_multi_update_delete_paused_migrations.js
+
+    # TODO: SERVER-104138 Support FLE integration with write commands.
+    - src/mongo/db/modules/enterprise/jstests/concurrency/fsm_workloads/fle2_compact.js
+    - src/mongo/db/modules/enterprise/jstests/concurrency/fsm_workloads/fle2_crud.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - does_not_support_causal_consistency
+    - assumes_against_mongod_not_mongos
+    - assumes_balancer_on
+    # This suite uses secondary read preference, which isn't currently compatible with transactions.
+    - uses_transactions
+    - requires_replication
+    # Tests which use $currentOp. Running an aggregation with $currentOp and read preference
+    # secondary doesn't make much sense, since there's no guarantee *which* secondary you get results
+    # from.
+    - uses_curop_agg_stage
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - assumes_unsharded_collection
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      global_vars:
+        TestData:
+          runningWithCausalConsistency: true
+          runningWithBalancer: false
+          implicitlyShardOnCreateCollectionOnly: true
+          internalQueryUnifiedWriteExecutor: true
+  hooks:
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        internalQueryUnifiedWriteExecutor: true
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        internalQueryUnifiedWriteExecutor: true
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    num_mongos: 2

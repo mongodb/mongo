@@ -1,0 +1,68 @@
+# This suite tests the core transactions functionality with causal consistency enabled on the
+# session. The purpose of this passthrough is to ensure that enabling causal consistency has no
+# effect on this core functionality when run against unsharded collections in a sharded cluster.
+
+test_kind: js_test
+selector:
+  roots:
+    - jstests/core/txns/**/*.js
+  exclude_files:
+    # Profile can only be run against the admin database on mongos.
+    - jstests/core/txns/transactions_profiling.js
+    - jstests/core/txns/transactions_profiling_with_drops.js
+
+    # transactionLifetimeLimitSeconds parameter is not available in mongos.
+    - jstests/core/txns/abort_expired_transaction.js
+    - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+    - jstests/core/txns/kill_op_on_txn_expiry.js
+
+    # Uses hangAfterCollectionInserts failpoint not available on mongos.
+    - jstests/core/txns/speculative_snapshot_includes_all_writes.js
+
+    # Does not use the transactions shell helpers so afterClusterTime read concern is incorrectly
+    # attached to statements in a transaction beyond the first one.
+    - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
+
+    # Exclusions because of unimplemented functionalities in the unified write executor.
+    # TODO: SERVER-104535 support cursor with bulk write.
+    - jstests/core/txns/bulk_write_getMore.js
+
+  exclude_with_any_tags:
+    - assumes_against_mongod_not_mongos
+    - does_not_support_causal_consistency
+    # Transactions are not allowed to operate on capped collections.
+    - requires_capped
+    # Prepare is not a command on mongos.
+    - uses_prepare_transaction
+    - requires_2_or_more_shards
+executor:
+  archive:
+    hooks:
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+      global_vars:
+        TestData:
+          internalQueryUnifiedWriteExecutor: true
+  hooks:
+    # We don't execute dbHash or oplog consistency checks since there is only a single replica set
+    # node.
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true

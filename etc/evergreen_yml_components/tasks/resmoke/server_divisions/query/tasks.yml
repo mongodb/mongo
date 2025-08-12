@@ -1756,6 +1756,42 @@ tasks:
           use_large_distro: "true"
           resmoke_jobs_max: 1
 
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_causal_consistency_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_causal_consistency_and_balancer_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharded_causally_consistent_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharded_causally_consistent_jscore_txns_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharded_causally_consistent_read_concern_snapshot_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
   - <<: *task_template
     name: query_correctness_query_shape_hash_stability_generated_test_1
     tags:

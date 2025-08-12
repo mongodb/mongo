@@ -471,6 +471,11 @@ buildvariants:
       - name: unified_write_executor_sharded_jscore_txns_without_snapshot
       - name: unified_write_executor_multi_shard_multi_stmt_txn_jscore_passthrough_gen
       - name: unified_write_executor_multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
+      - name: unified_write_executor_concurrency_sharded_causal_consistency_gen
+      - name: unified_write_executor_concurrency_sharded_causal_consistency_and_balancer_gen
+      - name: unified_write_executor_sharded_causally_consistent_jscore_passthrough_gen
+      - name: unified_write_executor_sharded_causally_consistent_jscore_txns_passthrough_gen
+      - name: unified_write_executor_sharded_causally_consistent_read_concern_snapshot_passthrough_gen
       - name: burn_in_tests_gen
         depends_on:
           - name: version_burn_in_gen

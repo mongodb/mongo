@@ -1,0 +1,133 @@
+test_kind: js_test
+# This suite's denylist is a sharded_collections_jscore_passthrough denylist with some additions
+# from causally_consistent_jscore_passthrough denylist.
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # The following tests fail because a certain command or functionality is not supported by
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/bypass_doc_validation.js # sharded $out output not permitted
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
+    - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
+    - jstests/core/**/tailable_skip_limit.js # capped collections.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    # The following tests fail because they count indexes. These counts do not take into account the
+    # additional hashed shard key indexes that are automatically added by this passthrough.
+    - jstests/core/**/bad_index_plugin.js
+    - jstests/core/**/create_indexes.js
+    - jstests/core/**/list_indexes_non_existent_ns.js
+    - jstests/core/**/mr_preserve_indexes.js
+    # This test uses `benchRun` which spawns connections which do not inherit the causal session.
+    - jstests/core/**/benchrun_pipeline_updates.js
+
+    # Exclusions because of unimplemented functionalities in the unified write executor.
+    # TODO: SERVER-108068 Support passing expected collection uuid in UWE.
+    - jstests/core/query/parsing/collection_uuid_write_commands.js
+
+    # TODO: SERVER-104535 support cursor with bulk write.
+    - jstests/core/txns/bulk_write_getMore.js
+    - jstests/core/write/bulk/bulk_write_insert_cursor.js
+
+    # TODO: SERVER-104139 Support write commands against timeseries collections in UWE.
+    - jstests/core/timeseries/**/*.js
+
+    # TODO: SERVER-104138 Support FLE integration with write commands.
+    - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+    - jstests/core/query/queryable_encryption/query_settings_fle.js
+    - jstests/core/query/queryable_encryption/basic_crud.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
+
+    # TODO: SERVER-108965 Handle targeting errors in the UWE.
+    - jstests/core/query/delete/remove_undefined.js
+    - jstests/core/write/bulk/bulk_write_non_transaction.js
+    - jstests/core/query/expr/expr.js
+
+  exclude_with_any_tags:
+    # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+    # can't be created on `getCollection` call.
+    - assumes_no_implicit_collection_creation_on_get_collection
+    # Tests tagged with the following will fail because they assume collections are not sharded.
+    - assumes_against_mongod_not_mongos
+    - assumes_standalone_mongod
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    ##
+    # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+    # override when it refuses to replace the readPreference of a particular command. Above each tag
+    # are the message(s) that cause the tag to be warranted.
+    ##
+    # "Cowardly refusing to override read preference of command: ..."
+    # "Cowardly refusing to run test with overridden read preference when it reads from a
+    #  non-replicated collection: ..."
+    - assumes_read_preference_unchanged
+    - does_not_support_causal_consistency
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
+    # These tests are run in sharded_causally_consistent_jscore_txns_passthrough.
+    - uses_transactions
+    # Parallel shell is not causally consistent because it uses a different session.
+    - uses_parallel_shell
+    # Capped collections cannot be sharded
+    - requires_capped
+    - requires_2_or_more_shards
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: |
+        await import("jstests/libs/override_methods/enable_causal_consistency.js");
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+  hooks:
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity:
+          command: 1
+          network:
+            verbosity: 1
+            asio: 2
+        internalQueryUnifiedWriteExecutor: true
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity:
+          command: 1
+          network:
+            verbosity: 1
+            asio: 2
+          replication:
+            heartbeats: 2
+        internalQueryUnifiedWriteExecutor: true
+    num_rs_nodes_per_shard: 2
