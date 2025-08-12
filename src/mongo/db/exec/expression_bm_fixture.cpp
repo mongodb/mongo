@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/decimal128.h"
@@ -53,6 +54,8 @@
 namespace mongo {
 
 namespace {
+using Parser = std::function<boost::intrusive_ptr<Expression>(
+    ExpressionContext* const, BSONElement, const VariablesParseState&)>;
 
 BSONArray rangeBSONArray(int start, int end) {
     BSONArrayBuilder builder;
@@ -112,6 +115,26 @@ void configureLogging(bool disable) {
     if (disable)
         lv2Config.makeDisabled();
     uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
+}
+
+/**
+ * Registers a new expression that is gated behind a feature flag and therefore does not get put
+ * into the map by default.
+ */
+void registerExpressionForBenchmark(std::string expression, Parser parser) {
+    // Temporarily disable logging because we don't want logs from expression registration to
+    // clutter the benchmark results table.
+    configureLogging(true);
+    ON_BLOCK_EXIT([&] { configureLogging(false); });
+    try {
+        Expression::registerExpression(expression,
+                                       parser,
+                                       AllowedWithApiStrict::kNeverInVersion1,
+                                       AllowedWithClientType::kAny,
+                                       nullptr /* featureFlag */);
+    } catch (const DBException& e) {
+        ASSERT(e.reason() == "Duplicate expression (" + expression + ") registered.");
+    }
 }
 
 }  // namespace
@@ -2122,6 +2145,41 @@ void ExpressionBenchmarkFixture::benchmarkJSConvertToInt(int32_t base,
                                         << "js")),
         state,
         std::vector<Document>(1, {{"input"_sd, input}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkMQLCreateObjectId(benchmark::State& state) {
+    // TODO(SERVER-105035): Delete this once the feature flag defaults to true.
+    registerExpressionForBenchmark("$createObjectId", ExpressionCreateObjectId::parse);
+    benchmarkExpression(
+        BSON("$createObjectId" << BSONObj()), state, std::vector<Document>(1, {{}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkJSCreateObjectId(benchmark::State& state) {
+    benchmarkExpression(BSON("$function" << BSON("body" << "function() {return ObjectId();}"
+                                                        << "args" << BSONArray() << "lang"
+                                                        << "js")),
+                        state,
+                        std::vector<Document>(1, {{}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkMQLSubtype(benchmark::State& state) {
+    // TODO(SERVER-105035): Delete this once the feature flag defaults to true.
+    registerExpressionForBenchmark("$subtype", ExpressionSubtype::parse);
+    benchmarkExpression(
+        BSON("$subtype" << "$input"),
+        state,
+        std::vector<Document>(
+            1, {{"input"_sd, Value(BSONBinData{"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, BinDataGeneral})}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkJSSubtype(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$function" << BSON("body" << "function(input) {return input.type;}"
+                                        << "args" << BSON_ARRAY("$input") << "lang"
+                                        << "js")),
+        state,
+        std::vector<Document>(
+            1, {{"input"_sd, Value(BSONBinData{"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, BinDataGeneral})}}));
 }
 
 }  // namespace mongo

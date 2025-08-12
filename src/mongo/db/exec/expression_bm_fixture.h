@@ -320,6 +320,11 @@ public:
     void benchmarkJSConvertToString(int32_t base, int32_t input, benchmark::State& state);
     void benchmarkJSConvertToInt(int32_t base, StringData input, benchmark::State& state);
 
+    void benchmarkMQLCreateObjectId(benchmark::State& state);
+    void benchmarkJSCreateObjectId(benchmark::State& state);
+    void benchmarkMQLSubtype(benchmark::State& state);
+    void benchmarkJSSubtype(benchmark::State& state);
+
 private:
     void testDateDiffExpression(long long startDate,
                                 long long endDate,
@@ -1184,6 +1189,22 @@ private:
                                                                                                 \
     BENCHMARK_F(Fixture, JSConvertToIntBase16)(benchmark::State & state) {                      \
         benchmarkJSConvertToInt(16, "7FFFFFFF"_sd, state);                                      \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLCreateObjectId)(benchmark::State & state) {                         \
+        benchmarkMQLCreateObjectId(state);                                                      \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSCreateObjectId)(benchmark::State & state) {                          \
+        benchmarkJSCreateObjectId(state);                                                       \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MQLSubtype)(benchmark::State & state) {                                \
+        benchmarkMQLSubtype(state);                                                             \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, JSSubtype)(benchmark::State & state) {                                 \
+        benchmarkJSSubtype(state);                                                              \
     }
 
 
