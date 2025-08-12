@@ -37,6 +37,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -115,10 +116,8 @@ public:
 };
 
 auto makeLookUpFromBson(BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto docSource = DocumentSourceLookUp::createFromBson(elem, expCtx);
-    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.detach());
-    return std::unique_ptr<DocumentSourceLookUp, DocumentSourceDeleter>(lookup,
-                                                                        DocumentSourceDeleter());
+    return boost::dynamic_pointer_cast<DocumentSourceLookUp>(
+        DocumentSourceLookUp::createFromBson(elem, expCtx));
 }
 
 // A 'let' variable defined in a $lookup stage is expected to be available to all sub-pipelines. For
@@ -1187,24 +1186,25 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
                                          {"as", "foreignDocs"_sd}}}}
                           .toBson();
     auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
-    lookup->setSource(mockLocalSource.get());
+    auto lookupStage = exec::agg::buildStage(lookup);
+    lookupStage->setSource(mockLocalSource.get());
 
-    auto next = lookup->getNext();
+    auto next = lookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
                        (Document{{"foreignId", 0}, {"foreignDocs", {Document{{"_id", 0}}}}}));
 
-    ASSERT_TRUE(lookup->getNext().isPaused());
+    ASSERT_TRUE(lookupStage->getNext().isPaused());
 
-    next = lookup->getNext();
+    next = lookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
                        (Document{{"foreignId", 1}, {"foreignDocs", {Document{{"_id", 1}}}}}));
 
-    ASSERT_TRUE(lookup->getNext().isPaused());
+    ASSERT_TRUE(lookupStage->getNext().isPaused());
 
-    ASSERT_TRUE(lookup->getNext().isEOF());
-    ASSERT_TRUE(lookup->getNext().isEOF());
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
@@ -1241,24 +1241,25 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
     lookup->setUnwindStage(DocumentSourceUnwind::create(
         expCtx, "foreignDoc", preserveNullAndEmptyArrays, includeArrayIndex));
 
-    lookup->setSource(mockLocalSource.get());
+    auto lookupStage = exec::agg::buildStage(lookup.get());
+    lookupStage->setSource(mockLocalSource.get());
 
-    auto next = lookup->getNext();
+    auto next = lookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
                        (Document{{"foreignId", 0}, {"foreignDoc", Document{{"_id", 0}}}}));
 
-    ASSERT_TRUE(lookup->getNext().isPaused());
+    ASSERT_TRUE(lookupStage->getNext().isPaused());
 
-    next = lookup->getNext();
+    next = lookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
                        (Document{{"foreignId", 1}, {"foreignDoc", Document{{"_id", 1}}}}));
 
-    ASSERT_TRUE(lookup->getNext().isPaused());
+    ASSERT_TRUE(lookupStage->getNext().isPaused());
 
-    ASSERT_TRUE(lookup->getNext().isEOF());
-    ASSERT_TRUE(lookup->getNext().isEOF());
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceLookUpTest, LookupReportsAsFieldIsModified) {
@@ -1580,17 +1581,18 @@ TEST_F(DocumentSourceLookUpTest,
             .firstElement(),
         expCtx);
 
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
+    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
+    ASSERT(lookup);
 
     // Prepare the mocked local source.
     auto mockLocalSource = DocumentSourceMock::createForTest(
         {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}}, expCtx);
 
+    auto lookupStage = exec::agg::buildStage(lookup);
     lookupStage->setSource(mockLocalSource.get());
 
     // Confirm that the empty 'kBuilding' cache is placed just before the correlated $addFields.
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 0));
+    auto subPipeline = lookup->getSubPipeline_forTest(DOC("_id" << 0));
     ASSERT(subPipeline);
 
     auto expectedPipe = fromjson(
@@ -1611,7 +1613,7 @@ TEST_F(DocumentSourceLookUpTest,
     // Preview the subpipeline that will be used to process the second local document {_id: 1}. The
     // sub-pipeline cache has been built on the first iteration, and is now serving in place of the
     // mocked foreign input source and the non-correlated stages at the start of the pipeline.
-    subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 1));
+    subPipeline = lookup->getSubPipeline_forTest(DOC("_id" << 1));
     ASSERT(subPipeline);
 
     expectedPipe =
@@ -1657,17 +1659,18 @@ TEST_F(DocumentSourceLookUpTest,
         expCtx,
         maxCacheSizeBytes);
 
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
+    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
+    ASSERT(lookup);
 
     // Prepare the mocked local and foreign sources.
     auto mockLocalSource =
         DocumentSourceMock::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
 
+    auto lookupStage = exec::agg::buildStage(lookup);
     lookupStage->setSource(mockLocalSource.get());
 
     // Confirm that the empty 'kBuilding' cache is placed just before the correlated $addFields.
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 0));
+    auto subPipeline = lookup->getSubPipeline_forTest(DOC("_id" << 0));
     ASSERT(subPipeline);
 
     auto expectedPipe = fromjson(
@@ -1686,7 +1689,7 @@ TEST_F(DocumentSourceLookUpTest,
     // Preview the subpipeline that will be used to process the second local document {_id: 1}. The
     // sub-pipeline cache exceeded its max size on the first iteration, was abandoned, and is now
     // absent from the pipeline.
-    subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 1));
+    subPipeline = lookup->getSubPipeline_forTest(DOC("_id" << 1));
     ASSERT(subPipeline);
 
     expectedPipe = fromjson(
