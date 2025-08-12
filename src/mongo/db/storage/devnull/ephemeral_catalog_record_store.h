@@ -127,6 +127,8 @@ public:
                         BSONObjBuilder* extraInfo = nullptr,
                         int infoLevel = 0) const override;
 
+    void sampleAndUpdate(OperationContext* opCTx) override {}
+
     long long dataSize(OperationContext* opCtx) const override {
         return _data->dataSize;
     }
@@ -150,7 +152,7 @@ public:
 
     void reserveRecordIds(OperationContext* opCtx,
                           std::vector<RecordId>* out,
-                          size_t nRecords) final{};
+                          size_t nRecords) final {};
 
     NamespaceString ns(OperationContext* opCtx) const final {
         return _data->ns;

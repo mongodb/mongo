@@ -45,6 +45,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/storage/wiredtiger/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -52,6 +55,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
@@ -156,6 +160,49 @@ void OplogCapMaintainerThread::run() {
 
     while (!globalInShutdownDeprecated()) {
         auto opCtx = tc->makeOperationContext();
+
+        if (feature_flags::gOplogSamplingAsyncEnabled.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+            gOplogSamplingAsyncEnabled) {
+            try {
+
+                boost::optional<AutoGetOplogFastPath> oplogRead;
+                RecordStore* rs = nullptr;
+
+                // Need the oplog to have been created first before we proceed.
+                do {
+                    // Create the initial set of truncate markers as part of this thread before we
+                    // attempt to delete excess markers. Ensure that the oplog has been created as
+                    // part of restart before we attempt to create markers.
+                    oplogRead.emplace(opCtx.get(),
+                                      OplogAccessMode::kRead,
+                                      Date_t::max(),
+                                      AutoGetOplogFastPathOptions{.skipRSTLLock = true});
+
+                    const auto& oplogCollection = oplogRead->getCollection();
+                    rs = oplogCollection->getRecordStore();
+                    if (rs) {
+                        return;
+                    }
+
+                    // Wait a bit to give the oplog a chance to be created.
+                    MONGO_IDLE_THREAD_BLOCK;
+
+                    // Reset the oplogRead so we don't hold a lock while we sleep.
+                    oplogRead.reset();
+                    sleepFor(Milliseconds(100));
+                } while (!rs);
+
+                // Initial sampling and marker creation.
+                rs->sampleAndUpdate(opCtx.get());
+            } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+                LOGV2_DEBUG(9468100,
+                            1,
+                            "Interrupted due to shutdown. OplogCapMaintainerThread Exiting!",
+                            "error"_attr = e.what());
+                return;
+            }
+        }
 
         if (MONGO_unlikely(hangOplogCapMaintainerThread.shouldFail())) {
             LOGV2(5095500, "Hanging the oplog cap maintainer thread due to fail point");

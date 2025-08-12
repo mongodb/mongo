@@ -115,6 +115,8 @@ public:
         return _keyFormat;
     }
 
+    void sampleAndUpdate(OperationContext* opCtx) override {}
+
     int64_t storageSize(OperationContext* opCtx,
                         BSONObjBuilder* extraInfo = nullptr,
                         int infoLevel = 0) const override {

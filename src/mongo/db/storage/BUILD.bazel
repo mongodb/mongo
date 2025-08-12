@@ -146,6 +146,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:database_holder",
         "//src/mongo/db/catalog:local_oplog_info",
         "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/storage/wiredtiger:oplog_truncate_marker_parameters_idl",
         "//src/mongo/util:background_job",
         "//src/mongo/util/concurrency:spin_lock",
     ],

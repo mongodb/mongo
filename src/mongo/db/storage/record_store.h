@@ -421,6 +421,8 @@ public:
         return 0;
     }
 
+    virtual void sampleAndUpdate(OperationContext* opCtx) = 0;
+
     // CRUD related
 
     /**

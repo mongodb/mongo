@@ -279,6 +279,8 @@ public:
      */
     void setDataSize(long long dataSize);
 
+    void sampleAndUpdate(OperationContext* opCtx) override;
+
     bool isOpHidden_forTest(const RecordId& id) const;
 
     class OplogTruncateMarkers;

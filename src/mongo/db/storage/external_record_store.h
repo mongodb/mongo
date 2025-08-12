@@ -92,6 +92,10 @@ public:
         return 0LL;
     }
 
+    void sampleAndUpdate(OperationContext*) override {
+        unimplementedTasserted();
+    }
+
     bool findRecord(OperationContext*, const RecordId&, RecordData*) const final {
         unimplementedTasserted();
         return false;
