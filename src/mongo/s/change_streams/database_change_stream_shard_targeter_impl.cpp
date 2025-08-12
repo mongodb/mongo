@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/all_databases_change_stream_shard_targeter_impl.h"
+#include "mongo/s/change_streams/database_change_stream_shard_targeter_impl.h"
 
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-ShardTargeterDecision AllDatabasesChangeStreamShardTargeterImpl::initialize(
+ShardTargeterDecision DatabaseChangeStreamShardTargeterImpl::initialize(
     Timestamp atClusterTime, ChangeStreamReaderContext& context) {
-    MONGO_UNIMPLEMENTED_TASSERT(10783906);
+    MONGO_UNIMPLEMENTED_TASSERT(10783903);
 }
 
-ShardTargeterDecision AllDatabasesChangeStreamShardTargeterImpl::handleEvent(
+ShardTargeterDecision DatabaseChangeStreamShardTargeterImpl::handleEvent(
     const Document& event, ChangeStreamReaderContext& context) {
-    MONGO_UNIMPLEMENTED_TASSERT(10783907);
+    MONGO_UNIMPLEMENTED_TASSERT(10783904);
 }
 
 std::pair<ShardTargeterDecision, boost::optional<Timestamp>>
-AllDatabasesChangeStreamShardTargeterImpl::startChangeStreamSegment(
+DatabaseChangeStreamShardTargeterImpl::startChangeStreamSegment(
     Timestamp atClusterTime, ChangeStreamReaderContext& context) {
-    MONGO_UNIMPLEMENTED_TASSERT(10783908);
+    MONGO_UNIMPLEMENTED_TASSERT(10783905);
 }
 
 }  // namespace mongo

@@ -12,13 +12,19 @@ exports_files(
 mongo_cc_library(
     name = "change_streams",
     srcs = [
+        "all_databases_change_stream_shard_targeter_impl.cpp",
+        "collection_change_stream_shard_targeter_impl.cpp",
         "control_events.cpp",
         "data_to_shards_allocation_query_service_impl.cpp",
+        "database_change_stream_shard_targeter_impl.cpp",
         "historical_placement_fetcher_impl.cpp",
     ],
     hdrs = [
+        "all_databases_change_stream_shard_targeter_impl.h",
+        "collection_change_stream_shard_targeter_impl.h",
         "control_events.h",
         "data_to_shards_allocation_query_service_impl.h",
+        "database_change_stream_shard_targeter_impl.h",
         "historical_placement_fetcher_impl.h",
     ],
     deps = [

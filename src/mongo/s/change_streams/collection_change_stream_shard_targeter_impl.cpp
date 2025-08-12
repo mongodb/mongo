@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/collection_change_stream_shard_targeter_impl.h"
+#include "mongo/s/change_streams/collection_change_stream_shard_targeter_impl.h"
 
 #include "mongo/util/assert_util.h"
 
@@ -39,7 +39,7 @@ ShardTargeterDecision CollectionChangeStreamShardTargeterImpl::initialize(
 }
 
 ShardTargeterDecision CollectionChangeStreamShardTargeterImpl::handleEvent(
-    const Document& event, ChangeStreamReaderContext& context) {
+    const Document& event, ChangeStreamReaderContext& readerContext) {
     MONGO_UNIMPLEMENTED_TASSERT(10783901);
 }
 
