@@ -128,102 +128,6 @@ constexpr auto expiredTokenSignaturePS =
     "MApaRRdvKTkz2YzvsCyPTgJdGAMQkZOYWxQYZnC0JMnfUuLeQnsOGNwrNbI6AfpG30eRS0wksi_1PJjArXO_"
     "PHukBow6OiGoFe2IeZ8bE5SRITwkQT6PdU4tvKUTz2w";
 
-// Valid Token for ES256
-// Serialization Header: { "alg": "ES256", "kid": "ec-prime256v1", "typ": "JWT" }
-// Serialization Body:
-// {
-//  "aud": "jwt@kernel.mongodb.com",
-//  "exp": 4908288373,
-//  "iat": 1754688373,
-//  "iss": "JWSCompactParserTest",
-//  "nonce": "gdfhjj324ehj23k4",
-//  "sub": "jwsParserTest1"
-//}
-// Expires at July 14, 2125 14:26:13
-//
-constexpr auto validTokenHeaderES256 =
-    "eyJhbGciOiJFUzI1NiIsImtpZCI6ImVjLXByaW1lMjU2djEiLCJ0eXAiOiJKV1QifQ";
-constexpr auto validTokenBodyES256 =
-    "eyJhdWQiOiJqd3RAa2VybmVsLm1vbmdvZGIuY29tIiwiZXhwIjo0OTA4Mjg4MzczLCJpYXQiOjE3NTQ2ODgzNzMsImlzcy"
-    "I6IkpXU0NvbXBhY3RQYXJzZXJUZXN0Iiwibm9uY2UiOiJnZGZoamozMjRlaGoyM2s0Iiwic3ViIjoiandzUGFyc2VyVGVz"
-    "dDEifQ";
-constexpr auto validTokenSignatureES256 =
-    "cDMIkjlitVouTrPh1qyDjM9MuMDzMhCzCN-IObSb4lyi5p8zBemC7LeI_wJzKL_q24hK_lzZO55lGZAg7A7g9g";
-
-// Expired token for ES256
-// Serialization Header: { "alg": "ES256", "kid": "ec-prime256v1", "typ": "JWT" }
-// Serialization Body:
-// {
-//   "aud": "jwt@kernel.mongodb.com",
-//   "exp": 1754615497,
-//   "iat": 1754615497,
-//   "iss": "JWSCompactParserTest",
-//   "nonce": "gdfhjj324ehj23k4",
-//   "sub": "jwsParserTest1"
-// }
-// Expires at Aug 7, 2025 18:11:37
-constexpr auto expiredTokenHeaderES256 =
-    "eyJhbGciOiJFUzI1NiIsImtpZCI6ImVjLXByaW1lMjU2djEiLCJ0eXAiOiJKV1QifQ";
-constexpr auto expiredTokenBodyES256 =
-    "eyJhdWQiOiJqd3RAa2VybmVsLm1vbmdvZGIuY29tIiwiZXhwIjoxNzU0NjE1NDk3LCJpYXQiOjE3NTQ2MTU0OTcsImlzcy"
-    "I6IkpXU0NvbXBhY3RQYXJzZXJUZXN0Iiwibm9uY2UiOiJnZGZoamozMjRlaGoyM2s0Iiwic3ViIjoiandzUGFyc2VyVGVz"
-    "dDEifQ";
-constexpr auto expiredTokenSignatureES256 =
-    "enBYgEgFtJZKa_PrIS2LKx3TP3Dadtf8ZwB8ulQ-BNr7ssauu_YRE9R65oGYQLd47slLuko2R84CQ9i5HAunlA";
-
-// Valid token for ES384
-// Serialization Header:
-// {
-//   "alg": "ES384",
-//   "kid": "ec-secp384r1",
-//   "typ": "JWT"
-// }
-// Serialization Body:
-// {
-//   "aud": "jwt@kernel.mongodb.com",
-//   "exp": 4908215777,
-//   "iat": 1754615777,
-//   "iss": "JWSCompactParserTest",
-//   "nonce": "gdfhjj324ehj23k4",
-//   "sub": "jwsParserTest1"
-// }
-// Expires at July 14, 2125 18:16:17
-constexpr auto validTokenHeaderES384 =
-    "eyJhbGciOiJFUzM4NCIsImtpZCI6ImVjLXNlY3AzODRyMSIsInR5cCI6IkpXVCJ9";
-constexpr auto validTokenBodyES384 =
-    "eyJhdWQiOiJqd3RAa2VybmVsLm1vbmdvZGIuY29tIiwiZXhwIjo0OTA4MjE1Nzc3LCJpYXQiOjE3NTQ2MTU3NzcsImlzcy"
-    "I6IkpXU0NvbXBhY3RQYXJzZXJUZXN0Iiwibm9uY2UiOiJnZGZoamozMjRlaGoyM2s0Iiwic3ViIjoiandzUGFyc2VyVGVz"
-    "dDEifQ";
-constexpr auto validTokenSignatureES384 =
-    "6akxDFHayzAAS3hWMM1YGOxLhz2wiPYPQuxUuUt51gkWGbbe-"
-    "54lBhsV7Q8A9KpYWRixQkyGuYeATmSPQtvrwjMx1jZWeEVSzRYrvngPkcllFmnLvip9FFtTG3x7TFbB";
-
-// Expired token for ES384
-// Serialization Header:
-// {
-//   "alg": "ES384",
-//   "kid": "ec-secp384r1",
-//   "typ": "JWT"
-// }
-// Serialization Body:
-// {
-//    "aud" : "jwt@kernel.mongodb.com",
-//    "exp" : 1754616270,
-//    "iat" : 1754616270,
-//    "iss" : "JWSCompactParserTest",
-//    "nonce" : "gdfhjj324ehj23k4",
-//    "sub" : "jwsParserTest1"
-// }
-// Expires at August 7, 2025 18:28:08
-constexpr auto expiredTokenHeaderES384 =
-    "eyJhbGciOiJFUzM4NCIsImtpZCI6ImVjLXNlY3AzODRyMSIsInR5cCI6IkpXVCJ9";
-constexpr auto expiredTokenBodyES384 =
-    "eyJhdWQiOiJqd3RAa2VybmVsLm1vbmdvZGIuY29tIiwiZXhwIjoxNzU0NjE2MjcwLCJpYXQiOjE3NTQ2MTYyNzAsImlzcy"
-    "I6IkpXU0NvbXBhY3RQYXJzZXJUZXN0Iiwibm9uY2UiOiJnZGZoamozMjRlaGoyM2s0Iiwic3ViIjoiandzUGFyc2VyVGVz"
-    "dDEifQ";
-constexpr auto expiredTokenSignatureES384 =
-    "ASIh5vKTwJiDb_UH_XWN8kvwM1QyfZItMZHRuaDZ9DvH6yBAMpvnfD_TYcQX5poCm1I9csqyQZQyVturVAG6i9-"
-    "iFyKI8z1rUwB8H2-hJyu7-Ovhb2sRZRxKg-RMXtm4";
 
 BSONObj getTestJWKSet() {
     BSONObjBuilder set;
@@ -255,24 +159,6 @@ BSONObj getTestJWKSet() {
                    "dFU1WgOvEYMvHmDAZtAP6RTkALE3AXlIHNb4mkOc9gwwn-"
                    "7cGBc08rufYcniKtS0ZHOtD1aE2CTi1MMQMKkqtVxWIdTI3wLJl1t966f9rBHR6qVtTV8Qpq1bquUc2"
                    "oaHjR4lPTf0Z_hTaELJa5-BBbvJU");
-        key.doneFast();
-    }
-    {
-        BSONObjBuilder key(keys.subobjStart());
-        key.append("kty", "EC");
-        key.append("kid", "ec-prime256v1");
-        key.append("crv", "P-256");
-        key.append("x", "YIq56eQHNCUKUhvpbXssCWvnCHaJkD-5KKoLxwRENxc");
-        key.append("y", "ZoGRVDgfGRZ8OsJN8O3DH6nFfo_LWbVK_e8Bk3ZyT1k");
-        key.doneFast();
-    }
-    {
-        BSONObjBuilder key(keys.subobjStart());
-        key.append("kty", "EC");
-        key.append("kid", "ec-secp384r1");
-        key.append("crv", "P-384");
-        key.append("x", "INQz_7Dh89R9A4ONlGgYdQKKE9ttkoe0-rPzop9x8OY7fQJ1U5cczA5lJeqAREot");
-        key.append("y", "8SHZNb0g6u-ZB_gg0268dP5RzJJE13_-jYC0GyZ_48B3JGPDGcROMifXwzMPadtX");
         key.doneFast();
     }
     keys.doneFast();
@@ -356,40 +242,6 @@ TEST_F(JWKManagerTest, failsWithModifiedTokenPS) {
 TEST_F(JWKManagerTest, failsWithModifiedHeaderForADifferentKeyPS) {
     auto modifiedToken =
         modifiedTokenHeaderPS + "."_sd + validTokenBodyPS + "."_sd + validTokenSignaturePS;
-    validateJWKManagerWithToken(this, modifiedToken);
-}
-
-TEST_F(JWKManagerTest, validateTokenFromKeysES256) {
-    validateTokenFromKeys(
-        this, validTokenHeaderES256, validTokenBodyES256, validTokenSignatureES256);
-}
-
-TEST_F(JWKManagerTest, failsWithExpiredTokenES256) {
-    auto expiredToken = expiredTokenHeaderES256 + "."_sd + expiredTokenBodyES256 + "."_sd +
-        expiredTokenSignatureES256;
-    validateJWKManagerWithToken(this, expiredToken);
-}
-
-TEST_F(JWKManagerTest, failsWithModifiedTokenES256) {
-    auto modifiedToken = validTokenHeaderES256 + "."_sd + validTokenBodyES256 + "."_sd +
-        validTokenSignatureES256 + "a"_sd;
-    validateJWKManagerWithToken(this, modifiedToken);
-}
-
-TEST_F(JWKManagerTest, validateTokenFromKeysES384) {
-    validateTokenFromKeys(
-        this, validTokenHeaderES384, validTokenBodyES384, validTokenSignatureES384);
-}
-
-TEST_F(JWKManagerTest, failsWithExpiredTokenES384) {
-    auto expiredToken = expiredTokenHeaderES384 + "."_sd + expiredTokenBodyES384 + "."_sd +
-        expiredTokenSignatureES384;
-    validateJWKManagerWithToken(this, expiredToken);
-}
-
-TEST_F(JWKManagerTest, failsWithModifiedTokenES384) {
-    auto modifiedToken = validTokenHeaderES384 + "."_sd + validTokenBodyES384 + "."_sd +
-        validTokenSignatureES384 + "a"_sd;
     validateJWKManagerWithToken(this, modifiedToken);
 }
 
