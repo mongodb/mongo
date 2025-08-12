@@ -47,7 +47,6 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/getmore_command_gen.h"
-#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -501,12 +500,6 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
                 }
             }
 
-            if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                isRawDataOperation(opCtx) = true;
-            }
-
             auto [rawPipeline, expCtx] = makeRawNaturalOrderPipeline(opCtx, mongoProcessInterface);
             MakePipelineOptions pipelineOpts;
             pipelineOpts.attachCursorSource = false;
@@ -539,6 +532,13 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
             // oplog.
             request.setRequestResumeToken(true);
             request.setHint(BSON("$natural" << 1));
+
+            // Send with rawData since the shard key is already translated for timeseries.
+            if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                request.setRawData(true);
+            }
 
             auto pipeline = Pipeline::makePipeline(rawPipeline, expCtx, pipelineOpts);
 

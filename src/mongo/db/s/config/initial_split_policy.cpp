@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock.h"
@@ -914,6 +915,14 @@ SamplingBasedSplitPolicy::SampleDocumentPipeline SamplingBasedSplitPolicy::_make
         return MongoProcessInterface::create(opCtx);
     }();
 
+    // Send with rawData since the shard key is already translated for timeseries.
+    auto aggRequest = AggregateCommandRequest(ns, rawPipeline);
+    if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        aggRequest.setRawData(true);
+    }
+
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx)
                       .mongoProcessInterface(std::move(pi))
@@ -923,7 +932,7 @@ SamplingBasedSplitPolicy::SampleDocumentPipeline SamplingBasedSplitPolicy::_make
                       .bypassDocumentValidation(true)
                       .tmpDir(storageGlobalParams.dbpath + "/_tmp")
                       .build();
-    return Pipeline::makePipeline(rawPipeline, expCtx, opts);
+    return Pipeline::makePipeline(aggRequest, expCtx, boost::none /* shardCursorsSortSpec */, opts);
 }
 
 SamplingBasedSplitPolicy::PipelineDocumentSource::PipelineDocumentSource(

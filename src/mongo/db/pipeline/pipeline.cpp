@@ -912,7 +912,9 @@ std::unique_ptr<Pipeline> Pipeline::makePipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<BSONObj> shardCursorsSortSpec,
     const MakePipelineOptions opts) {
-    tassert(7393500, "AttachCursorSource must be set to true.", opts.attachCursorSource);
+    tassert(10892201,
+            "shardCursorsSortSpec must not be set if attachCursorSource is false.",
+            opts.attachCursorSource || shardCursorsSortSpec == boost::none);
 
     boost::optional<BSONObj> readConcern;
     // If readConcern is set on opts and aggRequest, assert they are equal.
@@ -935,14 +937,18 @@ std::unique_ptr<Pipeline> Pipeline::makePipeline(
     pipeline->validateCommon(alreadyOptimized);
     aggRequest.setPipeline(pipeline->serializeToBson());
 
-    return expCtx->getMongoProcessInterface()->preparePipelineForExecution(
-        expCtx,
-        aggRequest,
-        pipeline.release(),
-        shardCursorsSortSpec,
-        opts.shardTargetingPolicy,
-        std::move(readConcern),
-        opts.useCollectionDefaultCollator);
+    if (opts.attachCursorSource) {
+        pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
+            expCtx,
+            aggRequest,
+            pipeline.release(),
+            shardCursorsSortSpec,
+            opts.shardTargetingPolicy,
+            std::move(readConcern),
+            opts.useCollectionDefaultCollator);
+    }
+
+    return pipeline;
 }
 
 DocumentSourceContainer::iterator Pipeline::optimizeEndOfPipeline(

@@ -190,8 +190,9 @@ public:
      * set on the aggRequest. The state of the returned pipeline will depend upon the supplied
      * MakePipelineOptions:
      * - The boolean opts.optimize determines whether the pipeline will be optimized.
+     * - If opts.attachCursorSource is false, the pipeline will be returned without attempting to
+     * add an initial cursor source.
      *
-     * This function requires opts.attachCursorSource to be true.
      * This function throws if parsing the pipeline set on aggRequest failed.
      */
     static std::unique_ptr<Pipeline> makePipeline(

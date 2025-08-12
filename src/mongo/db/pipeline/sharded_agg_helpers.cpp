@@ -66,6 +66,7 @@
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -246,7 +247,30 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
         cmdForShards["readConcern"] = Value(*readConcern);
     }
 
-    return cmdForShards.freeze().toBson();
+    auto shardCommand = cmdForShards.freeze().toBson();
+    auto filteredCommand = CommandHelpers::filterCommandRequestForPassthrough(shardCommand);
+
+    // TODO(SERVER-108928): rawData should be declared as should_forward_to_shards: true
+    // If rawData was explicitly set on the aggregate command, it will have been stripped by the
+    // call to filterCommandRequestForPassthrough. For rawData operations, it will be added back
+    // by the egress hook. However, if sending a rawData aggregate command from a non-rawData
+    // operation, we must add it back for it to be included in the outgoing network request.
+    auto cmdRawData = shardCommand.getField(GenericArguments::kRawDataFieldName);
+    if (!cmdRawData.eoo()) {
+        auto isRawOpCtx = isRawDataOperation(expCtx->getOperationContext());
+        tassert(10892200,
+                "Trying to send a non-rawData command from a rawData operation",
+                cmdRawData.boolean() || !isRawOpCtx);
+        if (cmdRawData.boolean() && !isRawOpCtx) {
+            filteredCommand = filteredCommand.addField(cmdRawData);
+        }
+    }
+
+    // Apply RW concern to the final shard command.
+    return applyReadWriteConcern(expCtx->getOperationContext(),
+                                 true,              /* appendRC */
+                                 !explainVerbosity, /* appendWC */
+                                 filteredCommand);
 }
 
 std::vector<RemoteCursor> establishShardCursors(
@@ -767,15 +791,8 @@ BSONObj createPassthroughCommandForShard(
         targetedCmd[AggregateCommandRequest::kIsHybridSearchFieldName] = Value(true);
     }
 
-    auto shardCommand = genericTransformForShards(
+    auto filteredCommand = genericTransformForShards(
         std::move(targetedCmd), expCtx, explainVerbosity, std::move(readConcern));
-
-    // Apply filter and RW concern to the final shard command.
-    auto filteredCommand = CommandHelpers::filterCommandRequestForPassthrough(
-        applyReadWriteConcern(expCtx->getOperationContext(),
-                              true,              /* appendRC */
-                              !explainVerbosity, /* appendWC */
-                              shardCommand));
 
     // Request the targeted shard to gossip back the routing metadata versions for the involved
     // collections.
@@ -860,14 +877,8 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
         targetedCmd[AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName] = Value(true);
     }
 
-    auto shardCommand = CommandHelpers::filterCommandRequestForPassthrough(
-        genericTransformForShards(std::move(targetedCmd), expCtx, explain, std::move(readConcern)));
-
-    // Apply RW concern to the final shard command.
-    return applyReadWriteConcern(expCtx->getOperationContext(),
-                                 true,     /* appendRC */
-                                 !explain, /* appendWC */
-                                 shardCommand);
+    return genericTransformForShards(
+        std::move(targetedCmd), expCtx, explain, std::move(readConcern));
 }
 
 TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
