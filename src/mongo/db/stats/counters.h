@@ -443,9 +443,61 @@ public:
 };
 extern FastPathQueryCounters fastPathQueryCounters;
 
-class LookupPushdownCounters {
+class SpillingCounters {
 public:
-    LookupPushdownCounters() = default;
+    enum SuffixStyle { kDotSuffix, kUpperCaseSuffix };
+
+    SpillingCounters(std::string stageName, SuffixStyle suffixStyle = kDotSuffix)
+        : spills(
+              *MetricBuilder<Counter64>{"query." + stageName + _getSuffix(suffixStyle, "spills")}),
+          spilledBytes(*MetricBuilder<Counter64>{"query." + stageName +
+                                                 _getSuffix(suffixStyle, "spilledBytes")}),
+          spilledRecords(*MetricBuilder<Counter64>{"query." + stageName +
+                                                   _getSuffix(suffixStyle, "spilledRecords")}),
+          spilledDataStorageSize(*MetricBuilder<Counter64>{
+              "query." + stageName + _getSuffix(suffixStyle, "spilledDataStorageSize")}) {}
+
+    SpillingCounters(SpillingCounters&) = delete;
+    SpillingCounters& operator=(const SpillingCounters&) = delete;
+
+    virtual ~SpillingCounters() = default;
+
+    void incrementPerSpilling(int64_t spills,
+                              int64_t spilledBytes,
+                              int64_t spilledRecords,
+                              int64_t spilledDataStorageSize) {
+        this->spills.incrementRelaxed(spills);
+        this->spilledBytes.incrementRelaxed(spilledBytes);
+        this->spilledRecords.incrementRelaxed(spilledRecords);
+        this->spilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
+    }
+
+    // The total number of spills.
+    Counter64& spills;
+    // The total number of bytes spilled. The spilled storage size after compression might be
+    // different from the bytes spilled.
+    Counter64& spilledBytes;
+    // The number of records spilled.
+    Counter64& spilledRecords;
+    // The size of the file or RecordStore spilled to disk, updated after all spilling happened.
+    Counter64& spilledDataStorageSize;
+
+private:
+    std::string _getSuffix(SuffixStyle suffixStyle, std::string metricName) {
+        switch (suffixStyle) {
+            case kDotSuffix:
+                return "." + metricName;
+            case kUpperCaseSuffix:
+                return "S" + metricName.substr(1);
+        }
+        MONGO_UNREACHABLE_TASSERT(10916900);
+    }
+};
+
+class LookupPushdownCounters : public SpillingCounters {
+public:
+    LookupPushdownCounters()
+        : SpillingCounters("lookup.hashLookup", SpillingCounters::kUpperCaseSuffix) {}
     LookupPushdownCounters(LookupPushdownCounters&) = delete;
     LookupPushdownCounters& operator=(const LookupPushdownCounters&) = delete;
 
@@ -463,15 +515,14 @@ public:
                               int64_t spilledBytes,
                               int64_t spilledRecords,
                               int64_t spilledDataStorageSize) {
-        hashLookupSpills.incrementRelaxed(spills);
-        hashLookupSpilledBytes.incrementRelaxed(spilledBytes);
-        hashLookupSpilledRecords.incrementRelaxed(spilledRecords);
-        hashLookupSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
+        SpillingCounters::incrementPerSpilling(
+            spills, spilledBytes, spilledRecords, spilledDataStorageSize);
 
         //  Counters for backward compatiblity.
         hashLookupSpillToDisk.incrementRelaxed(spills);
         hashLookupSpillToDiskBytes.incrementRelaxed(spilledBytes);
     }
+
     // Counters for lookup join strategies.
     Counter64& nestedLoopJoinCounter = *MetricBuilder<Counter64>{"query.lookup.nestedLoopJoin"};
     Counter64& indexedLoopJoinCounter = *MetricBuilder<Counter64>{"query.lookup.indexedLoopJoin"};
@@ -479,16 +530,7 @@ public:
     Counter64& dynamicIndexedLoopJoinCounter =
         *MetricBuilder<Counter64>{"query.lookup.dynamicIndexedLoopJoin"};
 
-    Counter64& hashLookupSpills = *MetricBuilder<Counter64>{"query.lookup.hashLookupSpills"};
-    // The spilled storage size after compression might be different from the bytes spilled.
-    Counter64& hashLookupSpilledBytes =
-        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpilledBytes"};
-    Counter64& hashLookupSpilledRecords =
-        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpilledRecords"};
-    Counter64& hashLookupSpilledDataStorageSize =
-        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpilledDataStorageSize"};
-
-    // Duplicate counters, not deleted to maintain backward compatibility.
+    // Duplicate spilling counters, not deleted to maintain backward compatibility.
     // Counter tracking hashLookup spills in lookup stages that get pushed down.
     Counter64& hashLookupSpillToDisk =
         *MetricBuilder<Counter64>{"query.lookup.hashLookupSpillToDisk"};
@@ -499,143 +541,36 @@ public:
 extern LookupPushdownCounters lookupPushdownCounters;
 
 /** Counters tracking group stats across all execution engines. */
-class GroupCounters {
+class GroupCounters : public SpillingCounters {
 public:
-    GroupCounters() = default;
+    GroupCounters() : SpillingCounters("group") {}
     GroupCounters(GroupCounters&) = delete;
-    GroupCounters& operator=(const GroupCounters&) = delete;
-
-    void incrementPerSpilling(int64_t spills,
-                              int64_t spilledBytes,
-                              int64_t spilledRecords,
-                              int64_t spilledDataStorageSize) {
-        groupSpills.incrementRelaxed(spills);
-        groupSpilledBytes.incrementRelaxed(spilledBytes);
-        groupSpilledRecords.incrementRelaxed(spilledRecords);
-        groupSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
-    }
-
-    // The total number of spills from group stages.
-    Counter64& groupSpills = *MetricBuilder<Counter64>{"query.group.spills"};
-    // The total number of bytes spilled from group stages. The spilled storage size after
-    // compression might be different from the bytes spilled.
-    Counter64& groupSpilledBytes = *MetricBuilder<Counter64>{"query.group.spilledBytes"};
-    // The number of records spilled.
-    Counter64& groupSpilledRecords = *MetricBuilder<Counter64>{"query.group.spilledRecords"};
-    // The size of the file or RecordStore spilled to disk, updated after all spilling happened.
-    Counter64& groupSpilledDataStorageSize =
-        *MetricBuilder<Counter64>{"query.group.spilledDataStorageSize"};
 };
 extern GroupCounters groupCounters;
 
 /** Counters tracking setWindowFields stats across all execution engines. */
-class SetWindowFieldsCounters {
+class SetWindowFieldsCounters : public SpillingCounters {
 public:
-    SetWindowFieldsCounters() = default;
-    SetWindowFieldsCounters(SetWindowFieldsCounters&) = delete;
-    SetWindowFieldsCounters& operator=(const SetWindowFieldsCounters&) = delete;
-
-    void incrementPerSpilling(int64_t spills,
-                              int64_t spilledBytes,
-                              int64_t spilledRecords,
-                              int64_t spilledDataStorageSize) {
-        setWindowFieldsSpills.incrementRelaxed(spills);
-        setWindowFieldsSpilledBytes.incrementRelaxed(spilledBytes);
-        setWindowFieldsSpilledRecords.incrementRelaxed(spilledRecords);
-        setWindowFieldsSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
-    }
-
-    // Counter tracking setWindowFields spills.
-    Counter64& setWindowFieldsSpills = *MetricBuilder<Counter64>{"query.setWindowFields.spills"};
-    // Counter tracking setWindowFields spilled bytes. The spilled storage size after compression
-    // might be different from the bytes spilled.
-    Counter64& setWindowFieldsSpilledBytes =
-        *MetricBuilder<Counter64>{"query.setWindowFields.spilledBytes"};
-    // Counter tracking setWindowFields spilled record number.
-    Counter64& setWindowFieldsSpilledRecords =
-        *MetricBuilder<Counter64>{"query.setWindowFields.spilledRecords"};
-    // The size of the file or RecordStore spilled to disk, updated after all spilling happened.
-    Counter64& setWindowFieldsSpilledDataStorageSize =
-        *MetricBuilder<Counter64>{"query.setWindowFields.spilledDataStorageSize"};
+    SetWindowFieldsCounters() : SpillingCounters("setWindowFields") {}
 };
 extern SetWindowFieldsCounters setWindowFieldsCounters;
 
 /** Counters tracking graphLookup stats. */
-class GraphLookupCounters {
+class GraphLookupCounters : public SpillingCounters {
 public:
-    GraphLookupCounters() = default;
-    GraphLookupCounters(GraphLookupCounters&) = delete;
-    GraphLookupCounters& operator=(const GraphLookupCounters&) = delete;
-
-    void incrementPerSpilling(int64_t spills,
-                              int64_t spilledBytes,
-                              int64_t spilledRecords,
-                              int64_t spilledDataStorageSize) {
-        graphLookupSpills.incrementRelaxed(spills);
-        graphLookupSpilledBytes.incrementRelaxed(spilledBytes);
-        graphLookupSpilledRecords.incrementRelaxed(spilledRecords);
-        graphLookupSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
-    }
-
-    Counter64& graphLookupSpills = *MetricBuilder<Counter64>{"query.graphLookup.spills"};
-    // The spilled storage size after compression might be different from the bytes spilled.
-    Counter64& graphLookupSpilledBytes =
-        *MetricBuilder<Counter64>{"query.graphLookup.spilledBytes"};
-    Counter64& graphLookupSpilledRecords =
-        *MetricBuilder<Counter64>{"query.graphLookup.spilledRecords"};
-    Counter64& graphLookupSpilledDataStorageSize =
-        *MetricBuilder<Counter64>{"query.graphLookup.spilledDataStorageSize"};
+    GraphLookupCounters() : SpillingCounters("graphLookup") {}
 };
 extern GraphLookupCounters graphLookupCounters;
 
-class TextOrCounters {
+class TextOrCounters : public SpillingCounters {
 public:
-    TextOrCounters() = default;
-    TextOrCounters(TextOrCounters&) = delete;
-    TextOrCounters& operator=(const TextOrCounters&) = delete;
-
-    void incrementPerSpilling(int64_t spills,
-                              int64_t spilledBytes,
-                              int64_t spilledRecords,
-                              int64_t spilledDataStorageSize) {
-        textOrSpills.incrementRelaxed(spills);
-        textOrSpilledBytes.incrementRelaxed(spilledBytes);
-        textOrSpilledRecords.incrementRelaxed(spilledRecords);
-        textOrSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
-    }
-
-    Counter64& textOrSpills = *MetricBuilder<Counter64>{"query.textOr.spills"};
-    // The spilled storage size after compression might be different from the bytes spilled.
-    Counter64& textOrSpilledBytes = *MetricBuilder<Counter64>{"query.textOr.spilledBytes"};
-    Counter64& textOrSpilledRecords = *MetricBuilder<Counter64>{"query.textOr.spilledRecords"};
-    Counter64& textOrSpilledDataStorageSize =
-        *MetricBuilder<Counter64>{"query.textOr.spilledDataStorageSize"};
+    TextOrCounters() : SpillingCounters("textOr") {}
 };
 extern TextOrCounters textOrCounters;
 
-class BucketAutoCounters {
+class BucketAutoCounters : public SpillingCounters {
 public:
-    BucketAutoCounters() = default;
-    BucketAutoCounters(BucketAutoCounters&) = delete;
-    BucketAutoCounters& operator=(const BucketAutoCounters&) = delete;
-
-    void incrementPerSpilling(int64_t spills,
-                              int64_t spilledBytes,
-                              int64_t spilledRecords,
-                              int64_t spilledDataStorageSize) {
-        bucketAutoSpills.incrementRelaxed(spills);
-        bucketAutoSpilledBytes.incrementRelaxed(spilledBytes);
-        bucketAutoSpilledRecords.incrementRelaxed(spilledRecords);
-        bucketAutoSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
-    }
-
-    Counter64& bucketAutoSpills = *MetricBuilder<Counter64>{"query.bucketAuto.spills"};
-    // The spilled storage size after compression might be different from the bytes spilled.
-    Counter64& bucketAutoSpilledBytes = *MetricBuilder<Counter64>{"query.bucketAuto.spilledBytes"};
-    Counter64& bucketAutoSpilledRecords =
-        *MetricBuilder<Counter64>{"query.bucketAuto.spilledRecords"};
-    Counter64& bucketAutoSpilledDataStorageSize =
-        *MetricBuilder<Counter64>{"query.bucketAuto.spilledDataStorageSize"};
+    BucketAutoCounters() : SpillingCounters("bucketAuto") {}
 };
 extern BucketAutoCounters bucketAutoCounters;
 
