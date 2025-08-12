@@ -35,13 +35,13 @@ def main():
         if not enterprise_mod.exists():
             enterprise = False
             print(
-                f"{enterprise_mod.relative_to(REPO_ROOT).as_posix()} missing, defaulting to local non-enterprise build (--config=local --build_enterprise=False). Add the directory to not automatically add these options."
+                f"{enterprise_mod.relative_to(REPO_ROOT).as_posix()} missing, defaulting to local non-enterprise build (--config=local --//bazel/config:build_enterprise=False). Add the directory to not automatically add these options."
             )
-            args += ["--build_enterprise=False", "--config=local"]
+            args += ["--//bazel/config:build_enterprise=False", "--config=local"]
 
         atlas_mod = REPO_ROOT / "src" / "mongo" / "db" / "modules" / "atlas"
         if not atlas_mod.exists():
-            args += ["--build_atlas=False"]
+            args += ["--//bazel/config:build_atlas=False"]
 
         engflow_auth(args)
 
