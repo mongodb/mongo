@@ -87,7 +87,7 @@ structs:
                 type: bool
                 stability: unstable
             cpuNanos:
-                description: "Amount of CPU time spent by a query operation. "
+                description: "Amount of CPU time spent by a query operation."
                 type: long
                 stability: unstable
             delinquentAcquisitions:
@@ -274,11 +274,15 @@ structs:
                 type: array<object>
                 stability: stable
                 optional: true
+                # Non-const getter is needed here so we can avoid copying the batch of BSONObjs in the batch.
+                non_const_getter: true
             nextBatch:
                 description: "The subsequent batch of the cursor."
                 type: array<object>
                 stability: stable
                 optional: true
+                # Non-const getter is needed here so we can avoid copying the batch of BSONObjs in the batch.
+                non_const_getter: true
             type:
                 description: "An optional field containing disambiguation information if a reply contains multiple cursors."
                 type: CursorType

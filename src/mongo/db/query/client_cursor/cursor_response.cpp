@@ -221,11 +221,9 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(
         return e.toStatus();
     }
 
-    const auto& cursor = response.getCursor();
-
-    auto maybeBatch = cursor.getFirstBatch();
-    if (!maybeBatch)
-        maybeBatch = cursor.getNextBatch();
+    // Take non-const references to the cursor data here so that we do not need to copy it.
+    auto& cursor = response.getCursor();
+    auto& maybeBatch = cursor.getFirstBatch() ? cursor.getFirstBatch() : cursor.getNextBatch();
 
     // IDL verifies that exactly one of these fields is present
     tassert(

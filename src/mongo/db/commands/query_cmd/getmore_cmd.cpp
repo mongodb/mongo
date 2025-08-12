@@ -417,8 +417,8 @@ public:
                             const bool isTailable,
                             CursorResponseBuilder* nextBatch,
                             uint64_t* numResults) {
-            BSONObj obj, pbrt = exec->getPostBatchResumeToken();
-            size_t objSize;
+            BSONObj obj;
+            BSONObj pbrt = exec->getPostBatchResumeToken();
             bool failedToAppend = false;
 
             // Capture diagnostics to be logged in the case of a failure.
@@ -432,7 +432,7 @@ public:
                 // Reserve space based on the size of the first object. Note that we always
                 // allow the first object to be appended to the batch so we can make
                 // progress.
-                objSize = obj.objsize();
+                size_t objSize = obj.objsize();
                 auto bytesToReserve =
                     FindCommon::getBytesToReserveForGetMoreReply(isTailable, objSize, batchSize);
                 nextBatch->reserveReplyBuffer(bytesToReserve);
@@ -483,7 +483,6 @@ public:
             // expiring at an interrupt point, we just continue as normal and return rather than
             // reporting a timeout to the user.
             PlanExecutor* exec = cursor->getExecutor();
-            BSONObj obj;
 
             // We intentionally set the batch size to the max size_t value for a batch size of 0 in
             // order to simulate "no limit" on the batch size. We will run out of space in the
@@ -569,10 +568,11 @@ public:
             exec->reattachToOperationContext(opCtx);
             exec->restoreState(locks.readLock ? &locks.readLock->getCollection() : nullptr);
 
-            auto planSummary = exec->getPlanExplainer().getPlanSummary();
             {
+                auto planSummary = exec->getPlanExplainer().getPlanSummary();
+
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                curOp->setPlanSummary(lk, planSummary);
+                curOp->setPlanSummary(lk, std::move(planSummary));
 
                 curOp->debug().queryFramework = exec->getQueryFramework();
                 curOp->setShouldOmitDiagnosticInformation(
