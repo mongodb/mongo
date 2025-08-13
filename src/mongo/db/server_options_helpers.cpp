@@ -470,12 +470,12 @@ Status storeBaseOptions(const moe::Environment& params) {
         }
     }
 
-    if (params.count("loadExtensions")) {
+    if (params.count("processManagement.loadExtensions")) {
 #ifdef __linux__
         // Save off configured extensions, but don't do any validation at this point - that will be
         // done later on during startup when we attempt to load them.
         for (const std::string& extension :
-             params["loadExtensions"].as<std::vector<std::string>>()) {
+             params["processManagement.loadExtensions"].as<std::vector<std::string>>()) {
             std::vector<std::string> intermediates;
             str::splitStringDelim(extension, &intermediates, ',');
             std::copy(intermediates.begin(),
@@ -484,7 +484,8 @@ Status storeBaseOptions(const moe::Environment& params) {
         }
 #else
         return Status(ErrorCodes::BadValue,
-                      "The --loadExtensions parameter is only supported on Linux");
+                      "Loading extensions via `--loadExtensions` or "
+                      "`processManagement.loadExtensions` is only supported on Linux");
 #endif
     }
 

@@ -147,8 +147,3 @@ configs:
         short_name: traceExceptions
         arg_vartype: Switch
         hidden: true
-
-    loadExtensions:
-        description: "Specify paths to extensions to load"
-        arg_vartype: StringVector
-        duplicate_behavior: append

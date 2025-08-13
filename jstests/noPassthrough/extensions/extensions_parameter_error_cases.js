@@ -1,7 +1,6 @@
 /**
- * Tests the --loadExtensions startup parameter on mongos and mongod.
- * This is NOT robustly testing loading extensions but rather ensuring that the loadExtensions
- * parameter provided to the server is properly passed to the extension loading module.
+ * Tests error cases when using the --loadExtensions startup parameter on mongos and mongod.
+ *
  * @tags: [featureFlagExtensionsAPI]
  */
 
@@ -15,13 +14,12 @@ const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.
 // the test.
 const st = new ShardingTest({shards: 1, mongos: 1});
 
-function runTest({options, shouldFail = false, validateExitCode = true}) {
+function runTest({options, validateExitCode = true}) {
     function tryStartup(startupFn) {
         try {
             startupFn();
-            assert(!shouldFail, "Expected startup to fail but it succeeded");
+            assert(false, "Expected startup to fail but it succeeded");
         } catch (e) {
-            assert(shouldFail, `Expected startup to succeed but it failed: ${e}`);
             assert(e instanceof MongoRunner.StopError, e);
             if (validateExitCode) {
                 assert.eq(e.returnCode, MongoRunner.EXIT_BADOPTIONS, e);
@@ -44,26 +42,20 @@ function runTest({options, shouldFail = false, validateExitCode = true}) {
 if (isLinux()) {
     // Empty filename (equivalent to no argument being provided to the parameter, so failure happens
     // at a higher level when parsing parameters).
-    runTest({options: {loadExtensions: ""}, shouldFail: true, validateExitCode: false});
+    runTest({options: {loadExtensions: ""}, validateExitCode: false});
     // Extensions parameter is not allowed when the feature flag is disabled.
     runTest({
         options:
-            {loadExtensions: pathToExtensionFoo, setParameter: {featureFlagExtensionsAPI: false}},
-        shouldFail: true
+            {loadExtensions: pathToExtensionFoo, setParameter: {featureFlagExtensionsAPI: false}}
     });
     // Extensions is a scalar, non-string.
-    runTest({options: {loadExtensions: 12345}, shouldFail: true});
+    runTest({options: {loadExtensions: 12345}});
     // Path to extension does not exist.
-    runTest({options: {loadExtensions: "path/does/not/exist.so"}, shouldFail: true});
-    // Single valid extension.
-    runTest({options: {loadExtensions: pathToExtensionFoo}});
-    // List of single valid extension.
-    runTest({options: {loadExtensions: [pathToExtensionFoo]}});
-    // TODO SERVER-108746 Test multiple valid extensions at once.
+    runTest({options: {loadExtensions: "path/does/not/exist.so"}});
 } else {
     // Startup should fail because we are attempting to load an extension on a platform that is not
     // linux.
-    runTest({options: {loadExtensions: pathToExtensionFoo}, shouldFail: true});
+    runTest({options: {loadExtensions: pathToExtensionFoo}});
 }
 
 st.stop();

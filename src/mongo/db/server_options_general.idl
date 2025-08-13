@@ -140,6 +140,11 @@ configs:
         arg_vartype: Switch
         condition:
             preprocessor: "!defined(_WIN32)"
+    "processManagement.loadExtensions":
+        description: "Specify paths to extensions to load"
+        short_name: loadExtensions
+        arg_vartype: StringVector
+        duplicate_behavior: append
 
     objcheck:
         description: "Inspect client data for validity on receipt (DEFAULT)"

@@ -429,6 +429,7 @@ mongo_install(
 extensions_with_config(
     name = "dist_test_extensions",
     srcs = [
+        "//src/mongo/db/extension/test_examples:bar_mongo_extension",
         "//src/mongo/db/extension/test_examples:foo_mongo_extension",
     ],
 )

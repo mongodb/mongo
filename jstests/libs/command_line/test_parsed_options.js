@@ -223,3 +223,14 @@ export function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
 export function testGetCmdLineOptsMongodFailed(mongoRunnerConfig) {
     assert.throws(() => MongoRunner.runMongod(mongoRunnerConfig));
 }
+
+/**
+ * Writes a temporary JSON config file with the given configuration object and returns the path to
+ * it.
+ */
+export function writeJSONConfigFile(config_name, config) {
+    // Writing to MongoRunner.dataPath ensures that the file will be cleaned up after the test.
+    const path = MongoRunner.dataPath + config_name + ".json";
+    writeFile(path, tojson(config));
+    return path;
+}
