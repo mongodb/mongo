@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/ddl/ddl_lock_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -42,6 +43,11 @@ namespace mongo {
 namespace {
 
 const Timestamp kDawnOfTime(0, 1);
+
+class DDLCoordinatorServiceMock : public DDLLockManager::Recoverable {
+public:
+    void waitForRecovery(OperationContext*) const override {}
+};
 
 void assertSameHistoricalPlacement(HistoricalPlacement historicalPlacement,
                                    std::vector<std::string> expectedSet) {
@@ -68,6 +74,9 @@ public:
 
     void setUp() override {
         ConfigServerTestFixture::setUp();
+        operationContext()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+        DDLLockManager::get(getServiceContext())->setRecoverable(_recoverable.get());
+
 
         DBDirectClient client(operationContext());
         client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);
@@ -180,6 +189,9 @@ private:
 
     // Allows the usage of transactions.
     ReadWriteConcernDefaultsLookupMock _lookupMock;
+
+    std::unique_ptr<DDLCoordinatorServiceMock> _recoverable =
+        std::make_unique<DDLCoordinatorServiceMock>();
 };
 
 TEST_F(GetHistoricalPlacementTestFixture, queriesOnShardedCollectionReturnExpectedPlacement) {

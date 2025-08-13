@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/ddl/ddl_lock_manager.h"
 #include "mongo/db/global_catalog/ddl/placement_history_cleaner.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -348,6 +349,18 @@ HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
     if (atClusterTime > vcTime.configTime().asTimestamp()) {
         return HistoricalPlacement{{}, HistoricalPlacementStatus::FutureClusterTime};
     }
+
+    // Acquire a shared lock on config.placementHistory to serialize incoming queries with
+    // inflight attempts to modify its content through InitializePlacementHistoryCoordinator
+    // (this requires making this read operation interruptible).
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+    DDLLockManager::ScopedBaseDDLLock placementHistoryLock(
+        opCtx,
+        shard_role_details::getLocker(opCtx),
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        "getHistoricalPlacement" /* reason */,
+        MODE_IS,
+        true /*waitForRecovery*/);
 
     ResolvedNamespaceMap resolvedNamespaces;
     resolvedNamespaces[NamespaceString::kConfigsvrPlacementHistoryNamespace] = {
@@ -713,6 +726,8 @@ HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
     auto aggRequest = AggregateCommandRequest(NamespaceString::kConfigsvrPlacementHistoryNamespace,
                                               mainPipeline->serializeToBson());
 
+    // Use a snapshot read at the latest majority committed time to retrieve the most recent
+    // results.
     const repl::ReadConcernArgs readConcern{vcTime.configTime(),
                                             repl::ReadConcernLevel::kSnapshotReadConcern};
     auto aggrResult = _localCatalogClient->runCatalogAggregation(opCtx, aggRequest, readConcern);
