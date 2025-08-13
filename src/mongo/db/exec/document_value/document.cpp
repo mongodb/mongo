@@ -34,6 +34,7 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/util/validate_id.h"
 #include "mongo/util/str.h"
 
 #include <cstdint>
@@ -513,7 +514,9 @@ void DocumentStorage::loadLazyMetadata() const {
             } else if (fieldName == Document::metaFieldSearchScoreDetails) {
                 _metadataFields.setSearchScoreDetails(elem.Obj());
             } else if (fieldName == Document::metaFieldSearchRootDocumentId) {
-                _metadataFields.setSearchRootDocumentId(elem.OID());
+                auto status = validIdField(elem);
+                uassertStatusOK(status);
+                _metadataFields.setSearchRootDocumentId(Value(elem));
             } else if (fieldName == Document::metaFieldSearchSortValues) {
                 _metadataFields.setSearchSortValues(elem.Obj());
             } else if (fieldName == Document::metaFieldVectorSearchScore) {
@@ -624,7 +627,7 @@ void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
     if (metadata().hasSearchScoreDetails())
         builder->append(metaFieldSearchScoreDetails, metadata().getSearchScoreDetails());
     if (metadata().hasSearchRootDocumentId())
-        builder->append(metaFieldSearchRootDocumentId, metadata().getSearchRootDocumentId());
+        metadata().getSearchRootDocumentId().addToBsonObj(builder, metaFieldSearchRootDocumentId);
     if (metadata().hasSearchSortValues()) {
         builder->append(metaFieldSearchSortValues, metadata().getSearchSortValues());
     }

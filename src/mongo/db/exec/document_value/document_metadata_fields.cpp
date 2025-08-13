@@ -202,8 +202,7 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
             setSearchScoreDetails(val.getDocument().toBson());
             break;
         case DocumentMetadataFields::kSearchRootDocumentId:
-            assertType(BSONType::oid);
-            setSearchRootDocumentId(val.getOid());
+            setSearchRootDocumentId(val);
             break;
         case DocumentMetadataFields::kTimeseriesBucketMinTime:
             assertType(BSONType::date);
@@ -479,7 +478,7 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
     }
     if (hasSearchRootDocumentId()) {
         buf.appendNum(static_cast<char>(MetaType::kSearchRootDocumentId + 1));
-        buf.appendStruct(getSearchRootDocumentId());
+        getSearchRootDocumentId().serializeForSorter(buf);
     }
     if (hasSearchSequenceToken()) {
         buf.appendNum(static_cast<char>(MetaType::kSearchSequenceToken + 1));
@@ -551,7 +550,8 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
             out->setSearchScoreDetails(
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
         } else if (marker == static_cast<char>(MetaType::kSearchRootDocumentId) + 1) {
-            out->setSearchRootDocumentId(OID::from(buf.skip(OID::kOIDSize)));
+            out->setSearchRootDocumentId(
+                Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
         } else if (marker == static_cast<char>(MetaType::kTimeseriesBucketMinTime) + 1) {
             out->setTimeseriesBucketMinTime(
                 Date_t::fromMillisSinceEpoch(buf.read<LittleEndian<long long>>()));

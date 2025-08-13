@@ -40,6 +40,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/util/validate_id.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -151,7 +152,7 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
                 // also, disallow undefined and arrays
                 // Make sure _id isn't duplicated (SERVER-19361).
                 if (fieldName == "_id") {
-                    auto status = storage_validation::storageValidIdField(e);
+                    auto status = validIdField(e);
                     if (!status.isOK()) {
                         return StatusWith<BSONObj>(status);
                     }

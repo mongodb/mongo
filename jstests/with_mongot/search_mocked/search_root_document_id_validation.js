@@ -16,10 +16,12 @@ import {
 
 const dbName = "test";
 const docOneSearchRootDocId = ObjectId("507f1f77bcf86cd799439011");
-const docTwoSearchRootDocId = ObjectId("507f1f77bcf86cd799439012");
-const docThreeSearchRootDocId = ObjectId("507f1f77bcf86cd799439013");
-const docFourSearchRootDocId = ObjectId("507f1f77bcf86cd799439014");
-const docFiveSearchRootDocId = ObjectId("507f1f77bcf86cd799439015");
+const docTwoSearchRootDocId = 1;
+const docThreeSearchRootDocId = "two";
+const docFourSearchRootDocId = {
+    obj: {nestedObj: {}}
+};
+const docFiveSearchRootDocId = BinData(7, "CQDolzLxggEAAID+fAAAAAAAAAA=");
 const shardingBoundary = ObjectId("507f1f77bcf86cd799439030");
 const shardedDocOneId = ObjectId("507f1f77bcf86cd799439021");
 const shardedDocTwoId = ObjectId("507f1f77bcf86cd799439022");
@@ -326,11 +328,13 @@ function runUnshardedTests() {
             {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}}
         ];
 
-        // Test null searchRootDocumentId should throw error 13111.
+        // Test array searchRootDocumentId should throw error InvalidIdField.
         {
             const cursorId = NumberLong(789);
-            const responseWithNull =
-                [{storedSource: {title: "Error Movie"}, $searchRootDocumentId: null}];
+            const responseWithInvalidIdType = [{
+                storedSource: {title: "Error Movie"},
+                $searchRootDocumentId: ["array", "invalid", "id", "type"]
+            }];
 
             const history = [{
                 expectedCommand: mongotCommandForQuery({
@@ -339,14 +343,14 @@ function runUnshardedTests() {
                     db: dbName,
                     collectionUUID: collUUID
                 }),
-                response:
-                    mongotResponseForBatch(responseWithNull, NumberLong(0), coll.getFullName(), 1),
+                response: mongotResponseForBatch(
+                    responseWithInvalidIdType, NumberLong(0), coll.getFullName(), 1),
             }];
 
             mongotMock.setMockResponses(history, cursorId);
             assert.commandFailedWithCode(
                 testDB.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
-                13111);
+                ErrorCodes.InvalidIdField);
         }
 
         // Test missing searchRootDocumentId field should succeed but not include the metadata.
@@ -592,7 +596,7 @@ function runShardedTests() {
         const responseOk = 1;
 
         const mongot0ResponseBatch = [
-            {storedSource: {title: "Error Movie"}, $searchScore: 100, $searchRootDocumentId: null}
+            {storedSource: {title: "Error Movie"}, $searchScore: 100, $searchRootDocumentId: /.*/}
         ];
 
         const mongot1ResponseBatch = [{
@@ -639,7 +643,7 @@ function runShardedTests() {
             testColl.getName(), mongotQuery, dbName, undefined, stWithMock);
 
         const err = assert.throws(() => testColl.aggregate(pipeline).toArray());
-        assert.commandFailedWithCode(err, 13111);
+        assert.commandFailedWithCode(err, ErrorCodes.InvalidIdField);
     }
 
     runTestOnPrimaries(testErrorShardedCase);

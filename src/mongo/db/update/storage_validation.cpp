@@ -38,6 +38,7 @@
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/query/dbref.h"
+#include "mongo/db/query/util/validate_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -129,29 +130,6 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
 }
 }  // namespace
 
-Status storageValidIdField(const mongo::BSONElement& element) {
-    switch (element.type()) {
-        case BSONType::regEx:
-        case BSONType::array:
-        case BSONType::undefined:
-            return Status(ErrorCodes::InvalidIdField,
-                          str::stream()
-                              << "The '_id' value cannot be of type " << typeName(element.type()));
-        case BSONType::object: {
-            auto status = element.Obj().storageValidEmbedded();
-            if (!status.isOK() && status.code() == ErrorCodes::DollarPrefixedFieldName) {
-                return Status(status.code(),
-                              str::stream() << "_id fields may not contain '$'-prefixed fields: "
-                                            << status.reason());
-            }
-            return status;
-        }
-        default:
-            break;
-    }
-    return Status::OK();
-}
-
 void scanDocument(const mutablebson::Document& doc,
                   const bool allowTopLevelDollarPrefixes,
                   const bool shouldValidate,
@@ -171,7 +149,7 @@ void scanDocument(const mutablebson::Document& doc,
                              true /* Indicates the element is embedded inside an _id field. */,
                              containsDotsAndDollarsField);
             } else {
-                uassertStatusOK(storageValidIdField(currElem.getValue()));
+                uassertStatusOK(validIdField(currElem.getValue()));
             }
             uassert(ErrorCodes::BadValue, "Can't have multiple _id fields in one document", !hasId);
             hasId = true;

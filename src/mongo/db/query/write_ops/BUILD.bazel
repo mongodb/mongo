@@ -110,6 +110,7 @@ mongo_cc_library(
         "//src/mongo/db/matcher:expressions_mongod_only",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/query/util:validate_id",
         "//src/mongo/db/repl:image_collection_entry",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/update:update_driver",

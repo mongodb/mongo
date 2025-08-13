@@ -31,6 +31,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db/pipeline:field_path",
         "//src/mongo/db/query/datetime:date_time_support",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/util:validate_id",
     ],
 )
 

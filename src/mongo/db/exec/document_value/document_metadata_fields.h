@@ -332,12 +332,12 @@ public:
         return _holder && _holder->metaFields.test(MetaType::kSearchRootDocumentId);
     }
 
-    OID getSearchRootDocumentId() const {
+    Value getSearchRootDocumentId() const {
         invariant(hasSearchRootDocumentId());
         return _holder->searchRootDocumentId;
     }
 
-    void setSearchRootDocumentId(OID rootDocId) {
+    void setSearchRootDocumentId(Value rootDocId) {
         _setCommon(MetaType::kSearchRootDocumentId);
         _holder->searchRootDocumentId = std::move(rootDocId);
     }
@@ -519,7 +519,7 @@ private:
         BSONObj indexKey;
         RecordId recordId;
         BSONObj searchScoreDetails;
-        OID searchRootDocumentId;
+        Value searchRootDocumentId;
         Date_t timeseriesBucketMinTime;
         Date_t timeseriesBucketMaxTime;
         BSONObj searchSortValues;
