@@ -189,3 +189,16 @@ server_parameters:
             gte: 0
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
+
+    internalOrStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the OrStage stage will cache in-memory before
+            spilling to disk.
+        set_at: [startup, runtime]
+        cpp_varname: "internalOrStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
