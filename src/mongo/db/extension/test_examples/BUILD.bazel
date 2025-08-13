@@ -9,7 +9,7 @@ package(default_visibility = ["//visibility:public"])
     # extension's tcmalloc. When testing on evergreen, we should build the extensions with the
     # system allocator, and load the extensions into a host that was built with tcmalloc.
     mongo_cc_library(
-        name = extension_name + "_extension",
+        name = extension_name + "_mongo_extension",
         srcs = [extension_name + ".cpp"],
         additional_linker_inputs = select({
             "@platforms//os:linux": [

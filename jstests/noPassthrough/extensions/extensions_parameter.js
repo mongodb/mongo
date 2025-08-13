@@ -8,7 +8,7 @@
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const pathToExtensionFoo = MongoRunner.getInstallPath("..", "lib", "libfoo_extension.so");
+const pathToExtensionFoo = MongoRunner.getInstallPath("..", "lib", "libfoo_mongo_extension.so");
 
 // Create a ShardingTest so that we have a config DB for mongos to point to in our test. We don't
 // use ShardingTest directly because repeated failed ShardingTest startups causes issues in the test

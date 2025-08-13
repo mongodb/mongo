@@ -52,11 +52,11 @@ static std::filesystem::path getExtensionPath(const std::string& extensionName) 
 class LoadExtensionsTest : public unittest::Test {
 protected:
     static inline const std::string kTestFooStageName = "$testFoo";
-    static inline const std::string kTestFooLibExtensionPath = "libfoo_extension.so";
-    // TODO SERVER-109108: Remove this when we can use only libfoo_extension.so.
-    static inline const std::string kTestBarLibExtensionPath = "libbar_extension.so";
-    // TODO SERVER-109108: Remove this when we can use only libfoo_extension.so.
-    static inline const std::string kTestBuzzLibExtensionPath = "libbuzz_extension.so";
+    static inline const std::string kTestFooLibExtensionPath = "libfoo_mongo_extension.so";
+    // TODO SERVER-109108: Remove this when we can use only libfoo_mongo_extension.so.
+    static inline const std::string kTestBarLibExtensionPath = "libbar_mongo_extension.so";
+    // TODO SERVER-109108: Remove this when we can use only libfoo_mongo_extension.so.
+    static inline const std::string kTestBuzzLibExtensionPath = "libbuzz_mongo_extension.so";
 
 private:
     RAIIServerParameterControllerForTest _featureFlag{"featureFlagExtensionsAPI", true};
@@ -78,37 +78,37 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
                        10615500);
 
     // malformed1_extension is missing the get_mongodb_extension symbol definition.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed1_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed1_mongo_extension.so")),
                        AssertionException,
                        10615501);
 
     // malformed2_extension returns null from get_mongodb_extension.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed2_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed2_mongo_extension.so")),
                        AssertionException,
                        10615503);
 
     // malformed3_extension has an incompatible major version (plus 1).
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed3_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed3_mongo_extension.so")),
                        AssertionException,
                        10615504);
 
     // malformed4_extension has an incompatible major version (minus 1).
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed4_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed4_mongo_extension.so")),
                        AssertionException,
                        10615504);
 
     // malformed5_extension has an incompatible minor version.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed5_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed5_mongo_extension.so")),
                        AssertionException,
                        10615505);
 
     // malformed6_extension has a null initialization function.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed6_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed6_mongo_extension.so")),
                        AssertionException,
                        10615506);
 
     // malformed7_extension has the maximum uint32_t value as its major version.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed7_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed7_mongo_extension.so")),
                        AssertionException,
                        10615504);
 }
@@ -134,7 +134,7 @@ TEST_F(LoadExtensionsTest, RepetitivelyLoadingTheSameExtensionViaLoadExtensionsF
 }
 
 // Tests successful extension loading and verifies stage registration works in pipelines.
-// The libfoo_extension.so adds a "$testFoo" stage for testing.
+// The libfoo_mongo_extension.so adds a "$testFoo" stage for testing.
 TEST_F(LoadExtensionsTest, LoadExtensionSucceeds) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(getExtensionPath(kTestFooLibExtensionPath)));
 
@@ -180,23 +180,24 @@ TEST_F(LoadExtensionsTest, InitializationFunctionPopulatesParserMap) {
 
 TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterSucceeds) {
     ASSERT_DOES_NOT_THROW(
-        ExtensionLoader::load(getExtensionPath("libhostVersionSucceeds_extension.so")));
+        ExtensionLoader::load(getExtensionPath("libhostVersionSucceeds_mongo_extension.so")));
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterFails) {
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libhostVersionFails_extension.so")),
-                       AssertionException,
-                       10615503);
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(getExtensionPath("libhostVersionFails_mongo_extension.so")),
+        AssertionException,
+        10615503);
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionInitializeVersionFails) {
     ASSERT_THROWS_CODE(
-        ExtensionLoader::load(getExtensionPath("libinitializeVersionFails_extension.so")),
+        ExtensionLoader::load(getExtensionPath("libinitializeVersionFails_mongo_extension.so")),
         AssertionException,
         10726600);
 }
 
 DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullStageDescriptor, "10596400") {
-    ExtensionLoader::load(getExtensionPath("libnullStageDescriptor_extension.so"));
+    ExtensionLoader::load(getExtensionPath("libnullStageDescriptor_mongo_extension.so"));
 }
 }  // namespace mongo::extension::host

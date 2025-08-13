@@ -32,8 +32,8 @@ if [[ -n "${EXTENSION_NAME}" ]]; then
     echo "extension_paths: \"${EXTENSION_PATH}\"" >"${TOP_LEVEL_DIR}/extension_paths.yml"
 else
     echo "EXTENSION_NAME not provided. Finding all unpacked extensions."
-    # Find all *_extension.so files and create a comma-separated list.
-    EXTENSIONS_LIST=$(find "${LIB_SRC}" -name "*_extension.so" | paste -sd, -)
+    # Find all *_mongo_extension.so files and create a comma-separated list.
+    EXTENSIONS_LIST=$(find "${LIB_SRC}" -name "*_mongo_extension.so" | paste -sd, -)
 
     if [[ -z "${EXTENSIONS_LIST}" ]]; then
         echo "Could not find any extracted extension files under lib/."
