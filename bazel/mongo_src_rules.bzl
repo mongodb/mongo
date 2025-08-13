@@ -792,11 +792,13 @@ def _mongo_cc_binary_and_test(
         "target_compatible_with": target_compatible_with + enterprise_compatible,
         "additional_linker_inputs": additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         "exec_properties": exec_properties | select({
-            # Debug compression significantly reduces .o, .dwo, and .a sizes
-            "//bazel/config:compress_debug_compile_enabled": {"cpp_link.coefficient": "18.0"},
-            "//conditions:default": {"cpp_link.coefficient": "3.0"},
+            "//bazel/config:remote_link_enabled": {},
+            "//conditions:default": {"cpp_link.coefficient": "18.0"},
         }) | select({
             "//bazel/config:thin_lto_enabled": {"cpp_link.cpus": str(NUM_CPUS)},
+            "//conditions:default": {},
+        }) | select({
+            "//bazel/config:remote_link_arm_linux_enabled": {"cpp_link.Pool": "arm_linker"},
             "//conditions:default": {},
         }),
         "env": env | SANITIZER_ENV,

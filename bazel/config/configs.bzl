@@ -565,6 +565,19 @@ release = rule(
 )
 
 # =========
+# remote link
+# =========
+remote_link_provider = provider(
+    doc = """Enable remote link features.""",
+    fields = ["enabled"],
+)
+
+remote_link = rule(
+    implementation = lambda ctx: remote_link_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # dwarf_version
 # =========
 dwarf_version_values = ["4", "5"]

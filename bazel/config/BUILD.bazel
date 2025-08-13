@@ -41,6 +41,7 @@ load(
     "propeller_profile_generate",
     "propeller_profile_use",
     "release",
+    "remote_link",
     "sdkroot",
     "separate_debug",
     "server_js",
@@ -709,6 +710,31 @@ selects.config_setting_group(
         "@platforms//os:windows",
         ":opt_off",
         ":dbg_enabled",
+    ],
+)
+
+# ==========
+# remote link
+# ==========
+
+remote_link(
+    name = "remote_link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "remote_link_enabled",
+    flag_values = {
+        "//bazel/config:remote_link": "True",
+    },
+)
+
+selects.config_setting_group(
+    name = "remote_link_arm_linux_enabled",
+    match_all = [
+        ":remote_link_enabled",
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
     ],
 )
 

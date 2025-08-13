@@ -374,6 +374,7 @@ common:remote_link --strategy=CppArchive=remote
 common:remote_link --strategy=SolibSymlink=remote
 common:remote_link --strategy=ExtractDebugInfo=remote
 common:remote_link --strategy=StripDebugInfo=remote
+common:remote_link --//bazel/config:remote_link=True
 common:remote_link --features=-thin_archive
 
 # Coverage
