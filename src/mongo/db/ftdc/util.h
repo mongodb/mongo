@@ -62,7 +62,7 @@ namespace FTDCBSONUtil {
  */
 enum class FTDCType : std::int32_t {
     /**
-     * A metadata document is composed of a header + an array of bson documents
+     * A metadata document is composed of a header + an array of bson documents.
      *
      * See createBSONMetadataChunkDocument
      */
@@ -76,11 +76,16 @@ enum class FTDCType : std::int32_t {
     kMetricChunk = 1,
 
     /**
-     * A periodic metadata document is composed of a header + a counter value + delta document
+     * A periodic metadata document is composed of a header + a counter value + delta document.
      *
      * See createBSONPeriodicMetadataDocument
      */
     kPeriodicMetadata = 2,
+
+    /**
+     * Unknown type used ONLY for initializing FTDCType in FTDCFileReader.
+     */
+    kUnknown = 3,
 };
 
 

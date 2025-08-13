@@ -131,7 +131,7 @@ private:
     std::vector<BSONObj> _docs;
 
     // Type of the current document
-    FTDCBSONUtil::FTDCType _type;
+    FTDCBSONUtil::FTDCType _type{FTDCBSONUtil::FTDCType::kUnknown};
 
     // _id of current metadata, metric chunk, or periodic metadata
     Date_t _dateId;

@@ -144,7 +144,8 @@ StatusWith<bool> FTDCFileReader::hasNext() {
 }
 
 std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t> FTDCFileReader::next() {
-    dassert(_state == State::kMetricChunk || _state == State::kMetadataDoc);
+    invariant(_state == State::kMetricChunk || _state == State::kMetadataDoc);
+    invariant(_type != FTDCBSONUtil::FTDCType::kUnknown);
 
     if (_state == State::kMetadataDoc) {
         return std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t>(
