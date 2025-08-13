@@ -45,6 +45,7 @@
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
@@ -81,7 +82,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
 namespace mongo {
 
 namespace {
@@ -91,20 +91,6 @@ constexpr char EXCLUDE_RECORDIDS[] = "excludeRecordIds";
 // TODO SERVER-106005: Remove this option once all versions tested in multiversion suites can scan
 // in natural order for capped collections.
 constexpr char USE_INDEX_SCAN_FOR_CAPPED_COLLECTIONS[] = "useIndexScanForCappedCollections";
-
-std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(OperationContext* opCtx) {
-    // Loop until we get a consistent catalog and snapshot. This is only used for the lock-free
-    // implementation of dbHash which skips acquiring database and collection locks.
-    while (true) {
-        auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
-        const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
-        if (catalogBeforeSnapshot == catalogAfterSnapshot) {
-            return catalogBeforeSnapshot;
-        }
-        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-    }
-}
 
 // Includes Records and their RecordIds explicitly in the hash.
 void hashRecordsAndRecordIds(const CollectionPtr& collection, PlanExecutor* exec, md5_state_t* st) {
@@ -239,17 +225,10 @@ public:
             shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource() ==
             RecoveryUnit::ReadSource::kProvided;
 
-        // We take the global lock here as dbHash runs lock-free with point-in-time catalog lookups.
-        Lock::GlobalLock globalLock(opCtx, MODE_IS);
-
-        // The CollectionCatalog to use for lock-free reads with point-in-time catalog lookups.
-        std::shared_ptr<const CollectionCatalog> catalog = getConsistentCatalogAndSnapshot(opCtx);
-
         boost::optional<AutoGetDb> autoDb;
         if (isPointInTimeRead) {
             // We only need to lock the database in intent mode and then collection in intent
             // mode as well to ensure that none of the collections get dropped.
-            // TODO:SERVER-75848 Make this lock-free
             autoDb.emplace(opCtx, dbName, MODE_IS);
         } else {
             // We lock the entire database in S-mode in order to ensure that the contents will not
@@ -266,13 +245,15 @@ public:
         std::map<std::string, UUID> collectionToUUIDMap;
         std::set<std::string> cappedCollectionSet;
 
-        auto checkAndHashCollection = [&](const Collection* collection) -> bool {
-            auto collNss = collection->ns();
+        auto checkAndHashCollection = [&](const CollectionAcquisition& collection) -> bool {
+            auto collNss = collection.nss();
 
             uassert(ErrorCodes::BadValue,
                     str::stream() << "weird fullCollectionName [" << collNss.toStringForErrorMsg()
                                   << "]",
                     collNss.size() - 1 > dbName.size());
+
+            auto& collPtr = collection.getCollectionPtr();
 
             if (repl::ReplicationCoordinator::isOplogDisabledForNS(collNss)) {
                 return true;
@@ -284,7 +265,7 @@ public:
                 return true;
             }
 
-            if (skipTempCollections && collection->isTemporary()) {
+            if (skipTempCollections && collPtr->isTemporary()) {
                 return true;
             }
 
@@ -292,47 +273,65 @@ public:
                 desiredCollections.count(std::string{collNss.coll()}) == 0)
                 return true;
 
-            if (collection->isCapped()) {
+            if (collPtr->isCapped()) {
                 cappedCollectionSet.insert(std::string{collNss.coll()});
             }
 
-            collectionToUUIDMap.emplace(std::string{collNss.coll()}, collection->uuid());
+            collectionToUUIDMap.emplace(std::string{collNss.coll()}, collection.uuid());
 
             // Compute the hash for this collection.
-            // TODO(SERVER-103401): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            std::string hash = _hashCollection(opCtx,
-                                               CollectionPtr::CollectionPtr_UNSAFE(collection),
-                                               excludeRecordIds,
-                                               useIndexScanForCappedCollections);
+            std::string hash = _hashCollection(
+                opCtx, collection, excludeRecordIds, useIndexScanForCappedCollections);
 
             collectionToHashMap[std::string{collNss.coll()}] = hash;
 
             return true;
         };
 
+        // Stash a consistent catalog for PIT reads
+        AutoReadLockFree lockFreeRead(opCtx);
+        // Access the stashed catalog
+        auto catalog = CollectionCatalog::get(opCtx);
         for (auto&& coll : catalog->range(dbName)) {
+            /*
+             * Acquisition Lock-free are the only way to execute a PIT acquisition. A locked
+             * acquisition doesn't provide such a feature because it's a use case that usually makes
+             * no sense (past information can't change). However, we want dbHash to fully serialize
+             * with the `validate` command which takes a MODE_X lock when {full:true} is set, so a
+             * lock is necessary.
+             */
             UUID uuid = coll->uuid();
-
-            // The namespace must be found as the UUID is fetched from the same
-            // CollectionCatalog instance.
             boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, uuid);
             invariant(nss);
-
-            // TODO:SERVER-75848 Make this lock-free
             Lock::CollectionLock clk(opCtx, *nss, MODE_IS);
 
-            auto collection = catalog->establishConsistentCollection(
-                opCtx,
-                {dbName, uuid},
-                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp());
+            try {
+                auto collection = acquireCollectionMaybeLockFree(
+                    opCtx,
+                    CollectionAcquisitionRequest{{dbName, coll->uuid()},
+                                                 PlacementConcern::kPretendUnsharded,
+                                                 repl::ReadConcernArgs::get(opCtx),
+                                                 AcquisitionPrerequisites::kRead});
 
-            if (!collection) {
+
+                (void)checkAndHashCollection(collection);
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 // The collection did not exist at the read timestamp with the given UUID.
                 continue;
+            } catch (const ExceptionFor<ErrorCodes::SnapshotUnavailable>&) {
+                // PIT reading for unreplicated capped collections is not supported.
+                // Note that "coll" represents the collection at the current read timestamp, so it
+                // could be that a the PIT read the collection was not capped. We have no access to
+                // metadata at the PIT as the acquisition fails. This is just to print a log, not
+                // really for correctness, so the assumption while not solid is still reasonable.
+                if (isPointInTimeRead && !nss->isReplicated() && coll->isCapped()) {
+                    LOGV2_INFO(10769600,
+                               "Skipping dbhash for capped non-replicated collection: snapshot "
+                               "read concern not supported",
+                               "nss"_attr = nss);
+                    continue;
+                }
             }
-
-            (void)checkAndHashCollection(collection.get());
         }
 
         BSONObjBuilder bb(result.subobjStart("collections"));
@@ -373,10 +372,10 @@ public:
 
 private:
     std::string _hashCollection(OperationContext* opCtx,
-                                const CollectionPtr& collection,
+                                const CollectionAcquisition& collection,
                                 bool excludeRecordIds,
                                 bool useIndexScanForCappedCollections) {
-        auto desc = collection->getIndexCatalog()->findIdIndex(opCtx);
+        auto desc = collection.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx);
 
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
 
@@ -384,12 +383,13 @@ private:
         // scan order is preserved across nodes. If to exclude recordIds, existing _id scan should
         // be kept too. This way a customer will get the same hash with excludeRecordIds option as
         // the one before upgrade.
-        bool includeRids = collection->areRecordIdsReplicated() && !excludeRecordIds;
+        bool includeRids =
+            collection.getCollectionPtr()->areRecordIdsReplicated() && !excludeRecordIds;
 
         if (desc && !includeRids &&
-            !(collection->isCapped() && !useIndexScanForCappedCollections)) {
+            !(collection.getCollectionPtr()->isCapped() && !useIndexScanForCappedCollections)) {
             exec = InternalPlanner::indexScan(opCtx,
-                                              &collection,
+                                              collection,
                                               desc,
                                               BSONObj(),
                                               BSONObj(),
@@ -397,12 +397,13 @@ private:
                                               PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                               InternalPlanner::FORWARD,
                                               InternalPlanner::IXSCAN_FETCH);
-        } else if (collection->isClustered() || includeRids ||
-                   (collection->isCapped() && !useIndexScanForCappedCollections)) {
+        } else if (collection.getCollectionPtr()->isClustered() || includeRids ||
+                   (collection.getCollectionPtr()->isCapped() &&
+                    !useIndexScanForCappedCollections)) {
             exec = InternalPlanner::collectionScan(
-                opCtx, &collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+                opCtx, collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         } else {
-            LOGV2(20455, "Can't find _id index for namespace", logAttrs(collection->ns()));
+            LOGV2(20455, "Can't find _id index for namespace", logAttrs(collection.nss()));
             return "no _id index";
         }
 
@@ -415,15 +416,16 @@ private:
             // It's unnecessary to explicitly include the RecordIds of a clustered collection in the
             // hash. In a clustered collection, each RecordId is generated by the _id, which is
             // already hashed as a part of the Record.
-            const bool explicitlyHashRecordIds = includeRids && !collection->isClustered();
+            const bool explicitlyHashRecordIds =
+                includeRids && !collection.getCollectionPtr()->isClustered();
             if (explicitlyHashRecordIds) {
-                hashRecordsAndRecordIds(collection, exec.get(), &st);
+                hashRecordsAndRecordIds(collection.getCollectionPtr(), exec.get(), &st);
             } else {
                 hashRecordsOnly(exec.get(), &st);
             }
         } catch (DBException& exception) {
             LOGV2_WARNING(
-                20456, "Error while hashing, db possibly dropped", logAttrs(collection->ns()));
+                20456, "Error while hashing, db possibly dropped", logAttrs(collection.nss()));
             exception.addContext("Plan executor error while running dbHash command");
             throw;
         }
