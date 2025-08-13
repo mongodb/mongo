@@ -32,10 +32,10 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/shard_registry.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>

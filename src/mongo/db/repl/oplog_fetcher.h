@@ -43,7 +43,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/vector_clock_metadata_hook.h"
+#include "mongo/db/vector_clock/vector_clock_metadata_hook.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"

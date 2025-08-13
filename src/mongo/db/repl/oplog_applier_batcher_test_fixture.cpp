@@ -41,7 +41,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"

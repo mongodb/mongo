@@ -30,7 +30,7 @@
 #include "mongo/db/query/query_stats/key.h"
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/collection_type.h"
+#include "mongo/db/local_catalog/collection_type.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"

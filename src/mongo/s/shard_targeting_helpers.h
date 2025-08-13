@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
 
 namespace mongo {
 

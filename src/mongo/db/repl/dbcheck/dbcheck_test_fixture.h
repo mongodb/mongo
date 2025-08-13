@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/bson/bson_validate_gen.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/commands/dbcheck_command.h"
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
+#include "mongo/db/local_catalog/clustered_collection_util.h"
+#include "mongo/db/local_catalog/throttle_cursor.h"
 #include "mongo/db/repl/dbcheck/dbcheck.h"
 #include "mongo/db/repl/dbcheck/dbcheck_gen.h"
 #include "mongo/db/write_concern.h"

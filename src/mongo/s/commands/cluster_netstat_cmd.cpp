@@ -40,8 +40,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/shard_registry.h"
 
 #include <string>
 

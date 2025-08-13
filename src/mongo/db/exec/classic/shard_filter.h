@@ -33,9 +33,9 @@
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
+#include "mongo/db/local_catalog/shard_role_catalog/scoped_collection_metadata.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
 
 #include <memory>
 

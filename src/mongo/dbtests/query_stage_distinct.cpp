@@ -37,6 +37,7 @@
 #include "mongo/db/exec/classic/distinct_scan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -46,7 +47,6 @@
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

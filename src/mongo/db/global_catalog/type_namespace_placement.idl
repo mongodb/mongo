@@ -1,0 +1,100 @@
+# Copyright(C) 2022 - present MongoDB, Inc.
+#
+# This program is free software : you can redistribute it and / or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program.If not, see
+# < http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library.You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein.If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so.If you do not wish to do so,
+# delete this exception statement from your version.If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
+
+enums:
+    HistoricalPlacementStatus:
+        description: "The status of historical placement information"
+        type: int
+        values:
+            OK:
+                description:
+                    The historical shard placement information is available for a given
+                    cluster time, and the cluster time is in the past. The historical shard
+                    placement information is present in shards attribute.
+                value: 0
+            NotAvailable:
+                description:
+                    The historical shard placement information is not available for a given
+                    cluster time.
+                value: 1
+            FutureClusterTime:
+                description: Given cluster time is in the future.
+                value: 2
+
+structs:
+    NamespacePlacementType:
+        description:
+            "Represents the layout and contents of documents contained in the
+            config.placementHistory collection.
+            Each document encodes placement information (at shard granularity) on a given
+            namespace at a specific point in time."
+        strict: false
+        fields:
+            nss:
+                type: namespacestring
+                description: "The namespace (database or full collection name)
+                    referenced by this object."
+            uuid:
+                cpp_name: uuid
+                type: uuid
+                description:
+                    "When nss references a collection, this field stores the uuid assigned
+                    to such collection at the time of its creation."
+                optional: true
+            timestamp:
+                type: timestamp
+                description:
+                    "The point in time at which this version of NamespacePlacementType
+                    for 'nss' has been generated."
+            shards:
+                type: array<shard_id>
+                description:
+                    "The list of shard IDs containing one of more chunks of 'nss'
+                    at time 'timestamp' (may be empty)."
+
+    HistoricalPlacement:
+        description:
+            "Result of the placement search query at a point in time over the
+            config.placementHistory"
+        strict: false
+        fields:
+            shards:
+                type: array<shard_id>
+                description:
+                    "The set of shard IDs containing data on the requested nss/cluster at
+                    the point in time"
+            status:
+                type: HistoricalPlacementStatus
+                description: "The status of historical placement information"

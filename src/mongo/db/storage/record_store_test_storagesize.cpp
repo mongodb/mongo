@@ -29,8 +29,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"

@@ -31,10 +31,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"

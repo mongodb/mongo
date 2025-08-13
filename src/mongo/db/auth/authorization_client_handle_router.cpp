@@ -30,8 +30,8 @@
 #include "mongo/db/auth/authorization_client_handle_router.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/sharding_environment/grid.h"
 
 namespace mongo {
 

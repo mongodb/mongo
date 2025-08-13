@@ -29,8 +29,8 @@
 
 #include "mongo/db/timeseries/collection_pre_conditions_util.h"
 
-#include "mongo/db/catalog/collection_uuid_mismatch.h"
-#include "mongo/db/catalog_raii.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/collection_uuid_mismatch.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 
 

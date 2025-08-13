@@ -786,8 +786,9 @@ TEST_F(ChangeStreamRewriteTest, RewritesUpdateAndReplaceFilterToSimpleUpdateFilt
 TEST_F(ChangeStreamRewriteTest, RewritesAllCrudOperationsToSimpleInLookup) {
     // This filter is rewritten nicely to just '{ op: { $in: [ "d", "i", "u" ] } }'.
 
-    auto expr = BSON("operationType"
-                     << BSON("$in" << BSON_ARRAY("update" << "insert" << "delete" << "replace")));
+    auto expr = BSON("operationType" << BSON("$in" << BSON_ARRAY("update" << "insert"
+                                                                          << "delete"
+                                                                          << "replace")));
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, getExpCtx());
     ASSERT_OK(statusWithMatchExpression.getStatus());
 

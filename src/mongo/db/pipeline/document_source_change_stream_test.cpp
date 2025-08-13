@@ -32,16 +32,16 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/index_constants.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_mock.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
 #include "mongo/db/pipeline/change_stream_stage_test_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -2500,8 +2500,11 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseValidSuppo
     for (const auto& supportedEvents :
          {BSONArray(),
           BSON_ARRAY("singleEvent"),
-          BSON_ARRAY("CASE" << "case" << "Case" << "insensitive"),  //< Test case sensitivity.
-          BSON_ARRAY("someEvent" << "someOtherEvent" << "yetAnotherEvent")}) {
+          BSON_ARRAY("CASE" << "case"
+                            << "Case"
+                            << "insensitive"),  //< Test case sensitivity.
+          BSON_ARRAY("someEvent" << "someOtherEvent"
+                                 << "yetAnotherEvent")}) {
         BSONObj spec =
             BSON(DocumentSourceChangeStreamTransform::kStageName << BSON(
                      "resumeAfter"
@@ -2532,9 +2535,13 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseInvalidSup
 
     for (const auto& supportedEvents : {
              BSON_ARRAY("singleEvent" << "singleEvent"),
-             BSON_ARRAY("a" << "b" << "c" << "d" << "a"),
+             BSON_ARRAY("a" << "b"
+                            << "c"
+                            << "d"
+                            << "a"),
              BSON_ARRAY(""),  //< Test invalid name.
-             BSON_ARRAY("a" << "b" << ""),
+             BSON_ARRAY("a" << "b"
+                            << ""),
          }) {
         BSONObj spec =
             BSON(DocumentSourceChangeStreamTransform::kStageName << BSON(
@@ -2571,8 +2578,10 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformSingle
              << BSON("resumeAfter" << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
                                    << "supportedEvents" << BSON_ARRAY("eventType1")));
 
-    BSONObj operationDescription =
-        BSON("foo" << "bar" << "baz" << "qux" << "sub" << BSON("sub1" << true << "sub2" << false));
+    BSONObj operationDescription = BSON("foo" << "bar"
+                                              << "baz"
+                                              << "qux"
+                                              << "sub" << BSON("sub1" << true << "sub2" << false));
 
     auto entry =
         makeOplogEntry(OpTypeEnum::kNoop,
@@ -2613,16 +2622,24 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultip
                                 << "supportedEvents" << BSON_ARRAY("eventType1" << "eventType2")));
 
     BSONObj operationDescriptionEvent1 =
-        BSON("foo" << "bar" << "baz" << "qux" << "sub" << BSON("sub1" << true << "sub2" << false));
-    BSONObj operationDescriptionEvent2 =
-        BSON("some" << BSON("that" << "will" << "end" << "up" << "in" << "result"));
+        BSON("foo" << "bar"
+                   << "baz"
+                   << "qux"
+                   << "sub" << BSON("sub1" << true << "sub2" << false));
+    BSONObj operationDescriptionEvent2 = BSON("some" << BSON("that" << "will"
+                                                                    << "end"
+                                                                    << "up"
+                                                                    << "in"
+                                                                    << "result"));
 
     auto entry1 = makeOplogEntry(OpTypeEnum::kNoop,
                                  nss,
                                  BSONObj(),
                                  testUuid(),
                                  false,
-                                 BSON("eventType1" << BSON("will" << "be" << "removed" << "too"))
+                                 BSON("eventType1" << BSON("will" << "be"
+                                                                  << "removed"
+                                                                  << "too"))
                                      .addFields(operationDescriptionEvent1));
 
     auto entry2 = makeOplogEntry(OpTypeEnum::kNoop,
@@ -2838,16 +2855,19 @@ TEST_F(ChangeStreamStageTest, DSCSInjectControlEventsStageSerialization) {
 
     // Test some valid actions.
     {
-        auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(
-            BSON("event1" << "transformToControlEvent" << "event2" << "injectControlEvent"));
+        auto [spec, stageSpecAsBSON] =
+            buildControlEventsSpecFromBSON(BSON("event1" << "transformToControlEvent"
+                                                         << "event2"
+                                                         << "injectControlEvent"));
         validateDocumentSourceStageSerialization<DocumentSourceChangeStreamInjectControlEvents>(
             std::move(spec), stageSpecAsBSON, getExpCtx());
     }
 
     // Test serializing for explain.
     {
-        auto actions =
-            BSON("event1" << "transformToControlEvent" << "event2" << "injectControlEvent");
+        auto actions = BSON("event1" << "transformToControlEvent"
+                                     << "event2"
+                                     << "injectControlEvent");
         auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(actions);
         auto stage = DocumentSourceChangeStreamInjectControlEvents::createFromBson(
             stageSpecAsBSON.firstElement(), getExpCtx());
@@ -2912,8 +2932,10 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTest,
                    DSCSInjectControlEventsStageSerializationDuplicateEvents,
                    "Tripwire assertion.*10384002") {
     // Test duplicate events in spec.
-    auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(
-        BSON("event1" << "injectControlEvent" << "event1" << "transformToControlEvent"));
+    auto [spec, stageSpecAsBSON] =
+        buildControlEventsSpecFromBSON(BSON("event1" << "injectControlEvent"
+                                                     << "event1"
+                                                     << "transformToControlEvent"));
     ASSERT_THROWS_CODE(
         validateDocumentSourceStageSerialization<DocumentSourceChangeStreamInjectControlEvents>(
             std::move(spec), stageSpecAsBSON, getExpCtx()),
@@ -2924,13 +2946,18 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTest,
 TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesNonMatchingInputsCorrectly) {
     auto expCtx = getExpCtx();
 
-    const BSONObj doc1 = BSON("operationType" << "test1" << "foo" << "bar");
-    const BSONObj doc2 = BSON("operationType" << "test2" << "test" << "value");
+    const BSONObj doc1 = BSON("operationType" << "test1"
+                                              << "foo"
+                                              << "bar");
+    const BSONObj doc2 = BSON("operationType" << "test2"
+                                              << "test"
+                                              << "value");
 
     // Test the control events stage with different configurations.
     for (const BSONObj& config : {
              BSONObj(),
-             BSON("eventType1" << "injectControlEvent" << "eventType2"
+             BSON("eventType1" << "injectControlEvent"
+                               << "eventType2"
                                << "transformToControlEvent"),
          }) {
         auto [_, stageSpecAsBSON] = buildControlEventsSpecFromBSON(config);
@@ -2971,18 +2998,30 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesNonMatchingInputsCorrect
 TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesMatchingInputsCorrectly) {
     auto expCtx = getExpCtx();
 
-    auto [_, stageSpecAsBSON] = buildControlEventsSpecFromBSON(
-        BSON("eventType1" << "injectControlEvent" << "eventType2" << "transformToControlEvent"));
+    auto [_, stageSpecAsBSON] =
+        buildControlEventsSpecFromBSON(BSON("eventType1" << "injectControlEvent"
+                                                         << "eventType2"
+                                                         << "transformToControlEvent"));
 
     auto injectControlEvents = DocumentSourceChangeStreamInjectControlEvents::createFromBson(
         stageSpecAsBSON.firstElement(), expCtx);
 
-    BSONObj doc1 = BSON("operationType" << "test1" << "foo" << "bar");
-    BSONObj doc2 = BSON("operationType" << "test2" << "test" << "value");
-    BSONObj doc3 = BSON("operationType" << "test3" << "baz" << "qux");
-    BSONObj ctrl1 = BSON("operationType" << "eventType1" << "value" << 1234);
-    BSONObj ctrl2 = BSON("operationType" << "eventType2" << "value" << "test");
-    BSONObj ctrl3 = BSON("operationType" << "eventType1" << "value" << BSONObj());
+    BSONObj doc1 = BSON("operationType" << "test1"
+                                        << "foo"
+                                        << "bar");
+    BSONObj doc2 = BSON("operationType" << "test2"
+                                        << "test"
+                                        << "value");
+    BSONObj doc3 = BSON("operationType" << "test3"
+                                        << "baz"
+                                        << "qux");
+    BSONObj ctrl1 = BSON("operationType" << "eventType1"
+                                         << "value" << 1234);
+    BSONObj ctrl2 = BSON("operationType" << "eventType2"
+                                         << "value"
+                                         << "test");
+    BSONObj ctrl3 = BSON("operationType" << "eventType1"
+                                         << "value" << BSONObj());
 
     std::deque<DocumentSource::GetNextResult> inputDocs = {
         DocumentSource::GetNextResult::makePauseExecution(),

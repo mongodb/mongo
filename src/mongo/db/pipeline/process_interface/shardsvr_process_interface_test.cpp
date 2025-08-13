@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_out.h"
@@ -47,7 +48,6 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/move/utility_core.hpp>

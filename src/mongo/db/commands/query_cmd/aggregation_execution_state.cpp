@@ -29,10 +29,10 @@
 
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_uuid_mismatch.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/pipeline/search/search_helper.h"

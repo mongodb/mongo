@@ -30,12 +30,12 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
+#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/request_types/auto_split_vector_gen.h"
-#include "mongo/s/router_role.h"
 
 #include <memory>
 #include <string>

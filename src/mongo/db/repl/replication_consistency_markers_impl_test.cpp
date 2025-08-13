@@ -31,10 +31,10 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"

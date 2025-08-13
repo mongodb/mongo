@@ -33,10 +33,10 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"

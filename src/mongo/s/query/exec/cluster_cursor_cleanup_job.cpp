@@ -33,7 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"

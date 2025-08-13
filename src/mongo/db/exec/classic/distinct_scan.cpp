@@ -36,17 +36,17 @@
 
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/classic/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/move/utility_core.hpp>

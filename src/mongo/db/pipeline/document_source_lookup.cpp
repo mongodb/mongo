@@ -64,9 +64,10 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 

@@ -32,7 +32,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/session/logical_session_id.idl"
-    - "mongo/s/database_version.idl"
+    - "mongo/db/versioning_protocol/database_version.idl"
 
 enums:
     MultiUpdateCoordinatorPhase:

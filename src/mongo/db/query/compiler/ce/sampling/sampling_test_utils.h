@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/ce/ce_test_utils.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"

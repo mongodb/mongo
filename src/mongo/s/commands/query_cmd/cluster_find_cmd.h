@@ -34,6 +34,9 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
+#include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
+#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
@@ -55,12 +58,9 @@
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/query/planner/cluster_find.h"
-#include "mongo/s/router_role.h"
 
 #include <boost/optional.hpp>
 

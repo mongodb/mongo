@@ -30,7 +30,7 @@
 
 #include "mongo/db/query/query_settings_decoration.h"
 
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/util/decorable.h"
 
 #include <utility>

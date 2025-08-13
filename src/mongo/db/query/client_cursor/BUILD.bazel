@@ -20,7 +20,7 @@ mongo_cc_library(
         "clientcursor.h",
         "collect_query_stats_mongod.h",
         "cursor_manager.h",
-        "//src/mongo/db/catalog:external_data_source_scope_guard.h",  # TODO(SERVER-95100): Remove
+        "//src/mongo/db/local_catalog:external_data_source_scope_guard.h",  # TODO(SERVER-95100): Remove
         "//src/mongo/db/memory_tracking:operation_memory_usage_tracker.h",
     ],
     deps = [

@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/deferred_writer.h"
+#include "mongo/db/deferred_writer.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"

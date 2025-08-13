@@ -31,12 +31,12 @@
 
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/client.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"

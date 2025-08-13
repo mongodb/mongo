@@ -36,9 +36,9 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -59,7 +59,7 @@
 #include <tuple>
 #include <utility>
 
-#include "src/mongo/db/index/index_descriptor.h"
+#include "src/mongo/db/local_catalog/index_descriptor.h"
 #include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>

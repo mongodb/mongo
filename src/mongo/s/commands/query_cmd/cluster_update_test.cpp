@@ -34,8 +34,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/s/commands/cluster_command_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 #include <functional>

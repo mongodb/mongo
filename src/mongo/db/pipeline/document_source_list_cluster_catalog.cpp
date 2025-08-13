@@ -40,8 +40,8 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 
 #include <cstddef>

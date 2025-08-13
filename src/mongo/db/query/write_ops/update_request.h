@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/catalog/collection_operation_source.h"
+#include "mongo/db/local_catalog/collection_operation_source.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/query/plan_yield_policy.h"

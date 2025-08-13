@@ -33,7 +33,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/curop.h"
-#include "mongo/s/catalog/type_shard.h"
+#include "mongo/db/global_catalog/type_shard.h"
 
 #include <boost/move/utility_core.hpp>
 

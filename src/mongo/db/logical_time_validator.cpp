@@ -41,7 +41,7 @@
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/transport/session.h"

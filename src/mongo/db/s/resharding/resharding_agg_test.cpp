@@ -65,7 +65,7 @@
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/unittest.h"

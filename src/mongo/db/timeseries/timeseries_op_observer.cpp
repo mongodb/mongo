@@ -30,10 +30,11 @@
 #include "mongo/db/timeseries/timeseries_op_observer.h"
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_operation_source.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_operation_source.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/stats/counters.h"
@@ -42,7 +43,6 @@
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/tracking/vector.h"
 

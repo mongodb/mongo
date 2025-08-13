@@ -1,0 +1,102 @@
+# Copyright (C) 2025-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/global_catalog/type_shard_identity.idl"
+    - "mongo/util/net/hostandport.idl"
+
+structs:
+    AddShardRequestBase:
+        description: "The addShard request fields shared by the add shard commands"
+        strict: false
+        fields:
+            name:
+                description: "A name for the shard."
+                type: string
+                optional: true
+
+    addShardResponse:
+        description: "The response for AddShard commands."
+        strict: false
+        fields:
+            shardAdded:
+                description: "A name for the shard."
+                type: string
+                optional: true
+
+commands:
+    addShard:
+        command_name: addShard
+        command_alias: addshard
+        cpp_name: AddShard
+        description: The public addShard command to add a shard."
+        strict: false
+        namespace: type
+        type: connection_string
+        api_version: ""
+        chained_structs:
+            AddShardRequestBase: AddShardRequestBase
+
+    _configsvrAddShard:
+        command_name: _configsvrAddShard
+        cpp_name: ConfigsvrAddShard
+        description: "The internal _configsvrAddShard command to add a shard."
+        strict: false
+        namespace: type
+        type: connection_string
+        api_version: ""
+        chained_structs:
+            AddShardRequestBase: AddShardRequestBase
+
+    _addShard:
+        command_name: _addShard
+        # TODO (SERVER-99411): make this alias the command_name when 9.0 becomes last LTS
+        command_alias: _shardsvrAddShard
+        cpp_name: ShardsvrAddShard
+        description: "_addShard Command"
+        namespace: ignored
+        api_version: ""
+        fields:
+            shardIdentity:
+                description: "Identity metadata for the new shard"
+                type: ShardIdentity
+
+    # Internal command where the config server expects the shard to send a hello command to the
+    # config server. This is used to find out if the contact could be done both ways (without
+    # network or security issue)
+    _shardsvrCheckCanConnectToConfigServer:
+        command_name: _shardsvrCheckCanConnectToConfigServer
+        cpp_name: ShardsvrCheckCanConnectToConfigServer
+        description: "Internal command where the config server expects the shard to send a hello command to the config server. This is used to find out if the contact could be done both ways (without network or security issue)"
+        namespace: type
+        type: HostAndPort
+        api_version: ""

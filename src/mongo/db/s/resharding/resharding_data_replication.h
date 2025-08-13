@@ -31,6 +31,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
@@ -40,9 +41,8 @@
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"

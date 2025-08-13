@@ -32,7 +32,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"

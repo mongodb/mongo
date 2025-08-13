@@ -32,12 +32,12 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
-#include "mongo/db/shard_id.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/stdx/unordered_set.h"
 
 #include <unordered_set>

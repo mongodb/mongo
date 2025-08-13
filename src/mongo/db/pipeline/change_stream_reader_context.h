@@ -31,7 +31,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/pipeline/change_stream.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/stdx/unordered_set.h"
 
 #include <boost/optional.hpp>

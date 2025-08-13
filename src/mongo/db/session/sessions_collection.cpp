@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_base.h"
-#include "mongo/db/create_indexes_gen.h"
+#include "mongo/db/local_catalog/ddl/create_indexes_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/session/logical_session_id.h"

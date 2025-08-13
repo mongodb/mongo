@@ -30,11 +30,11 @@
 #include "mongo/db/s/query_analysis_op_observer_configsvr.h"
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/global_catalog/type_mongos.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/query_analysis_op_observer.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/transaction_resources.h"
-#include "mongo/s/catalog/type_mongos.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 

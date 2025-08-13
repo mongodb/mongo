@@ -39,7 +39,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/s/client/shard.h"
+#include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
 

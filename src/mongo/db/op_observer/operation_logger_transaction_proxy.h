@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/operation_logger.h"
 #include "mongo/db/operation_context.h"

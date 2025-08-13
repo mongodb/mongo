@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"

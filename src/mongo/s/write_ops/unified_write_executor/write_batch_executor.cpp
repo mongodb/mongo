@@ -29,7 +29,7 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
-#include "mongo/s/grid.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/wc_error.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"

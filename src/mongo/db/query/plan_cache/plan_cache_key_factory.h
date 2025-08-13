@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"

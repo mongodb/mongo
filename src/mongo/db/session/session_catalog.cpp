@@ -30,9 +30,9 @@
 
 #include "mongo/db/session/session_catalog.h"
 
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/unordered_map.h"

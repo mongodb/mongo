@@ -29,8 +29,8 @@
 
 #include "mongo/s/change_streams/historical_placement_fetcher_impl.h"
 
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/placement_history_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/placement_history_commands_gen.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 

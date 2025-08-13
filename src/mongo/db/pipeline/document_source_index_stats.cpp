@@ -31,11 +31,11 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/net/socket_utils.h"

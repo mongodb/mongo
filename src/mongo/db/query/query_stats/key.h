@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/collection_type.h"
+#include "mongo/db/local_catalog/collection_type.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"

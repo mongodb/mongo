@@ -50,7 +50,7 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/unittest/death_test.h"

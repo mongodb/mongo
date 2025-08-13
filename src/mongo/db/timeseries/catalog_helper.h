@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 
 #include <boost/optional/optional.hpp>

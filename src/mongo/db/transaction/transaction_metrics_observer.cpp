@@ -31,11 +31,11 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"

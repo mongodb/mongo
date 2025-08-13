@@ -149,8 +149,8 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     BSONObj cmdMatch = DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx);
 
     // (2.1) The namespace for matching relevant commands.
-    auto cmdNsMatch =
-        backingBsonObjs.emplace_back(BSON("op" << "c" << "ns" << cmdMatch.firstElement()));
+    auto cmdNsMatch = backingBsonObjs.emplace_back(BSON("op" << "c"
+                                                             << "ns" << cmdMatch.firstElement()));
 
     // (2.2) Commands that are run on a monitored database and/or collection.
     auto dropEvent = backingBsonObjs.emplace_back(BSON("o.drop" << collMatch.firstElement()));

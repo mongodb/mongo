@@ -30,8 +30,8 @@
 #include "mongo/db/repl/timestamp_block.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

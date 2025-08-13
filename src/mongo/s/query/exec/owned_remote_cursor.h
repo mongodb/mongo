@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/query/exec/establish_cursors.h"
 
 namespace mongo {

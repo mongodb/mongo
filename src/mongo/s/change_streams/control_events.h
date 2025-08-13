@@ -32,7 +32,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 
 namespace mongo {
 

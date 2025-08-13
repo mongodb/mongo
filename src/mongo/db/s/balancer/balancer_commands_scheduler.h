@@ -30,17 +30,17 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
-#include "mongo/s/shard_version.h"
 #include "mongo/util/future.h"
 
 #include <cstdint>

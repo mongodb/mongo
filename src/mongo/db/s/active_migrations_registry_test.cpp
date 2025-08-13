@@ -36,7 +36,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/baton.h"
 #include "mongo/db/client.h"
-#include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 

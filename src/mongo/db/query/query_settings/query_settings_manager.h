@@ -33,7 +33,7 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

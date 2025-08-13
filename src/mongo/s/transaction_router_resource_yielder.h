@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/local_catalog/shard_role_api/resource_yielder.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/resource_yielder.h"
 
 #include <memory>
 

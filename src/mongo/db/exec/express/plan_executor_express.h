@@ -28,13 +28,13 @@
  */
 #pragma once
 
+#include "mongo/db/local_catalog/shard_role_catalog/scoped_collection_metadata.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/session/logical_session_id.h"
 
 #include <boost/optional/optional.hpp>

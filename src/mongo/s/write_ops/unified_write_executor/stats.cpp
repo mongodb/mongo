@@ -29,8 +29,8 @@
 
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
 
+#include "mongo/db/sharding_environment/client/num_hosts_targeted_metrics.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/s/client/num_hosts_targeted_metrics.h"
 
 namespace mongo {
 namespace unified_write_executor {

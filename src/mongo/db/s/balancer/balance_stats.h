@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/s/catalog/type_shard.h"
+#include "mongo/db/global_catalog/type_shard.h"
 
 #include <cstddef>
 #include <cstdint>

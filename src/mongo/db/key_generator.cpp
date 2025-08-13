@@ -37,7 +37,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock/vector_clock.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/fail_point.h"
 

@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
@@ -48,6 +47,7 @@
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"

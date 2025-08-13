@@ -29,8 +29,8 @@
 
 #include "mongo/db/exec/classic/multi_plan_rate_limiter.h"
 
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/classic/multi_plan_admission_context.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 
 namespace mongo {

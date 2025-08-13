@@ -30,13 +30,13 @@
 #pragma once
 
 
-#include "mongo/db/db_raii.h"
+#include "mongo/db/local_catalog/db_raii.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 

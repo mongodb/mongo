@@ -42,7 +42,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"

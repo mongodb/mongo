@@ -29,8 +29,8 @@
 
 #include "mongo/db/storage/oplog_truncation.h"
 
-#include "mongo/db/catalog/local_oplog_info.h"
-#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/local_catalog/local_oplog_info.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"

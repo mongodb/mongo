@@ -31,9 +31,9 @@
 
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/local_catalog/util/partitioned.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"

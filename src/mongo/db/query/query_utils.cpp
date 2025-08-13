@@ -32,9 +32,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/basic_types.h"
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/sbe/match_path.h"
+#include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"

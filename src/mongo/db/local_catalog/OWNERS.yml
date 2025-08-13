@@ -1,0 +1,43 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "collection_compact*":
+    approvers:
+      - 10gen/server-compact
+  - "health_log*":
+    approvers:
+      - 10gen/server-dbcheck
+  - "import*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "index_key_validate*":
+    approvers:
+      - 10gen/server-index-builds
+  - "index_spec_validate*":
+    approvers:
+      - 10gen/server-index-builds
+  - "index_repair*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "throttle_cursor*":
+    approvers:
+      - 10gen/server-validate
+  - "durable_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+      - 10gen/server-storage-engine-integration
+  - "index_catalog_entry_helpers*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "local_oplog_info*":
+    approvers:
+      - 10gen/server-oplog
+  - "document_validation*":
+    approvers:
+      - 10gen/query-execution
+  - "external_data_source_scope_guard*":
+    approvers:
+      - 10gen/query-integration-extensions

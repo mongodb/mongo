@@ -32,9 +32,9 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/baton.h"
+#include "mongo/db/local_catalog/shard_role_api/resource_yielders.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/s/resource_yielders.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 

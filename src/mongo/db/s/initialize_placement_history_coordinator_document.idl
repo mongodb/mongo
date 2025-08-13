@@ -31,11 +31,11 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/s/catalog/type_collection.h"
+        - "mongo/db/global_catalog/type_collection.h"
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/s/sharding_ddl_coordinator.idl"
+    - "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.idl"
 
 enums:
     InitializePlacementHistoryPhase:

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source_list_catalog.h"
+#include "mongo/db/local_catalog/document_source_list_catalog.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"

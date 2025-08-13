@@ -30,7 +30,7 @@
 #include "mongo/db/s/replica_set_endpoint_feature_flag.h"
 
 #include "mongo/db/feature_flag.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 
 namespace mongo {
 namespace replica_set_endpoint {

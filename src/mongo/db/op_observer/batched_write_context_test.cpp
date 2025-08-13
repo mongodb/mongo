@@ -31,7 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/service_context_d_test_fixture.h"

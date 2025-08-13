@@ -31,14 +31,14 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

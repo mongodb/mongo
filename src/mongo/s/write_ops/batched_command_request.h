@@ -38,9 +38,9 @@
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/database_version.h"
-#include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 

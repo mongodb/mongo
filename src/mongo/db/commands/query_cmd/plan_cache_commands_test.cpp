@@ -31,8 +31,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"

@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 

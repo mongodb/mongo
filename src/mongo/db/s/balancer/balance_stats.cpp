@@ -30,9 +30,9 @@
 
 #include "mongo/db/s/balancer/balance_stats.h"
 
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/db/shard_id.h"
-#include "mongo/s/chunk_manager.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/string_map.h"
 

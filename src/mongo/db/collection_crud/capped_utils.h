@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/shard_role.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/util/uuid.h"
 
 #include <boost/optional/optional.hpp>

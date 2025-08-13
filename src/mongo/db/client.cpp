@@ -34,10 +34,10 @@
 #include "mongo/db/client.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log_service.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/thread_name.h"

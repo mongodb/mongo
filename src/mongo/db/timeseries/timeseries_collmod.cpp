@@ -32,8 +32,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/local_catalog/coll_mod.h"
+#include "mongo/db/local_catalog/collection_uuid_mismatch.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"

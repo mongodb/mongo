@@ -34,7 +34,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/analyze_shard_key_cmd.idl"
-    - "mongo/s/sharding_types.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
 
 structs:
     DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec:

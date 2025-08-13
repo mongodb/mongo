@@ -38,7 +38,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/client.h"
 #include "mongo/db/raw_data_operation.h"
-#include "mongo/db/write_block_bypass.h"
+#include "mongo/db/user_write_block/write_block_bypass.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/metadata/audit_client_attrs.h"
 #include "mongo/rpc/metadata/audit_metadata.h"

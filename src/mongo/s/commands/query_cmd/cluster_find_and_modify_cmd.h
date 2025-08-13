@@ -45,7 +45,9 @@
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
@@ -54,8 +56,6 @@
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/commands/strategy.h"
-#include "mongo/s/database_version.h"
-#include "mongo/s/shard_version.h"
 
 #include <set>
 #include <string>

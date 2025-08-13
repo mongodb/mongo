@@ -1,0 +1,52 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "chunk_version_gen",
+    src = "chunk_version.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "database_version_base_gen",
+    src = "database_version_base.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "database_version_gen",
+    src = "database_version.idl",
+    deps = [
+        ":database_version_base_gen",
+    ],
+)
+
+idl_generator(
+    name = "shard_version_gen",
+    src = "shard_version.idl",
+    deps = [
+        ":chunk_version_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "get_database_version_gen",
+    src = "get_database_version.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)

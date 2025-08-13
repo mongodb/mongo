@@ -9,19 +9,14 @@ exports_files(
     ]),
 )
 
-idl_generator(
-    name = "shard_gen",
-    src = "shard.idl",
-)
-
 mongo_cc_library(
     name = "shard_interface",
     srcs = [
-        "shard.cpp",
-        ":shard_gen",
+        "//src/mongo/db/sharding_environment/client:shard.cpp",
+        "//src/mongo/db/sharding_environment/client:shard_gen",
     ],
     hdrs = [
-        "shard.h",
+        "//src/mongo/db/sharding_environment/client:shard.h",
     ],
     deps = [
         "//src/mongo/client:remote_command_retry_scheduler",
@@ -33,12 +28,12 @@ mongo_cc_library(
 mongo_cc_library(
     name = "sharding_client",
     srcs = [
-        "num_hosts_targeted_metrics.cpp",
-        "shard_remote.cpp",
+        "//src/mongo/db/sharding_environment/client:num_hosts_targeted_metrics.cpp",
+        "//src/mongo/db/sharding_environment/client:shard_remote.cpp",
     ],
     hdrs = [
-        "num_hosts_targeted_metrics.h",
-        "shard_remote.h",
+        "//src/mongo/db/sharding_environment/client:num_hosts_targeted_metrics.h",
+        "//src/mongo/db/sharding_environment/client:shard_remote.h",
     ],
     deps = [
         ":shard_interface",

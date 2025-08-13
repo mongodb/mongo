@@ -22,7 +22,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:fle_crud",
         "//src/mongo/db:shared_request_handling",
-        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/local_catalog:collection_uuid_mismatch_info",
         "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:docs_needed_bounds_visitor",
@@ -52,7 +52,7 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db:curop_failpoint_helpers",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/local_catalog:collection_uuid_mismatch_info",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:query_common",
         "//src/mongo/db/query:shard_key_diagnostic_printer",

@@ -33,6 +33,7 @@
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"

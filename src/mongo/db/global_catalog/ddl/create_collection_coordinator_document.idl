@@ -1,0 +1,119 @@
+# Copyright (C) 2021-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# This file defines the format of documents stored in config.ddl.dropCollections, used by the
+# shard coordinator to guarantee resilience in the event of stepdowns while creating collections.
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.idl"
+    - "mongo/db/global_catalog/ddl/sharded_ddl_commands.idl"
+    - "mongo/db/global_catalog/type_collection_common_types.idl"
+
+enums:
+    CreateCollectionCoordinatorPhase:
+        description: "Current create collection coordinator's operation state."
+        type: string
+        values:
+            kUnset: "unset"
+            kEnterWriteCriticalSectionOnCoordinator: "enterWriteCriticalSectionOnCoordinator"
+            kTranslateRequestParameters: "translateRequestParameters"
+            kEnterWriteCSOnDataShardAndCheckEmpty: "enterWriteCSOnDataShardAndCheckEmpty"
+            kSyncIndexesOnCoordinator: "syncIndexesOnCoordinator"
+            kCreateCollectionOnCoordinator: "createCollectionOnCoordinator"
+            kEnterCriticalSection: "enterCriticalSection"
+            kCreateCollectionOnParticipants: "createCollectionOnParticipants"
+            kCommitOnShardingCatalog: "commitOnShardingCatalog"
+            kSetPostCommitMetadata: "setPostCommitMetadata"
+            kExitCriticalSection: "exitCriticalSection"
+
+structs:
+    TranslatedRequestParams:
+        description: "Subset of ShardsvrCreateCollectionRequest fields that may get overridden once the kTranslateRequest phase gets executed"
+        generate_comparison_operators: false
+        strict: false
+        fields:
+            nss:
+                type: namespacestring
+                description: "The namespace that will be used by the DDL while accessing the Sharding Catalog"
+                optional: false
+            keyPattern:
+                type: KeyPattern
+                description: "The shard key that will be used by the DDL while accessing the Sharding Catalog"
+                optional: false
+            collation:
+                type: object_owned
+                description: "Collation value from the targeted unsharded collection if this exists; otherwise, simple-collation"
+                optional: false
+            timeseries:
+                type: TypeCollectionTimeseriesFields
+                description: "The options to create the time-series collection with."
+                optional: true
+
+    CreateCollectionCoordinatorDocument:
+        description: "Object with neccessary fields to create a collection"
+        generate_comparison_operators: false
+        strict: false
+        chained_structs:
+            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            ShardsvrCreateCollectionRequest: ShardsvrCreateCollectionRequest
+        fields:
+            phase:
+                type: CreateCollectionCoordinatorPhase
+                description: "Coordinator phase."
+                default: kUnset
+            translatedRequestParams:
+                type: TranslatedRequestParams
+                description: "The field is populated only once the kTranslateRequest phase is completed."
+                optional: true
+            collectionIsEmpty:
+                type: bool
+                description: "True if the collection has no data or does not exist. False otherwise."
+                optional: true
+            shardIds:
+                type: array<shard_id>
+                description: "The list of shards involved in the create collection operation."
+                optional: true
+            originalDataShard:
+                type: shard_id
+                description: >-
+                    The current data shard that the collection lives on. Will be the coordinator
+                    shard if the collection does not yet exist. Only guaranteed to be set after the
+                    enterWriteCSOnDataShardAndCheckEmpty phase completes.
+                optional: true
+            # TODO (SERVER-100309): remove once 9.0 becomes last LTS
+            createSessionsCollectionRemotelyOnFirstShard:
+                type: bool
+                description: >-
+                    When true, the coordinator will set the first shard as the data shard for the
+                    config.system.sessions collection. When false, the coordinator will create the
+                    chunk for the sessions collection locally (pre-8.1 behavior).
+                optional: true

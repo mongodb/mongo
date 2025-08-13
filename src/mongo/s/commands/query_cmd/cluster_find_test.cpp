@@ -35,8 +35,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/s/commands/cluster_command_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 #include <functional>

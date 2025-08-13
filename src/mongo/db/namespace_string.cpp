@@ -31,7 +31,8 @@
 
 #include <boost/optional.hpp>
 
-// IWYU pragma: no_include "mongo/db/namespace_string_reserved.def.h"
+// IWYU pragma: no_include
+// "mongo/db/namespace_string_reserved.def.h"
 
 namespace mongo {
 namespace {

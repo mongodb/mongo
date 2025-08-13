@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/shard_role.h"
 
 namespace mongo::timeseries {
 

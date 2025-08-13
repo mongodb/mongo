@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/catalog/durable_catalog.h"
+#include "mongo/db/local_catalog/durable_catalog.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -36,22 +36,23 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/index_spec.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_impl.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index/index_constants.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_impl.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/durable_catalog_entry_metadata.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -66,7 +67,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -1090,7 +1090,8 @@ TEST_F(DurableCatalogTest, CreateCollectionRemovesPriorDocumentsAfterRecreate) {
         auto collection = acquireCollectionForWrite(opCtx, nss);
         WriteUnitOfWork wuow(opCtx);
         RecordId rid(1);
-        BSONObj obj = BSON("_id" << 1 << "x" << "doc1");
+        BSONObj obj = BSON("_id" << 1 << "x"
+                                 << "doc1");
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
         ASSERT_OK(collectionRecordStore
                       ->insertRecord(opCtx, ru, obj.objdata(), obj.objsize(), Timestamp())

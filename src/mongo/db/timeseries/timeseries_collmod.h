@@ -31,7 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/coll_mod_gen.h"
+#include "mongo/db/local_catalog/ddl/coll_mod_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 

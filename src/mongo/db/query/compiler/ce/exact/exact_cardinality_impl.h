@@ -28,7 +28,7 @@
  */
 
 #pragma once
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"

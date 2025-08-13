@@ -195,7 +195,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:server_status_core",
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/db/local_catalog/lock_manager:flow_control_ticketholder",
         "//src/mongo/util:background_job",
     ],
 )
@@ -238,7 +238,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db:shard_role_api",
-        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/local_catalog/lock_manager",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/unittest",
         "//src/mongo/util:mock_periodic_runner",

@@ -28,11 +28,11 @@
  */
 #include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 
-#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/change_stream_options_gen.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_pre_image_test_helpers.h"
 #include "mongo/db/change_stream_pre_image_util.h"
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_test_fixture.h"

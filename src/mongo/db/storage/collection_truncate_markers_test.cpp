@@ -31,10 +31,10 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"

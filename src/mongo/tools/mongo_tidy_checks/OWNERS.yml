@@ -3,9 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/server-programmability
-  - "MongoCollectionShardingRuntimeCheck.*":
-    approvers:
-      - 10gen/server-cluster-scalability
   - "MongoFCVConstantCheck.*":
     approvers:
       - 10gen/server-fcv

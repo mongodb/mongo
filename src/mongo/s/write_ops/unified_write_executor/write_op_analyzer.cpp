@@ -29,7 +29,7 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 
-#include "mongo/s/collection_routing_info_targeter.h"
+#include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
 
 namespace mongo {
 namespace unified_write_executor {

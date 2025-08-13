@@ -34,8 +34,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/disagg_storage/server_parameters_gen.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 

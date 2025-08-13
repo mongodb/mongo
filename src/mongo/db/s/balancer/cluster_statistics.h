@@ -31,7 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 
 #include <cstdint>
 #include <set>

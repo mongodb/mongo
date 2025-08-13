@@ -29,7 +29,7 @@
 
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 
-#include "mongo/s/sharding_mongos_test_fixture.h"
+#include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

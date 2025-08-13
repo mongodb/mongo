@@ -29,7 +29,7 @@ core:
     - src/mongo/platform/
     - src/mongo/stdx/
     - src/mongo/util/
-    - src/mongo/db/catalog/util/partitioned*
+    - src/mongo/db/local_catalog/util/partitioned*
     - src/mongo/db/field_parser[._]*
     - src/mongo/db/find_one_bm.cpp
     - src/mongo/db/generic_argument_util.*
@@ -192,7 +192,6 @@ query:
     - src/mongo/db/query/
     - src/mongo/db/s/query_analysis* # note the filename pattern
     - src/mongo/db/s/*query*analyzer* # note the filename pattern
-    - src/mongo/db/s/shard_filtering_util*
     - src/mongo/db/s/document_source_visitor_docs_needed_bounds.cpp
     - src/mongo/db/s/query_cmd
     - src/mongo/db/stats/
@@ -254,38 +253,35 @@ car_common:
     slack: server-catalog-and-routing
     jira: Catalog and Routing
   files:
-    - src/mongo/s/chunk.*
-    - src/mongo/s/chunk_constraints.h
-    - src/mongo/s/chunk_manager*
-    - src/mongo/s/chunk_map*
-    - src/mongo/s/chunk_range.idl
-    - src/mongo/s/chunk_test*
-    - src/mongo/s/chunks_test*
-    - src/mongo/db/s/range_arithmetic*
-    - src/mongo/db/s/sharding_config_server_parameters.idl
-    - src/mongo/s/shard_key_pattern*
-    - src/mongo/s/commands/cluster_commands.idl
-    - src/mongo/s/mongod_and_mongos_server_parameters.idl
-    - src/mongo/s/cluster_commands_helpers*
-    - src/mongo/s/sharding_feature_flags.cpp
-    - src/mongo/s/sharding_feature_flags.idl
-    - src/mongo/s/sharding_mongos_test_fixture.cpp
-    - src/mongo/s/sharding_mongos_test_fixture.h
-    - src/mongo/s/sharding_types.idl
-    - src/mongo/s/type_collection_common_types.idl
-    - src/mongo/db/s/operation_sharding_state*
+    - src/mongo/db/global_catalog/chunk.*
+    - src/mongo/db/global_catalog/chunk_constraints.h
+    - src/mongo/db/global_catalog/chunk_manager*
+    - src/mongo/db/global_catalog/chunk_map*
+    - src/mongo/db/global_catalog/chunk_range.idl
+    - src/mongo/db/global_catalog/chunk_test*
+    - src/mongo/db/global_catalog/chunks_test*
+    - src/mongo/db/global_catalog/shard_key_pattern*
+    - src/mongo/db/global_catalog/type_collection_common_types.idl
+    - src/mongo/db/sharding_environment/range_arithmetic*
+    - src/mongo/db/sharding_environment/sharding_config_server_parameters.idl
+    - src/mongo/db/sharding_environment/cluster_commands.idl
+    - src/mongo/db/sharding_environment/mongod_and_mongos_server_parameters.idl
+    - src/mongo/db/sharding_environment/sharding_feature_flags.cpp
+    - src/mongo/db/sharding_environment/sharding_feature_flags.idl
+    - src/mongo/db/sharding_environment/sharding_mongos_test_fixture.cpp
+    - src/mongo/db/sharding_environment/sharding_mongos_test_fixture.h
+    - src/mongo/db/sharding_environment/sharding_types.idl
     - src/mongo/db/persistent_task_store*
 
     # Observers overlaps between shard_catalog, ddl and routing_and_topology. Putting them in this
     # module because it is "generic infrastructure", but likely their contents need to be moved
     # to each respective module.
-    - src/mongo/db/s/shard_server_op_observer[._]*
-    - src/mongo/db/s/config_server_op_observer[._]*
+    - src/mongo/db/sharding_environment/shard_server_op_observer[._]*
+    - src/mongo/db/sharding_environment/config_server_op_observer[._]*
 
     # observability
-    - src/mongo/db/s/sharding_logging*
-    - src/mongo/db/s/sharding_statistics*
-    - src/mongo/s/commands/cluster_*_stats_cmd.cpp
+    - src/mongo/db/sharding_environment/sharding_logging*
+    - src/mongo/db/sharding_environment/sharding_statistics*
 
 car_common_catalog_ddl:
   meta:
@@ -295,22 +291,7 @@ car_common_catalog_ddl:
     slack: server-catalog-and-routing
     jira: Catalog and Routing
   files:
-    - src/mongo/db/coll_mod.idl
-    - src/mongo/db/coll_mod_reply_validation*
-    - src/mongo/db/create_indexes.idl
-    - src/mongo/db/drop.idl
-    - src/mongo/db/drop_database.idl
-    - src/mongo/db/drop_indexes.idl
-    - src/mongo/db/list_collections.idl
-    - src/mongo/db/list_indexes.idl
-    - src/mongo/db/commands/collmod_cmd.cpp
-    - src/mongo/db/commands/create.idl
-    - src/mongo/db/commands/create_command*
-    - src/mongo/db/commands/drop*
-    - src/mongo/db/commands/list_*
-    - src/mongo/db/commands/*rename*
-    - src/mongo/db/s/clone_catalog_data_command.cpp
-    - src/mongo/s/request_types/clone_catalog_data.idl
+    - src/mongo/db/local_catalog/ddl/*
 
 shard_catalog:
   meta:
@@ -329,65 +310,25 @@ shard_catalog:
     - src/mongo/db/database_name[._]*
     - src/mongo/db/namespace_string[._]*
     - src/mongo/util/namespace_string[._]*
+    - src/mongo/util/database_name[._]*
 
     # lock_manager:
-    - src/mongo/db/concurrency/
-    - src/mongo/db/collection_acquisition_bm.cpp
-    - src/mongo/db/dump_lock_manager[._]*
-    - src/mongo/db/commands/lock_info*
-    - src/mongo/db/resource_yielder*
-    - src/mongo/s/commands/cluster_lock_info_cmd.cpp
+    - src/mongo/db/local_catalog/lock_manager/*
 
     # shard_role_api: The public Shard Role API that the rest of the teams use to build the shard
     # side of distributed date applications.
-    - src/mongo/db/shard_role[._]*
-    - src/mongo/db/transaction_resources[._]*
-    - src/mongo/s/resource_yielders*
-
-    # shard_role_api_cluster_part: Implementation detail of the public Shard Role API that contains
-    # the parts of the catalog that are projected on the Config Server and managed through the
-    # non-authoritative model.
-    - src/mongo/db/direct_shard_client_tracker[._]*
-    - src/mongo/db/direct_connection_util[._]*
-    - src/mongo/db/s/collection_metadata[._]*
-    - src/mongo/db/s/collection_sharding_state[._]*
-    - src/mongo/db/s/collection_sharding_runtime[._]*
-    - src/mongo/db/s/database_sharding_state[._]*
-    - src/mongo/db/s/database_sharding_runtime[._]*
-    - src/mongo/db/s/metadata_manager[._]*
-    - src/mongo/db/s/op_observer_sharding_test*
-    - src/mongo/db/s/scoped_collection_metadata*
-    - src/mongo/db/s/shard_filtering_metadata_refresh*
-    - src/mongo/s/shard_cannot_refresh_due_to_locks_held_exception*
-
-    # shard_role_api_local_part: Implementation detail of the public Shard Role API that contains
-    # the parts of the catalog that are not projected on the Config Server.
-    - src/mongo/db/catalog_shard_feature_flag.idl
-    - src/mongo/db/catalog/*
-    - src/mongo/db/catalog_raii[._]*
-    - src/mongo/db/collection_type.h
-    - src/mongo/db/db_raii[._]*
-    - src/mongo/db/d_concurrency_*
-    - src/mongo/db/raw_data_operation*
-    - src/mongo/dbtests/catalogtests.cpp
-    - src/mongo/dbtests/indexcatalogtests.cpp
-
-    # authoritative metadata
-    - src/mongo/db/s/*authoritative*
-    - src/mongo/db/s/shardsvr_fetch_coll_metadata_command.cpp
-    - src/mongo/db/s/type_oplog_catalog_metadata.idl
-
-    # validate db metadata
-    - src/mongo/db/commands/validate_db_*
-    - src/mongo/s/commands/cluster_validate_db_*
-
-    # unit_testing_framework: Components that are used to implement unit-tests that require a
-    # functioning shard catalog.
-    - src/mongo/db/catalog/catalog_test_fixture.*
-
-    # unsorted: Everything else.
+    - src/mongo/db/local_catalog/shard_role_api/*
     - src/mongo/db/service_entry_point_shard_role[._]*
-    - src/mongo/db/s/implicit_collection_creation_test.cpp
+
+    # shard_role_catalog: Implementation detail of the public Shard Role API that contains the parts
+    # of the catalog that are projected on the Config Server and managed through the non-authoritative
+    # model.
+    - src/mongo/db/local_catalog/shard_role_catalog/*
+
+    # local_catalog: Implementation detail of the public Shard Role API that contains the parts of
+    # the catalog that are not projected on the Config Server.
+    - src/mongo/db/local_catalog/*
+    - src/mongo/db/raw_data_operation*
 
 ddl:
   meta:
@@ -404,123 +345,17 @@ ddl:
     # The files below are grouped by the logical component/library that they (should) represent in
     # the ideal state of the codebase.
 
-    # ddl_role_api: The public DDL Role API that the rest of the teams use to implement the shard
-    # side of DDL operations in a replicaset and sharded clusters.
-    - src/mongo/db/s/config/configsvr_coordinator*
-    - src/mongo/db/s/ddl_lock_manager[._]*
-    - src/mongo/db/s/shard_key*util*
-    - src/mongo/db/s/shard_metadata_util*
-    - src/mongo/db/s/sharding_ddl_coordinator[._]*
-    - src/mongo/db/s/sharding_test_helpers.h
-    - src/mongo/db/s/sharding_util[._]*
-    - src/mongo/db/s/sharding_ddl_util[._]*
-    - src/mongo/s/shard_util*
+    # global_catalog
+    - src/mongo/db/global_catalog/*
 
     # DDL operations
-    - src/mongo/db/s/*change_primary*
-    - src/mongo/db/s/*collmod*
-    - src/mongo/db/s/*convert_to_capped*
-    - src/mongo/db/s/*create*
-    - src/mongo/db/s/*drop*
-    - src/mongo/db/s/*merge*
-    - src/mongo/db/s/*move_primary*
-    - src/mongo/db/s/*participant_block*
-    - src/mongo/db/s/*refine*
-    - src/mongo/db/s/remove_chunks.idl
-    - src/mongo/db/s/*rename*
-    - src/mongo/db/s/*reshard_collection_coordinator*
-    - src/mongo/db/s/*split_chunk*
-    - src/mongo/db/s/*untrack*
-    - src/mongo/s/cannot_implicitly_create_collection_info*
-
-    # critical section
-    - src/mongo/db/s/collection_critical_section_document.idl
-    - src/mongo/db/s/*move_primary*critical_section*
-    - src/mongo/db/s/*migration*critical_section*
-    - src/mongo/db/s/sharding_recovery_service*
-
-    # placement history
+    - src/mongo/db/global_catalog/ddl/*
+    - src/mongo/s/request_types/list_shards.idl
+    - src/mongo/db/s/config/sharding_catalog_manager_collection_operations_test.cpp
     - src/mongo/db/s/*placement_history*
-    - src/mongo/db/s/config/*historical_placement*
-    - src/mongo/db/s/config/*placement_history*
-    - src/mongo/s/commands/*placement_history*
-    - src/mongo/s/request_types/*placement_history*
-
-    # change streams
-    - src/mongo/db/commands/notify_sharding_event*
-    - src/mongo/db/s/shardsvr_notify_sharding_event_command.cpp
-
-    # migrations
-    - src/mongo/db/s/commit_chunk_migration.idl
-    - src/mongo/db/s/shardsvr_join_migrations_command.cpp
-    - src/mongo/db/s/*set_allow_migrations*
-    - src/mongo/db/s/config/configsvr_set_allow_migrations_command.cpp
-    - src/mongo/s/request_types/*set_allow_migrations*
-    - src/mongo/s/request_types/shardsvr_join_migrations_request.idl
 
     # metadata consistency checkers
-    - src/mongo/db/s/check_sharding_index_command.cpp
-    - src/mongo/db/s/*metadata_consistency*
-    - src/mongo/db/s/*index_consistency*
-    - src/mongo/db/s/config/*metadata_consistency*
-    - src/mongo/s/check_metadata_consistency.idl
-    - src/mongo/s/commands/*metadata_consistency*
-
-    # sessions collection
-    - src/mongo/db/s/sessions_collection_config_server*
-    - src/mongo/s/sessions_collection_sharded*
-
-    # commands: Commands that belong to this module.
-    - src/mongo/s/commands/*change_primary*
-    - src/mongo/s/commands/*collection_mod*
-    - src/mongo/s/commands/*convert_to_capped*
-    - src/mongo/s/commands/*create*
-    - src/mongo/s/commands/*drop*
-    - src/mongo/s/commands/*enable_sharding*
-    - src/mongo/s/commands/*list*
-    - src/mongo/s/commands/*merge*
-    - src/mongo/s/commands/*move_collection*
-    - src/mongo/s/commands/*move_primary*
-    - src/mongo/s/commands/*refine*
-    - src/mongo/s/commands/*rename*
-    - src/mongo/s/commands/*_shard_collection*
-    - src/mongo/s/commands/shard_collection*
-    - src/mongo/db/s/config/*collmod*
-    - src/mongo/db/s/config/configsvr_coordinator*
-    - src/mongo/db/s/config/*configsvr*chunk*
-    - src/mongo/db/s/config/*move_primary*
-    - src/mongo/db/s/config/*refine*
-    - src/mongo/s/request_types/*drop_collection*
-    - src/mongo/s/request_types/*merge_chunk*
-    - src/mongo/s/request_types/*move_primary*
-    - src/mongo/s/request_types/sharded_ddl_commands.idl
-    - src/mongo/s/request_types/*untrack*
-    - src/mongo/s/request_types/shardsvr_join_ddl_coordinators_request.idl
-    - src/mongo/db/s/shardsvr_join_ddl_coordinators_command.cpp
-    - src/mongo/db/s/config/configsvr_create_database_command.cpp
-    - src/mongo/s/commands/cluster_create_unsplittable_collections_command.cpp
-    - src/mongo/s/commands/cluster_repair_sharded_collection_chunks_history_cmd.cpp
-    - src/mongo/s/commands/*move_collection*
-    - src/mongo/s/commands/*reshard*
-    - src/mongo/s/commands/*unshard*
-    - src/mongo/s/request_types/*reshard_collection*
-    - src/mongo/s/commands/cluster_set_allow_migrations_cmd.cpp
-    - src/mongo/s/commands/cluster_untrack_unsplittable_collection.cpp
-    - src/mongo/s/request_types/list_shards.idl
-
-    # unsorted: Everything else.
-    - src/mongo/s/cluster_ddl.*
-    - src/mongo/s/catalog/*
-    - src/mongo/db/s/config/index_on_config*
-    - src/mongo/db/s/config/sharding_catalog_manager*
-    - src/mongo/db/s/migration_blocking_operation/*blocking*
-    - src/mongo/s/request_types/migration_blocking_operation*
-    - src/mongo/s/migration_blocking_operation*
-    - src/mongo/db/metadata_consistency_types.idl
-    - src/mongo/db/commands/shuffle_list_command_results*
-    - src/mongo/db/s/shardsvr_validate_shard_key_candidate.cpp
-    - src/mongo/db/s/config/configsvr_run_restore*
-    - src/mongo/db/s/config/known_collections.h
+    - src/mongo/db/global_catalog/metadata_consistency_validation/*
 
 routing_and_topology:
   meta:
@@ -533,50 +368,27 @@ routing_and_topology:
     slack: server-catalog-and-routing
     jira: Catalog and Routing
   files:
-    # base: Fundamental, stateless value types that are used throughout the codebase (MongoS and MongoD).
-    - src/mongo/db/cluster_role.*
-    - src/mongo/db/shard_id[._]*
-    - src/mongo/s/version_mongos[._]*
-    - src/mongo/s/stale_exception[._]*
-    - src/mongo/s/collection_uuid_mismatch.*
+    - src/mongo/db/topology/*
+    - src/mongo/db/s/config/configsvr_commit_shard_removal_command.cpp
+    - src/mongo/s/commands/cluster_commit_shard_removal_cmd.cpp
+
     # shard versioning protocol
-    - src/mongo/db/s/*database_version*
-    - src/mongo/db/s/*shard_version*
-    - src/mongo/s/*chunk_version*
-    - src/mongo/s/*database_version*
-    - src/mongo/s/*shard_version*
-    - src/mongo/s/commands/*database_version*
-    - src/mongo/s/commands/*shard_version*
-    - src/mongo/s/request_types/*chunk_version*
-    - src/mongo/s/request_types/*database_version*
+    - src/mongo/db/versioning_protocol/*
 
     # sharding_environment: Fundamental mutable state that all sharding components rely.
-    - src/mongo/s/grid.*
-    - src/mongo/db/s/sharding_state*
-    - src/mongo/db/s/sharding_initialization[._]*
-    - src/mongo/db/s/sharding_ready*
-    - src/mongo/s/sharding_initialization*
+    - src/mongo/db/sharding_environment/*
+    - src/mongo/db/sharding_environment/client/*
 
     # vector_clock:
-    - src/mongo/db/vector_clock[._]*
-    - src/mongo/db/s/vector_clock*
-    - src/mongo/db/s/topology_time*
+    - src/mongo/db/vector_clock/*
 
     # router_role_api:
-    - src/mongo/db/s/*write_router*
-    - src/mongo/s/client/shard_registry[._]*
-    - src/mongo/s/*ns_targeter*
-    - src/mongo/s/router_role[._]*
-    - src/mongo/s/*routing*
+    - src/mongo/db/global_catalog/router_role_api/*
+    - src/mongo/s/service_entry_point_router_role[._]*
+    - src/mongo/s/commands/strategy*
 
-    # catalog cache
-    - src/mongo/db/s/*catalog_cache*
-    - src/mongo/db/s/*flush*cache*
-    - src/mongo/db/s/namespace_metadata_change_notifications*
-    - src/mongo/db/s/type_shard_*
-    - src/mongo/s/*catalog_cache*
-    - src/mongo/s/commands/flush_router_config_cmd.cpp
-    - src/mongo/s/request_types/*flush*cache*
+    # catalog_cache:
+    - src/mongo/db/global_catalog/catalog_cache/*
 
     # FCV:
     - src/mongo/db/version_context*
@@ -585,26 +397,10 @@ routing_and_topology:
     # cluster_server_parameters: Cluster server parameters are a special type of server parameter that
     # are stored in the config server and are replicated to all shards. They are used to control
     # the behavior of the cluster as a whole, rather than individual shards.
-    - src/mongo/db/commands/*cluster_parameter*
-    - src/mongo/db/commands/cluster_server_parameter*
-    - src/mongo/db/s/config/*cluster_parameter*
-    - src/mongo/db/s/shardsvr_set_cluster_parameter_command.cpp
-    - src/mongo/idl/cluster_server_parameter*
-    - src/mongo/idl/cluster_parameter_synchronization_helpers*
-    - src/mongo/s/migration_blocking_operation/migration_blocking_operation_cluster_parameters.idl
-    - src/mongo/s/set_cluster_server_parameter_router_impl[._]*
-    - src/mongo/s/sharding_cluster_parameters.idl
-    - src/mongo/s/commands/cluster_get_cluster_parameter_cmd.cpp
-    - src/mongo/s/commands/cluster_set_cluster_parameter_cmd.cpp
-
-    # commands: Commands that belong to this module.
-    - src/mongo/db/s/get_sharding_ready_command.cpp
-    - src/mongo/db/s/shardsvr_check_can_connect_to_config_server_cmd.cpp
-    - src/mongo/s/commands/cluster_is_db_grid_cmd.cpp
-    - src/mongo/s/s_sharding_server_status.cpp
-    - src/mongo/s/commands/cluster_multicast_cmd.cpp
+    - src/mongo/db/cluster_parameters/*
 
     # config shard
+    - src/mongo/db/catalog_shard_feature_flag.idl
     - src/mongo/db/s/config/*transition*dedicated_config*
     - src/mongo/s/commands/*transition*dedicated_config*
     - src/mongo/s/request_types/transition*
@@ -613,85 +409,26 @@ routing_and_topology:
     - src/mongo/db/commands/*rwc_defaults*
     - src/mongo/s/commands/cluster_rwc_defaults_commands.cpp
     - src/mongo/s/commands/s_read_write_concern_defaults_server_status.cpp
-
-    # add/remove shard
-    - src/mongo/db/s/add_shard*
-    - src/mongo/db/s/shardsvr_add_shard_cmd.cpp
-    - src/mongo/db/s/config/configsvr_add_shard*
-    - src/mongo/s/commands/*add_shard*
-    - src/mongo/s/request_types/add_shard*
-
-    - src/mongo/db/s/remove_shard*
-    - src/mongo/db/s/config/configsvr_start_shard_draining_command.cpp
-    - src/mongo/db/s/config/configsvr_stop_shard_draining_command.cpp
-    - src/mongo/db/s/config/configsvr_remove_shard*
-    - src/mongo/db/s/config/remove_shard_command_helpers*
-    - src/mongo/s/commands/*remove_shard*
-    - src/mongo/s/commands/cluster_start_shard_draining_cmd.cpp
-    - src/mongo/s/commands/cluster_stop_shard_draining_cmd.cpp
-    - src/mongo/s/request_types/remove_shard*
-    - src/mongo/db/s/config/configsvr_shard_draining_status_command.cpp
-    - src/mongo/s/commands/cluster_shard_draining_status_cmd.cpp
-    - src/mongo/db/s/config/configsvr_commit_shard_removal_command.cpp
-    - src/mongo/s/commands/cluster_commit_shard_removal_cmd.cpp
-
-    - src/mongo/db/s/complete_promotion_to_sharded_cluster_coordinator*
-    - src/mongo/db/s/topology_change_helpers*
-
-    - src/mongo/db/s/periodic_replica_set_configshard_maintenance_mode_checker*
-
-    # shard identity
-    - src/mongo/db/s/*shard_identity*
-
-    # unit_testing_framework: Components that are used to implement unit-tests that require a
-    # functioning routing and topology environment.
-    - src/mongo/s/catalog_cache_test_fixture.*
-    - src/mongo/s/sharding_test_fixture_common.*
-    - src/mongo/db/vector_clock_test_fixture.*
-    - src/mongo/db/s/sharding_mongod_test_fixture.*
-    - src/mongo/db/s/shard_server_test_fixture.*
-    - src/mongo/db/s/config/config_server_test_fixture.*
+    - src/mongo/s/read_write_concern_defaults_cache_lookup_mongos*
 
     # replica_set_endpoint: will be deleted eventually
     - src/mongo/db/s/replica_set_endpoint*
 
     # user writes block
-    - src/mongo/db/commands/*user_write_block*
-    - src/mongo/db/op_observer/*user_write_block*
-    - src/mongo/db/write_block_bypass[._]*
-    - src/mongo/db/s/*user_write*
-    - src/mongo/db/s/config/*user_write*
-    - src/mongo/s/commands/cluster_set_user_write_block_mode_command.cpp
-
-    # unsorted: Everything else.
-    - src/mongo/s/client/num_hosts_targeted_metrics*
-    - src/mongo/s/cluster_identity_loader[._]*
-    - src/mongo/s/service_entry_point_router_role[._]*
-    - src/mongo/s/commands/cluster_command_test_fixture*
-    - src/mongo/s/commands/get_shard_map_cmd.cpp
-    - src/mongo/s/commands/strategy*
-    - src/mongo/db/s/sharding_api_d_params.idl
-    - src/mongo/db/s/sharding_runtime_d*
-    - src/mongo/db/s/sharding_server_status.cpp
-    - src/mongo/db/s/transition_to_sharded_cluster*
-    - src/mongo/s/mongos_hello_response*
-    - src/mongo/s/mongos_server_parameters*
-    - src/mongo/s/mongos_topology_coordinator*
-    - src/mongo/s/read_write_concern_defaults_cache_lookup_mongos*
-    - src/mongo/s/router_uptime_reporter*
+    - src/mongo/db/user_write_block/*
 
     # change streams
     - src/mongo/s/change_streams*
 
 sharding_clients:
   meta:
-    slack: server-sharding
+    slack: server-catalog-and-routing
     jira: Catalog and Routing
   files:
     - src/mongo/db/rs_local_client*
-    - src/mongo/s/client/config_shard_wrapper*
-    - src/mongo/s/client/shard*
-    - src/mongo/db/s/shard_local*
+    - src/mongo/db/sharding_environment/client/config_shard_wrapper*
+    - src/mongo/db/sharding_environment/client/shard*
+    - src/mongo/db/sharding_environment/shard_local*
 
 transactions:
   meta:
@@ -756,7 +493,7 @@ admission:
     jira: server-workload-scheduling
   files:
     - src/mongo/db/admission/
-    - src/mongo/db/concurrency/flow_control_ticketholder*
+    - src/mongo/db/flow_control_ticketholder*
     - src/mongo/util/concurrency/admission_context*
 
 workload_simulation:
@@ -819,7 +556,7 @@ field_level_encryption:
   files:
     - src/mongo/db/commands/fle2_*
     - src/mongo/db/fle_*
-    - src/mongo/db/s/*_structured_encryption_*
+    - src/mongo/db/global_catalog/ddl/*_structured_encryption_*
     - src/mongo/s/commands/*fle2*
     - src/mongo/db/commands/fle_compact_test.cpp
 
@@ -859,8 +596,8 @@ data_movement:
     - src/mongo/db/s/config/sampling_based_initial_split_policy_test.cpp
     - src/mongo/s/*reshard*
     - src/mongo/db/s/metrics/**
-    - src/mongo/s/request_types/flush_resharding_state_change.idl
-    - src/mongo/s/request_types/resharding_operation_time.idl
+    - src/mongo/s/request_types/*reshard*
+    - src/mongo/s/commands/*reshard*
 
     # chunk operations
     - src/mongo/db/s/migration_chunk*
@@ -892,6 +629,7 @@ data_movement:
     - src/mongo/s/request_types/migration_secondary_throttle*
     - src/mongo/s/request_types/repair_sharded_collection_chunks_history.idl
     - src/mongo/s/request_types/cleanup_orphaned.idl
+    - src/mongo/s/migration_blocking_operation/migration_blocking_operation*
 
     # jumbo flag
     # TODO SERVER-105531: consider restructuring the sharding catalog manager
@@ -909,7 +647,7 @@ data_movement:
     - src/mongo/db/cloner*
 
     # zones
-    - src/mongo/db/s/remove_tags.idl
+    - src/mongo/db/global_catalog/ddl/remove_tags.idl
     - src/mongo/db/s/config/configsvr_remove_tags_command.cpp
     - src/mongo/db/s/config/configsvr_update_zone_key_range_command.cpp
     - src/mongo/s/commands/cluster_update_zone_key_range_cmd.cpp
@@ -1018,7 +756,7 @@ networking.commands:
     - src/mongo/db/commands/command_mirroring_test.cpp
     - src/mongo/db/commands/conn_pool_stats.cpp
     - src/mongo/db/commands/conn_pool_sync.cpp
-    - src/mongo/db/commands/drop_connections_command.cpp
+    - src/mongo/db/commands/drop_connections*
     - src/mongo/db/commands/http_client.cpp
     - src/mongo/db/commands/http_client.idl
     - src/mongo/db/commands/isself.cpp
@@ -1100,8 +838,8 @@ index_builds: # authoritative: @10gen/server-index-builds
   files:
     - src/mongo/db/index_builds
     - src/mongo/db/index/index_access_method*
-    - src/mongo/db/catalog/index_key_validate*
-    - src/mongo/db/catalog/index_spec_validate*
+    - src/mongo/db/local_catalog/index_key_validate*
+    - src/mongo/db/local_catalog/index_spec_validate*
     - src/mongo/db/commands/create_indexes*
     - src/mongo/db/commands/set_index_commit_quorum*
     - src/mongo/db/commands/vote*index_build*
@@ -1151,8 +889,8 @@ storage_engine_integration:
     - src/mongo/db/mongod_options_storage.idl
     - src/mongo/db/dbhelpers*
     - src/mongo/db/dbcommands.idl
-    - src/mongo/db/catalog/import*
-    - src/mongo/db/catalog/index_repair*
+    - src/mongo/db/local_catalog/import*
+    - src/mongo/db/local_catalog/index_repair*
     - src/mongo/db/commands/fsync*
     - src/mongo/db/commands/dbcommands*
     - src/mongo/db/commands/resize_oplog*
@@ -1170,7 +908,7 @@ validate:
     slack: storage-engines-server-integration
     jira: Server Integration
   files:
-    - src/mongo/db/catalog/throttle_cursor*
+    - src/mongo/db/local_catalog/throttle_cursor*
     - src/mongo/db/commands/validate.cpp
     - src/mongo/db/validate
     - src/mongo/dbtests/validate_tests.cpp
@@ -1188,7 +926,7 @@ compact:
     slack: storage-engines-server-integration
     jira: Server Integration
   files:
-    - src/mongo/db/catalog/collection_compact*
+    - src/mongo/db/local_catalog/collection_compact*
     - src/mongo/db/commands/auto_compact*
     - src/mongo/db/commands/compact*
     - src/mongo/db/storage/compact_options*
@@ -1199,9 +937,9 @@ dbcheck:
     slack: storage-engines-server-integration
     jira: Server Integration
   files:
-    - src/mongo/db/catalog/health_log*
+    - src/mongo/db/local_catalog/health_log*
     - src/mongo/db/commands/dbcheck*
-    - src/mongo/db/concurrency/deferred_writer*
+    - src/mongo/db/deferred_writer*
     - src/mongo/dbtests/deferred_writer.cpp
     - src/mongo/db/repl/dbcheck*
 
@@ -1270,7 +1008,7 @@ replication:
     - src/mongo/db/commands/test_api_version_2_commands.cpp
     - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
     - src/mongo/db/mongod_options_replication*
-    - src/mongo/db/concurrency/replication_state_transition_lock_guard*
+    - src/mongo/db/replication_state_transition_lock_guard*
     - src/mongo/db/incremental_rollout_metrics.cpp
     - src/mongo/dbtests/mock_replica_set_test.cpp
     - src/mongo/dbtests/replica_set_tests.cpp
@@ -1300,7 +1038,7 @@ replication.oplog:
   files:
     - src/mongo/db/op_observer/op_observer*
     - src/mongo/db/op_observer/operation_logger*
-    - src/mongo/db/catalog/local_oplog_info*
+    - src/mongo/db/local_catalog/local_oplog_info*
     - src/mongo/db/commands/oplog*
     - src/mongo/db/commands/apply_ops*
     - src/mongo/db/repl/*oplog*

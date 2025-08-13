@@ -38,7 +38,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/s/transaction_coordinator_test_fixture.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

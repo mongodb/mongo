@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"

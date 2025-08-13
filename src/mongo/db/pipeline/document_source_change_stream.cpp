@@ -50,7 +50,7 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock/vector_clock.h"
 #include "mongo/idl/idl_parser.h"
 
 #include <string>

@@ -29,7 +29,7 @@
 
 
 #include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/dump_lock_manager.h"
+#include "mongo/db/local_catalog/lock_manager/dump_lock_manager.h"
 #include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_impl_gen.h"

@@ -3,6 +3,3 @@ filters:
   - "*":
     approvers:
       - 10gen/server-programmability
-  - "cluster*parameter*":
-    approvers:
-      - 10gen/server-catalog-and-routing

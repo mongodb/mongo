@@ -31,11 +31,11 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string/key_string.h"

@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/catalog/virtual_collection_options.h"
+#include "mongo/db/local_catalog/virtual_collection_options.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/virtual_collection/input_stream.h"
 #include "mongo/db/record_id.h"

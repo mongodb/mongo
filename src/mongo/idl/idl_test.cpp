@@ -670,9 +670,9 @@ TEST(IDLStatusType, ParseAndSerialize) {
 
     const auto testErrorCode = ErrorCodes::ForTestingErrorExtraInfo;
     const auto testErrMsg = "Test errmsg for IDL parsed Status";
-    const auto testStatusBSON =
-        BSON("code" << testErrorCode << "codeName" << "ForTestingErrorExtraInfo"
-                    << "errmsg" << testErrMsg << "data" << 1234);
+    const auto testStatusBSON = BSON("code" << testErrorCode << "codeName"
+                                            << "ForTestingErrorExtraInfo"
+                                            << "errmsg" << testErrMsg << "data" << 1234);
     const auto testDoc = BSON("value" << testStatusBSON);
     const auto testStruct = One_status_type::parse(ctxt, testDoc);
 
@@ -694,8 +694,8 @@ TEST(IDLStatusType, OKNotAllowed) {
     IDLParserContext ctxt("");
 
     // Test that serialization of an OK status is not allowed.
-    const auto testDoc =
-        BSON("value" << BSON("ok" << 1 << "code" << ErrorCodes::OK << "codeName" << "OK"));
+    const auto testDoc = BSON("value" << BSON("ok" << 1 << "code" << ErrorCodes::OK << "codeName"
+                                                   << "OK"));
     ASSERT_THROWS_CODE(One_status_type::parse(ctxt, testDoc), DBException, 7418501);
 
     // Test that deserialization of an OK status is not allowed.

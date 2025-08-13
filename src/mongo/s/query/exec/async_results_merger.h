@@ -41,7 +41,7 @@
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/cluster_query_result.h"

@@ -39,7 +39,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/vector_clock/vector_clock_mutable.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 

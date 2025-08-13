@@ -29,13 +29,14 @@
 
 #pragma once
 
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/local_catalog/shard_role_catalog/flush_routing_table_cache_updates_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/request_types/flush_resharding_state_change_gen.h"
-#include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
+#include "mongo/executor/async_rpc.h"
 #include "mongo/s/resharding/common_types_gen.h"
 
 namespace mongo {

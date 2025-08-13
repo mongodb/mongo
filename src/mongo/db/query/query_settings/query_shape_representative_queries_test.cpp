@@ -33,8 +33,8 @@
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
+#include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/executor/mock_async_rpc.h"
-#include "mongo/s/sharding_mongos_test_fixture.h"
 
 #include <memory>
 

@@ -29,14 +29,14 @@
 
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_external_state.h"
 
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/cluster_ddl.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/global_catalog/ddl/cluster_ddl.h"
+#include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator.h"
+#include "mongo/db/global_catalog/ddl/migration_blocking_operation_gen.h"
+#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
-#include "mongo/s/request_types/migration_blocking_operation_gen.h"
 #include "mongo/s/service_entry_point_router_role.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

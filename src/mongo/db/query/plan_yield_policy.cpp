@@ -29,11 +29,11 @@
 
 #include "mongo/db/query/plan_yield_policy.h"
 
-#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"

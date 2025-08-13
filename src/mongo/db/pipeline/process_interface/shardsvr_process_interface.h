@@ -47,10 +47,10 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/database_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 

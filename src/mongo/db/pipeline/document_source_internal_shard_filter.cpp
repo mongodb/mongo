@@ -32,8 +32,8 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
+#include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 

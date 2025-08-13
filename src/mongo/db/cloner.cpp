@@ -42,26 +42,29 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/cloner_gen.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/commands/list_collections_filter.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/index/index_constants.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
-#include "mongo/db/list_collections_gen.h"
-#include "mongo/db/list_indexes_gen.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/database.h"
+#include "mongo/db/local_catalog/database_holder.h"
+#include "mongo/db/local_catalog/ddl/list_collections_filter.h"
+#include "mongo/db/local_catalog/ddl/list_collections_gen.h"
+#include "mongo/db/local_catalog/ddl/list_indexes_gen.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/insert.h"
@@ -69,13 +72,10 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -220,7 +220,8 @@ struct DefaultClonerImpl::BatchHandler {
             BSONObj tmp = cursor.nextSafe();
 
             /* assure object is valid.  note this will slow us down a little. */
-            // We allow cloning of collections containing decimal data even if decimal is disabled.
+            // We allow cloning of collections containing decimal data even if decimal is
+            // disabled.
             const Status status = validateBSON(tmp.objdata(), tmp.objsize());
             if (!status.isOK()) {
                 if (gSkipCorruptDocumentsWhenCloning.load()) {
@@ -440,17 +441,17 @@ Status DefaultClonerImpl::_createCollectionsForDb(
                                   MODE_IX);
             if (collection.exists()) {
                 if (!params.trackedColls) {
-                    // If the collection is unsharded then we want to fail when a collection we're
-                    // trying to create already exists.
+                    // If the collection is unsharded then we want to fail when a collection
+                    // we're trying to create already exists.
                     return Status(ErrorCodes::NamespaceExists,
                                   str::stream() << "unsharded collection with same namespace "
                                                 << nss.toStringForErrorMsg() << " already exists.");
                 }
 
-                // If the collection is sharded and a collection with the same name already exists
-                // on the target, we check if the existing collection's UUID matches that of the one
-                // we're trying to create. If it does, we treat the create as a no-op; if it doesn't
-                // match, we return an error.
+                // If the collection is sharded and a collection with the same name already
+                // exists on the target, we check if the existing collection's UUID matches that
+                // of the one we're trying to create. If it does, we treat the create as a
+                // no-op; if it doesn't match, we return an error.
                 const auto& existingOpts = collection.getCollectionPtr()->getCollectionOptions();
                 const UUID clonedUUID =
                     uassertStatusOK(UUID::parse(params.collectionInfo["info"]["uuid"]));
@@ -466,10 +467,10 @@ Status DefaultClonerImpl::_createCollectionsForDb(
                 uassertStatusOK(userAllowedCreateNS(opCtx, nss));
 
                 // If the collection does not already exist and is tracked, we create a new
-                // collection on the target shard with the UUID of the original collection and copy
-                // the options and secondary indexes. If the collection does not already exist and
-                // is untracked, we create a new collection with its own UUID and copy the options
-                // and secondary indexes of the original collection.
+                // collection on the target shard with the UUID of the original collection and
+                // copy the options and secondary indexes. If the collection does not already
+                // exist and is untracked, we create a new collection with its own UUID and copy
+                // the options and secondary indexes of the original collection.
                 if (params.trackedColls) {
                     optionsBuilder.append(params.collectionInfo["info"]["uuid"]);
                 }
@@ -580,8 +581,8 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
                                  std::set<std::string>* clonedColls) {
     invariant(clonedColls && clonedColls->empty(),
               str::stream() << masterHost << ":" << dbName.toStringForErrorMsg());
-    // This function can potentially block for a long time on network activity, so holding of locks
-    // is disallowed.
+    // This function can potentially block for a long time on network activity, so holding of
+    // locks is disallowed.
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     auto toCloneStatus = getListOfCollections(opCtx, dbName, masterHost);
     if (!toCloneStatus.isOK()) {
@@ -642,8 +643,9 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
         // now build the secondary indexes
         for (auto&& params : createCollectionParams) {
 
-            // Indexes of sharded collections are not copied: the primary shard is not required to
-            // have all indexes. The listIndexes cmd is sent to the shard owning the MinKey value.
+            // Indexes of sharded collections are not copied: the primary shard is not required
+            // to have all indexes. The listIndexes cmd is sent to the shard owning the MinKey
+            // value.
             if (params.trackedColls) {
                 continue;
             }

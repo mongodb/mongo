@@ -45,7 +45,7 @@ mongo_cc_library(
     srcs = [
         "timeseries_constants.h",
         "timeseries_extended_range.cpp",
-        "//src/mongo/db/commands:create_command_validation.h",
+        "//src/mongo/db/local_catalog/ddl:create_command_validation.h",
     ],
     hdrs = [
         "timeseries_extended_range.h",
@@ -53,7 +53,7 @@ mongo_cc_library(
     deps = [
         ":timeseries_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo:base",
-        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/local_catalog:index_catalog",
     ],
 )
 
@@ -83,9 +83,9 @@ mongo_cc_library(
         ":timeseries_options",
         "//src/mongo:base",
         "//src/mongo/db:shard_role",
-        "//src/mongo/db/catalog:catalog_helpers",
-        "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/local_catalog:catalog_helpers",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
         "//src/mongo/db/timeseries/bucket_catalog",
     ],
 )
@@ -115,7 +115,11 @@ mongo_cc_library(
         "timeseries_options.h",
         "timeseries_write_util.h",
         "//src/mongo/bson:unordered_fields_bsonobj_comparator.h",
-        "//src/mongo/db/commands:create_command_validation.h",
+        "//src/mongo/db/local_catalog:collection.h",
+        "//src/mongo/db/local_catalog:index_catalog.h",
+        "//src/mongo/db/local_catalog:index_catalog_entry.h",
+        "//src/mongo/db/local_catalog/ddl:create_command_validation.h",
+        "//src/mongo/db/timeseries:collection_pre_conditions_util.h",
         # TODO(SERVER-93876): move these headers under a timeseries bucket catalog target once one is added
         "//src/mongo/db/timeseries/bucket_catalog:bucket.h",
         "//src/mongo/db/timeseries/bucket_catalog:bucket_catalog.h",
@@ -129,11 +133,7 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/bucket_catalog:rollover.h",
         "//src/mongo/db/timeseries/bucket_catalog:tracking_contexts.h",
         "//src/mongo/db/timeseries/bucket_catalog:write_batch.h",
-        "//src/mongo/db/timeseries:collection_pre_conditions_util.h",
         "//src/mongo/db/timeseries/write_ops:measurement.h",
-        "//src/mongo/db/catalog:collection.h",
-        "//src/mongo/db/catalog:index_catalog.h",
-        "//src/mongo/db/catalog:index_catalog_entry.h",
     ],
     header_deps = [
         "//src/mongo/db/commands:server_status_core",
@@ -175,8 +175,8 @@ mongo_cc_library(
         "//src/mongo/db:expression_context_builder",
         "//src/mongo/db:index_commands_idl",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
-        "//src/mongo/db/catalog:index_catalog",
         "//src/mongo/db/exec:bucket_unpacker",
+        "//src/mongo/db/local_catalog:index_catalog",
         "//src/mongo/db/query:bucket_predicate_generator",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/write_ops:write_ops_parsers",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
@@ -195,7 +195,7 @@ mongo_cc_library(
         ":timeseries_options",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role",
-        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/local_catalog:collection_catalog",
     ],
 )
 
@@ -217,9 +217,9 @@ mongo_cc_library(
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:shard_role",
-        "//src/mongo/db/catalog:collection_query_info",
-        "//src/mongo/db/catalog:document_validation",
         "//src/mongo/db/collection_crud",
+        "//src/mongo/db/local_catalog:collection_query_info",
+        "//src/mongo/db/local_catalog:document_validation",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/query/write_ops:delete_request_idl",
         "//src/mongo/db/query/write_ops:write_ops_exec_util",
@@ -240,8 +240,8 @@ mongo_cc_library(
     ],
     deps = [
         ":timeseries_extended_range",
-        "//src/mongo/db/catalog:collection_catalog",
-        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/local_catalog:collection_catalog",
+        "//src/mongo/db/local_catalog/lock_manager",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/timeseries/bucket_catalog",
     ],
@@ -263,8 +263,8 @@ mongo_cc_library(
         "//src/mongo/db:index_commands_idl",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role",
-        "//src/mongo/db/catalog:catalog_helpers",
         "//src/mongo/db/exec:bucket_unpacker",
+        "//src/mongo/db/local_catalog:catalog_helpers",
     ],
 )
 

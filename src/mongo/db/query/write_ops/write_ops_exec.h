@@ -34,7 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/db/catalog/collection_operation_source.h"
+#include "mongo/db/local_catalog/collection_operation_source.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
@@ -48,8 +48,8 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 

@@ -35,7 +35,7 @@
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/local_catalog/clustered_collection_util.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string/key_string.h"

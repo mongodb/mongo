@@ -30,11 +30,11 @@
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/sharding_mongos_test_fixture.h"
-#include "mongo/s/sharding_test_fixture_common.h"
+#include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
+#include "mongo/db/sharding_environment/sharding_test_fixture_common.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
 

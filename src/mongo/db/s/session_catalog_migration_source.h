@@ -31,6 +31,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -40,8 +42,6 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"

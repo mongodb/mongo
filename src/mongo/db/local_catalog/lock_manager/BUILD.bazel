@@ -1,0 +1,189 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+        "*.py",
+    ]),
+)
+
+idl_generator(
+    name = "exception_util_gen",
+    src = "exception_util.idl",
+)
+
+mongo_cc_library(
+    name = "exception_util",
+    srcs = [
+        "exception_util.cpp",
+        ":exception_util_gen",
+    ],
+    hdrs = [
+        "exception_util.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_options_servers",
+        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/storage:exceptions",
+        "//src/mongo/db/storage:recovery_unit_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:log_and_backoff",
+    ],
+)
+
+mongo_cc_library(
+    name = "lock_manager",
+    srcs = [
+        "cond_var_lock_grant_notification.cpp",
+        "fill_locker_info.cpp",
+        "lock_manager.cpp",
+        "lock_manager_defs.cpp",
+        "lock_request_list.h",
+        "lock_stats.cpp",
+        "locker.cpp",
+        "resource_catalog.cpp",
+    ],
+    hdrs = [
+        "cond_var_lock_grant_notification.h",
+        "fill_locker_info.h",
+        "lock_manager.h",
+        "lock_manager_defs.h",
+        "lock_stats.h",
+        "locker.h",
+        "resource_catalog.h",
+    ],
+    no_undefined_ref_DO_NOT_USE = False,
+    deps = [
+        ":flow_control_ticketholder",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/admission:ticketholder_manager",
+        "//src/mongo/db/stats:counter_ops",
+        "//src/mongo/db/storage/key_string",
+        "//src/mongo/util:background_job",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:ticketholder",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "flow_control_ticketholder",
+    srcs = [
+        "//src/mongo/db:flow_control_ticketholder.cpp",
+    ],
+    hdrs = [
+        "//src/mongo:core_headers",
+        "//src/mongo/db:flow_control_ticketholder.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/crypto:sha256_block",
+        "//src/mongo/db:cluster_role",
+        "//src/mongo/db/stats:counter_ops",
+        "//src/mongo/db/storage:damage_vector",
+        "//src/mongo/db/storage:ident",
+        "//src/mongo/util:secure_compare_memory",
+    ],
+)
+
+mongo_cc_library(
+    name = "deferred_writer",
+    srcs = [
+        "deferred_writer.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db:deferred_writer.h",
+    ],
+    deps = [
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/local_catalog:catalog_helpers",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "exception_util_test",
+    srcs = [
+        "exception_util_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-programmability",
+        "server-storage-engine-integration",
+    ],
+    deps = [
+        ":exception_util",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/transport:transport_layer_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "lock_manager_test",
+    srcs = [
+        "fast_map_noalloc_test.cpp",
+        "fill_locker_info_test.cpp",
+        "lock_manager_test.cpp",
+        "lock_manager_test_help.h",
+        "lock_stats_test.cpp",
+        "locker_test.cpp",
+        "resource_catalog_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":exception_util",
+        ":lock_manager",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/transport:transport_layer_mock",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "lock_manager_bm",
+    srcs = [
+        "lock_manager_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+    deps = [
+        ":lock_manager",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+py_binary(
+    name = "lock_gdb_test",
+    srcs = ["lock_gdb_test.py"],
+)
+
+idl_generator(
+    name = "lock_info_gen",
+    src = "lock_info.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "lock_info_command",
+    srcs = [
+        ":lock_info_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
+    ],
+)

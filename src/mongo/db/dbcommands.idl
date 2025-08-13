@@ -29,7 +29,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/db/catalog/collection_options.idl"
+    - "mongo/db/local_catalog/collection_options.idl"
     - "mongo/db/pipeline/storage_stats_spec.idl"
     - "mongo/db/basic_types.idl"
 

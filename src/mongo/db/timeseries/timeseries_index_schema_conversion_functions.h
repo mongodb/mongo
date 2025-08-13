@@ -31,7 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"

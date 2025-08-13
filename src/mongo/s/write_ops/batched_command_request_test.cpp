@@ -38,8 +38,8 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/query/write_ops/write_ops_parsers_test_helpers.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/shard_version_factory.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
 

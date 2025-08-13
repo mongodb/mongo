@@ -3,7 +3,7 @@ filters:
   - "storage_stats*":
     approvers:
       - 10gen/server-storage-engine-integration
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "counters*":
     approvers:
       - 10gen/query-execution

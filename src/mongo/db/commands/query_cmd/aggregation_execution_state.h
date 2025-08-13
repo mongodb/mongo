@@ -28,8 +28,9 @@
  */
 #pragma once
 
-#include "mongo/db/catalog/external_data_source_scope_guard.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/db/local_catalog/db_raii.h"
+#include "mongo/db/local_catalog/external_data_source_scope_guard.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -41,7 +42,6 @@
 #include "mongo/db/read_concern.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
-#include "mongo/s/catalog_cache.h"
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>

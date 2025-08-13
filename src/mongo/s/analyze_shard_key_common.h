@@ -31,11 +31,11 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 namespace analyze_shard_key {

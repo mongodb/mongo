@@ -31,7 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/concurrency/flow_control_ticketholder.h"
+#include "mongo/db/flow_control_ticketholder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"

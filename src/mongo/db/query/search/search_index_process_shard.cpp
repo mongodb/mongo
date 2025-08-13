@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/search/search_index_process_shard.h"
 
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 

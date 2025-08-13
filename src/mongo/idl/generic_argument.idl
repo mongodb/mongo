@@ -30,7 +30,7 @@ global:
     cpp_includes:
         - "mongo/db/basic_types.h"
         - "mongo/idl/generic_argument.h"
-        - "mongo/s/shard_version.h"
+        - "mongo/db/versioning_protocol/shard_version.h"
 
 imports:
     - "mongo/client/read_preference_setting.idl"
@@ -39,12 +39,12 @@ imports:
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/session/logical_session_id.idl"
-    - "mongo/db/vector_clock.idl"
+    - "mongo/db/vector_clock/vector_clock.idl"
     - "mongo/db/version_context.idl"
     - "mongo/db/write_concern_options.idl"
     - "mongo/rpc/metadata/audit_metadata.idl"
-    - "mongo/s/sharding_types.idl"
-    - "mongo/s/gossiped_routing_cache.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
+    - "mongo/db/global_catalog/router_role_api/gossiped_routing_cache.idl"
 
 structs:
     GenericArguments:

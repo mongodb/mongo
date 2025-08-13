@@ -1,0 +1,139 @@
+# Copyright (C) 2023-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+imports:
+    - "mongo/db/cluster_parameters/cluster_server_parameter.idl"
+
+global:
+    cpp_namespace: mongo
+
+structs:
+    ShardedClusterCardinalityParam:
+        description: >-
+            Cluster parameter for the number of shards in a sharded cluster. Used to allow or disallow
+            direct writes to the cluster.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            hasTwoOrMoreShards:
+                description: >-
+                    Whether there are or have been two or more shards in the cluster. Shards should disallow
+                    direct writes if set to true.
+                type: bool
+                default: false
+
+    AddOrRemoveShardInProgressParam:
+        description: >-
+            Reflects whether there is a sharding topology change (e.g. addShard, removeShard) currently
+            ongoing.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            inProgress:
+                description: "True when there's an ongoing sharding topology change. False otherwise."
+                type: bool
+                default: false
+
+    ConfigServerReadPreferenceForCatalogQueriesParam:
+        description: >-
+            Cluster parameter to always use nearest as the read preference for catalog queries targeting
+            the config server.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            mustAlwaysUseNearest:
+                description: >-
+                    When true, catalog queries targeting the config server will always use nearest as read
+                    preference. Otherwise, the read preference for all those queries is chosen depending on
+                    whether the cluster has a config shard (primaryPreferred) or not (nearest).
+                type: bool
+                default: false
+
+    OnlyTargetDataOwningShardsForMultiWritesParam:
+        description: >-
+            Cluster parameter determining if multi-write operations should target only shards owning
+            data instead of broadcasting to all shards.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            enabled:
+                description: >-
+                    If true, multi-write operations will only target shards that own the data,
+                    honoring the sharding protocol, instead of broadcasting to all shards.
+                type: bool
+                default: false
+
+server_parameters:
+    shardedClusterCardinalityForDirectConns:
+        description: >-
+            Cluster parameter for the number of shards in a sharded cluster. Used to allow or
+            disallow direct writes to the cluster.
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_vartype: ShardedClusterCardinalityParam
+        cpp_varname: shardedClusterCardinalityForDirectConns
+        redact: false
+
+    addOrRemoveShardInProgress:
+        description: >-
+            Reflects whether there is a sharding topology change (e.g. addShard, removeShard) currently
+            ongoing.
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_vartype: AddOrRemoveShardInProgressParam
+        cpp_varname: addOrRemoveShardInProgress
+        redact: false
+        condition:
+            min_fcv: 8.0
+
+    configServerReadPreferenceForCatalogQueries:
+        description: >-
+            Cluster parameter to always use nearest as the read preference for catalog queries targeting
+            the config server.
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_vartype: ConfigServerReadPreferenceForCatalogQueriesParam
+        cpp_varname: configServerReadPreferenceForCatalogQueries
+        redact: false
+        condition:
+            min_fcv: 8.0
+
+    onlyTargetDataOwningShardsForMultiWrites:
+        description: >-
+            Cluster parameter determining if multi-write operations should target only shards owning
+            data instead of broadcasting to all shards.
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_vartype: OnlyTargetDataOwningShardsForMultiWritesParam
+        cpp_varname: onlyTargetDataOwningShardsForMultiWrites
+        redact: false
+        condition:
+            min_fcv: 8.2

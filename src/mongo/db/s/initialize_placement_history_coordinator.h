@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 #include "mongo/db/s/initialize_placement_history_coordinator_document_gen.h"
-#include "mongo/db/s/sharding_ddl_coordinator.h"
 
 namespace mongo {
 

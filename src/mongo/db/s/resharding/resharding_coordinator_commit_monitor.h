@@ -31,7 +31,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"

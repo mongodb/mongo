@@ -37,9 +37,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/database_version.h"
-#include "mongo/s/shard_version.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 

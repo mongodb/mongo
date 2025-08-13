@@ -30,7 +30,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 
 #include <memory>

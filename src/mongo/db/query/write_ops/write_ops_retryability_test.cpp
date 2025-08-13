@@ -52,7 +52,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_catalog.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

@@ -43,9 +43,9 @@
 #include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/search_index_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/async_multicaster.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/stacktrace.h"
 
 #include <boost/optional/optional.hpp>

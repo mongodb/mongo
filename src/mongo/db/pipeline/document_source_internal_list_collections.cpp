@@ -35,7 +35,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/list_collections_gen.h"
+#include "mongo/db/local_catalog/ddl/list_collections_gen.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"

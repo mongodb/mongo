@@ -27,7 +27,7 @@
 #
 
 imports:
-    - "mongo/idl/cluster_server_parameter.idl"
+    - "mongo/db/cluster_parameters/cluster_server_parameter.idl"
 
 global:
     cpp_namespace: "mongo"

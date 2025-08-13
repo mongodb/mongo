@@ -62,7 +62,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_txn_record_gen.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"

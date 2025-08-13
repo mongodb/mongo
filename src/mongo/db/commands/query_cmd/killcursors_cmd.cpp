@@ -31,7 +31,7 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/killcursors_common.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"

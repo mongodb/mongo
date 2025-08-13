@@ -1,0 +1,230 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/local_catalog/ddl/create_command_validation.h"
+
+imports:
+    - "mongo/crypto/encryption_fields.idl"
+    - "mongo/db/auth/access_checks.idl"
+    - "mongo/db/auth/action_type.idl"
+    - "mongo/db/local_catalog/collection_options.idl"
+    - "mongo/db/local_catalog/clustered_collection_options.idl"
+    - "mongo/db/timeseries/timeseries.idl"
+    - "mongo/db/pipeline/change_stream_pre_and_post_images_options.idl"
+
+structs:
+    CreateCommandReply:
+        description: "Reply from the {create: ...} command"
+        strict: true
+        is_command_reply: true
+        fields:
+            note:
+                description: "Warnings or other additional information"
+                type: string
+                optional: true
+                stability: stable
+
+    CreateCollectionRequest:
+        description: "Base request to create a collection"
+        strict: true
+        fields:
+            capped:
+                description:
+                    "Specify true to create a capped collection. If you specify true, you
+                    must also set a maximum size in the 'size' field."
+                type: safeBool
+                default: false
+                # The capped parameter should actually be unstable, and in practice it is, because
+                # it is required to also set the 'size' field, which is properly marked as unstable.
+                stability: stable
+            idIndex:
+                description: "Specify the default _id index specification."
+                type: object
+                optional: true
+                stability: stable
+            size:
+                description: "Specify a maximum size in bytes for the capped collection."
+                type: safeInt64
+                optional: true
+                validator:
+                    gte: 1
+                    lte: 1125899906842624 # 1 PB
+                stability: unstable
+            max:
+                description:
+                    "The maximum number of documents allowed in the capped collection. The
+                    'size' limit takes precedence over this limit."
+                type: safeInt64
+                optional: true
+                validator:
+                    lt: 2147483648 # 2^31
+                stability: unstable
+            storageEngine:
+                description:
+                    "Specify a configuration to the storage engine on a per-collection
+                    basis when creating a collection."
+                type: object
+                optional: true
+                stability: unstable
+            validator:
+                description: "Specify validation rules or expressions for the collection."
+                type: object
+                optional: true
+                stability: stable
+            validationLevel:
+                description:
+                    "Determines how strictly to apply the validation rules to existing
+                    documents during an update.
+                    Can be one of following values: 'off', 'strict' or 'moderate'."
+                type: ValidationLevel
+                optional: true
+                stability: stable
+            validationAction:
+                description:
+                    "Determines whether to error on invalid documents or just warn about
+                    the violations but allow invalid documents to be inserted.
+                    Can be either 'warn' or 'error'."
+                type: ValidationAction
+                optional: true
+                stability: stable
+            indexOptionDefaults:
+                description:
+                    "Allows users to specify a default configuration for indexes when
+                    creating a collection."
+                type: IndexOptionDefaults
+                optional: true
+                stability: unstable
+            viewOn:
+                description:
+                    "The name of the source collection or view from which to create the
+                    view."
+                type: string
+                optional: true
+                stability: stable
+                validator:
+                    callback: create_command_validation::validateViewOnNotEmpty
+            pipeline:
+                description:
+                    "An array that consists of the aggregation pipeline. Creates the view
+                    by applying the specified pipeline to the 'viewOn' collection or
+                    view."
+                type: array<object>
+                optional: true
+                stability: stable
+            collation:
+                description: "Specifies the default collation for the collection or the view."
+                type: Collation
+                optional: true
+                stability: stable
+            changeStreamPreAndPostImages:
+                description: "The options for point-in-time pre- and post-images in change streams opened on this collection."
+                type: ChangeStreamPreAndPostImagesOptions
+                optional: true
+                stability: unstable
+            timeseries:
+                description: "The options to create the time-series collection with."
+                type: TimeseriesOptions
+                optional: true
+                stability: stable
+            clusteredIndex:
+                description:
+                    "Specifies whether this collection should have a clusteredIndex.
+                    Boolean is accepted as the legacy clustered index format for specific internal
+                    collections - and implies clustering by _id. Otherwise, clusters according to
+                    the ClusteredIndexSpec."
+                type:
+                    variant: [safeBool, ClusteredIndexSpec]
+                optional: true
+                stability: stable
+            recordIdsReplicated:
+                description:
+                    "Specifies whether this collection should utilize the same recordId for a given document
+                    across all nodes in a replica set."
+                type: safeBool
+                optional: true
+                stability: unstable
+            expireAfterSeconds:
+                description: "The number of seconds after which old data should be deleted."
+                type: safeInt64
+                optional: true
+                stability: stable
+            encryptedFields:
+                description: "Specifies the fields that are encrypted by client-side FLE."
+                type: EncryptedFieldConfig
+                optional: true
+                stability: stable
+            temp:
+                description: "Internal field that can be used in the $out aggregation code."
+                type: safeBool
+                optional: true
+                # The temp field is an internal field and not documented publicly, but we need to set
+                # the 'stability' to 'stable' because it can be used in the $out aggregation stage.
+                # This is due to the limitation of the API strict checking infrastructure.
+                stability: stable
+            flags:
+                description: "DEPRECATED"
+                type: safeInt64
+                optional: true
+                stability: unstable
+
+commands:
+    create:
+        description: "Parser for the 'create' Command"
+        command_name: create
+        namespace: concatenate_with_db
+        cpp_name: CreateCommand
+        api_version: "1"
+        access_check:
+            complex:
+                - check: should_ignore_auth_checks
+                - check: get_authenticated_user # Can be triggered by aggregation
+                - check: lookup_user # Can be triggered by aggregation
+                - privilege:
+                      resource_pattern: exact_namespace
+                      action_type: convertToCapped
+                - privilege:
+                      resource_pattern: exact_namespace
+                      action_type: createCollection
+                - privilege:
+                      resource_pattern: exact_namespace
+                      action_type: insert
+                - privilege:
+                      resource_pattern: exact_namespace
+                      action_type: find
+                - privilege: # Can be triggered by aggregation
+                      resource_pattern: exact_namespace
+                      action_type:
+                          [remove, update, collStats, indexStats, planCacheRead]
+        reply_type: CreateCommandReply
+        strict: true
+        inline_chained_structs: true
+        chained_structs:
+            CreateCollectionRequest: CreateCollectionRequest

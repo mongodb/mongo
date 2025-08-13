@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/router_role.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/s/transaction_router.h"
 
 namespace mongo {

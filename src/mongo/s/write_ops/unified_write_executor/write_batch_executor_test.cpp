@@ -33,10 +33,10 @@
 #include "mongo/bson/json.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/shard_version_factory.h"
-#include "mongo/s/sharding_mongos_test_fixture.h"
+#include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

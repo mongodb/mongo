@@ -22,19 +22,19 @@ filegroup(
     srcs = [
         "cancellation.h",
         "concurrent_shared_values_map.h",
-        "database_name_util.h",
         "fail_point.h",
         "inline_memory.h",
         "log_with_sampling.h",
         "make_array_type.h",
         "moving_average.h",
         "moving_average_metric.h",
-        "namespace_string_util.h",
         "overloaded_visitor.h",
         "periodic_runner.h",
         "safe_num.h",
         "scoped_unlock.h",
         "serialization_context.h",
+        "//src/mongo/util:database_name_util.h",
+        "//src/mongo/util:namespace_string_util.h",
     ],
 )
 
@@ -340,7 +340,7 @@ mongo_cc_library(
         "progress_meter.h",
     ],
     header_deps = [
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/db/local_catalog/lock_manager:flow_control_ticketholder",
     ],
     deps = [
         "//src/mongo:base",
@@ -400,7 +400,7 @@ mongo_cc_library(
         "safe_num.h",
     ],
     header_deps = [
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/db/local_catalog/lock_manager:flow_control_ticketholder",
     ],
     deps = [
         "//src/mongo:base",

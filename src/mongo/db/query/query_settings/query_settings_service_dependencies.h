@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
+#include "mongo/db/cluster_parameters/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo::query_settings {

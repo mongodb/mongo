@@ -41,7 +41,7 @@
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/s/client/shard.h"
+#include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/util/net/hostandport.h"
 

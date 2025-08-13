@@ -35,9 +35,9 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future_impl.h"
 

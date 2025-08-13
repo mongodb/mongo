@@ -38,8 +38,8 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
+#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
@@ -818,8 +818,10 @@ TEST(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
     const auto nss = NamespaceString::createNamespaceString_forTest(ns);
     const UUID indexBuildUUID = UUID::gen();
     const std::vector<BSONObj> indexSpecs = {
-        BSON("v" << 2 << "key" << BSON("x" << 1) << "name" << "x_1"),
-        BSON("v" << 2 << "key" << BSON("y" << 1) << "name" << "y_1"),
+        BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
+                 << "x_1"),
+        BSON("v" << 2 << "key" << BSON("y" << 1) << "name"
+                 << "y_1"),
     };
     const std::vector<std::string> indexNames = {"x_1", "y_1"};
     const std::vector<BSONObj> o2Indexes = {BSON("indexIdent" << "index-0"),
@@ -902,7 +904,8 @@ TEST(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
     };
 
     BSONObj baseObj =
-        BSON("startIndexBuild" << "test.coll" << "indexBuildUUID" << UUID::gen() << "indexes"
+        BSON("startIndexBuild" << "test.coll"
+                               << "indexBuildUUID" << UUID::gen() << "indexes"
                                << BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
                                                       << "x_1")));
     auto setField = [&](StringData name, auto value) {
@@ -926,7 +929,8 @@ TEST(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
     ASSERT_EQ(parse(baseObj, BSON("indexes" << BSON_ARRAY(1))), ErrorCodes::BadValue);
 
     baseObj =
-        BSON("abortIndexBuild" << "test.coll" << "indexBuildUUID" << UUID::gen() << "indexes"
+        BSON("abortIndexBuild" << "test.coll"
+                               << "indexBuildUUID" << UUID::gen() << "indexes"
                                << BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
                                                       << "x_1")));
     ASSERT_EQ(parse(baseObj), ErrorCodes::BadValue);

@@ -45,10 +45,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/shard_registry.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>

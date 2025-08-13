@@ -31,9 +31,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/index/index_constants.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"

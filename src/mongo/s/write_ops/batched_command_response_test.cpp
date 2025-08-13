@@ -36,11 +36,11 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
-#include "mongo/db/shard_id.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/shard_version.h"
-#include "mongo/s/shard_version_factory.h"
-#include "mongo/s/stale_exception.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/unittest/unittest.h"
 
 #include <ostream>

@@ -26,12 +26,15 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/commands/notify_sharding_event_utils.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/catalog_cache/routing_information_cache.h"
+#include "mongo/db/global_catalog/ddl/commit_reshard_collection_gen.h"
+#include "mongo/db/global_catalog/ddl/drop_collection_if_uuid_not_matching_gen.h"
+#include "mongo/db/global_catalog/ddl/notify_sharding_event_utils.h"
+#include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/balancer/balance_stats.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
@@ -41,15 +44,13 @@
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/s/sharding_logging.h"
-#include "mongo/db/vector_clock.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_logging.h"
+#include "mongo/db/vector_clock/vector_clock.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
-#include "mongo/s/request_types/commit_reshard_collection_gen.h"
-#include "mongo/s/request_types/drop_collection_if_uuid_not_matching_gen.h"
+#include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
-#include "mongo/s/routing_information_cache.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 

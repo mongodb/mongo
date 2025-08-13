@@ -29,8 +29,8 @@
 
 #include "mongo/db/pipeline/spilling/spilling_test_process_interface.h"
 
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
 
 namespace mongo {
 

@@ -1,0 +1,169 @@
+# Copyright (C) 2020-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/keypattern.idl"
+    - "mongo/db/versioning_protocol/chunk_version.idl"
+    - "mongo/s/resharding/type_collection_fields.idl"
+    - "mongo/db/global_catalog/type_collection_common_types.idl"
+
+enums:
+    DefragmentationPhase:
+        description: "The list of phases composing the Collection Chunks Defragmentation Algorithm"
+        type: string
+        values:
+            kMergeAndMeasureChunks: "mergeAndMeasureChunks"
+            kMoveAndMergeChunks: "moveAndMergeChunks"
+            kMergeChunks: "mergeChunks"
+            kSplitChunks: "splitChunks" # Never used but kept for parsing backwards compatibility
+            kFinished: "finished"
+
+structs:
+    CollectionTypeBase:
+        description:
+            "Represents the layout and contents of documents contained in the config
+            server's config.collections collection."
+        strict: false
+        fields:
+            _id:
+                cpp_name: nss
+                type: namespacestring
+                description: "The full namespace (with the database prefix)."
+                optional: false
+            lastmodEpoch:
+                cpp_name: pre22CompatibleEpoch
+                type: objectid
+                description:
+                    "Uniquely identifies this incarnation of the collection. Only changes
+                    in case of drop and create, or shard key refine.
+
+                    It is optional for parsing purposes, because in versions of MongoDB
+                    prior to 2.2, this value wasn't being written. In such cases, it will
+                    default to an all-zero OID."
+                optional: true
+            lastmod:
+                cpp_name: updatedAt
+                type: date
+                description: "Contains the time of when the collection was either created."
+                optional: false
+            timestamp:
+                type: timestamp
+                description:
+                    "Uniquely identifies this incarnation of the collection. Only changes
+                    in case of drop and create, or shard key refine.
+                    This field will store the ClusterTime of the Config Server when the
+                    collection was created or it's shard key last refined. Because
+                    timestamps are comparable, we are able to define a total order in time
+                    in the collection. This field will replace Epoch, which are not
+                    comparable."
+            uuid:
+                cpp_name: uuid
+                type: uuid
+                description:
+                    "The UUID that will be used to create the local collection on each of
+                    the shards which have chunks."
+                optional: false
+            key:
+                cpp_name: KeyPattern
+                type: KeyPattern
+                description: "The shard key pattern for the collection."
+            defaultCollation:
+                type: object_owned
+                description:
+                    "Optional collection default collation. If missing or set to the empty
+                    BSON, implies simple collation."
+                optional: true
+            unique:
+                type: bool
+                description: "Uniqueness of the sharding key."
+                default: false
+            maxChunkSizeBytes:
+                type: safeInt64
+                description: "Max chunk size in bytes."
+                optional: true
+            defragmentCollection:
+                type: bool
+                description: "Balancer will merge chunks up to the configured maxChunkSizeBytes."
+                optional: true
+            enableAutoMerge:
+                type: bool
+                description: "Specifies whether the auto-merger should be running or not for this collection."
+                optional: true
+            defragmentationPhase:
+                type: DefragmentationPhase
+                description:
+                    "When the balancer is performing defragmentation on the collection,
+                    stores the ID of the currently active phase of the process."
+                optional: true
+            noBalance:
+                type: bool
+                description:
+                    "Consulted by the Balancer only and indicates whether this collection
+                    should be considered for balancing or not."
+                default: false
+            reshardingFields:
+                type: TypeCollectionReshardingFields
+                description:
+                    "Resharding-related fields. Only set when this collection is either the
+                    original collection undergoing a resharding operation or this
+                    collection is the temporary resharding collection."
+                optional: true
+            allowMigrations:
+                type: bool
+                description:
+                    "Whether this collection allows chunks to move. It is required by
+                    almost all DDL operations in order to guarantee that the set of
+                    shards, which comprise a collection will not change.
+
+                    If the flag is not present it defaults to true."
+                optional: true
+            unsplittable:
+                type: optionalBool
+                description:
+                    "Flag that identifies whether the collection is splittable in multiple
+                    chunks. If unsplittable, the collection is always equivalent to a 1
+                    chunk collection."
+
+            timeseriesFields:
+                type: TypeCollectionTimeseriesFields
+                description:
+                    "Time-series collection fields. Only set when this is a time-series
+                    buckets collection."
+                optional: true
+            # TODO SERVER-61033: merge this flag with allowMigrations.
+            permitMigrations:
+                type: bool
+                description:
+                    "DEPRECATED flag that determines wether this collection allows chunks to
+                    move. This will only prevent migration from committing and new balancer
+                    rounds, this flag will not be loaded by shards."
+                optional: true

@@ -31,7 +31,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/s/sharding_types.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
 structs:
     clusterQueryWithoutShardKeyResponse:
         description: "The response for the '_clusterQueryWithoutShardKeyFind' command."

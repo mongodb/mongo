@@ -37,8 +37,8 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_server_helpers.h"
+#include "mongo/db/sharding_environment/version_mongos.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/version_mongos.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/options_parser/startup_options.h"

@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include "mongo/db/catalog/catalog_repair.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_impl.h"
-#include "mongo/db/catalog/durable_catalog.h"
-#include "mongo/db/catalog_raii.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/catalog_repair.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_impl.h"
+#include "mongo/db/local_catalog/durable_catalog.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -41,7 +42,6 @@
 #include "mongo/db/storage/spill_table.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 
 #include <boost/iterator/transform_iterator.hpp>

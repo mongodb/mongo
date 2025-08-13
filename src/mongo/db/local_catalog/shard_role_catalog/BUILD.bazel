@@ -1,0 +1,63 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel/config:generate_config_header.bzl", "generate_config_header")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "shard_authoritative_catalog_gen",
+    src = "shard_authoritative_catalog.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "type_oplog_catalog_metadata_gen",
+    src = "type_oplog_catalog_metadata.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog:type_database_gen",
+    ],
+)
+
+idl_generator(
+    name = "collection_critical_section_document_gen",
+    src = "collection_critical_section_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "participant_block_gen",
+    src = "participant_block.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "flush_database_cache_updates_gen",
+    src = "flush_database_cache_updates.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "flush_routing_table_cache_updates_gen",
+    src = "flush_routing_table_cache_updates.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)

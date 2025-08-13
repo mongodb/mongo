@@ -30,9 +30,9 @@
 #include "mongo/db/s/random_migration_testing_utils.h"
 
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/s/shard_key_index_util.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/sharding_state.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 

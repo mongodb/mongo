@@ -34,6 +34,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -43,12 +45,10 @@
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/split_pipeline.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/async_requests_sender.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard.h"
 #include "mongo/s/query/exec/owned_remote_cursor.h"
-#include "mongo/s/router_role.h"
 
 #include <cstddef>
 #include <memory>

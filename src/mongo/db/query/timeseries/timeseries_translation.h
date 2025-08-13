@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/shard_role.h"
-#include "mongo/s/catalog_cache.h"
 
 namespace mongo {
 

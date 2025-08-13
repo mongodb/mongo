@@ -29,7 +29,7 @@
 
 #include "mongo/db/exec/classic/query_shard_server_test_fixture.h"
 
-#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
 
 namespace mongo {
 namespace {

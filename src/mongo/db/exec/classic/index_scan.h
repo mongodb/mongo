@@ -30,14 +30,14 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/operation_context.h"

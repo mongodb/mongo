@@ -1,0 +1,30 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "metadata_consistency_types_gen",
+    src = "metadata_consistency_types.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "check_metadata_consistency_gen",
+    src = "check_metadata_consistency.idl",
+    deps = [
+        ":metadata_consistency_types_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query/client_cursor:cursor_response_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)

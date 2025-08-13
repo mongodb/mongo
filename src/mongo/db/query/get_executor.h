@@ -31,12 +31,13 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/exec/classic/update_stage.h"
 #include "mongo/db/exec/exec_shard_filter_policy.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -53,7 +54,6 @@
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/executor/task_executor_cursor.h"
 

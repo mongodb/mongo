@@ -33,13 +33,13 @@ global:
     cpp_includes:
         - "mongo/db/namespace_string.h"
         - "mongo/db/pipeline/document_source_merge_spec.h"
-        - "mongo/s/chunk_version.h"
+        - "mongo/db/versioning_protocol/chunk_version.h"
 
 imports:
     - "mongo/db/pipeline/document_source_merge_modes.idl"
     - "mongo/db/basic_types.idl"
     - "mongo/db/namespace_spec.idl"
-    - "mongo/s/chunk_version.idl"
+    - "mongo/db/versioning_protocol/chunk_version.idl"
 
 types:
     MergeTargetNss:

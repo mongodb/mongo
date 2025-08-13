@@ -31,7 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"

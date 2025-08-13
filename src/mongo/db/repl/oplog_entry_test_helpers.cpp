@@ -32,7 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 

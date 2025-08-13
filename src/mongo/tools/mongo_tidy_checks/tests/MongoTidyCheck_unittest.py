@@ -183,22 +183,6 @@ class MongoTidyTests(unittest.TestCase):
         ]
         self.run_clang_tidy()
 
-    def test_MongoCollectionShardingRuntimeCheck(self):
-        msg = (
-            "error: Illegal use of CollectionShardingRuntime outside of mongo/db/s/; "
-            "use CollectionShardingState instead; see src/mongo/db/s/collection_sharding_state.h for details."
-        )
-        opt = "mongo-collection-sharding-runtime-check,-warnings-as-errors"
-        self.expected_output = [
-            f"{msg} [{opt}]\n{n:5} | {src}"
-            for n, src in [
-                (21, '    CollectionShardingRuntime csr(5, "Test");'),
-                (24, '    int result = CollectionShardingRuntime::functionTest(7, "Test");'),
-            ]
-        ]
-
-        self.run_clang_tidy()
-
     def test_MongoMacroDefinitionLeaksCheck(self):
         self.expected_output = [
             "Missing #undef 'MONGO_LOGV2_DEFAULT_COMPONENT'",

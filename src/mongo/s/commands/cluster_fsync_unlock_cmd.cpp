@@ -32,14 +32,14 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/topology/shard_registry.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/async_requests_sender.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_fsync_unlock_cmd_gen.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

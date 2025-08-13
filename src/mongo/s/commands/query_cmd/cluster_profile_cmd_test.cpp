@@ -33,8 +33,8 @@
 #include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/rpc/factory.h"
-#include "mongo/s/commands/cluster_command_test_fixture.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

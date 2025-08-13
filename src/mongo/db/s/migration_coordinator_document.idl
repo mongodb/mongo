@@ -36,9 +36,9 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/s/sharding_types.idl"
-    - "mongo/s/chunk_range.idl"
-    - "mongo/s/chunk_version.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
+    - "mongo/db/global_catalog/chunk_range.idl"
+    - "mongo/db/versioning_protocol/chunk_version.idl"
     - "mongo/db/session/logical_session_id.idl"
 
 enums:

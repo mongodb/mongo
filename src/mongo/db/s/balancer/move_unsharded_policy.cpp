@@ -32,14 +32,14 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/list_collections_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/local_catalog/ddl/list_collections_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/topology/shard_registry.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

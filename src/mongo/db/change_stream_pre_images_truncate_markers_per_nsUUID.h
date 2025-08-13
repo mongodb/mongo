@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/tenant_id.h"

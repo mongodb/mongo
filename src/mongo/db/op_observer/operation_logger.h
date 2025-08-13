@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/catalog/collection.h"  // for CollectionPtr
+#include "mongo/db/local_catalog/collection.h"  // for CollectionPtr
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"                  // for OplogLink
 #include "mongo/db/repl/oplog_entry.h"            // for MutableOplogEntry

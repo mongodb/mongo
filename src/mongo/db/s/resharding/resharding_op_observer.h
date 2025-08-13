@@ -31,7 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/operation_context.h"

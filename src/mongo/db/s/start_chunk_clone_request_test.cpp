@@ -36,7 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>

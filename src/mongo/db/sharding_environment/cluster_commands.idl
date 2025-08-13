@@ -1,0 +1,156 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
+
+structs:
+    ClusterMulticast:
+        description: "A struct representing the 'multicast' command's arguments"
+        strict: false
+        fields:
+            multicast: object
+            $db:
+                cpp_name: db
+                type: database_name
+                description: The database name.
+            concurrency:
+                type: int
+                optional: true
+            timeout:
+                type: int
+                optional: true
+
+    GetDatabaseVersionResponse:
+        description: Structure representing the 'getDatabaseVersion' command's response.
+        strict: false
+        fields:
+            primaryShard:
+                description: Primary shard known by the node for the given database.
+                type: shard_id
+            dbVersion:
+                description: Version known by the node for the given database.
+                type: database_version
+
+commands:
+    createDatabase:
+        description: "The public enableSharding command on mongos."
+        command_name: enableSharding
+        command_alias: enablesharding
+        cpp_name: ClusterCreateDatabase
+        strict: false
+        namespace: type
+        type: string
+        api_version: ""
+        reply_type: OkReply
+        fields:
+            primaryShard:
+                type: shard_id
+                description:
+                    "If set, indicates to the system which shard should be used as the
+                    primary for the database (if not already created). Otherwise, the
+                    system will use the balancer in order to select a primary."
+                optional: true
+
+    clearJumboFlag:
+        description: "The public clearJumboFlag command on mongos."
+        command_name: clearJumboFlag
+        cpp_name: ClusterClearJumboFlag
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        reply_type: OkReply
+        fields:
+            bounds:
+                type: array<object>
+                description: "The exact boundaries for a single chunk."
+                optional: true
+
+            find:
+                type: object
+                description:
+                    "The shard key value that is within a chunk's boundaries.
+                    Cannot be used on collections with hashed shard keys."
+                optional: true
+
+    moveChunk:
+        description: "The public moveChunk command on mongos."
+        command_name: moveChunk
+        command_alias: movechunk
+        cpp_name: ClusterMoveChunkRequest
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            bounds:
+                type: array<object>
+                description: "The bounds of a specific chunk to move. The array must consist of two documents that specify the lower and upper shard key values of a chunk to move. Specify either the bounds field or the find field but not both."
+                optional: true
+            find:
+                type: object
+                description: "An equality match on the shard key that specifies the shard-key value of the chunk to move. Specify either the bounds field or the find field but not both."
+                optional: true
+            to:
+                type: string
+                description: "The name of the destination shard for the chunk."
+
+            forceJumbo:
+                type: bool
+                description: "Specifies whether or not forcing jumbo chunks move"
+                default: false
+
+            # Secondary throttle can be specified by passing one of the following 2 parameters
+            secondaryThrottle:
+                type: optionalBool
+                description: "Secondary throttle policy to adopt during the migration"
+            _secondaryThrottle:
+                type: optionalBool
+                description: "Secondary throttle policy to adopt during the migration"
+
+            # Wait for delete can be specified with one of the following 2 parameters
+            waitForDelete:
+                type: optionalBool
+                description: "Internal option for testing purposes. The default is false. If set to true, the delete phase of a moveChunk operation blocks."
+            _waitForDelete:
+                type: optionalBool
+                description: "Internal option for testing purposes. The default is false. If set to true, the delete phase of a moveChunk operation blocks."
+
+    getDatabaseVersion:
+        command_name: getDatabaseVersion
+        description: Returns the routing information cached by the node for the passed database.
+        cpp_name: ClusterGetDatabaseVersion
+        namespace: type
+        type: database_name
+        api_version:
+        strict: false

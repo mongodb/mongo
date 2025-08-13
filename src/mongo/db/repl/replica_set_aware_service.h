@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/topology/cluster_role.h"
 
 #include <string>
 #include <utility>

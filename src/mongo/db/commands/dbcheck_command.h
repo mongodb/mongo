@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/throttle_cursor.h"
+#include "mongo/db/local_catalog/throttle_cursor.h"
 #include "mongo/db/repl/dbcheck/dbcheck.h"
 #include "mongo/db/repl/dbcheck/dbcheck_gen.h"
 #include "mongo/db/repl/dbcheck/dbcheck_idl.h"

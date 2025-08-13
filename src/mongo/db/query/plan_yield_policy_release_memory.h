@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/db_raii.h"
+#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/yieldable.h"

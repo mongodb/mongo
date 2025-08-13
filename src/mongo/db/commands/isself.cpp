@@ -38,9 +38,9 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction_resources.h"
 
 #include <iosfwd>
 #include <string>

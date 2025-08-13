@@ -30,6 +30,7 @@
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/canonical_query_encoder.h"
@@ -37,9 +38,8 @@
 #include "mongo/db/query/plan_cache/plan_cache_key_info.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/shard_version.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
 
 #include <cstddef>
 #include <map>

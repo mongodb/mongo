@@ -47,7 +47,7 @@ idl_generator(
     src = "recipient_resume_document.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/s:sharding_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
         "//src/mongo/s/resharding:common_types_gen",
         "//src/mongo/util/net:hostandport_gen",
     ],
@@ -75,7 +75,7 @@ idl_generator(
     deps = [
         ":donor_oplog_id_gen",
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/s:sharding_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
         "//src/mongo/s/resharding:common_types_gen",
     ],
 )
@@ -85,7 +85,7 @@ idl_generator(
     src = "resharding_oplog_fetcher_progress.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/s:sharding_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
         "//src/mongo/s/resharding:common_types_gen",
     ],
 )
@@ -96,7 +96,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/session:logical_session_id_gen",
-        "//src/mongo/s:sharding_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
         "//src/mongo/s/resharding:common_types_gen",
     ],
 )

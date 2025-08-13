@@ -48,9 +48,6 @@ filters:
   - "s2*key_generator*":
     approvers:
       - 10gen/query-integration-extensions
-  - "index_descriptor*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "wildcard_access_method*":
     approvers:
       - 10gen/query-execution-write-exec

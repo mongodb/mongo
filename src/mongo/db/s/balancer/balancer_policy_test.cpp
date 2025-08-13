@@ -35,9 +35,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>

@@ -35,11 +35,11 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/classic/mock_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/classic/working_set_common.h"
+#include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -65,22 +65,33 @@ static const StringData kIndexName = "x_test";
 static const std::vector<BSONObj> kMovieDocs = {
     BSON(
         "_id"
-        << 1 << "movie" << "The Devil Wears Prada" << "quote"
+        << 1 << "movie"
+        << "The Devil Wears Prada"
+        << "quote"
         << "We Have All The Published Harry Potter Books. The Twins Want To Know What Happens Next."
         << "rating" << 8.7),
-    BSON("_id" << 2 << "movie" << "Arrival" << "quote"
+    BSON("_id" << 2 << "movie"
+               << "Arrival"
+               << "quote"
                << "But now I'm not so sure I believe in beginnings and endings. There are days "
                   "that define your story beyond your life. Like the day they arrived."
                << "rating" << 9.2),
-    BSON("_id" << 3 << "movie" << "Whiplash" << "quote"
+    BSON("_id" << 3 << "movie"
+               << "Whiplash"
+               << "quote"
                << "There are no two words in the English language more harmful than good job"
                << "rating" << 9.5),
-    BSON("_id" << 4 << "movie" << "La La Land" << "quote"
+    BSON("_id" << 4 << "movie"
+               << "La La Land"
+               << "quote"
                << "It's conflict and it's compromise, and it's just... it's brand new every time. "
                   "It's brand new every night."
                << "rating" << 9.0),
-    BSON("_id" << 5 << "movie" << "Formula 1: The Movie" << "quote"
-               << "Hope is not a strategy. Create your own breaks." << "rating" << 8.8)};
+    BSON("_id" << 5 << "movie"
+               << "Formula 1: The Movie"
+               << "quote"
+               << "Hope is not a strategy. Create your own breaks."
+               << "rating" << 8.8)};
 
 class TextOrStageTest : public ServiceContextMongoDTest {
 public:
@@ -152,7 +163,8 @@ public:
         member->recordId = recordId;
         member->keyData.push_back(
             IndexKeyDatum(indexDescriptor->keyPattern(),
-                          BSON("" << 1 << "" << term << "" << score << "" << "english"),
+                          BSON("" << 1 << "" << term << "" << score << ""
+                                  << "english"),
                           indexId,
                           shard_role_details::getRecoveryUnit(_opCtx.get())->getSnapshotId()));
 

@@ -40,8 +40,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops_exec.h"
-#include "mongo/s/shard_version.h"
-#include "mongo/s/stale_exception.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>

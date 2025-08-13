@@ -32,7 +32,7 @@ mongo_cc_library(
         "//src/mongo/db:multitenancy",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/local_catalog:collection_options",
     ],
 )
 
@@ -94,10 +94,10 @@ mongo_cc_library(
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_feature_flags",
-        "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/commands:list_collections_filter",
         "//src/mongo/db/index_builds:index_build_entry_helpers",
         "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/local_catalog:collection_options",
         "//src/mongo/db/repl:member_data",
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl:replication_auth",
@@ -194,7 +194,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:storage_interface_impl",
         # Required for service context test fixture
         "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/local_catalog:collection_options",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/dbtests:mocklib",
         "//src/mongo/util:clock_source_mock",

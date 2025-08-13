@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
@@ -48,7 +47,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

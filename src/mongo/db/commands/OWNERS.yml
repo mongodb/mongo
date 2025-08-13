@@ -9,24 +9,12 @@ filters:
   - "buildinfo_common.*":
     approvers:
       - 10gen/server-programmability
-  - "*cluster*parameter*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "cluster_server_parameter_cmds.idl":
-    approvers:
-      - 10gen/server-security
-  - "collmod_cmd.cpp":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "connection_status.*":
     approvers:
       - 10gen/server-security
   - "cpuload.*":
     approvers:
       - 10gen/server-programmability
-  - "create*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "create_indexes*":
     approvers:
       - 10gen/server-index-builds
@@ -72,15 +60,6 @@ filters:
   - "rotate_certificates*":
     approvers:
       - 10gen/server-security
-  - "list*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "rename*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "set_cluster*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "profile*":
     approvers:
       - 10gen/query-integration-observability
@@ -99,27 +78,9 @@ filters:
   - "oplog*":
     approvers:
       - 10gen/server-oplog
-  - "drop_index*":
+  - "*rwc_defaults*":
     approvers:
-      - 10gen/server-catalog-and-routing
-  - "internal_rename*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "lock_info*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "notify_sharding_event*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "rwc_defaults*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "set_user_write_block_mode*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "validate_db_metadata*":
-    approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "set_index_commit_quorum*":
     approvers:
       - 10gen/server-index-builds
@@ -135,9 +96,9 @@ filters:
   - "apply_ops*":
     approvers:
       - 10gen/server-oplog
-  - "set_feature_compatibility_version*":
+  - "*set_feature_compatibility_version*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
       - 10gen/server-fcv
   - "snapshot_management*":
     approvers:
@@ -175,7 +136,7 @@ filters:
   - "conn_pool_sync.cpp":
     approvers:
       - 10gen/server-networking-and-observability
-  - "drop_connections_command.cpp":
+  - "drop_connections*":
     approvers:
       - 10gen/server-networking-and-observability
   - "http_client.*":
@@ -208,3 +169,6 @@ filters:
   - "*txn*":
     approvers:
       - 10gen/server-transactions
+  - "*read_write_concern_defaults_server_status*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

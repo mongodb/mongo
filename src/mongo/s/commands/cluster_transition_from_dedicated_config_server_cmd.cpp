@@ -41,10 +41,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/shard_registry.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/request_types/transition_from_dedicated_config_server_gen.h"
 #include "mongo/util/assert_util.h"
 

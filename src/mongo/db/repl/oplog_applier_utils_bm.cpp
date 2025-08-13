@@ -31,12 +31,12 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/query/compiler/stats/rand_utils.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/db/transaction_resources.h"
 
 #include <chrono>
 #include <string>

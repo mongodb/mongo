@@ -32,7 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"

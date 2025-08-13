@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {

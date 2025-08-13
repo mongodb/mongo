@@ -53,7 +53,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"

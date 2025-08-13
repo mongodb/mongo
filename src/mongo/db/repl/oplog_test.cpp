@@ -32,10 +32,10 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/create_collection.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -401,7 +401,8 @@ TEST_F(CreateIndexForApplyOpsTest, GeneratesNewIdentIfNone) {
     {
         Lock::DBLock lock(opCtx.get(), _nss.dbName(), MODE_X);
         createIndexForApplyOps(opCtx.get(),
-                               BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                               BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                                        << "a_1"),
                                boost::none,
                                _nss,
                                OplogApplication::Mode::kSecondary);
@@ -427,7 +428,8 @@ TEST_F(CreateIndexForApplyOpsTest, UsesIdentIfSpecified) {
     {
         Lock::DBLock lock(opCtx.get(), _nss.dbName(), MODE_X);
         createIndexForApplyOps(opCtx.get(),
-                               BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                               BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                                        << "a_1"),
                                BSON("ident" << ident),
                                _nss,
                                OplogApplication::Mode::kSecondary);
@@ -450,7 +452,8 @@ TEST_F(CreateIndexForApplyOpsTest, MetadataValidation) {
 
     auto opCtx = cc().makeOperationContext();
     Lock::DBLock lock(opCtx.get(), _nss.dbName(), MODE_X);
-    auto spec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1");
+    auto spec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                         << "a_1");
     ASSERT_THROWS_CODE(createIndexForApplyOps(
                            opCtx.get(), spec, BSONObj(), _nss, OplogApplication::Mode::kSecondary),
                        AssertionException,

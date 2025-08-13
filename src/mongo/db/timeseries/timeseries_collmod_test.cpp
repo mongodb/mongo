@@ -29,10 +29,10 @@
 
 #include "mongo/db/timeseries/timeseries_collmod.h"
 
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/coll_mod_gen.h"
-#include "mongo/db/commands/create_gen.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/local_catalog/create_collection.h"
+#include "mongo/db/local_catalog/ddl/coll_mod_gen.h"
+#include "mongo/db/local_catalog/ddl/create_gen.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"

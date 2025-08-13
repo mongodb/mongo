@@ -30,9 +30,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/unittest/unittest.h"
 namespace mongo {
 namespace resharding {

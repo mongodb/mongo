@@ -49,7 +49,7 @@
 #include "mongo/db/commands/query_cmd/release_memory_cmd.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/classic/queued_data_stage.h"
-#include "mongo/db/list_collections_gen.h"
+#include "mongo/db/local_catalog/ddl/list_collections_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"

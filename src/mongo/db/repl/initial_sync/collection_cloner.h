@@ -37,7 +37,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/initial_sync/base_cloner.h"

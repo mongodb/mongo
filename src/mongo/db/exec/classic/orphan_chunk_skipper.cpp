@@ -33,8 +33,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/classic/working_set.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/optional/optional.hpp>

@@ -31,10 +31,10 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/local_catalog/shard_role_api/resource_yielders.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/s/resource_yielders.h"
 #include "mongo/util/assert_util.h"
 
 #include <utility>

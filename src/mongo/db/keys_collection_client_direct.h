@@ -42,8 +42,8 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/rs_local_client.h"
+#include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/client/shard.h"
 
 #include <memory>
 #include <string>

@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/collection_index_usage_tracker.h"
+#include "mongo/db/local_catalog/collection.h"
 
 #include <boost/intrusive_ptr.hpp>
 

@@ -44,7 +44,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/sync_source_selector_mock.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"

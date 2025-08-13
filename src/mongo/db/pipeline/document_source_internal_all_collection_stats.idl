@@ -33,8 +33,8 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/pipeline/storage_stats_spec.idl"
     - "mongo/db/pipeline/document_source_coll_stats.idl"
+    - "mongo/db/pipeline/storage_stats_spec.idl"
 
 structs:
     DocumentSourceInternalAllCollectionStatsSpec:

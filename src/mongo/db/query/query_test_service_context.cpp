@@ -32,7 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/topology/sharding_state.h"
 
 #include <memory>
 

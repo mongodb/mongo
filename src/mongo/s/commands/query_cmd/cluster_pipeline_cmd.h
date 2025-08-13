@@ -33,11 +33,11 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/views/resolved_view.h"
-#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 
 namespace mongo {

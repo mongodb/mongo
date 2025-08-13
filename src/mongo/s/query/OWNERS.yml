@@ -5,11 +5,11 @@ filters:
       - 10gen/query
   - "README.md":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "README_aggregation.md":
     approvers:
       - 10gen/query
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "OWNERS.yml":
     approvers:
       - 10gen/query-execution-staff-leads

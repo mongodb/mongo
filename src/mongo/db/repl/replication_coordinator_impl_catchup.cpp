@@ -30,8 +30,8 @@
 
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_metrics.h"
-#include "mongo/db/vector_clock.h"
-#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/vector_clock/vector_clock_mutable.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/time_support.h"

@@ -29,7 +29,7 @@
 
 #include "mongo/db/exec/express/express_plan.h"
 
-#include "mongo/db/transaction_resources.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/util/stacktrace.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

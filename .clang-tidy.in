@@ -67,7 +67,6 @@ Checks:          '-*,
                   mongo-assert-check,
                   mongo-banned-names-check,
                   mongo-cctype-check,
-                  mongo-collection-sharding-runtime-check,
                   mongo-config-header-check,
                   mongo-cxx20-banned-includes-check,
                   mongo-cxx20-std-chrono-check,
@@ -158,7 +157,5 @@ CheckOptions:
     value:           llvm
   - key:             modernize-replace-random-shuffle.IncludeStyle
     value:           llvm
-  - key:             mongo-collection-sharding-runtime-check.exceptionDirs
-    value:           'src/mongo/db/s'
   - key:             mongo-header-bracket-check.mongoSourceDirs
     value:           'src/mongo;@MONGO_BRACKET_BUILD_DIR@'

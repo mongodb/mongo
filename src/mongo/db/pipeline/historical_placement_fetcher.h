@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/global_catalog/type_namespace_placement_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/catalog/type_namespace_placement_gen.h"
 
 #include <boost/optional/optional.hpp>
 

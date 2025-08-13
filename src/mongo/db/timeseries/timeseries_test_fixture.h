@@ -33,7 +33,7 @@
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"

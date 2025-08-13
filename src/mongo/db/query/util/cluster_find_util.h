@@ -32,6 +32,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
@@ -42,7 +43,6 @@
 #include "mongo/db/query/timeseries/timeseries_translation.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
-#include "mongo/s/router_role.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/optional/optional.hpp>

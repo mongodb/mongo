@@ -31,7 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/extensions_callback.h"

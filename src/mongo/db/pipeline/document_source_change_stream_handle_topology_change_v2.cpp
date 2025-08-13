@@ -29,8 +29,8 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change_v2.h"
 
+#include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/s/catalog/type_shard.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

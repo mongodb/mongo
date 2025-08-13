@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_retry_policy.h"
-#include "mongo/s/client/shard.h"
 
 namespace mongo {
 namespace async_rpc {

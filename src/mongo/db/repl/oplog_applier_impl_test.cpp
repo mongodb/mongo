@@ -53,20 +53,21 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/db/catalog/clustered_collection_options_gen.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/index_constants.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/clustered_collection_options_gen.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/database_holder.h"
+#include "mongo/db/local_catalog/db_raii.h"
+#include "mongo/db/local_catalog/document_validation.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -100,13 +101,12 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/executor/task_executor.h"
@@ -641,12 +641,13 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandDisaggBasic) {
     auto catalogIdentifier =
         newCatalogIdentifier(_opCtx.get(), nss.dbName(), true /* includeIdIndexIdent*/);
 
-    auto entry = makeCreateCollectionOplogEntry(
-        nextOpTime(),
-        nss,
-        CollectionOptions{.uuid = UUID::gen()},
-        BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name" << "_id_") /* idIndex */,
-        catalogIdentifier);
+    auto entry =
+        makeCreateCollectionOplogEntry(nextOpTime(),
+                                       nss,
+                                       CollectionOptions{.uuid = UUID::gen()},
+                                       BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
+                                                << "_id_") /* idIndex */,
+                                       catalogIdentifier);
 
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn =

@@ -50,9 +50,9 @@ idl_generator(
     src = "query_settings_cluster_parameter.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/cluster_parameters:cluster_server_parameter_gen",
         "//src/mongo/db/query:query_feature_flags_gen",
         "//src/mongo/db/query/query_settings:query_settings_gen",
-        "//src/mongo/idl:cluster_server_parameter_gen",
     ],
 )
 
@@ -66,7 +66,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db/commands:cluster_server_parameter_cmds_idl",
+        "//src/mongo/db/cluster_parameters:cluster_server_parameter_cmds_idl",
     ],
 )
 
@@ -93,11 +93,11 @@ mongo_cc_library(
         "//src/mongo/crypto:sha256_block",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/catalog:index_key_validate",
         "//src/mongo/db/commands:server_status_core",
-        "//src/mongo/db/concurrency:exception_util",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/local_catalog:index_key_validate",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/pipeline/process_interface:common_process_interface",
         "//src/mongo/db/query:command_shapes",
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.

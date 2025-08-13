@@ -35,7 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/unittest/unittest.h"
 

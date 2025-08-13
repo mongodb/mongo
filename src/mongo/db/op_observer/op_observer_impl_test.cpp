@@ -41,21 +41,21 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_options_gen.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
-#include "mongo/db/catalog/local_oplog_info.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cluster_role.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/clustered_collection_util.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_options_gen.h"
+#include "mongo/db/local_catalog/create_collection.h"
+#include "mongo/db/local_catalog/database.h"
+#include "mongo/db/local_catalog/import_collection_oplog_entry_gen.h"
+#include "mongo/db/local_catalog/local_oplog_info.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
@@ -95,10 +95,10 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
@@ -553,14 +553,14 @@ protected:
             // Generate the create oplog entry.
             AutoGetCollection autoColl(opCtx, nss, MODE_X);
             WriteUnitOfWork wuow(opCtx);
-            opObserver.onCreateCollection(
-                opCtx,
-                nss,
-                options,
-                BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name" << "_id_") /* idIndex */,
-                repl::getNextOpTime(opCtx),
-                catalogIdentifier,
-                false /* fromMigrate*/);
+            opObserver.onCreateCollection(opCtx,
+                                          nss,
+                                          options,
+                                          BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
+                                                   << "_id_") /* idIndex */,
+                                          repl::getNextOpTime(opCtx),
+                                          catalogIdentifier,
+                                          false /* fromMigrate*/);
             wuow.commit();
         }
 
@@ -694,14 +694,14 @@ DEATH_TEST_F(OpObserverOnCreateCollectionTest, CrashIfNoReplicatedCatalogIdentif
     ASSERT_TRUE(nss.isReplicated());
     AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
     WriteUnitOfWork wuow(opCtx.get());
-    opObserver.onCreateCollection(
-        opCtx.get(),
-        nss,
-        CollectionOptions{.uuid = UUID::gen()},
-        BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name" << "_id_") /* idIndex */,
-        repl::getNextOpTime(opCtx.get()),
-        boost::none /* createCollCatalogIdentifier */,
-        false /* fromMigrate*/);
+    opObserver.onCreateCollection(opCtx.get(),
+                                  nss,
+                                  CollectionOptions{.uuid = UUID::gen()},
+                                  BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
+                                           << "_id_") /* idIndex */,
+                                  repl::getNextOpTime(opCtx.get()),
+                                  boost::none /* createCollCatalogIdentifier */,
+                                  false /* fromMigrate*/);
     wuow.commit();
 }
 
@@ -840,12 +840,15 @@ TEST_F(OpObserverTest, checkIsViewlessTimeseriesOnReplLogUpdate) {
     cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
 
-    const auto criteria = BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
+    const auto criteria = BSON("_id" << 0 << "data"
+                                     << "original"
+                                     << "timestamp" << Date_t::now());
     const auto preImageDoc = criteria;
     CollectionUpdateArgs updateArgs{preImageDoc};
     updateArgs.criteria = criteria;
-    updateArgs.updatedDoc =
-        BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
+    updateArgs.updatedDoc = BSON("_id" << 0 << "data"
+                                       << "original"
+                                       << "timestamp" << Date_t::now());
     updateArgs.update = BSON("$set" << BSON("data" << "x"));
 
     WriteUnitOfWork wuow(opCtx.get());
@@ -881,7 +884,9 @@ TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogDelete) {
     AutoGetCollection autoColl(opCtx.get(), curNss, MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
     OplogDeleteEntryArgs args;
-    auto doc = BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
+    auto doc = BSON("_id" << 0 << "data"
+                          << "original"
+                          << "timestamp" << Date_t::now());
     const auto& documentKey = getDocumentKey(*autoColl, doc);
     opObserver.onDelete(opCtx.get(), *autoColl, kUninitializedStmtId, doc, documentKey, args);
 
@@ -903,7 +908,9 @@ TEST_F(OpObserverTest, checkIsTimeseriesOnInserts) {
     cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
 
-    const auto criteria = BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
+    const auto criteria = BSON("_id" << 0 << "data"
+                                     << "original"
+                                     << "timestamp" << Date_t::now());
     std::vector<InsertStatement> insert;
     insert.emplace_back(criteria);
 
@@ -3421,8 +3428,12 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateOnViewlessTimeseri
     WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
     ASSERT(bwc.writesAreBatched());
 
-    auto doc = BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
-    auto doc2 = BSON("_id" << 1 << "data" << "original" << "timestamp" << Date_t::now());
+    auto doc = BSON("_id" << 0 << "data"
+                          << "original"
+                          << "timestamp" << Date_t::now());
+    auto doc2 = BSON("_id" << 1 << "data"
+                           << "original"
+                           << "timestamp" << Date_t::now());
 
     // (0) Insert
     {
@@ -3447,8 +3458,9 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateOnViewlessTimeseri
     }
     // (2) Update
     {
-        const auto criteria =
-            BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
+        const auto criteria = BSON("_id" << 0 << "data"
+                                         << "original"
+                                         << "timestamp" << Date_t::now());
         const auto preImageDoc = doc;
         CollectionUpdateArgs collUpdateArgs{preImageDoc};
         collUpdateArgs.criteria = criteria;

@@ -394,7 +394,7 @@ mongo_cc_library(
         # please add that library here, as a private library dependency.
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/client:connection_string",
-        "//src/mongo/db/catalog:index_key_validate",
+        "//src/mongo/db/local_catalog:index_key_validate",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db/pipeline:change_stream_error_extra_info",
         "//src/mongo/db/query:command_request_response",

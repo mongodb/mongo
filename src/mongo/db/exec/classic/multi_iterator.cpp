@@ -29,11 +29,11 @@
 
 #include "mongo/db/exec/classic/multi_iterator.h"
 
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>

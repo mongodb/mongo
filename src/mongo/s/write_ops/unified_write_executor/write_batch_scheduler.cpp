@@ -29,7 +29,7 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_batch_scheduler.h"
 
-#include "mongo/s/cluster_ddl.h"
+#include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 
 namespace mongo {
 namespace unified_write_executor {

@@ -1,0 +1,84 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "cluster_server_parameter_cmds_gen",
+    src = "cluster_server_parameter_cmds.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "cluster_server_parameter_gen",
+    src = "cluster_server_parameter.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "cluster_server_parameter_refresher_gen",
+    src = "cluster_server_parameter_refresher.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "cluster_server_parameter_test_gen",
+    src = "cluster_server_parameter_test.idl",
+    deps = [
+        ":cluster_server_parameter_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "sharding_cluster_parameters_gen",
+    src = "sharding_cluster_parameters.idl",
+    deps = [
+        ":cluster_server_parameter_gen",
+    ],
+)
+
+idl_generator(
+    name = "migration_blocking_operation_cluster_parameters_gen",
+    src = "migration_blocking_operation_cluster_parameters.idl",
+    deps = [
+        ":cluster_server_parameter_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_server_parameter_cmds_idl",
+    srcs = [
+        ":cluster_server_parameter_cmds_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/idl:cluster_server_parameter",
+    ],
+)
+
+idl_generator(
+    name = "set_cluster_parameter_coordinator_document_gen",
+    src = "set_cluster_parameter_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:configsvr_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+    ],
+)

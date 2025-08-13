@@ -32,7 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog_raii.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/record_id.h"
 
 #include <functional>

@@ -30,7 +30,6 @@
 #include "MongoAssertCheck.h"
 #include "MongoBannedNamesCheck.h"
 #include "MongoCctypeCheck.h"
-#include "MongoCollectionShardingRuntimeCheck.h"
 #include "MongoConfigHeaderCheck.h"
 #include "MongoCxx20BannedIncludesCheck.h"
 #include "MongoCxx20StdChronoCheck.h"
@@ -73,8 +72,6 @@ public:
         CheckFactories.registerCheck<MongoAssertCheck>("mongo-assert-check");
         CheckFactories.registerCheck<MongoFCVConstantCheck>("mongo-fcv-constant-check");
         CheckFactories.registerCheck<MongoUnstructuredLogCheck>("mongo-unstructured-log-check");
-        CheckFactories.registerCheck<MongoCollectionShardingRuntimeCheck>(
-            "mongo-collection-sharding-runtime-check");
         CheckFactories.registerCheck<MongoMacroDefinitionLeaksCheck>(
             "mongo-macro-definition-leaks-check");
         CheckFactories.registerCheck<MongoRandCheck>("mongo-rand-check");

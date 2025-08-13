@@ -10,27 +10,6 @@ exports_files(
 )
 
 idl_generator(
-    name = "sharded_ddl_commands_gen",
-    src = "sharded_ddl_commands.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db:coll_mod_gen",
-        "//src/mongo/db:drop_database_gen",
-        "//src/mongo/db:drop_indexes_gen",
-        "//src/mongo/db:keypattern_gen",
-        "//src/mongo/db:metadata_consistency_types_gen",
-        "//src/mongo/db/commands:create_gen",
-        "//src/mongo/db/commands:rename_collection_gen",
-        "//src/mongo/db/commands:set_user_write_block_mode_gen",
-        "//src/mongo/db/query/client_cursor:cursor_response_gen",
-        "//src/mongo/db/timeseries:timeseries_gen",
-        "//src/mongo/s:sharding_types_gen",
-        "//src/mongo/s/catalog:type_database_gen",
-        "//src/mongo/s/resharding:common_types_gen",
-    ],
-)
-
-idl_generator(
     name = "abort_reshard_collection_gen",
     src = "abort_reshard_collection.idl",
     deps = [
@@ -77,29 +56,11 @@ idl_generator(
 )
 
 idl_generator(
-    name = "clone_catalog_data_gen",
-    src = "clone_catalog_data.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "cluster_commands_without_shard_key_gen",
     src = "cluster_commands_without_shard_key.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:sharding_types_gen",
-    ],
-)
-
-idl_generator(
-    name = "commit_reshard_collection_gen",
-    src = "commit_reshard_collection.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
@@ -123,54 +84,8 @@ idl_generator(
 )
 
 idl_generator(
-    name = "drop_collection_if_uuid_not_matching_gen",
-    src = "drop_collection_if_uuid_not_matching.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
-    name = "ensure_chunk_version_is_greater_than_gen",
-    src = "ensure_chunk_version_is_greater_than.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:chunk_version_gen",
-    ],
-)
-
-idl_generator(
-    name = "flush_database_cache_updates_gen",
-    src = "flush_database_cache_updates.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "flush_resharding_state_change_gen",
     src = "flush_resharding_state_change.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
-    name = "flush_routing_table_cache_updates_gen",
-    src = "flush_routing_table_cache_updates.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
-    name = "get_database_version_gen",
-    src = "get_database_version.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:generic_argument_gen",
@@ -187,66 +102,13 @@ idl_generator(
 )
 
 idl_generator(
-    name = "merge_chunk_request_gen",
-    src = "merge_chunk_request.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:chunk_range_gen",
-        "//src/mongo/s:chunk_version_gen",
-        "//src/mongo/s:sharding_types_gen",
-    ],
-)
-
-idl_generator(
-    name = "migration_blocking_operation_gen",
-    src = "migration_blocking_operation.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
-    name = "move_primary_gen",
-    src = "move_primary.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:sharding_types_gen",
-    ],
-)
-
-idl_generator(
     name = "move_range_request_gen",
     src = "move_range_request.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db:write_concern_options_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
         "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:sharding_types_gen",
-    ],
-)
-
-idl_generator(
-    name = "placement_history_commands_gen",
-    src = "placement_history_commands.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:sharding_types_gen",
-        "//src/mongo/s/catalog:type_namespace_placement_gen",
-    ],
-)
-
-idl_generator(
-    name = "remove_shard_gen",
-    src = "remove_shard.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/s:remove_shard_draining_progress_gen",
-        "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:sharding_types_gen",
     ],
 )
 
@@ -270,37 +132,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "set_allow_migrations_gen",
-    src = "set_allow_migrations.idl",
-    hdrs = [
-        "//src/mongo/db/s:forwardable_operation_metadata.h",
-    ],
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/s:sharding_ddl_coordinator_gen",
-        "//src/mongo/s/request_types:sharded_ddl_commands_gen",
-    ],
-)
-
-idl_generator(
-    name = "shardsvr_join_migrations_request_gen",
-    src = "shardsvr_join_migrations_request.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
-    name = "shardsvr_join_ddl_coordinators_request_gen",
-    src = "shardsvr_join_ddl_coordinators_request.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "transition_from_dedicated_config_server_gen",
     src = "transition_from_dedicated_config_server.idl",
     deps = [
@@ -313,8 +144,8 @@ idl_generator(
     name = "transition_to_dedicated_config_server_gen",
     src = "transition_to_dedicated_config_server.idl",
     deps = [
-        ":remove_shard_gen",
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/topology:remove_shard_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
@@ -322,15 +153,6 @@ idl_generator(
 idl_generator(
     name = "wait_for_fail_point_gen",
     src = "wait_for_fail_point.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
-    name = "untrack_unsplittable_collection_gen",
-    src = "untrack_unsplittable_collection.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:generic_argument_gen",
@@ -347,29 +169,10 @@ idl_generator(
 )
 
 idl_generator(
-    name = "add_shard_to_zone_gen",
-    src = "add_shard_to_zone.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "update_zone_key_range_gen",
     src = "update_zone_key_range.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
-    name = "add_shard_gen",
-    src = "add_shard.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/s:type_shard_identity_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
 )

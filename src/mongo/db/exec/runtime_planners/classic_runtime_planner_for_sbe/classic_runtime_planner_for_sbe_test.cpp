@@ -28,11 +28,12 @@
  */
 
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/classic_runtime_planner_for_sbe_test_util.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/planner_interface.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
@@ -43,7 +44,6 @@
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 

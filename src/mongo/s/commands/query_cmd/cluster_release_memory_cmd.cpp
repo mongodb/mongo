@@ -38,7 +38,7 @@
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/release_memory_gen.h"
 #include "mongo/db/query/client_cursor/release_memory_util.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/util/assert_util.h"
 

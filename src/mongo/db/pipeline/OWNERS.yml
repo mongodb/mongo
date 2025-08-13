@@ -292,13 +292,13 @@ filters:
       - 10gen/query-execution-classic
   - "document_source_coll_stats*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "document_source_internal_all_collection_stats*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "document_source_internal_list_collections*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "document_source_list_cluster_catalog*":
     approvers:
       - 10gen/server-catalog-and-routing

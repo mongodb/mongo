@@ -1,0 +1,132 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/client/connection_string.h"
+        - "mongo/db/global_catalog/ddl/notify_sharding_event_utils.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
+
+structs:
+    CollectionSharded:
+        description: "Event describing the details of a committing shardCollection operation."
+        strict: false
+        fields:
+            nss:
+                description: "The namespace of the sharded collection."
+                type: namespacestring
+            uuid:
+                description: "The UUID of the collection."
+                type: uuid
+            request:
+                type: object_owned
+                description: "The user request that originated this event."
+
+    CollectionResharded:
+        description: "Event describing the details of a committing reshardCollection operation."
+        strict: false
+        fields:
+            nss:
+                description: "The namespace of the resharded collection."
+                type: namespacestring
+            sourceUUID:
+                description: "The original UUID of the collection."
+                type: uuid
+            reshardingUUID:
+                description: "The UUID of the resharded collection."
+                type: uuid
+            sourceKey:
+                description: "The original shard key of the collection
+                    (defined as optional for retro compatibility)."
+                type: object_owned
+                optional: true
+            unique:
+                type: bool
+                description: "The user-specified value for the unique request field."
+                optional: true
+            collation:
+                type: object_owned
+                description: "The user-specified value for the collation request field."
+                optional: true
+            reshardingKey:
+                description: "The shard key of the resharded collection."
+                type: object_owned
+            numInitialChunks:
+                type: long
+                description: "The number of chunks the new collection should have after resharding."
+                optional: true
+            referenceToZoneList:
+                type: namespacestring
+                description:
+                    "The full collection name that is currently associated to the set of zones created as part of this operation.
+                    When no value is specified, the nss field will be used instead."
+                optional: true
+            provenance:
+                type: ReshardingProvenance
+                description: "The type of user/system request that originated
+                    the commit of this reshardCollection."
+                optional: true
+
+    NamespacePlacementChanged:
+        description:
+            "Marker event matching the commit of a generic DDL operation that caused
+            a modification of the set of shards serving data for a specific collection or database."
+        strict: false
+        fields:
+            nss:
+                description: "The database or collection name whose placement across shards got changed."
+                type: namespacestring
+            committedAt:
+                description: "The cluster time at which the placement-changing DDL got recorded into the global catalog."
+                type: timestamp
+
+commands:
+    _shardsvrNotifyShardingEvent:
+        command_name: _shardsvrNotifyShardingEvent
+        cpp_name: ShardsvrNotifyShardingEventRequest
+        description:
+            "Internal command to be invoked by the config server to notify a shard
+            of an event concerning the shard itself or the whole cluster."
+        namespace: ignored
+        api_version: ""
+        strict: false
+        reply_type: OkReply
+        fields:
+            eventType:
+                type: string
+                description: "The type of sharding event"
+                validator:
+                    {callback: "notify_sharding_event::validateEventType"}
+            details:
+                type: object_owned
+                description: "A descriptor of the sharding event
+                    (to be serialized and interpreted based on the value of eventType)."

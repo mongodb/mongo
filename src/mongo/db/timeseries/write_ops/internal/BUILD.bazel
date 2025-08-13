@@ -42,8 +42,8 @@ mongo_cc_unit_test(
         "server-timeseries-bucket-catalog",
     ],
     deps = [
-        "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/collection_crud",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
         "//src/mongo/db/query/write_ops:write_ops_exec",
         "//src/mongo/db/timeseries:timeseries_metadata",
         "//src/mongo/db/timeseries:timeseries_options",

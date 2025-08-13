@@ -29,8 +29,8 @@
 
 #include "mongo/s/query_analysis_sample_tracker.h"
 
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"

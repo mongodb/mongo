@@ -64,9 +64,6 @@ filters:
   - "max_time.*":
     approvers:
       - 10gen/server-networking-and-observability
-  - "metadata_consistency*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "mongod.cpp":
     approvers:
       - 10gen/server-programmability
@@ -139,12 +136,6 @@ filters:
   - "*transaction*":
     approvers:
       - 10gen/server-transactions
-  - "*transaction_resources.h":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "*transaction_resources.cpp":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "*txn*":
     approvers:
       - 10gen/server-transactions
@@ -153,6 +144,10 @@ filters:
       - 10gen/server-programmability
   - "service_entry_point*":
     approvers:
+      - 10gen/server-programmability
+  - "service_entry_point_shard_role*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
       - 10gen/server-programmability
   - "audit*":
     approvers:
@@ -194,12 +189,6 @@ filters:
   - "update_index_data*":
     approvers:
       - 10gen/query-execution-write-exec
-  - "create*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "drop*idl":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "startup_recovery*":
     approvers:
       - 10gen/server-storage-engine-api
@@ -218,51 +207,15 @@ filters:
   - "feature_compatibility*":
     approvers:
       - 10gen/server-fcv
-  - "catalog_raii*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "catalog_shard_feature_flag.idl":
     approvers:
-      - 10gen/server-catalog-and-routing
-  - "cluster_role*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "coll_mod*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "collection_acquisition*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "collection_type*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "db_raii*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "direct_connection*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "*lock_manager*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "list*idl":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "shard_id*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "shard_role*":
-    approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability
   - "traffic*":
     approvers:
       - 10gen/query-optimization
-  - "vector_clock*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "version_context*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "server_lifecycle_monitor*":
     approvers:
       - 10gen/server-programmability
@@ -313,16 +266,22 @@ filters:
       - 10gen/server-workload-scheduling
   - "namespace_string*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "database_name*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "namespace_spec*":
+    approvers:
+      - 10gen/query
   - "rs_local_client*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "raw_data_operation*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "persistent_task_store*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "validate_api_parameters*":
     approvers:
       - 10gen/query-optimization
@@ -335,3 +294,12 @@ filters:
   - "tenant_id*":
     approvers:
       - 10gen/server-security
+  - "deferred_writer*":
+    approvers:
+      - 10gen/server-dbcheck
+  - "flow_control_ticketholder*":
+    approvers:
+      - 10gen/server-workload-scheduling
+  - "replication_state_transition_lock_guard*":
+    approvers:
+      - 10gen/server-replication

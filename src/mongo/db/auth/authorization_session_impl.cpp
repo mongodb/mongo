@@ -52,7 +52,7 @@
 #include "mongo/db/auth/resource_pattern_search_list.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
-#include "mongo/db/list_collections_gen.h"
+#include "mongo/db/local_catalog/ddl/list_collections_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"

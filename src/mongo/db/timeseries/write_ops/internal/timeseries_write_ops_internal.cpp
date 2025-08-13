@@ -29,11 +29,11 @@
 
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 
-#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/local_catalog/document_validation.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/write_ops/write_ops_exec_util.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"

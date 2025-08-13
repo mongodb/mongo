@@ -29,7 +29,7 @@
 
 #include "mongo/db/s/initialize_placement_history_coordinator.h"
 
-#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -28,9 +28,9 @@
  */
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_metadata.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
 
 namespace mongo {
 /**

@@ -42,13 +42,13 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction_resources.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/grid.h"
 
 #include <functional>
 #include <string>

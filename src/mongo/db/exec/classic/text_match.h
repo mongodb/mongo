@@ -36,7 +36,7 @@
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 

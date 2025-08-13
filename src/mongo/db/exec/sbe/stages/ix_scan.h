@@ -34,8 +34,6 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/admission/execution_admission_context.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
@@ -45,6 +43,9 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/local_catalog/db_raii.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
@@ -53,7 +54,6 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>

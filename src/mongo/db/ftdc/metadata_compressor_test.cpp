@@ -31,7 +31,7 @@
 
 #include "mongo/db/exec/mutable_bson/algorithm.h"
 #include "mongo/db/exec/mutable_bson/document.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

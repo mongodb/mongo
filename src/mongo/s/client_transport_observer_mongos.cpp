@@ -35,7 +35,7 @@
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/load_balancer_support.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/transaction_router.h"

@@ -38,7 +38,6 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/queued_data_stage.h"

@@ -30,8 +30,8 @@
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
 
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
-#include "mongo/db/transaction_resources.h"
 
 #include <fmt/format.h>
 

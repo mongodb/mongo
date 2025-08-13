@@ -29,8 +29,8 @@
 
 #include "mongo/db/repl/oplog_visibility_manager.h"
 
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication

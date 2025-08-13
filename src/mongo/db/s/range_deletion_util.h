@@ -33,13 +33,13 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/util/uuid.h"
 
 #include <boost/optional.hpp>

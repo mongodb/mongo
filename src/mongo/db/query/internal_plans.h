@@ -30,14 +30,16 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/classic/batched_delete_stage.h"
 #include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -46,8 +48,6 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/s/shard_key_index_util.h"
-#include "mongo/db/shard_role.h"
 
 #include <cstdint>
 #include <memory>

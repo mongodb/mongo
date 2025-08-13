@@ -31,11 +31,11 @@
 #include "mongo/db/session/logical_session_cache_impl.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/logical_session_cache_gen.h"

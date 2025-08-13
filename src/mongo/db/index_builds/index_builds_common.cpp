@@ -30,7 +30,7 @@
 #include "mongo/db/index_builds/index_builds_common.h"
 
 #include "mongo/db/database_name.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {

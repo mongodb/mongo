@@ -29,8 +29,8 @@ idl_generator(
         "//src/mongo/db/query/write_ops:write_ops_gen",
         "//src/mongo/db/repl:read_concern_args_gen",
         "//src/mongo/db/repl:replication_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
         "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:sharding_types_gen",
     ],
 )
 
@@ -118,7 +118,7 @@ mongo_cc_library(
         "map_reduce_out_options.h",
     ],
     header_deps = [
-        "//src/mongo/db/commands:set_user_write_block_mode_idl",
+        "//src/mongo/db/user_write_block:set_user_write_block_mode_idl",
     ],
     deps = [
         "//src/mongo/db:server_base",
@@ -224,9 +224,9 @@ mongo_cc_library(
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db:commands",
         "//src/mongo/db:dbdirectclient",
-        "//src/mongo/db/catalog:catalog_helpers",
-        "//src/mongo/db/commands:cluster_server_parameter_cmds_idl",
+        "//src/mongo/db/cluster_parameters:cluster_server_parameter_cmds_idl",
         "//src/mongo/db/commands:set_cluster_parameter_impl",
+        "//src/mongo/db/local_catalog:catalog_helpers",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
         "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/query_shape",
@@ -260,8 +260,8 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
-        "//src/mongo/db/catalog:document_validation",
-        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/local_catalog:document_validation",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",
         "//src/mongo/db/pipeline/process_interface:mongod_process_interfaces",
         "//src/mongo/db/query/client_cursor",
         "//src/mongo/db/query/write_ops",

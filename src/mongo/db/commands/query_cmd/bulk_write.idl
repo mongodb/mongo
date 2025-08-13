@@ -32,8 +32,8 @@ global:
         - "mongo/client/read_preference.h"
         - "mongo/db/commands/query_cmd/bulk_write_parser.h"
         - "mongo/db/repl/optime.h"
-        - "mongo/s/database_version.h"
-        - "mongo/s/shard_version.h"
+        - "mongo/db/versioning_protocol/database_version.h"
+        - "mongo/db/versioning_protocol/shard_version.h"
 
 imports:
     - "mongo/client/read_preference_setting.idl"
@@ -42,7 +42,7 @@ imports:
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/write_concern_options.idl"
-    - "mongo/s/sharding_types.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
 
 types:
     BulkWriteReplyItem:

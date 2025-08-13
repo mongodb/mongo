@@ -29,15 +29,15 @@
 
 #pragma once
 
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/shard_id.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_version.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
 

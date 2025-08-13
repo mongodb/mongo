@@ -31,9 +31,9 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain.h"

@@ -30,10 +30,10 @@
 #include "mongo/db/persistent_task_store.h"
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>

@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/local_catalog/util/partitioned.h"
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/util/container_size_helper.h"
 

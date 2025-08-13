@@ -28,13 +28,13 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/local_catalog/database.h"
+#include "mongo/db/local_catalog/database_holder.h"
+#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"

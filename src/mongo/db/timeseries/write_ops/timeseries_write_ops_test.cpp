@@ -31,9 +31,9 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"

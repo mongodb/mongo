@@ -31,7 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/admission/throughput_probing_gen.h"
-#include "mongo/db/dump_lock_manager.h"
+#include "mongo/db/local_catalog/lock_manager/dump_lock_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"

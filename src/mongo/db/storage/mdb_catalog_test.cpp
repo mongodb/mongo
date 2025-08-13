@@ -30,11 +30,11 @@
 #include "mongo/db/storage/mdb_catalog.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/collection_record_store_options.h"
-#include "mongo/db/catalog/durable_catalog.h"
-#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
+#include "mongo/db/local_catalog/clustered_collection_util.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/collection_record_store_options.h"
+#include "mongo/db/local_catalog/durable_catalog.h"
+#include "mongo/db/local_catalog/durable_catalog_entry_metadata.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

@@ -39,9 +39,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/shard_id.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 
 #include <set>
 

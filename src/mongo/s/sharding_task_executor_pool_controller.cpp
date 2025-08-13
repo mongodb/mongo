@@ -33,9 +33,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/topology/shard_registry.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>

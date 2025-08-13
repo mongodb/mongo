@@ -29,10 +29,10 @@
 
 #include "mongo/s/analyze_shard_key_role.h"
 
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/topology/cluster_role.h"
 
 namespace mongo {
 namespace analyze_shard_key {

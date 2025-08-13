@@ -31,11 +31,11 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/classic/filter.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/classic/working_set_common.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"

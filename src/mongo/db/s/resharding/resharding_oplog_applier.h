@@ -30,7 +30,8 @@
 #pragma once
 
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -44,9 +45,8 @@
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"

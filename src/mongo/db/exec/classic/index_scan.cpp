@@ -33,11 +33,11 @@
 
 #include "mongo/db/exec/classic/filter.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/key_string/key_string.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/none.hpp>

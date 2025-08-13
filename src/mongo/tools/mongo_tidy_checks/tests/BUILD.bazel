@@ -30,7 +30,6 @@ tests = [
     "test_MongoAssertCheck",
     "test_MongoFCVConstantCheck",
     "test_MongoUnstructuredLogCheck",
-    "test_MongoCollectionShardingRuntimeCheck",
     "test_MongoMacroDefinitionLeaksCheck",
     "test_MongoRandCheck",
     "test_MongoRWMutexCheck",

@@ -29,12 +29,12 @@
 
 #include "mongo/db/query/search/search_index_process_router.h"
 
-#include "mongo/db/list_collections_gen.h"
+#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
+#include "mongo/db/global_catalog/router_role_api/router_role.h"
+#include "mongo/db/local_catalog/ddl/list_collections_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/views/view_graph.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/router_role.h"
 
 #include <boost/optional/optional.hpp>
 

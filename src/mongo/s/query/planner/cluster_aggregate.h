@@ -34,16 +34,16 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/views/resolved_view.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
-#include "mongo/s/router_role.h"
 
 #include <boost/optional/optional.hpp>
 

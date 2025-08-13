@@ -463,7 +463,7 @@ mongo_cc_fuzzer_test(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/local_catalog/lock_manager",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/util/net:ssl_manager",
     ],

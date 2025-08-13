@@ -35,7 +35,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 

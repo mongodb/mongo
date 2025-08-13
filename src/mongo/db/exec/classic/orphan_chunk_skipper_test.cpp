@@ -32,9 +32,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>

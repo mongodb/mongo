@@ -51,7 +51,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>

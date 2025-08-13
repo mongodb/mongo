@@ -41,12 +41,12 @@
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 
 #include <functional>
 #include <memory>

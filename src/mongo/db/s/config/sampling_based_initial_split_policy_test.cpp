@@ -34,15 +34,15 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/s/config/initial_split_policy.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
-#include "mongo/s/shard_key_pattern.h"
 #include "mongo/unittest/unittest.h"
 
 #include <deque>

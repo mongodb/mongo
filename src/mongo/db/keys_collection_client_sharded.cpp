@@ -30,9 +30,9 @@
 #include "mongo/db/keys_collection_client_sharded.h"
 
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 
 namespace mongo {
 

@@ -34,10 +34,10 @@
 #include "mongo/base/status.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/topology/cluster_role.h"
 
 #include <boost/optional/optional.hpp>
 

@@ -29,9 +29,9 @@
 
 #include "mongo/db/scoped_read_concern.h"
 
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/transaction_resources.h"
 
 namespace mongo {
 

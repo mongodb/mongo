@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"

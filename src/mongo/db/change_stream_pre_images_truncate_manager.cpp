@@ -32,10 +32,10 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_tenant_truncate_markers.h"
-#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

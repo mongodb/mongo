@@ -32,7 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

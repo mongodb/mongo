@@ -52,7 +52,7 @@ filters:
       - 10gen/server-networking-and-observability
   - "read_through_cache*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "version_constants_gen.py":
     approvers:
       - 10gen/devprod-build

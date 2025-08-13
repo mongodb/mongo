@@ -41,7 +41,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/shard_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"

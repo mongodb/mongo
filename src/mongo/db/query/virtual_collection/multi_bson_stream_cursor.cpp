@@ -34,7 +34,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/catalog/virtual_collection_options.h"
+#include "mongo/db/local_catalog/virtual_collection_options.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/compiler.h"

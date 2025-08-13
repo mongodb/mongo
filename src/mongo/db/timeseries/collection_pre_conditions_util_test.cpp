@@ -29,7 +29,7 @@
 
 #include "mongo/db/timeseries/collection_pre_conditions_util.h"
 
-#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 
 

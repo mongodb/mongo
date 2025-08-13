@@ -28,11 +28,11 @@
  */
 
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/canonical_query.h"

@@ -32,10 +32,10 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
