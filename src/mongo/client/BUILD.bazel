@@ -579,6 +579,7 @@ mongo_cc_unit_test(
     srcs = [
         "async_remote_command_targeter_adapter_test.cpp",
         "authenticate_test.cpp",
+        "backoff_with_jitter_test.cpp",
         "connection_string_test.cpp",
         "dbclient_cursor_test.cpp",
         "fetcher_test.cpp",
@@ -587,6 +588,7 @@ mongo_cc_unit_test(
         "read_preference_test.cpp",
         "remote_command_retry_scheduler_test.cpp",
         "replica_set_monitor_server_parameters_test.cpp",
+        "retry_strategy_test.cpp",
         "server_discovery_monitor_expedited_test.cpp",
         "server_discovery_monitor_test.cpp",
         "server_ping_monitor_test.cpp",
@@ -605,6 +607,7 @@ mongo_cc_unit_test(
     }),
     deps = [
         ":authentication",
+        ":backoff_with_jitter",
         ":clientdriver_minimal",
         ":clientdriver_network",
         ":connection_string",
@@ -613,6 +616,7 @@ mongo_cc_unit_test(
         ":remote_command_retry_scheduler",
         ":remote_command_targeter_mock",
         ":replica_set_monitor_protocol_test_util",
+        ":retry_strategy",
         "//src/mongo/client/sdam",
         "//src/mongo/client/sdam:sdam_test_util",
         "//src/mongo/db:server_base",
@@ -732,5 +736,41 @@ mongo_cc_integration_test(
         "//src/mongo/transport:transport_layer_egress_init",
         "//src/mongo/util:version_impl",
         "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+idl_generator(
+    name = "retry_strategy_server_parameters_gen",
+    src = "retry_strategy_server_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "backoff_with_jitter",
+    srcs = [
+        "backoff_with_jitter.cpp",
+    ],
+    hdrs = [
+        "backoff_with_jitter.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "retry_strategy",
+    srcs = [
+        "retry_strategy.cpp",
+        ":retry_strategy_server_parameters_gen",
+    ],
+    hdrs = [
+        "retry_strategy.h",
+        "//src/mongo/base:error_codes_header",
+    ],
+    deps = [
+        ":backoff_with_jitter",
+        "//src/mongo:base",
+        "//src/mongo/db:error_labels",
+        "//src/third_party/folly:folly_token_bucket",
     ],
 )
