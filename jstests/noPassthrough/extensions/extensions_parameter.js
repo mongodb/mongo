@@ -8,8 +8,7 @@
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const pathToExtensionFoo = MongoRunner.getInstallPath("..", "lib", "libfoo_mongo_extension.so");
-
+const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
 // Create a ShardingTest so that we have a config DB for mongos to point to in our test. We don't
 // use ShardingTest directly because repeated failed ShardingTest startups causes issues in the test
 // environment. This also reduces the amount of times we have to start a whole sharded cluster in
@@ -56,11 +55,11 @@ if (isLinux()) {
     runTest({options: {loadExtensions: 12345}, shouldFail: true});
     // Path to extension does not exist.
     runTest({options: {loadExtensions: "path/does/not/exist.so"}, shouldFail: true});
-    // TODO SERVER-107864 Enable these tests.
     // Single valid extension.
-    // runTest({options: {loadExtensions: pathToExtensionFoo}});
-    // List of valid extensions.
-    // runTest({options: {loadExtensions: [pathToExtensionFoo, pathToExtensionFoo]}});
+    runTest({options: {loadExtensions: pathToExtensionFoo}});
+    // List of single valid extension.
+    runTest({options: {loadExtensions: [pathToExtensionFoo]}});
+    // TODO SERVER-108746 Test multiple valid extensions at once.
 } else {
     // Startup should fail because we are attempting to load an extension on a platform that is not
     // linux.
