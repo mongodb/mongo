@@ -89,8 +89,6 @@ public:
             markHostNotPrimary(host, status);
         } else if (ErrorCodes::isNetworkError(status.code())) {
             markHostUnreachable(host, status);
-        } else if (status == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
-            markHostUnreachable(host, status);
         } else if (ErrorCodes::isShutdownError(status.code())) {
             markHostShuttingDown(host, status);
         }
