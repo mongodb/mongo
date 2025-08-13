@@ -23,7 +23,7 @@ py_binary(
     main = "rules_lint_format_wrapper.py",
     visibility = ["//visibility:public"],
     deps = [
-        "//buildscripts:unittest_grouper",
+        "//buildscripts:bazel_custom_formatter",
     ],
 )
 

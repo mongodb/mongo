@@ -8,15 +8,16 @@ import subprocess
 import sys
 import time
 import urllib.request
+from collections import deque
+from pathlib import Path
 from typing import Dict, List
 
 from retry import retry
 
-from buildscripts.simple_report import make_report, put_report, try_combine_reports
-
 sys.path.append(".")
 
 from buildscripts.install_bazel import install_bazel
+from buildscripts.simple_report import make_report, put_report, try_combine_reports
 
 RELEASE_URL = "https://github.com/bazelbuild/buildtools/releases/download/v7.3.1/"
 
@@ -146,6 +147,72 @@ def find_multiple_groups(test, groups):
     return tagged_groups
 
 
+def iter_clang_tidy_files(root: str | Path) -> list[Path]:
+    """Return a list of repo-relative Paths to '.clang-tidy' files.
+    - Uses os.scandir for speed
+    - Does NOT follow symlinks
+    """
+    root = Path(root).resolve()
+    results: list[Path] = []
+    stack = deque([root])
+
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                for entry in it:
+                    name = entry.name
+                    if entry.is_dir(follow_symlinks=False):
+                        stack.append(Path(entry.path))
+                    elif entry.is_file(follow_symlinks=False) and name == ".clang-tidy":
+                        # repo-relative path
+                        results.append(Path(entry.path).resolve().relative_to(root))
+        except PermissionError:
+            continue
+    return results
+
+def validate_clang_tidy_configs(generate_report, fix):
+    buildozer = download_buildozer()
+
+    mongo_dir = "src/mongo"
+
+    tidy_files = iter_clang_tidy_files("src/mongo")
+
+    p = subprocess.run(
+        [buildozer, "print label srcs", "//:clang_tidy_config_files"],
+        capture_output=True,
+        text=True,
+    )
+    tidy_targets = None
+    for line in p.stdout.splitlines():
+        if line.startswith("//") and line.endswith("]"):
+            tokens = line.split("[")
+            tidy_targets = tokens[1][:-1].split(" ")
+            break
+    if tidy_targets is None:
+        print(p.stderr)
+        raise Exception(f"could not parse tidy config targets from '{p.stdout}'")
+
+    if tidy_targets == ['']:
+        tidy_targets = []
+
+    all_targets = []
+    for tidy_file in tidy_files:
+        tidy_file_target = "//" + os.path.dirname(os.path.join(mongo_dir, tidy_file)) + ":clang_tidy_config"
+        all_targets.append(tidy_file_target)
+    
+    if all_targets != tidy_targets:
+        msg = f"Incorrect clang tidy config targets: {all_targets} != {tidy_targets}"
+        print(msg)
+        if generate_report:
+            report = make_report("//:clang_tidy_config_files", msg, 1)
+            try_combine_reports(report)
+            put_report(report)
+
+    if fix:
+        subprocess.run([buildozer, f"set srcs {' '.join(all_targets)}", "//:clang_tidy_config_files"])
+
+
 def validate_bazel_groups(generate_report, fix):
     buildozer = download_buildozer()
 
@@ -266,6 +333,7 @@ def main():
     parser.add_argument("--generate-report", default=False, action="store_true")
     parser.add_argument("--fix", default=False, action="store_true")
     args = parser.parse_args()
+    validate_clang_tidy_configs(args.generate_report, args.fix)
     validate_bazel_groups(args.generate_report, args.fix)
 
 

@@ -79,9 +79,9 @@ py_library(
 )
 
 py_library(
-    name = "unittest_grouper",
+    name = "bazel_custom_formatter",
     srcs = [
-        "unittest_grouper.py",
+        "bazel_custom_formatter.py",
     ],
     visibility = ["//visibility:public"],
     deps = [

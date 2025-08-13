@@ -1,16 +1,16 @@
-load("@npm//:defs.bzl", "npm_link_all_packages")
-load("@aspect_rules_js//npm:defs.bzl", "npm_link_package")
-load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS", "extensions_with_config", "mongo_install")
-load("//bazel/install_rules:bolt.bzl", "bolt_instrument", "bolt_optimize")
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary")
-load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
-load("//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl", "setup_gdb_toolchain_aliases")
-load("//bazel/config:render_template.bzl", "render_template")
-load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
-load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
-load("@npm//:prettier/package_json.bzl", prettier = "bin")
 load("@aspect_bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
+load("@aspect_rules_js//npm:defs.bzl", "npm_link_package")
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
+load("@npm//:prettier/package_json.bzl", prettier = "bin")
+load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary")
+load("//bazel/config:render_template.bzl", "render_template")
+load("//bazel/install_rules:bolt.bzl", "bolt_instrument", "bolt_optimize")
+load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS", "extensions_with_config", "mongo_install")
+load("//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl", "setup_gdb_toolchain_aliases")
+load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -539,4 +539,9 @@ bolt_optimize(
         "//bazel/config:bolt_profile_use_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
+)
+
+filegroup(
+    name = "clang_tidy_config_files",
+    srcs = [],
 )

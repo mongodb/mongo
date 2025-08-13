@@ -336,6 +336,17 @@ remap_linker_inputs_ownership = rule(
     fragments = ["cpp"],
 )
 
+def tidy_config_filegroup():
+    if native.existing_rule("clang_tidy_config") == None:
+        native.filegroup(
+            name = "clang_tidy_config",
+            srcs = native.glob(
+                [".clang-tidy"],
+                allow_empty = True,
+            ),
+            visibility = ["//visibility:public"],
+        )
+
 def mongo_cc_library(
         name,
         srcs = [],
@@ -497,6 +508,8 @@ def mongo_cc_library(
         name = name + HEADER_DEP_SUFFIX,
         header_deps = header_deps,
     )
+
+    tidy_config_filegroup()
 
     # Create a cc_library entry to generate a shared archive of the target.
     cc_library(

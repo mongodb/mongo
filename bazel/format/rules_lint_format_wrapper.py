@@ -4,7 +4,7 @@ import pathlib
 import subprocess
 from typing import List, Union
 
-from buildscripts.unittest_grouper import validate_bazel_groups
+from buildscripts.bazel_custom_formatter import validate_bazel_groups, validate_clang_tidy_configs
 
 
 def _git_distance(args: list) -> int:
@@ -204,6 +204,7 @@ def main() -> int:
         return any(file.endswith(".bazel") or "BUILD" in file for file in files)
 
     if files_to_format_contains_bazel_file(files_to_format):
+        validate_clang_tidy_configs(generate_report=True, fix=not args.check)
         validate_bazel_groups(generate_report=True, fix=not args.check)
 
     if files_to_format != "all":
