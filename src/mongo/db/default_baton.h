@@ -88,6 +88,8 @@ private:
      */
     void _safeExecute(stdx::unique_lock<stdx::mutex> lk, Job job);
 
+    void _notify(stdx::unique_lock<stdx::mutex>) noexcept;
+
     stdx::mutex _mutex;
     stdx::condition_variable _cv;
     bool _notified = false;

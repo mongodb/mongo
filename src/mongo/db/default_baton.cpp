@@ -36,12 +36,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 
 #include <algorithm>
-#include <memory>
 #include <mutex>
 #include <utility>
 
@@ -108,10 +106,15 @@ void DefaultBaton::schedule(Task func) {
     }
 }
 
-void DefaultBaton::notify() noexcept {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+void DefaultBaton::_notify(stdx::unique_lock<stdx::mutex> lk) noexcept {
+    dassert(lk.mutex() == &_mutex);
+
     _notified = true;
     _cv.notify_one();
+}
+
+void DefaultBaton::notify() noexcept {
+    _notify(stdx::unique_lock<stdx::mutex>(_mutex));
 }
 
 Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
@@ -181,6 +184,8 @@ void DefaultBaton::run(ClockSource* clkSource) noexcept {
 }
 
 void DefaultBaton::_safeExecute(stdx::unique_lock<stdx::mutex> lk, Job job) {
+    dassert(lk.mutex() == &_mutex);
+
     if (!_opCtx) {
         // If we're detached, no job can safely execute.
         iasserted(kDetached);
@@ -192,8 +197,7 @@ void DefaultBaton::_safeExecute(stdx::unique_lock<stdx::mutex> lk, Job job) {
                 job(stdx::unique_lock<stdx::mutex>(_mutex));
             }
         });
-        lk.unlock();
-        notify();
+        _notify(std::move(lk));
     } else {
         job(std::move(lk));
     }
