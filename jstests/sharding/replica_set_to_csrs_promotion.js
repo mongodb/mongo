@@ -253,6 +253,80 @@ describe("transitions", function() {
             replSet: "replica_set_to_csrs_promotion",
         });
     });
+
+    it("multiple state changes", () => {
+        this.rs.startSet({
+            replSet: "replica_set_to_csrs_promotion",
+            remember: false,
+        });
+        this.rs.initiate();
+        this.doRollingRestart(this.rs, {
+            configsvr: "",
+            replicaSetConfigShardMaintenanceMode: "",
+        });
+
+        let config = this.rs.getReplSetConfigFromNode();
+        config.configsvr = true;
+        config.version = config.version + 1;
+        assert.commandWorked(this.rs.getPrimary().adminCommand({replSetReconfig: config}));
+        this.doRollingRestart(this.rs, {
+            configsvr: "",
+        });
+
+        this.doRollingRestart(this.rs, {
+            replSet: "replica_set_to_csrs_promotion",
+            replicaSetConfigShardMaintenanceMode: "",
+        });
+
+        config = this.rs.getReplSetConfigFromNode();
+        assert.eq(config.configsvr, true);
+        delete config.configsvr;
+        config.version = config.version + 1;
+        assert.commandWorked(this.rs.getPrimary().adminCommand({replSetReconfig: config}));
+        this.doRollingRestart(this.rs, {
+            replSet: "replica_set_to_csrs_promotion",
+        });
+    });
+
+    it("multiple state changes with full promotion", () => {
+        this.rs.startSet({
+            replSet: "replica_set_to_csrs_promotion",
+            remember: false,
+        });
+        this.rs.initiate();
+        this.doRollingRestart(this.rs, {
+            configsvr: "",
+            replicaSetConfigShardMaintenanceMode: "",
+        });
+
+        let config = this.rs.getReplSetConfigFromNode();
+        config.configsvr = true;
+        config.version = config.version + 1;
+        assert.commandWorked(this.rs.getPrimary().adminCommand({replSetReconfig: config}));
+        this.doRollingRestart(this.rs, {
+            configsvr: "",
+        });
+
+        let mongos = MongoRunner.runMongos({configdb: this.rs.getURL()});
+        assert.commandWorked(
+            mongos.getDB("admin").runCommand({"transitionFromDedicatedConfigServer": 1}));
+
+        this.doRollingRestart(this.rs, {
+            replSet: "replica_set_to_csrs_promotion",
+            replicaSetConfigShardMaintenanceMode: "",
+        });
+
+        config = this.rs.getReplSetConfigFromNode();
+        assert.eq(config.configsvr, true);
+        delete config.configsvr;
+        config.version = config.version + 1;
+        assert.commandWorked(this.rs.getPrimary().adminCommand({replSetReconfig: config}));
+        this.doRollingRestart(this.rs, {
+            replSet: "replica_set_to_csrs_promotion",
+        });
+
+        MongoRunner.stopMongos(mongos);
+    });
 });
 
 describe("operations during rolling restart", function() {

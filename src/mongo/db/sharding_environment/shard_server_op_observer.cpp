@@ -471,14 +471,41 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
 
     const auto& nss = args.coll->ns();
     if (nss == NamespaceString::kServerConfigurationNamespace) {
-        auto idElem = args.updateArgs->criteria["_id"];
-        auto shardName = updateDoc["shardName"];
-        if (idElem && idElem.str() == ShardIdentityType::IdName && shardName) {
-            auto updatedShardIdentityDoc = args.updateArgs->updatedDoc;
-            auto shardIdentityDoc = uassertStatusOK(
+        [&]() {
+            const auto idElem = args.updateArgs->criteria["_id"];
+            if (!idElem) {
+                return;
+            }
+            if (idElem.str() != ShardIdentityType::IdName) {
+                return;
+            }
+            const auto updatedShardIdentityDoc = args.updateArgs->updatedDoc;
+            const auto oldShardIdentityDoc = uassertStatusOK(
+                ShardIdentityType::fromShardIdentityDocument(args.updateArgs->preImageDoc));
+            const auto shardIdentityDoc = uassertStatusOK(
                 ShardIdentityType::fromShardIdentityDocument(updatedShardIdentityDoc));
             uassertStatusOK(shardIdentityDoc.validate());
-        }
+
+            const auto deferShardingInitialization =
+                shardIdentityDoc.getDeferShardingInitialization().value_or(false);
+
+            // If there was a change in the defer sharding initialization field, then try
+            // to initialize
+            if (deferShardingInitialization !=
+                oldShardIdentityDoc.getDeferShardingInitialization().value_or(false)) {
+                if (deferShardingInitialization) {
+                    LOGV2_WARNING(10892401,
+                                  "ShardIdentity's deferShardingInitialization flag went from "
+                                  "false to true, which is suspicious");
+                }
+                try {
+                    ShardingInitializationMongoD::get(opCtx)->initializeFromShardIdentity(
+                        opCtx, shardIdentityDoc);
+                } catch (const AssertionException& ex) {
+                    fassertFailedWithStatus(10892400, ex.toStatus());
+                }
+            }
+        }();
     }
 }
 

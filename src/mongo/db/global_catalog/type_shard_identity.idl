@@ -37,6 +37,7 @@ imports:
 structs:
     ShardIdentity:
         description: "Contains all the information needed to identify a shard and lookup the shard identity document from storage"
+        strict: false
         fields:
             shardName:
                 description: "The name of the shard"
@@ -47,3 +48,7 @@ structs:
             configsvrConnectionString:
                 description: "Connection string to the config server"
                 type: connection_string
+            deferShardingInitialization:
+                description: "If true, the writing of shard identity does not imply sharding initializations"
+                type: bool
+                optional: true

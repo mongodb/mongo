@@ -60,6 +60,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
+#include "mongo/db/global_catalog/type_shard_identity.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/local_catalog/coll_mod.h"
 #include "mongo/db/local_catalog/collection.h"
@@ -1215,7 +1216,37 @@ private:
 
     // This helper function is for any actions that should be done before taking the global lock in
     // S mode.
-    void _prepareToDowngradeActions(OperationContext* opCtx) {
+    void _prepareToDowngradeActions(OperationContext* opCtx, const FCV requestedVersion) {
+        if (!feature_flags::gFeatureFlagEnableReplicasetTransitionToCSRS.isEnabledOnVersion(
+                requestedVersion)) {
+            BSONObj shardIdentityBSON;
+            if ([&] {
+                    auto coll = acquireCollection(
+                        opCtx,
+                        CollectionAcquisitionRequest(
+                            NamespaceString::kServerConfigurationNamespace,
+                            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                            repl::ReadConcernArgs::get(opCtx),
+                            AcquisitionPrerequisites::kRead),
+                        LockMode::MODE_IS);
+                    return Helpers::findOne(
+                        opCtx, coll, BSON("_id" << ShardIdentityType::IdName), shardIdentityBSON);
+                }()) {
+                auto shardIdentity = uassertStatusOK(
+                    ShardIdentityType::fromShardIdentityDocument(shardIdentityBSON));
+                if (shardIdentity.getDeferShardingInitialization().has_value()) {
+                    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+                        uasserted(ErrorCodes::CannotDowngrade,
+                                  "Downgrading FCV is prohibited during promotion to sharded "
+                                  "cluster. Please finish the promotion before proceeding.");
+                    }
+                    uasserted(ErrorCodes::CannotDowngrade,
+                              "Downgrading FCV is prohibited during promotion to sharded cluster. "
+                              "Please remove the shard identity document before proceeding.");
+                }
+            }
+        }
+
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
@@ -1525,7 +1556,7 @@ private:
 
         // Any actions that should be done before taking the global lock in S mode should go in
         // this function.
-        _prepareToDowngradeActions(opCtx);
+        _prepareToDowngradeActions(opCtx, requestedVersion);
 
         {
             // Take the global lock in S mode to create a barrier for operations taking the global

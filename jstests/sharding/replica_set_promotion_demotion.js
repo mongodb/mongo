@@ -128,6 +128,12 @@ describe("promote and demote replicaset to sharded cluster", function() {
             replicaSetConfigShardMaintenanceMode: "",
         });
 
+        this.configRS.asCluster(this.configRS.getPrimary(), () => {
+            const res = assert.commandWorked(
+                this.configRS.getPrimary().getDB('admin').runCommand({shardingState: 1}));
+            assert.eq(res.enabled, false);
+        });
+
         let config = {};
         this.configRS.asCluster(this.configRS.getPrimary(), () => {
             config = this.configRS.getReplSetConfigFromNode();
@@ -142,6 +148,12 @@ describe("promote and demote replicaset to sharded cluster", function() {
             configsvr: "",
         });
 
+        this.configRS.asCluster(this.configRS.getPrimary(), () => {
+            const res = assert.commandWorked(
+                this.configRS.getPrimary().getDB('admin').runCommand({shardingState: 1}));
+            assert.eq(res.enabled, false);
+        });
+
         this.mongos =
             MongoRunner.runMongos({keyFile: this.keyFile, configdb: this.configRS.getURL()});
 
@@ -149,6 +161,12 @@ describe("promote and demote replicaset to sharded cluster", function() {
         assert(this.adminDBMongosConnection.auth("admin", 'x'), "Authentication failed");
         assert.commandWorked(
             this.adminDBMongosConnection.runCommand({"transitionFromDedicatedConfigServer": 1}));
+
+        this.configRS.asCluster(this.configRS.getPrimary(), () => {
+            const res = assert.commandWorked(
+                this.configRS.getPrimary().getDB('admin').runCommand({shardingState: 1}));
+            assert.eq(res.enabled, true);
+        });
 
         // Resetting connections as during the rolling restart we lost them
         this.userDirectConnection = new Mongo(this.configRS.getPrimary().host);

@@ -1192,7 +1192,17 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         if (!serverGlobalParams.doAutoBootstrapSharding ||
             gFeatureFlagAllMongodsAreSharded.isEnabled(VersionContext::getDecoration(opCtx),
                                                        fcvSnapshot)) {
-            ShardingCatalogManager::get(opCtx)->installConfigShardIdentityDocument(opCtx);
+            // We only want to install the shard identity if we don't have one yet. Otherwise the
+            // field in the shard identity representing the replicaSetConfigShardMaintenanceMode
+            // might differ from the actual startup value, and we try to install a shard identity
+            // that differs from the existing one, which is prohibited. Since that field is
+            // responsible for the deferred sharding initialization, we should trust the persisted
+            // field instead of the startup flag (which will be reset by transforming to a sharded
+            // cluster).
+            if (!ShardingInitializationMongoD::getShardIdentityDoc(opCtx)) {
+                ShardingCatalogManager::get(opCtx)->installConfigShardIdentityDocument(
+                    opCtx, serverGlobalParams.replicaSetConfigShardMaintenanceMode);
+            }
         }
 
         if (gFeatureFlagAllMongodsAreSharded.isEnabled(VersionContext::getDecoration(opCtx),

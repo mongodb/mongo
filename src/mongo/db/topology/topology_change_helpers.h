@@ -211,6 +211,11 @@ void installShardIdentity(
 bool installShardIdentity(OperationContext* opCtx, const ShardIdentityType& identity);
 
 /**
+ * Updates the shard identity document locally.
+ */
+void updateShardIdentity(OperationContext* opCtx, const ShardIdentityType& identity);
+
+/**
  * Remove all existing cluster parameters on the replica set and sets the ones stored on the config
  * server.
  */

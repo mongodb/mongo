@@ -1219,6 +1219,30 @@ bool installShardIdentity(OperationContext* opCtx, const ShardIdentityType& iden
     return false;
 }
 
+void updateShardIdentity(OperationContext* opCtx, const ShardIdentityType& identity) {
+    BSONObj newIdentity = identity.toShardIdentityDocument();
+
+    write_ops::UpdateOpEntry updateEntry;
+    updateEntry.setMulti(false);
+    updateEntry.setUpsert(false);
+    updateEntry.setQ(BSON("_id" << identity.IdName));
+    updateEntry.setU(mongo::write_ops::UpdateModification(
+        newIdentity, write_ops::UpdateModification::ReplacementTag{}));
+    write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace,
+                                             {std::move(updateEntry)});
+
+    BSONObjBuilder cmdObjBuilder;
+    updateOp.serialize(&cmdObjBuilder);
+    cmdObjBuilder.append(WriteConcernOptions::kWriteConcernField,
+                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter().toBSON());
+
+    DBDirectClient localClient(opCtx);
+
+    BSONObj res;
+    localClient.runCommand(DatabaseName::kAdmin, cmdObjBuilder.obj(), res);
+    uassertStatusOK(getStatusFromWriteCommandReply(res));
+}
+
 void setClusterParametersOnReplicaSet(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,

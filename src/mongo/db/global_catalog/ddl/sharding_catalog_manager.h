@@ -542,7 +542,8 @@ public:
      * Inserts the config server shard identity document using a sentinel shard id. Requires the
      * config server's ShardingState has not already been enabled. Throws on errors.
      */
-    void installConfigShardIdentityDocument(OperationContext* opCtx);
+    void installConfigShardIdentityDocument(OperationContext* opCtx,
+                                            bool deferShardingInitialization);
 
     /**
      * Checks if the shard has already been removed from the cluster. If not, checks that

@@ -73,7 +73,8 @@ public:
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             if (!ShardingState::get(opCtx)->enabled()) {
-                ShardingCatalogManager::get(opCtx)->installConfigShardIdentityDocument(opCtx);
+                ShardingCatalogManager::get(opCtx)->installConfigShardIdentityDocument(opCtx,
+                                                                                       false);
             }
 
             auto shardingReady = ShardingReady::get(opCtx);

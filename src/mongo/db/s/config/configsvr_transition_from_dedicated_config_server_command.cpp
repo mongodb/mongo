@@ -45,6 +45,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/add_shard_coordinator.h"
 #include "mongo/db/topology/cluster_role.h"
@@ -141,6 +142,14 @@ public:
                          boost::optional<FixedFCVRegion>& fcvRegion) {
             invariant(ddlLock);
             invariant(fcvRegion);
+
+            auto shardIdentityDoc = ShardingInitializationMongoD::getShardIdentityDoc(opCtx);
+            invariant(shardIdentityDoc);
+            if (shardIdentityDoc->getDeferShardingInitialization().value_or(false)) {
+                shardIdentityDoc->setDeferShardingInitialization(boost::none);
+                topology_change_helpers::updateShardIdentity(opCtx, *shardIdentityDoc);
+                ShardingState::get(opCtx)->awaitClusterRoleRecovery().get();
+            }
 
             const auto [configConnString, shardName] =
                 ShardingCatalogManager::get(opCtx)->getConfigShardParameters(opCtx);

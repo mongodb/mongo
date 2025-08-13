@@ -337,10 +337,13 @@ StatusWith<std::vector<DatabaseName>> ShardingCatalogManager::_getDBNamesListFro
     }
 }
 
-void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext* opCtx) {
+void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext* opCtx,
+                                                                bool deferShardingInitialization) {
     invariant(!ShardingState::get(opCtx)->enabled());
-    const auto identity =
-        topology_change_helpers::createShardIdentity(opCtx, ShardId::kConfigServerId);
+    auto identity = topology_change_helpers::createShardIdentity(opCtx, ShardId::kConfigServerId);
+    if (deferShardingInitialization) {
+        identity.setDeferShardingInitialization(true);
+    }
     topology_change_helpers::installShardIdentity(opCtx, identity);
 }
 

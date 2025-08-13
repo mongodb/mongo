@@ -535,6 +535,10 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
     invariant(shard_role_details::getLocker(opCtx)->isLocked());
 
+    if (shardIdentity.getDeferShardingInitialization().value_or(false)) {
+        return;
+    }
+
     uassertStatusOKWithContext(
         shardIdentity.validate(),
         "Invalid shard identity document found when initializing sharding state");

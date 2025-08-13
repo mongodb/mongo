@@ -52,6 +52,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/add_shard_coordinator.h"
 #include "mongo/db/topology/add_shard_gen.h"
@@ -89,6 +90,14 @@ public:
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
+
+            const auto shardIdentity = ShardingInitializationMongoD::getShardIdentityDoc(opCtx);
+            invariant(shardIdentity);
+            uassert(
+                ErrorCodes::IllegalOperation,
+                "This configserver was not fully promoted to sharded cluster. Either finish the "
+                "process or intervene by removing the shard identity and restart the configserver",
+                !shardIdentity->getDeferShardingInitialization().value_or(false));
 
             // Set the operation context read concern level to local for reads into the config
             // database.
