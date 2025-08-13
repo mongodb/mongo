@@ -2,7 +2,6 @@
 
 import {
     __magicNoPrint,
-    __prompt__,
     __promptWrapper__,
     _awaitRSHostViaRSMonitor,
     _getErrorWithCode,
@@ -38,7 +37,6 @@ import {
 } from "src/mongo/shell/utils.js";
 
 globalThis.__magicNoPrint = __magicNoPrint;
-globalThis.__prompt__ = __prompt__;
 globalThis.__promptWrapper__ = __promptWrapper__;
 globalThis._awaitRSHostViaRSMonitor = _awaitRSHostViaRSMonitor;
 globalThis._getErrorWithCode = _getErrorWithCode;
