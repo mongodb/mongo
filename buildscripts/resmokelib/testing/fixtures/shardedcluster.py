@@ -46,6 +46,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         replica_set_endpoint=False,
         random_migrations=False,
         launch_mongot=False,
+        load_all_extensions=False,
         set_cluster_parameter=None,
         inject_catalog_metadata=None,
     ):
@@ -68,6 +69,10 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.mongod_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongod_options, {})
         )
+        
+        if load_all_extensions:
+            self.fixturelib.load_all_extensions(self.config.EVERGREEN_TASK_ID, self.mongod_options, self.logger, self.mongos_options)
+        
         self.mongod_executable = mongod_executable
         self.mongod_options["set_parameters"] = self.fixturelib.make_historic(
             mongod_options.get("set_parameters", {})

@@ -32,6 +32,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         preserve_dbpath: bool = False,
         port: Optional[int] = None,
         launch_mongot: bool = False,
+        load_all_extensions: bool = False,
     ):
         """Initialize MongoDFixture with different options for the mongod process.
 
@@ -54,6 +55,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.mongod_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongod_options, {})
         )
+
+        if load_all_extensions:
+            self.fixturelib.load_all_extensions(self.config.EVERGREEN_TASK_ID, self.mongod_options, self.logger)
 
         if "set_parameters" not in self.mongod_options:
             self.mongod_options["set_parameters"] = {}

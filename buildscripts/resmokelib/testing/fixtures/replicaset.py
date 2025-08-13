@@ -72,6 +72,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         initial_sync_uninitialized_fcv=False,
         hide_initial_sync_node_from_conn_string=False,
         launch_mongot=False,
+        load_all_extensions=False,
         router_endpoint_for_mongot: Optional[int] = None,
     ):
         """Initialize ReplicaSetFixture."""
@@ -84,6 +85,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.mongod_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongod_options, {})
         )
+        
+        if load_all_extensions:
+            self.fixturelib.load_all_extensions(self.config.EVERGREEN_TASK_ID, self.mongod_options, self.logger)
+        
         self.preserve_dbpath = preserve_dbpath
         self.start_initial_sync_node = start_initial_sync_node
         self.electable_initial_sync_node = electable_initial_sync_node

@@ -1,7 +1,9 @@
 """Facade wrapping the resmokelib dependencies used by fixtures."""
 
+import glob
+import os
 from logging import Handler, Logger
-from typing import Dict
+from typing import Dict, Optional
 
 from buildscripts.resmokelib import config, core, errors, logging, utils
 from buildscripts.resmokelib.core import network
@@ -135,6 +137,38 @@ class FixtureLib:
         original[self.SET_PARAMETERS_KEY] = merged_set_parameters
 
         return original
+    
+    def load_all_extensions(self, is_evergreen: bool, mongod_options: dict, logger: logging.Logger, mongos_options: Optional[dict] = None):
+        cwd = os.getcwd()
+        if is_evergreen:
+            search_dirs = [os.path.join(cwd, "dist-test", "lib")]
+        else:
+            search_dirs = [
+                os.path.join(cwd, "bazel-bin", "install-dist-test", "lib"),
+                os.path.join(cwd, "bazel-bin", "install-extensions", "lib"),
+            ]
+
+        logger.debug("Extension search directories (in order): %s", search_dirs)
+        ext_dir = next((d for d in search_dirs if os.path.isdir(d)), None)
+        if not ext_dir:
+            error_msg = f"No extension directories found in {search_dirs}. If extensions are required, ensure they are properly built."
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        logger.debug("Looking for extensions in %s", ext_dir)
+        pattern = "*_mongo_extension.so"
+        so_files = sorted(glob.glob(os.path.join(ext_dir, pattern)))
+
+        if so_files:
+            logger.debug("Found extension files: %s", so_files)
+            joined_files = ",".join(so_files)
+            mongod_options["loadExtensions"] = joined_files
+            if mongos_options is not None:
+                mongos_options["loadExtensions"] = joined_files
+        else:
+            error_msg = f"No extension files matching {pattern} found under {ext_dir}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
 
 
 class _FixtureConfig(object):
