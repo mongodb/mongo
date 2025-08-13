@@ -429,6 +429,14 @@ mongo_install(
 extensions_with_config(
     name = "dist_test_extensions",
     srcs = [
+        # TODO SERVER-108821: Remove the comment below once extension stages are no longer
+        # listed by $listMqlEntities.
+        # Any extension added here will result in the with-extensions Evergreen variant
+        # automatically loading it into the server for its tasks. This means that
+        # null_chars_string_input.js will break as not all stages from $listMqlEntities
+        # will have a null character test. To resolve this, ensure that these new stages
+        # are added to the "skips" list in that test.
+        # TODO SERVER-109108: Remove this entry when the bar extension is no longer needed.
         "//src/mongo/db/extension/test_examples:bar_mongo_extension",
         "//src/mongo/db/extension/test_examples:foo_mongo_extension",
     ],
