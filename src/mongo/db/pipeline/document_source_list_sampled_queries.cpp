@@ -29,27 +29,14 @@
 
 #include "mongo/db/pipeline/document_source_list_sampled_queries.h"
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/analyze_shard_key_common_gen.h"
-#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/namespace_string_util.h"
-
-#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -79,77 +66,23 @@ Value DocumentSourceListSampledQueries::serialize(const SerializationOptions& op
     return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
 }
 
-DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
-    if (_pipeline == nullptr) {
-        auto foreignExpCtx =
-            makeCopyFromExpressionContext(pExpCtx, NamespaceString::kConfigSampledQueriesNamespace);
-        std::vector<BSONObj> stages;
-        if (auto& nss = _spec.getNamespace()) {
-            uassertStatusOK(validateNamespace(*nss));
-            stages.push_back(
-                BSON("$match" << BSON(SampledQueryDocument::kNsFieldName
-                                      << NamespaceStringUtil::serialize(
-                                             *nss, SerializationContext::stateDefault()))));
-        }
-        try {
-            _pipeline = Pipeline::makePipeline(stages, foreignExpCtx);
-            _execPipeline = exec::agg::buildPipeline(_pipeline->freeze());
-        } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-            LOGV2(7807800,
-                  "Failed to create aggregation pipeline to list sampled queries",
-                  "error"_attr = redact(ex.toStatus()));
-            return GetNextResult::makeEOF();
-        }
-    }
-
-    if (auto doc = _execPipeline->getNext()) {
-        auto queryDoc = SampledQueryDocument::parse(
-            IDLParserContext(DocumentSourceListSampledQueries::kStageName), doc->toBson());
-        DocumentSourceListSampledQueriesResponse response;
-        response.setSampledQueryDocument(std::move(queryDoc));
-        return {Document(response.toBSON())};
-    }
-
-    return GetNextResult::makeEOF();
-}
-
-void DocumentSourceListSampledQueries::detachFromOperationContext() {
-    if (_pipeline) {
-        tassert(10713700,
-                "expecting '_execPipeline' to be initialized when '_pipeline' is initialized",
-                _execPipeline);
-        _execPipeline->detachFromOperationContext();
-        _pipeline->detachFromOperationContext();
-    }
-}
-
 void DocumentSourceListSampledQueries::detachSourceFromOperationContext() {
-    if (_pipeline) {
+    if (_sharedState->pipeline) {
         tassert(10713701,
                 "expecting '_execPipeline' to be initialized when '_pipeline' is initialized",
-                _execPipeline);
-        _execPipeline->detachFromOperationContext();
-        _pipeline->detachFromOperationContext();
-    }
-}
-
-void DocumentSourceListSampledQueries::reattachToOperationContext(OperationContext* opCtx) {
-    if (_pipeline) {
-        tassert(10713702,
-                "expecting '_execPipeline' to be initialized when '_pipeline' is initialized",
-                _execPipeline);
-        _execPipeline->reattachToOperationContext(opCtx);
-        _pipeline->reattachToOperationContext(opCtx);
+                _sharedState->execPipeline);
+        _sharedState->execPipeline->detachFromOperationContext();
+        _sharedState->pipeline->detachFromOperationContext();
     }
 }
 
 void DocumentSourceListSampledQueries::reattachSourceToOperationContext(OperationContext* opCtx) {
-    if (_pipeline) {
+    if (_sharedState->pipeline) {
         tassert(10713703,
                 "expecting '_execPipeline' to be initialized when '_pipeline' is initialized",
-                _execPipeline);
-        _execPipeline->reattachToOperationContext(opCtx);
-        _pipeline->reattachToOperationContext(opCtx);
+                _sharedState->execPipeline);
+        _sharedState->execPipeline->reattachToOperationContext(opCtx);
+        _sharedState->pipeline->reattachToOperationContext(opCtx);
     }
 }
 
