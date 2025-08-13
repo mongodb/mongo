@@ -27,22 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/sdk/extension_factory.h"
 
-// The initialization function is empty since the test should never reach initialization.
-MongoExtensionStatus* initialize_extension(MongoExtensionHostPortal* portal) {
-    return mongo::extension::sdk::enterCXX([&]() {});
-}
-
-static const MongoExtension my_extension = {
-    // Minor version is one greater than the currently-supported version.
-    .version = MongoExtensionAPIVersion{0, MONGODB_EXTENSION_API_VERSION.minor + 1, 0},
-    .initialize = initialize_extension,
+class MyExtension : public mongo::extension::sdk::Extension {
+public:
+    // The initialization function is empty since the test should never reach initialization.
+    void initialize(const ::MongoExtensionHostPortal* portal) override {}
 };
 
 extern "C" {
-MongoExtensionStatus* get_mongodb_extension(const MongoExtensionAPIVersionVector* hostVersions,
-                                            const MongoExtension** extension) {
-    return mongo::extension::sdk::enterCXX([&]() { *extension = &my_extension; });
+::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
+                                              const ::MongoExtension** extension) {
+
+    return mongo::extension::sdk::enterCXX([&]() {
+        static auto ext = std::make_unique<mongo::extension::sdk::ExtensionAdapter>(
+            std::make_unique<MyExtension>(),
+            // Minor version is one greater than the currently-supported version.
+            ::MongoExtensionAPIVersion{0, MONGODB_EXTENSION_API_VERSION.minor + 1, 0});
+        *extension = reinterpret_cast<const ::MongoExtension*>(ext.get());
+    });
 }
 }

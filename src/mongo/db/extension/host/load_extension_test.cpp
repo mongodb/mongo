@@ -111,6 +111,11 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
     ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed7_mongo_extension.so")),
                        AssertionException,
                        10615504);
+
+    // malformed8_extension attempts to register the same stage descriptor multiple times.
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed8_mongo_extension.so")),
+                       AssertionException,
+                       10696402);
 }
 
 // TODO SERVER-109108: Switch this to use the foo extension once we can reset state in between
@@ -199,5 +204,25 @@ TEST_F(LoadExtensionsTest, LoadExtensionInitializeVersionFails) {
 
 DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullStageDescriptor, "10596400") {
     ExtensionLoader::load(getExtensionPath("libnullStageDescriptor_mongo_extension.so"));
+}
+
+TEST(LoadExtensionTest, LoadExtensionTwoStagesSucceeds) {
+    ASSERT_DOES_NOT_THROW(
+        ExtensionLoader::load(getExtensionPath("libloadTwoStages_mongo_extension.so")));
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+    std::vector<BSONObj> pipeline = {BSON("$foo" << BSONObj()), BSON("$bar" << BSONObj())};
+    auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    ASSERT_TRUE(parsedPipeline != nullptr);
+    ASSERT_EQUALS(parsedPipeline->getSources().size(), 2U);
+
+    auto fooStage =
+        dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+    auto barStage =
+        dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().back().get());
+
+    ASSERT_TRUE(fooStage != nullptr && barStage != nullptr);
+    ASSERT_EQUALS(std::string(fooStage->getSourceName()), "$foo");
+    ASSERT_EQUALS(std::string(barStage->getSourceName()), "$bar");
 }
 }  // namespace mongo::extension::host

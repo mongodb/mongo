@@ -31,8 +31,8 @@
 
 namespace mongo::extension::sdk {
 
-bool isVersionCompatible(const MongoExtensionAPIVersionVector* hostVersions,
-                         const MongoExtensionAPIVersion* version) {
+bool isVersionCompatible(const ::MongoExtensionAPIVersionVector* hostVersions,
+                         const ::MongoExtensionAPIVersion* version) {
     for (size_t i = 0; i < hostVersions->len; ++i) {
         const auto& hostVersion = hostVersions[i].versions;
         if (hostVersion->major == version->major && hostVersion->minor >= version->minor) {

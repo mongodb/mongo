@@ -27,22 +27,58 @@
  *    it in the license file.
  */
 
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
 
-class MyExtension : public sdk::Extension {
+class FooLogicalStage : public mongo::extension::sdk::LogicalAggregationStage {};
+
+class FooStageDescriptor : public mongo::extension::sdk::AggregationStageDescriptor {
 public:
-    void initialize(const ::MongoExtensionHostPortal* portal) override {
-        const bool extensionAPIVersionValid =
-            portal->hostExtensionsAPIVersion.major == MONGODB_EXTENSION_API_MAJOR_VERSION &&
-            portal->hostExtensionsAPIVersion.minor <= MONGODB_EXTENSION_API_MINOR_VERSION;
-        // Does not align with FallbackVersionInfo and errors out, for testing purposes only.
-        const bool serverVersionValid = portal->hostMongoDBVersion.major > 0;
-        uassert(10726600,
-                "MongoExtensionHostPortal contains incompatible versions",
-                extensionAPIVersionValid && serverVersionValid);
+    static inline const std::string kStageName = "$foo";
+
+    FooStageDescriptor()
+        : mongo::extension::sdk::AggregationStageDescriptor(
+              kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+
+    std::unique_ptr<mongo::extension::sdk::LogicalAggregationStage> parse(
+        mongo::BSONObj stageBson) const override {
+        uassert(10696400,
+                "Failed to parse " + kStageName + ", expected object",
+                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
+
+        return std::make_unique<FooLogicalStage>();
     }
 };
 
-REGISTER_EXTENSION(MyExtension)
+class BarLogicalStage : public mongo::extension::sdk::LogicalAggregationStage {};
+
+class BarStageDescriptor : public sdk::AggregationStageDescriptor {
+public:
+    static inline const std::string kStageName = "$bar";
+
+    BarStageDescriptor()
+        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+
+    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
+        uassert(10696401,
+                "Failed to parse " + kStageName + ", expected object",
+                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
+
+        return std::make_unique<BarLogicalStage>();
+    }
+};
+
+
+class MyExtension : public sdk::Extension {
+public:
+    void initialize(const ::MongoExtensionHostPortal* portal) override {
+        _registerStage<FooStageDescriptor>(portal);
+        _registerStage<BarStageDescriptor>(portal);
+    }
+};
+
+REGISTER_EXTENSION(MyExtension);

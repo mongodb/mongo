@@ -31,22 +31,20 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/sdk/extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
 
-class TestBarLogicalStage : public mongo::extension::sdk::LogicalAggregationStage {};
+class TestBarLogicalStage : public sdk::LogicalAggregationStage {};
 
-class TestBarStageDescriptor : public mongo::extension::sdk::AggregationStageDescriptor {
+class TestBarStageDescriptor : public sdk::AggregationStageDescriptor {
 public:
     static inline const std::string kStageName = "$testBar";
 
     TestBarStageDescriptor()
-        : mongo::extension::sdk::AggregationStageDescriptor(
-              kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
-    std::unique_ptr<mongo::extension::sdk::LogicalAggregationStage> parse(
-        mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
         uassert(10845401,
                 "Failed to parse " + kStageName + ", expected object",
                 stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
@@ -55,27 +53,11 @@ public:
     }
 };
 
-
-MongoExtensionStatus* initialize_extension(MongoExtensionHostPortal* portal) {
-    return sdk::enterCXX([&]() {
-        static sdk::ExtensionAggregationStageDescriptor testBarDescriptor{
-            std::make_unique<TestBarStageDescriptor>()};
-        return sdk::enterC([&]() {
-            return portal->registerStageDescriptor(
-                reinterpret_cast<const ::MongoExtensionAggregationStageDescriptor*>(
-                    &testBarDescriptor));
-        });
-    });
-}
-
-static const MongoExtension my_extension = {
-    .version = MONGODB_EXTENSION_API_VERSION,
-    .initialize = initialize_extension,
+class BarExtension : public sdk::Extension {
+public:
+    void initialize(const ::MongoExtensionHostPortal* portal) override {
+        _registerStage<TestBarStageDescriptor>(portal);
+    }
 };
 
-extern "C" {
-MongoExtensionStatus* get_mongodb_extension(const MongoExtensionAPIVersionVector* hostVersions,
-                                            const MongoExtension** extension) {
-    return mongo::extension::sdk::enterCXX([&]() { *extension = &my_extension; });
-}
-}
+REGISTER_EXTENSION(BarExtension);

@@ -36,6 +36,6 @@ namespace mongo::extension::sdk {
  * Given a vector of current maximum Extension API versions for each major version and the version
  * of an extension, determine whether the extension is compatible with the server.
  */
-bool isVersionCompatible(const MongoExtensionAPIVersionVector* hostVersions,
-                         const MongoExtensionAPIVersion* version);
+bool isVersionCompatible(const ::MongoExtensionAPIVersionVector* hostVersions,
+                         const ::MongoExtensionAPIVersion* version);
 }  // namespace mongo::extension::sdk

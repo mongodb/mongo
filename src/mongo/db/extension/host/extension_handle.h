@@ -26,27 +26,34 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-
+#pragma once
+#include "mongo/db/extension/host/handle.h"
+#include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 
-static ::MongoExtensionStatus* initialize_extension(const ::MongoExtension* extension,
-                                                    const ::MongoExtensionHostPortal* portal) {
-    return portal->registerStageDescriptor(nullptr);
-}
+namespace mongo::extension::host {
 
-static const ::MongoExtensionVTable vtable = {
-    .initialize = &initialize_extension,
+/**
+ * Wrapper for ::MongoExtension providing safe access to its public API via the vtable.
+ * This is an unowned handle, meaning extensions remain fully owned by themselves, and ownership
+ * is never transferred to the host.
+ */
+class ExtensionHandle : public UnownedHandle<const ::MongoExtension> {
+
+public:
+    ExtensionHandle(const ::MongoExtension* ext) : UnownedHandle<const ::MongoExtension>(ext) {}
+
+    void initialize(const ::MongoExtensionHostPortal* portal) const {
+        sdk::enterC([&] {
+            assertValid();
+            return vtable().initialize(get(), portal);
+        });
+    }
+
+    ::MongoExtensionAPIVersion getVersion() const {
+        assertValid();
+        return get()->version;
+    }
 };
 
-static const ::MongoExtension my_extension = {
-    .vtable = &vtable,
-    .version = MONGODB_EXTENSION_API_VERSION,
-};
-
-extern "C" {
-::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
-                                              const ::MongoExtension** extension) {
-    return mongo::extension::sdk::enterCXX([&]() { *extension = &my_extension; });
-}
-}
+}  // namespace mongo::extension::host

@@ -27,26 +27,37 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/extension_factory.h"
 
-#include "mongo/db/extension/sdk/extension_status.h"
+namespace sdk = mongo::extension::sdk;
 
-static ::MongoExtensionStatus* initialize_extension(const ::MongoExtension* extension,
-                                                    const ::MongoExtensionHostPortal* portal) {
-    return portal->registerStageDescriptor(nullptr);
-}
+class MyLogicalStage : public sdk::LogicalAggregationStage {};
 
-static const ::MongoExtensionVTable vtable = {
-    .initialize = &initialize_extension,
+class MyStageDescriptor : public sdk::AggregationStageDescriptor {
+public:
+    static inline const std::string kStageName = "$myStage";
+
+    MyStageDescriptor()
+        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+
+    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
+        uassert(10696403,
+                "Failed to parse " + kStageName + ", expected object",
+                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
+
+        return std::make_unique<MyLogicalStage>();
+    }
 };
 
-static const ::MongoExtension my_extension = {
-    .vtable = &vtable,
-    .version = MONGODB_EXTENSION_API_VERSION,
+class MyExtension : public sdk::Extension {
+public:
+    void initialize(const ::MongoExtensionHostPortal* portal) override {
+        // Should fail due to registering the same StageDescriptor multiple times.
+        _registerStage<MyStageDescriptor>(portal);
+        _registerStage<MyStageDescriptor>(portal);
+    }
 };
 
-extern "C" {
-::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
-                                              const ::MongoExtension** extension) {
-    return mongo::extension::sdk::enterCXX([&]() { *extension = &my_extension; });
-}
-}
+REGISTER_EXTENSION(MyExtension);

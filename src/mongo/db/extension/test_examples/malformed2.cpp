@@ -30,8 +30,8 @@
 #include "mongo/db/extension/sdk/extension_status.h"
 
 extern "C" {
-MongoExtensionStatus* get_mongodb_extension(const MongoExtensionAPIVersionVector* hostVersions,
-                                            const MongoExtension** extension) {
+::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
+                                              const ::MongoExtension** extension) {
     return mongo::extension::sdk::enterCXX([&]() {});
 }
 }

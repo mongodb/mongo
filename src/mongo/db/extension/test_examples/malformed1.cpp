@@ -27,16 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/sdk/extension_factory.h"
 
-// The initialization function is empty since the test should never reach initialization.
-MongoExtensionStatus* initialize_extension(MongoExtensionHostPortal* portal) {
-    return mongo::extension::sdk::enterCXX([&]() {});
-}
-
-static const MongoExtension my_extension = {
-    .version = MONGODB_EXTENSION_API_VERSION,
-    .initialize = initialize_extension,
+class MyExtension : public mongo::extension::sdk::Extension {
+public:
+    // The initialization function is empty since the test should never reach initialization.
+    void initialize(const ::MongoExtensionHostPortal* portal) override {}
 };
 
 // No definition of get_mongodb_extension() here, which is intentional to simulate a malformed

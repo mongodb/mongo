@@ -29,15 +29,22 @@
 
 #include "mongo/db/extension/sdk/extension_status.h"
 
-// The initialization function is null.
-static const MongoExtension my_extension = {
-    .version = MONGODB_EXTENSION_API_VERSION,
+// This extension is implemented without the SDK-provided ExtensionAdapter in order to simulate a
+// scenario in which the initialize function has a null pointer in the vtable. This is an unlikely
+// scenario if an extension developer is building a C++ extension with our provided SDK, however, it
+// is still a possible scenario that we should test and account for.
+static const ::MongoExtensionVTable vtable = {
     .initialize = nullptr,
 };
 
+static const ::MongoExtension my_extension = {
+    .vtable = &vtable,
+    .version = MONGODB_EXTENSION_API_VERSION,
+};
+
 extern "C" {
-MongoExtensionStatus* get_mongodb_extension(const MongoExtensionAPIVersionVector* hostVersions,
-                                            const MongoExtension** extension) {
+::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
+                                              const ::MongoExtension** extension) {
     return mongo::extension::sdk::enterCXX([&]() { *extension = &my_extension; });
 }
 }

@@ -37,9 +37,9 @@
 
 namespace mongo::extension::host {
 
-static MongoExtensionAPIVersion supportedVersions[] = {MONGODB_EXTENSION_API_VERSION};
+static ::MongoExtensionAPIVersion supportedVersions[] = {MONGODB_EXTENSION_API_VERSION};
 
-static const MongoExtensionAPIVersionVector MONGO_EXTENSION_API_VERSIONS_SUPPORTED = {
+static const ::MongoExtensionAPIVersionVector MONGO_EXTENSION_API_VERSIONS_SUPPORTED = {
     .len = 1, .versions = supportedVersions};
 
 

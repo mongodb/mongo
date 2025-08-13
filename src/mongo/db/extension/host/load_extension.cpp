@@ -29,6 +29,7 @@
 
 #include "mongo/db/extension/host/load_extension.h"
 
+#include "mongo/db/extension/host/extension_handle.h"
 #include "mongo/db/extension/host/stage_registry.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_status.h"
@@ -83,8 +84,9 @@ bool loadExtensions(const std::vector<std::string>& extensionPaths) {
     return true;
 }
 
-void assertVersionCompatibility(const MongoExtensionAPIVersionVector* hostVersions,
-                                const MongoExtensionAPIVersion& extensionVersion) {
+namespace {
+void assertVersionCompatibility(const ::MongoExtensionAPIVersionVector* hostVersions,
+                                const ::MongoExtensionAPIVersion& extensionVersion) {
     bool foundCompatibleMajor = false;
     bool foundCompatibleMinor = false;
 
@@ -114,6 +116,35 @@ void assertVersionCompatibility(const MongoExtensionAPIVersionVector* hostVersio
             foundCompatibleMinor);
 }
 
+ExtensionHandle getMongoExtension(SharedLibrary& extensionLib, const std::string& extensionPath) {
+    StatusWith<get_mongo_extension_t> swGetExtensionFunction =
+        extensionLib.getFunctionAs<get_mongo_extension_t>(GET_MONGODB_EXTENSION_SYMBOL);
+    uassert(10615501,
+            str::stream() << "Loading extension '" << extensionPath
+                          << "' failed: " << swGetExtensionFunction.getStatus().reason(),
+            swGetExtensionFunction.isOK());
+
+    const ::MongoExtension* extension = nullptr;
+    sdk::enterC([&]() {
+        return swGetExtensionFunction.getValue()(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED,
+                                                 &extension);
+    });
+    uassert(10615503,
+            str::stream() << "Failed to load extension '" << extensionPath
+                          << "': get_mongodb_extension failed to set an extension",
+            extension != nullptr);
+
+    const auto extHandle = ExtensionHandle{extension};
+
+    uassert(10615506,
+            str::stream() << "Loading extension '" << extensionPath
+                          << "' failed: initialize function is not defined",
+            extHandle.vtable().initialize != nullptr);
+
+    return extHandle;
+}
+}  // namespace
+
 void ExtensionLoader::load(const std::string& extensionPath) {
     uassert(10845400,
             str::stream() << "Loading extension '" << extensionPath
@@ -128,30 +159,10 @@ void ExtensionLoader::load(const std::string& extensionPath) {
             swExtensionLib.isOK());
     auto& extensionLib = swExtensionLib.getValue();
 
-    StatusWith<get_mongo_extension_t> swGetExtensionFunction =
-        extensionLib->getFunctionAs<get_mongo_extension_t>(GET_MONGODB_EXTENSION_SYMBOL);
-    uassert(10615501,
-            str::stream() << "Loading extension '" << extensionPath
-                          << "' failed: " << swGetExtensionFunction.getStatus().reason(),
-            swGetExtensionFunction.isOK());
-
-    const MongoExtension* extension = nullptr;
-    sdk::enterC([&]() {
-        return swGetExtensionFunction.getValue()(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED,
-                                                 &extension);
-    });
-    uassert(10615503,
-            str::stream() << "Failed to load extension '" << extensionPath
-                          << "': get_mongodb_extension failed to set an extension",
-            extension != nullptr);
-
+    ExtensionHandle extHandle = getMongoExtension(*extensionLib, extensionPath);
     // Validate that the major and minor versions from the extension implementation are compatible
     // with the host API version.
-    assertVersionCompatibility(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED, extension->version);
-    uassert(10615506,
-            str::stream() << "Loading extension '" << extensionPath
-                          << "' failed: initialize function is not defined",
-            extension->initialize != nullptr);
+    assertVersionCompatibility(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED, extHandle.getVersion());
 
     // Retrieve the VersionInfoInterface and convert to MongoDBVersion to pass across the API
     // header. During unit testing, use FallbackVersionInfo.
@@ -160,12 +171,12 @@ void ExtensionLoader::load(const std::string& extensionPath) {
             ? VersionInfoInterface::NotEnabledAction::kFallback
             : VersionInfoInterface::NotEnabledAction::kAbortProcess);
 
-    MongoExtensionHostPortal portal{extension->version,
-                                    MongoDBVersion{serverVersion.majorVersion(),
-                                                   serverVersion.minorVersion(),
-                                                   serverVersion.patchVersion()},
-                                    registerStageDescriptor};
-    sdk::enterC([&]() { return extension->initialize(&portal); });
+    ::MongoExtensionHostPortal portal{extHandle.getVersion(),
+                                      MongoDBVersion{serverVersion.majorVersion(),
+                                                     serverVersion.minorVersion(),
+                                                     serverVersion.patchVersion()},
+                                      registerStageDescriptor};
+    extHandle.initialize(&portal);
 
     // Add the 'SharedLibrary' pointer to our loaded extensions array to keep it alive for the
     // lifetime of the server.

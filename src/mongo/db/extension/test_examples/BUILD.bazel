@@ -63,6 +63,7 @@ package(default_visibility = ["//visibility:public"])
         "malformed5",
         "malformed6",
         "malformed7",
+        "malformed8",
         "foo",
         # TODO SERVER-109108: Remove this entry when the bar extension is no longer needed.
         "bar",
@@ -71,6 +72,7 @@ package(default_visibility = ["//visibility:public"])
         "hostVersionSucceeds",
         "hostVersionFails",
         "initializeVersionFails",
+        "loadTwoStages",
         "nullStageDescriptor",
     ]
 ]
