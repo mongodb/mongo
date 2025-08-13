@@ -148,8 +148,7 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
         // Check if the applyOps command is empty. This is probably not something that should
         // happen, so require a superuser to do this.
         if (applyOpsObj.firstElement().Array().empty()) {
-            // TODO(SERVER-96657): Do not return here, as it skips the remaining validations
-            return OplogApplicationValidity::kNeedsSuperuser;
+            demandAuthorization(OplogApplicationValidity::kNeedsSuperuser);
         }
 
         // createCollection and renameCollection are only allowed to be applied
@@ -161,8 +160,7 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
                 auto oplogEntry = e.Obj();
                 if (checkCOperationType(oplogEntry, "create"_sd) ||
                     checkCOperationType(oplogEntry, "renameCollection"_sd)) {
-                    // TODO(SERVER-96657): Do not return here, as it skips the remaining validations
-                    return OplogApplicationValidity::kNeedsSuperuser;
+                    demandAuthorization(OplogApplicationValidity::kNeedsSuperuser);
                 }
             }
         }
