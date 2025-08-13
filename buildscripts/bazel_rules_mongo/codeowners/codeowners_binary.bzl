@@ -59,3 +59,7 @@ _codeowners_binary = repository_rule(
 
 def codeowners_binary():
     _codeowners_binary(name = "codeowners_binary")
+
+codeowners_binary_extension = module_extension(
+    implementation = lambda ctx: _codeowners_binary(name = "codeowners_binary"),
+)

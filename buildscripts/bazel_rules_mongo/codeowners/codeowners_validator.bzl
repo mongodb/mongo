@@ -59,3 +59,7 @@ _codeowners_validator = repository_rule(
 
 def codeowners_validator():
     _codeowners_validator(name = "codeowners_validator")
+
+codeowners_validator_extension = module_extension(
+    implementation = lambda ctx: _codeowners_validator(name = "codeowners_validator"),
+)
