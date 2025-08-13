@@ -152,6 +152,7 @@ mongo_cc_library(
         "shell_utils_launcher.h",
         "//src/mongo/bson:bson_bin_util.h",
         "//src/mongo/bson:bsonobj_comparator.h",
+        "//src/mongo/bson/util:bson_corpus.h",
         "//src/mongo/transport:message_compressor_options_client_gen",
     ],
     deps = [
@@ -160,6 +161,7 @@ mongo_cc_library(
         ":shell_options_storage",
         "//src/mongo/base:environment_buffer",  # TODO(SERVER-93876): Remove.
         "//src/mongo/bson/column",
+        "//src/mongo/bson/util:bson_corpus",
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/db:mongohasher",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:traffic_reader",
