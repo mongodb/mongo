@@ -59,9 +59,22 @@ def print_decl_recursive(decl: Decl, indent_level=0, parent: Decl = None):
     print("".join(line_parts))
 
     if decl.visibility.endswith("private") and ext_usages:
-        # This is only reachable if the merger exits with an error when checking
-        # visibility. But it dumps the json first so we can still get here.
-        print(f"{indent}^^ERROR^^: private declaration has external usages!")
+        direct_ext_usages = sum(
+            len(locs)
+            for mod, locs in decl.direct_usages.items()
+            if not is_submodule_usage(decl, mod)
+        )
+        if direct_ext_usages:
+            # This is only reachable if the merger exits with an error when checking
+            # visibility. But it dumps the json first so we can still get here.
+            print(
+                f"{indent}^^ERROR^^: private declaration above has {direct_ext_usages} direct external usages!"
+            )
+        else:
+            print(
+                f"{indent}// NOTE: private declaration above has transitive but not direct external usages.\n"
+                f"{indent}// This is fine if no error is printed below, and expected if any children are public."
+            )
 
     # Sort children for most readable/scannable output.
     for child_decl in sorted_decls(decl.sem_children):
