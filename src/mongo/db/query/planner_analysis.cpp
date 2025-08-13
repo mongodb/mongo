@@ -506,7 +506,12 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(
     bool mayProvideAdditionalFields = false) {
     LOGV2_DEBUG(20949, 5, "PROJECTION: Current plan", "plan"_attr = redact(solnRoot->toString()));
 
+    tassert(1085250,
+            "No projection detected when choosing projection implementation",
+            projectionOverride || query.getProj());
+
     const auto& projection = projectionOverride ? *projectionOverride : *query.getProj();
+
     tassert(9305901,
             "Can only permit additional fields when projection is strictly inclusive",
             !mayProvideAdditionalFields || projection.isInclusionOnly());
