@@ -35,12 +35,14 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/shell/shell_utils_extended.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 using shell_utils::getObjInDumpFile;
+using shell_utils::getURIFromArgs;
 using shell_utils::NormalizationOpts;
 using shell_utils::NormalizationOptsSet;
 using shell_utils::normalizeBSONObj;
@@ -48,6 +50,8 @@ using shell_utils::numObjsInDumpFile;
 using shell_utils::readDumpFile;
 using shell_utils::removeFile;
 using shell_utils::writeBsonArrayToFile;
+
+using namespace std::literals::string_literals;
 
 const auto fullOpts = NormalizationOpts::kSortBSON | NormalizationOpts::kSortArrays |
     NormalizationOpts::kNormalizeNumerics;
@@ -464,5 +468,142 @@ TEST(NormalizationOpts, RoundedFloatingPointNumericsAreEqual) {
     auto expected = "{ a: { y: [ 1, 9.87654321098765 ], z: 1.23456789012346 } }";
     ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
 }
+
+
+TEST(GetURIFromArgs, BasicHostNameParsing) {
+
+    std::string uri;
+
+    uri = getURIFromArgs("arg"s, "host"s, "port"s);
+    ASSERT_EQ(uri, "mongodb://host:port/arg"s);
+
+    uri = getURIFromArgs("arg"s, "host:port"s, ""s);
+    ASSERT_EQ(uri, "mongodb://host:port/arg"s);
+
+    uri = getURIFromArgs("arg"s, "host:port"s, "port"s);
+    ASSERT_EQ(uri, "mongodb://host:port/arg"s);
+}
+
+DEATH_TEST(GetURIFromArgs,
+           HostPortDoesNotMatchProvidedPort,
+           "connection string bears different port than provided by --port") {
+    getURIFromArgs(""s, "host:port1"s, "port2"s);
+}
+
+TEST(GetURIFromArgs, ArgHostNames) {
+
+    std::string uri;
+
+    uri = getURIFromArgs("host/db"s, ""s, ""s);
+    ASSERT_EQ(uri, "mongodb://host:27017/db"s);
+
+    uri = getURIFromArgs("host.db"s, ""s, "port"s);
+    ASSERT_EQ(uri, "mongodb://host.db:port/test"s);
+
+    uri = getURIFromArgs("host.db"s, ""s, ""s);
+    ASSERT_EQ(uri, "mongodb://host.db:27017/test"s);
+
+    uri = getURIFromArgs("host:1234"s, ""s, ""s);
+    ASSERT_EQ(uri, "mongodb://host:1234/test"s);
+
+    uri = getURIFromArgs("host:1234"s, ""s, "1234"s);
+    ASSERT_EQ(uri, "mongodb://host:1234/test"s);
+}
+
+DEATH_TEST(GetURIFromArgs,
+           FullURIWithHost,
+           "If a full URI is provided, you cannot also specify --host or --port") {
+    getURIFromArgs("host/port"s, "host"s, ""s);
+}
+
+DEATH_TEST(GetURIFromArgs,
+           FullURIWithPort,
+           "If a full URI is provided, you cannot also specify --host or --port") {
+    getURIFromArgs("host/port"s, ""s, "port"s);
+}
+
+DEATH_TEST(GetURIFromArgs,
+           ArgHostPortDoesNotMatchProvidedPort,
+           "connection string bears different port than provided by --port") {
+    getURIFromArgs("host:1234"s, ""s, "5678"s);
+}
+
+TEST(GetURIFromArgs, MultipleHosts) {
+
+    std::string uri;
+
+    uri = getURIFromArgs("arg"s, "host1,host2,host3"s, ""s);
+    ASSERT_EQ(uri, "mongodb://host1:27017,host2:27017,host3:27017/arg"s);
+
+    uri = getURIFromArgs("arg"s, "host1,,host3"s, ""s);
+    ASSERT_EQ(uri, "mongodb://host1:27017,host3:27017/arg"s);
+
+    uri = getURIFromArgs("arg"s, "host1,host2"s, "1234"s);
+    ASSERT_EQ(uri, "mongodb://host1:1234,host2:1234/arg"s);
+}
+
+TEST(GetURIFromArgs, SpecialPrefixes) {
+
+    std::string uri;
+
+    uri = getURIFromArgs("mongodb://dummy"s, ""s, ""s);
+    ASSERT_EQ(uri, "mongodb://dummy"s);
+
+    uri = getURIFromArgs(""s, "mongodb://dummy"s, ""s);
+    ASSERT_EQ(uri, "mongodb://dummy"s);
+
+    uri = getURIFromArgs(""s, "mongodb+srv://dummy"s, ""s);
+    ASSERT_EQ(uri, "mongodb+srv://dummy"s);
+}
+
+TEST(GetURIFromArgs, ReplSet) {
+
+    std::string uri;
+
+    uri = getURIFromArgs(""s, "replset/host"s, "port"s);
+    ASSERT_EQ(uri, "mongodb://host:port/?replicaSet=replset"s);
+
+    uri = getURIFromArgs("arg"s, "replset/host"s, "port"s);
+    ASSERT_EQ(uri, "mongodb://host:port/arg?replicaSet=replset"s);
+}
+
+TEST(GetURIFromArgs, UnixDomainSocket) {
+
+    std::string uri;
+
+    uri = getURIFromArgs("arg"s, "/unix/domain.sock"s, "port"s);
+    ASSERT_EQ(uri, "mongodb://%2Funix%2Fdomain.sock/arg"s);
+}
+
+
+TEST(GetURIFromArgs, IPv6) {
+
+    std::string uri;
+
+    uri = getURIFromArgs("arg"s, "2001::"s, ""s);
+    ASSERT_EQ(uri, "mongodb://[2001::]:27017/arg"s);
+
+    uri = getURIFromArgs("arg"s, "[2001::]"s, ""s);
+    ASSERT_EQ(uri, "mongodb://[2001::]:27017/arg"s);
+
+    uri = getURIFromArgs("arg"s, "[2001::]:443"s, ""s);
+    ASSERT_EQ(uri, "mongodb://[2001::]:443/arg"s);
+}
+
+TEST(GetURIFromArgs, LocalHost) {
+
+    std::string uri;
+
+    uri = getURIFromArgs("host"s, ""s, ""s);
+    ASSERT_EQ(uri, "mongodb://127.0.0.1:27017/host"s);
+
+    uri = getURIFromArgs(""s, ""s, ""s);
+    ASSERT_EQ(uri, "mongodb://127.0.0.1:27017"s);
+
+    uri = getURIFromArgs(""s, ""s, "1234"s);
+    ASSERT_EQ(uri, "mongodb://127.0.0.1:1234/"s);
+}
+
+
 }  // namespace
 }  // namespace mongo

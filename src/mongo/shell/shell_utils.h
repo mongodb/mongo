@@ -164,5 +164,11 @@ void sortQueryResults(std::vector<BSONObj>& input);
  */
 BSONObj normalizeBSONObj(const BSONObj& input,
                          NormalizationOptsSet opts = NormalizationOpts::kResults);
+
+
+std::string getURIFromArgs(const std::string& arg,
+                           const std::string& host,
+                           const std::string& port);
+
 }  // namespace shell_utils
 }  // namespace mongo

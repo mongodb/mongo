@@ -158,14 +158,6 @@ bool gotInterrupted = false;
 bool inMultiLine = false;
 static AtomicWord<bool> atPrompt(false);  // can eval before getting to prompt
 
-const std::string kDefaultMongoHost = "127.0.0.1"s;
-const std::string kDefaultMongoPort = "27017"s;
-const std::string kDefaultMongoURL = "mongodb://"s + kDefaultMongoHost + ":"s + kDefaultMongoPort;
-#ifdef MONGO_CONFIG_GRPC
-const std::string kDefaultMongoGRPCPort = "27021"s;
-const std::string kDefaultMongoGRPCURL =
-    "mongodb://"s + kDefaultMongoHost + ":"s + kDefaultMongoGRPCPort;
-#endif
 
 // Initialize the featureCompatibilityVersion server parameter since the mongo shell does not have a
 // featureCompatibilityVersion document from which to initialize the parameter. The parameter is set
@@ -388,167 +380,6 @@ void setupSignals() {
     signal(SIGINT, quitNicely);
 }
 
-std::string getURIFromArgs(const std::string& arg,
-                           const std::string& host,
-                           const std::string& port) {
-    if (host.empty() && arg.empty() && port.empty()) {
-// Nothing provided, just play the default.
-#ifdef MONGO_CONFIG_GRPC
-        return shellGlobalParams.gRPC ? kDefaultMongoGRPCURL : kDefaultMongoURL;
-#else
-        return kDefaultMongoURL;
-#endif
-    }
-
-    if ((str::startsWith(arg, "mongodb://") || str::startsWith(arg, "mongodb+srv://")) &&
-        host.empty() && port.empty()) {
-        // mongo mongodb://blah
-        return arg;
-    }
-    if ((str::startsWith(host, "mongodb://") || str::startsWith(host, "mongodb+srv://")) &&
-        arg.empty() && port.empty()) {
-        // mongo --host mongodb://blah
-        return host;
-    }
-
-    // We expect a positional arg to be a plain dbname or plain hostname at this point
-    // since we have separate host/port args.
-    if ((arg.find('/') != std::string::npos) && (host.size() || port.size())) {
-        std::cerr << "If a full URI is provided, you cannot also specify --host or --port"
-                  << std::endl;
-        quickExit(ExitCode::badOptions);
-    }
-
-    const auto parseDbHost = [port](const std::string& db, const std::string& host) -> std::string {
-        // Parse --host as a connection string.
-        // e.g. rs0/host0:27000,host1:27001
-        const auto slashPos = host.find('/');
-        const auto hasReplSet = (slashPos > 0) && (slashPos != std::string::npos);
-
-        std::ostringstream ss;
-        ss << "mongodb://";
-
-        // Handle each sub-element of the connection string individually.
-        // Comma separated list of host elements.
-        // Each host element may be:
-        // * /unix/domain.sock
-        // * hostname
-        // * hostname:port
-        // If --port is specified and port is included in connection string,
-        // then they must match exactly.
-        auto start = hasReplSet ? slashPos + 1 : 0;
-        while (start < host.size()) {
-            // Encode each host component.
-            auto end = host.find(',', start);
-            if (end == std::string::npos) {
-                end = host.size();
-            }
-            if ((end - start) == 0) {
-                // Ignore empty components.
-                start = end + 1;
-                continue;
-            }
-
-            const auto hostElem = host.substr(start, end - start);
-            if ((hostElem.find('/') != std::string::npos) && str::endsWith(hostElem, ".sock")) {
-                // Unix domain socket, ignore --port.
-                ss << uriEncode(hostElem);
-
-            } else {
-                auto colon = hostElem.find(':');
-                if ((colon != std::string::npos) &&
-                    (hostElem.find(':', colon + 1) != std::string::npos)) {
-                    // Looks like an IPv6 numeric address.
-                    const auto close = hostElem.find(']');
-                    if ((hostElem[0] == '[') && (close != std::string::npos)) {
-                        // Encapsulated already.
-                        ss << '[' << uriEncode(hostElem.substr(1, close - 1), ":") << ']';
-                        colon = hostElem.find(':', close + 1);
-                    } else {
-                        // Not encapsulated yet.
-                        ss << '[' << uriEncode(hostElem, ":") << ']';
-                        colon = std::string::npos;
-                    }
-                } else if (colon != std::string::npos) {
-                    // Not IPv6 numeric, but does have a port.
-                    ss << uriEncode(hostElem.substr(0, colon));
-                } else {
-                    // Raw hostname/IPv4 without port.
-                    ss << uriEncode(hostElem);
-                }
-
-                if (colon != std::string::npos) {
-                    // Have a port in our host element, verify it.
-                    const auto myport = hostElem.substr(colon + 1);
-                    if (port.size() && (port != myport)) {
-                        std::cerr
-                            << "connection string bears different port than provided by --port"
-                            << std::endl;
-                        quickExit(ExitCode::badOptions);
-                    }
-                    ss << ':' << uriEncode(myport);
-                } else if (port.size()) {
-                    ss << ':' << uriEncode(port);
-                } else {
-#ifdef MONGO_CONFIG_GRPC
-                    ss << ":"
-                       << (shellGlobalParams.gRPC ? kDefaultMongoGRPCPort : kDefaultMongoPort);
-#else
-                    ss << ":" << kDefaultMongoPort;
-#endif
-                }
-            }
-            start = end + 1;
-            if (start < host.size()) {
-                ss << ',';
-            }
-        }
-
-        ss << '/' << uriEncode(db);
-
-        if (hasReplSet) {
-            // Remap included replica set name to URI option
-            ss << "?replicaSet=" << uriEncode(host.substr(0, slashPos));
-        }
-
-        return ss.str();
-    };
-
-    if (host.size()) {
-        // --host provided, treat it as the connect string and get db from positional arg.
-        return parseDbHost(arg, host);
-    } else if (arg.size()) {
-        // --host missing, but we have a potential host/db positional arg.
-        const auto slashPos = arg.find('/');
-        if (slashPos != std::string::npos) {
-            // host/db pair.
-            return parseDbHost(arg.substr(slashPos + 1), arg.substr(0, slashPos));
-        }
-
-        // Compatability formats.
-        // * Any arg with a dot is assumed to be a hostname or IPv4 numeric address.
-        // * Any arg with a colon followed by a digit assumed to be host or IP followed by port.
-        // * Anything else is assumed to be a db.
-
-        if (arg.find('.') != std::string::npos) {
-            // Assume IPv4 or hostnameish.
-            return parseDbHost("test", arg);
-        }
-
-        const auto colonPos = arg.find(':');
-        if ((colonPos != std::string::npos) && ((colonPos + 1) < arg.size()) &&
-            ctype::isDigit(arg[colonPos + 1])) {
-            // Assume IPv4 or hostname with port.
-            return parseDbHost("test", arg);
-        }
-
-        // db, assume localhost.
-        return parseDbHost(arg, "127.0.0.1");
-    }
-
-    // --host empty, position arg empty, fallback on localhost without a dbname.
-    return parseDbHost("", "127.0.0.1");
-}
 
 std::string finishCode(std::string code) {
     while (!shell_utils::isBalanced(code)) {
@@ -830,10 +661,10 @@ int mongo_main(int argc, char* argv[]) {
 
         // Parse the output of getURIFromArgs which will determine if --host passed in a URI
         MongoURI parsedURI;
-        parsedURI =
-            uassertStatusOK(MongoURI::parse(getURIFromArgs(cmdlineURI,
-                                                           str::escape(shellGlobalParams.dbhost),
-                                                           str::escape(shellGlobalParams.port))));
+        parsedURI = uassertStatusOK(MongoURI::parse(
+            mongo::shell_utils::getURIFromArgs(cmdlineURI,
+                                               str::escape(shellGlobalParams.dbhost),
+                                               str::escape(shellGlobalParams.port))));
 
         // TODO: add in all of the relevant shellGlobalParams to parsedURI
         parsedURI.setOptionIfNecessary("compressors"s, shellGlobalParams.networkMessageCompressors);
