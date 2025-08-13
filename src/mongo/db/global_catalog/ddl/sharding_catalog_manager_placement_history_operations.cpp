@@ -763,12 +763,6 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
      * Such description will then be persisted in config.placementHistory.
      */
 
-    // Suspend the periodic cleanup job that runs in background.
-    ScopeGuard restartHistoryCleaner(
-        [opCtx]() { PlacementHistoryCleaner::get(opCtx)->resume(opCtx); });
-
-    PlacementHistoryCleaner::get(opCtx)->pause();
-
     // Delete any existing document that has been already majority committed.
     {
         // Set the needed read concern for the operation; since its execution through

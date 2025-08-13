@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/initialize_placement_history_coordinator.h"
 
+#include "mongo/db/global_catalog/ddl/placement_history_cleaner.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -40,8 +41,24 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_buildPhaseHandler(Phase::kExecute, [](auto* opCtx) {
-            ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
+        .then([this, anchor = shared_from_this()] {
+            auto opCtxHolder = makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            // TODO SERVER-109079: Reject requests when the config server isn't running under a
+            // compatible FCV version.
+
+            // Ensure that there is no concurrent access from the periodic cleaning job (which may
+            // have been re-activated during the execution of this Coordinator during a node step
+            // up).
+            PlacementHistoryCleaner::get(opCtx)->pause();
+        })
+        .then(_buildPhaseHandler(Phase::kExecute,
+                                 [](auto* opCtx) {
+                                     ShardingCatalogManager::get(opCtx)->initializePlacementHistory(
+                                         opCtx);
+                                 }))
+        .then(_buildPhaseHandler(Phase::kPostExecution, [](auto* opCtx) {
+            PlacementHistoryCleaner::get(opCtx)->resume(opCtx);
         }));
 }
 

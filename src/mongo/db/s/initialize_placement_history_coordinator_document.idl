@@ -44,6 +44,7 @@ enums:
         values:
             kUnset: "unset"
             kExecute: "execute"
+            kPostExecution: "postExecution"
 
 structs:
     InitializePlacementHistoryCoordinatorDocument:
