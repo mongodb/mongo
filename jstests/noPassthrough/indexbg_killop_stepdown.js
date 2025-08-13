@@ -67,13 +67,17 @@ assert.commandWorked(primary.adminCommand({
 assert.commandWorked(testDB.adminCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 10}));
 rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 
+// Checking if a feature flag is enabled requires a connection to the primary. As a result, we must
+// run the check before resuming the abort (which may cause the primary to crash if the feature flag
+// is disabled).
+const gracefulIndexBuildFlag = FeatureFlagUtil.isEnabled(testDB, "IndexBuildGracefulErrorHandling");
+
 // Resume the abort.
 assert.commandWorked(
     primary.adminCommand({configureFailPoint: "hangIndexBuildBeforeAbortCleanUp", mode: "off"}));
 
 awaitIndexBuild();
 
-const gracefulIndexBuildFlag = FeatureFlagUtil.isEnabled(testDB, "IndexBuildGracefulErrorHandling");
 if (!gracefulIndexBuildFlag) {
     // We expect the node to crash without this feature enabled.
     assert.soon(function() {
