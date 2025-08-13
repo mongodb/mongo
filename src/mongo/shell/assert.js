@@ -666,7 +666,6 @@ assert = (function() {
         if (!ignoreWriteConcernErrors && raw.hasOwnProperty("writeConcernError")) {
             return false;
         }
-
         return true;
     }
 
@@ -850,6 +849,17 @@ assert = (function() {
         try {
             // First check if the command worked.
             return assert.commandWorked(res, msg);
+        } catch (e) {
+            // If the command did not work, assert it failed with one of the specified codes.
+            return assert.commandFailedWithCode(res, errorCodeSet, msg);
+        }
+    };
+
+    assert.commandWorkedIgnoringWriteConcernErrorsOrFailedWithCode =
+        function commandWorkedOrFailedWithCode(res, errorCodeSet, msg) {
+        try {
+            // First check if the command worked.
+            return _assertCommandWorked(res, msg, {ignoreWriteConcernErrors: true});
         } catch (e) {
             // If the command did not work, assert it failed with one of the specified codes.
             return assert.commandFailedWithCode(res, errorCodeSet, msg);

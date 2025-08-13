@@ -1184,6 +1184,13 @@ var ShardingTest = function(params) {
     };
 
     /**
+     * Returns all shards in the cluster.
+     */
+    ShardingTest.prototype.getAllShards = function() {
+        return this._rs.map(obj => obj.test);
+    };
+
+    /**
      * Returns if there is a new feature compatibility version for the "latest" version. This must
      * be manually changed if and when there is a new feature compatibility version.
      */
