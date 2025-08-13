@@ -34,10 +34,16 @@ For some of the versions we are using such generic names as `latest`, `last-lts`
 - `latest` - the current version. In Evergreen, the version that was compiled in the current build.
 
 - `last-lts` - the latest LTS (Long Term Support) Major release version. In Evergreen, the version
-  that was downloaded from the last LTS release branch project.
+  that was downloaded from the last LTS release branch project. It resolves to an entry
+  in `longTermSupportReleases` of [releases.yml](../../src/mongo/util/version/releases.yml).
 
 - `last-continuous` - the latest Rapid release version. In Evergreen, the version that was
-  downloaded from the Rapid release branch project.
+  downloaded from the Rapid release branch project. It resolves to the entry in
+  `featureCompatibilityVersions` of [releases.yml](../../src/mongo/util/version/releases.yml)
+  that looks older than the output of `git describe`. Will not be tested against if it is listed in
+  `eolVersions` as being end of life.
+
+Note: The latest release.yml file from master is always used, even fetched remotely when on another branch.
 
 ### Old vs new
 
