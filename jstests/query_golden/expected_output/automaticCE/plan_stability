@@ -35,7 +35,6 @@
 [jsTest] ----
 
 {">>>pipelines":[
-
 {">>>pipeline": [{"$match":{"$nor":[{"d_compound":{"$exists":false}},{"d_idx":{"$gte":19}},{"a_compound":{"$all":[13,19,6]}}],"i_compound":{"$in":[2,7]},"z_compound":{"$nin":[5,14]}}},{"$limit":31}],
     "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1_z_compound_1","indexBounds":{"i_compound":["[2.0, 2.0]","[7.0, 7.0]"],"z_compound":["[MinKey, 5.0)","(5.0, 14.0)","(14.0, MaxKey]"]}}}},
     "keys" :      4,
@@ -8387,6 +8386,7 @@
     "sorts":      0,
     "plans":      2,
     "rows" :  20000}
+
 ],
 ">>>totals": {"pipelines": 1044, "plans": 10419, "keys": 103812838, "docs": 55270416, "sorts": 78945509, "rows": 38020103, "errors":      0},
 ">>>parameters": {"planRankerMode":"automaticCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"random","internalQuerySamplingBySequentialScan":true}}

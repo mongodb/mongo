@@ -87,6 +87,10 @@ pipelines.forEach((pipeline, index) => {
     // JSON does not allow trailing commas.
     const separator = index === pipelines.length - 1 ? "" : ",";
 
+    // We print the pipeline here so that, even if the test fails,
+    // we have already emitted the failing pipeline.
+    print(`{">>>pipeline": ${JSON.stringify(pipeline)},`);
+
     // We do not use explain() as it loses the errmsg in case of an error.
     const explain = db.runCommand({
         explain: {aggregate: collName, pipeline: pipeline, cursor: {}},
@@ -94,6 +98,7 @@ pipelines.forEach((pipeline, index) => {
     });
 
     if (explain.ok !== 1) {
+        print(`    "error": ${JSON.stringify(explain.errmsg)}}${separator}`);
         totalErrors++;
         return;
     }
@@ -116,14 +121,13 @@ pipelines.forEach((pipeline, index) => {
     const sorts = extractSortEffort(executionStats.executionStages);
     totalSorts += sorts;
 
-    print();
-    print(`{">>>pipeline": ${JSON.stringify(pipeline)},`);
     print(`    "winningPlan": ${JSON.stringify(winningPlan)},`);
     print(`    "keys" : ${padNumber(keys)},`);
     print(`    "docs" : ${padNumber(docs)},`);
     print(`    "sorts": ${padNumber(sorts)},`);
     print(`    "plans": ${padNumber(plans)},`);
     print(`    "rows" : ${padNumber(nReturned)}}${separator}`);
+    print();
 });
 print("],");
 
