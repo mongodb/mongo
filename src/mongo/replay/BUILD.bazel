@@ -42,6 +42,7 @@ mongo_cc_library(
         "//src/mongo/util:periodic_runner_factory",
         "//src/mongo/util:signal_handlers",
         "//src/mongo/util:version_impl",
+        "//src/third_party/nlohmann-json:json",
     ],
 )
 

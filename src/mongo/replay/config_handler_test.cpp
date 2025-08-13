@@ -60,11 +60,18 @@ protected:
         ASSERT_TRUE(tempConfigFile.is_open());
         tempRecordingFile1 << "test\n";
         tempRecordingFile2 << "test\n";
-        tempConfigFile << "recordings:\n"
-                       << "  - path: \"tmp_recording_file1.dat\"\n"
-                       << "    uri: \"$local:12345\"\n"
-                       << "  - path: \"tmp_recording_file2.dat\"\n"
-                       << "    uri: \"$local:12346\"\n";
+        tempConfigFile << "{"
+                       << "\"recordings\": ["
+                       << "{"
+                       << "\"path\": \"tmp_recording_file1.dat\","
+                       << "\"uri\": \"$local:12345\""
+                       << "},"
+                       << "{"
+                       << "\"path\": \"tmp_recording_file2.dat\","
+                       << "\"uri\": \"$local:12346\""
+                       << "}"
+                       << "]"
+                       << "}";
     }
 
     void tearDown() override {
