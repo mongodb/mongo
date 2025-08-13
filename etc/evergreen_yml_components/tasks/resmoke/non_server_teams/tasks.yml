@@ -236,7 +236,7 @@ tasks:
         vars:
           extraction_change_dir: bazel-bin/install/
           decompress: tar --strip-components=1 -zxvf
-          extensions_required: false
+          skip_extensions: true
       - func: "run tests"
 
   - <<: *task_template
