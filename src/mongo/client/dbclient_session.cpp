@@ -89,8 +89,12 @@
 
 namespace mongo {
 namespace {
+// Tracks the number of times DbClientSession detects that the connection has been broken in
+// ensureConnection() and attempts to reconnect.
 auto& dbClientSessionReconnectAttempts =
     *MetricBuilder<Counter64>("network.dbClientSessionReconnectAttempts");
+// Tracks the number of times DbClientSession detects that the connection has been broken in
+// ensureConnection() with autoReconnect = false so does not try to reconnect.
 auto& dbClientSessionWithoutAutoReconnectFailures =
     *MetricBuilder<Counter64>("network.dbClientSessionWithoutAutoReconnectFailures");
 }  // namespace
@@ -584,5 +588,17 @@ bool DBClientSession::isTLS() {
     return sslPeerInfo && sslPeerInfo->isTLS();
 }
 #endif
+
+void DBClientSession::ensureConnection() {
+    if (!_failed.load()) {
+        return;
+    }
+    if (!_autoReconnect) {
+        dbClientSessionWithoutAutoReconnectFailures.increment();
+        throwSocketError(SocketErrorKind::FAILED_STATE, toString());
+    }
+    dbClientSessionReconnectAttempts.increment();
+    _reconnectSession();
+}
 
 }  // namespace mongo

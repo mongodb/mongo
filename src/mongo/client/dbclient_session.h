@@ -213,14 +213,7 @@ public:
     }
 
     // Throws a NetworkException if in failed state and not reconnecting or if waiting to reconnect.
-    void ensureConnection() override {
-        if (_failed.load()) {
-            if (!_autoReconnect) {
-                throwSocketError(SocketErrorKind::FAILED_STATE, toString());
-            }
-            _reconnectSession();
-        }
-    }
+    void ensureConnection() override;
 
     bool isReplicaSetMember() const override {
         return _isReplicaSetMember;
