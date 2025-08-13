@@ -159,12 +159,7 @@ private:
     WorkingSet* const _workingSet;
 
     // A progressive search works in stages of buffering and then advancing
-    enum SearchState {
-        SearchState_Initializing,
-        SearchState_Buffering,
-        SearchState_Advancing,
-        SearchState_Finished
-    } _searchState;
+    enum class SearchState { Initializing, Buffering, Advancing, Finished } _searchState;
 
     // Tracks RecordIds from the child stage to do our own deduping.
     stdx::unordered_map<RecordId, WorkingSetID, RecordId::Hasher> _seenDocuments;

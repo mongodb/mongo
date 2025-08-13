@@ -61,7 +61,7 @@ NearStage::NearStage(ExpressionContext* expCtx,
                      const IndexDescriptor* indexDescriptor)
     : RequiresIndexStage(typeName, expCtx, collection, indexDescriptor, workingSet),
       _workingSet(workingSet),
-      _searchState(SearchState_Initializing),
+      _searchState(SearchState::Initializing),
       _nextIntervalStats(nullptr),
       _stageType(type),
       _nextInterval(nullptr) {}
@@ -81,7 +81,7 @@ NearStage::CoveredInterval::CoveredInterval(PlanStage* covering,
 PlanStage::StageState NearStage::initNext(WorkingSetID* out) {
     PlanStage::StageState state = initialize(opCtx(), _workingSet, out);
     if (state == PlanStage::IS_EOF) {
-        _searchState = SearchState_Buffering;
+        _searchState = SearchState::Buffering;
         return PlanStage::NEED_TIME;
     }
 
@@ -99,14 +99,14 @@ PlanStage::StageState NearStage::doWork(WorkingSetID* out) {
     // Work the search
     //
 
-    if (SearchState_Initializing == _searchState) {
+    if (SearchState::Initializing == _searchState) {
         nextState = initNext(&toReturn);
-    } else if (SearchState_Buffering == _searchState) {
+    } else if (SearchState::Buffering == _searchState) {
         nextState = bufferNext(&toReturn);
-    } else if (SearchState_Advancing == _searchState) {
+    } else if (SearchState::Advancing == _searchState) {
         nextState = advanceNext(&toReturn);
     } else {
-        invariant(SearchState_Finished == _searchState);
+        invariant(SearchState::Finished == _searchState);
         nextState = PlanStage::IS_EOF;
     }
 
@@ -134,9 +134,15 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     if (!_nextInterval) {
         auto interval = nextInterval(opCtx(), _workingSet);
         if (!interval) {
-            _searchState = SearchState_Finished;
+            _searchState = SearchState::Finished;
             return PlanStage::IS_EOF;
         }
+
+        tassert(10922800,
+                "Intervals must be continious",
+                _childrenIntervals.empty() ||
+                    interval->minDistance <= _childrenIntervals.back()->maxDistance +
+                            std::numeric_limits<double>::epsilon());
 
         // CoveredInterval and its child stage are owned by _childrenIntervals
         _childrenIntervals.push_back(std::move(interval));
@@ -152,7 +158,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     PlanStage::StageState intervalState = _nextInterval->covering->work(&nextMemberID);
 
     if (PlanStage::IS_EOF == intervalState) {
-        _searchState = SearchState_Advancing;
+        _searchState = SearchState::Advancing;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::NEED_YIELD == intervalState) {
         *toReturn = nextMemberID;
@@ -175,11 +181,15 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
         }
     }
 
-    ++_nextIntervalStats->numResultsBuffered;
-
     // If the member's distance is in the current distance interval, add it to our buffered
     // results.
     auto memberDistance = computeDistance(nextMember);
+    if (memberDistance < _nextInterval->minDistance) {
+        _workingSet->free(nextMemberID);
+        return PlanStage::NEED_TIME;
+    }
+
+    ++_nextIntervalStats->numResultsBuffered;
 
     // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
     nextMember->makeObjOwnedIfNeeded();
@@ -206,17 +216,6 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
         SearchResult result = _resultBuffer.top();
         memberDistance = result.distance;
 
-        // Throw out all documents with memberDistance < minDistance
-        if (memberDistance < _nextInterval->minDistance) {
-            WorkingSetMember* member = _workingSet->get(result.resultID);
-            if (member->hasRecordId()) {
-                _seenDocuments.erase(member->recordId);
-            }
-            _resultBuffer.pop();
-            _workingSet->free(result.resultID);
-            return PlanStage::NEED_TIME;
-        }
-
         bool inInterval = _nextInterval->inclusiveMax ? memberDistance <= _nextInterval->maxDistance
                                                       : memberDistance < _nextInterval->maxDistance;
         if (inInterval) {
@@ -232,7 +231,7 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
     if (WorkingSet::INVALID_ID == resultID) {
         _nextInterval = nullptr;
         _nextIntervalStats = nullptr;
-        _searchState = SearchState_Buffering;
+        _searchState = SearchState::Buffering;
         return PlanStage::NEED_TIME;
     }
 
@@ -255,7 +254,7 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
 }
 
 bool NearStage::isEOF() const {
-    return SearchState_Finished == _searchState;
+    return SearchState::Finished == _searchState;
 }
 
 unique_ptr<PlanStageStats> NearStage::getStats() {
