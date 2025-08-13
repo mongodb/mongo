@@ -379,6 +379,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
                                            const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
     : DocumentSource(kStageName, newExpCtx),
       _resolvedNs(original._resolvedNs),
+      _fromNsIsAView(original._fromNsIsAView),
       _sharedState(std::make_shared<LookUpSharedState>(
           original._sharedState->fromNs,
           original._sharedState->as,
