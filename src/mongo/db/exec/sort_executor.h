@@ -241,7 +241,7 @@ public:
             if (_output->spillable()) {
                 SorterTracker tracker;
                 auto opts = makeSortOptions();
-                opts.Tracker(&tracker);
+                opts.sorterTracker = &tracker;
 
                 _output = _output->spill(opts, typename DocumentSorter::Settings());
 
@@ -269,15 +269,16 @@ private:
 
     SortOptions makeSortOptions() const {
         SortOptions opts;
-        opts.MoveSortedDataIntoIterator(_moveSortedDataIntoIterator);
+        opts.moveSortedDataIntoIterator = _moveSortedDataIntoIterator;
         if (_stats.limit) {
-            opts.Limit(_stats.limit);
+            opts.limit = _stats.limit;
         }
 
-        opts.MaxMemoryUsageBytes(_stats.maxMemoryUsageBytes);
+        opts.maxMemoryUsageBytes = _stats.maxMemoryUsageBytes;
         if (_diskUseAllowed) {
-            opts.TempDir(_tempDir);
-            opts.FileStats(_sorterFileStats.get());
+            opts.extSortAllowed = true;
+            opts.tempDir = _tempDir;
+            opts.sorterFileStats = _sorterFileStats.get();
         }
 
         return opts;

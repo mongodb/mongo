@@ -178,7 +178,7 @@ public:
 
                 SorterTracker tracker;
                 auto opts = _makeSortOptions();
-                opts.Tracker(&tracker);
+                opts.sorterTracker = &tracker;
 
                 _outputIt = _outputIt->spill(opts, typename Sorter<KeyRow, ValueRow>::Settings());
                 _stage._memoryTracker.value().set(0);
@@ -210,17 +210,18 @@ private:
 
     SortOptions _makeSortOptions() {
         SortOptions opts;
-        opts.TempDir(storageGlobalParams.dbpath + "/_tmp");
-        opts.MaxMemoryUsageBytes(_stage._specificStats.maxMemoryUsageBytes);
-        opts.Limit(_stage._specificStats.limit != std::numeric_limits<size_t>::max()
-                       ? _stage._specificStats.limit
-                       : 0);
-        opts.MoveSortedDataIntoIterator(true);
+        opts.tempDir = storageGlobalParams.dbpath + "/_tmp";
+        opts.maxMemoryUsageBytes = _stage._specificStats.maxMemoryUsageBytes;
+        opts.extSortAllowed = _stage._allowDiskUse;
+        opts.limit = _stage._specificStats.limit != std::numeric_limits<size_t>::max()
+            ? _stage._specificStats.limit
+            : 0;
+        opts.moveSortedDataIntoIterator = true;
         if (_stage._allowDiskUse) {
             if (!_sorterFileStats) {
                 _sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
             }
-            opts.FileStats(_sorterFileStats.get());
+            opts.sorterFileStats = _sorterFileStats.get();
         }
         return opts;
     }

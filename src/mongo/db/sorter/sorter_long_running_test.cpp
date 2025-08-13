@@ -71,7 +71,7 @@ private:
     int _appendToFile(const SortOptions* opts, int currentFileSize, int range) {
         auto makeFile = [&] {
             return std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
-                sorter::nextFileName(*(opts->tempDir)), opts->sorterFileStats);
+                sorter::nextFileName(opts->tempDir), opts->sorterFileStats);
         };
 
         int currentBufSize = 0;
@@ -175,7 +175,8 @@ public:
     void run() {
         unittest::TempDir tempDir("sorterTests");
         SorterTracker sorterTracker;
-        const SortOptions opts = SortOptions().TempDir(tempDir.path()).Tracker(&sorterTracker);
+        const SortOptions opts =
+            SortOptions().TempDir(tempDir.path()).ExtSortAllowed().Tracker(&sorterTracker);
 
         {  // test empty (no limit)
             ASSERT_ITERATORS_EQUIVALENT(makeSorter(opts)->done(),
@@ -329,7 +330,7 @@ private:
 
         auto numSpilledRangesOccurred = correctSpilledRanges();
         auto state = sorter->persistDataForShutdown();
-        if (opts.tempDir) {
+        if (opts.extSortAllowed) {
             ASSERT_NE(state.fileName, "");
         }
         ASSERT_EQ(state.ranges.size(), numRanges);
@@ -545,7 +546,7 @@ public:
                          MergeableSorter<IntWrapper, IntWrapper, IWComparator>::kFileIteratorSize),
                      static_cast<std::size_t>(1)));
 
-        return opts.MaxMemoryUsageBytes(MEM_LIMIT);
+        return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed();
     }
 
     void addData(IWSorter* sorter) override {
@@ -618,7 +619,7 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
         MONGO_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT > 100);
         MONGO_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT < 500);
 
-        return opts.MaxMemoryUsageBytes(MEM_LIMIT).Limit(Limit);
+        return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed().Limit(Limit);
     }
     std::shared_ptr<IWIterator> correct() override {
         return std::make_shared<LimitIterator>(Limit, Parent::correct());
@@ -651,7 +652,7 @@ class LotsOfSpillsLittleMemory : public LotsOfDataLittleMemory<Random> {
                          MergeableSorter<IntWrapper, IntWrapper, IWComparator>::kFileIteratorSize),
                      static_cast<std::size_t>(1)));
 
-        return opts.MaxMemoryUsageBytes(MEM_LIMIT);
+        return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed();
     }
 
     size_t correctSpilledRanges() const override {

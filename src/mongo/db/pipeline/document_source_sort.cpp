@@ -401,8 +401,9 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     opts.maxMemoryUsageBytes =
         loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes);
     if (expCtx->getAllowDiskUse()) {
-        opts.TempDir(expCtx->getTempDir());
-        opts.FileStats(ds->_sortExecutor->getSorterFileStats());
+        opts.extSortAllowed = true;
+        opts.tempDir = expCtx->getTempDir();
+        opts.sorterFileStats = ds->_sortExecutor->getSorterFileStats();
     }
 
     if (limit) {
@@ -502,6 +503,7 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     opts.MaxMemoryUsageBytes(
         loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes));
     if (expCtx->getAllowDiskUse()) {
+        opts.ExtSortAllowed(true);
         opts.TempDir(expCtx->getTempDir());
         opts.FileStats(ds->_sortExecutor->getSorterFileStats());
     }

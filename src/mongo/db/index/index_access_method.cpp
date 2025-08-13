@@ -206,6 +206,7 @@ SortOptions makeSortOptions(size_t maxMemoryUsageBytes,
                             SorterFileStats* stats) {
     return SortOptions()
         .TempDir(storageGlobalParams.dbpath + "/_tmp")
+        .ExtSortAllowed()
         .MaxMemoryUsageBytes(maxMemoryUsageBytes)
         .UseMemoryPool(true)
         .FileStats(stats)

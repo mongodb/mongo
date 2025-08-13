@@ -116,15 +116,19 @@ struct SortOptions {
     size_t maxMemoryUsageBytes;
     static const size_t DefaultMaxMemoryUsageBytes = 64 * 1024 * 1024;
 
+    // Whether we are allowed to spill to disk. If this is false and in-memory exceeds
+    // maxMemoryUsageBytes, we will uassert.
+    bool extSortAllowed;
+
     // In case the sorter spills encrypted data to disk that must be readable even after process
     // restarts, it must encrypt with a persistent key. This key is accessed using the database
     // name that the sorted collection lives in. If encryption is enabled and dbName is boost::none,
     // a temporary key is used.
     boost::optional<DatabaseName> dbName;
 
-    // Directory into which we place a file when spilling to disk. boost::none means we aren't
-    // allowing external sorting.
-    boost::optional<std::string> tempDir;
+    // Directory into which we place a file when spilling to disk. Must be explicitly set if
+    // extSortAllowed is true.
+    std::string tempDir;
 
     // If set, allows us to observe Sorter file handle usage.
     SorterFileStats* sorterFileStats;
@@ -142,19 +146,19 @@ struct SortOptions {
     // instead of copying.
     bool moveSortedDataIntoIterator;
 
-    // Checksum version to use for spill files. Only applicable if tempDir != boost::none.
+    // Checksum version to use for spill files. Only applicable if extSortAllowed = true.
     SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2;
 
     SortOptions()
         : limit(0),
           maxMemoryUsageBytes(DefaultMaxMemoryUsageBytes),
-          tempDir(boost::none),
+          extSortAllowed(false),
           sorterFileStats(nullptr),
           sorterTracker(nullptr),
           useMemPool(false),
           moveSortedDataIntoIterator(false) {}
 
-    // Fluent API to support expressions like SortOptions().Limit(1000)
+    // Fluent API to support expressions like SortOptions().Limit(1000).ExtSortAllowed(true)
 
     SortOptions& Limit(unsigned long long newLimit) {
         limit = newLimit;
@@ -163,6 +167,11 @@ struct SortOptions {
 
     SortOptions& MaxMemoryUsageBytes(size_t newMaxMemoryUsageBytes) {
         maxMemoryUsageBytes = newMaxMemoryUsageBytes;
+        return *this;
+    }
+
+    SortOptions& ExtSortAllowed(bool newExtSortAllowed = true) {
+        extSortAllowed = newExtSortAllowed;
         return *this;
     }
 

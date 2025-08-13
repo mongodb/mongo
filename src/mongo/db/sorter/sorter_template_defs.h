@@ -100,7 +100,7 @@ inline void checkNoExternalSortOnMongos(const SortOptions& opts) {
     uassert(16947,
             "Attempting to use external sort from mongos. This is not allowed.",
             !(serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) &&
-              opts.tempDir));
+              opts.extSortAllowed));
 }
 
 /**
@@ -199,13 +199,13 @@ public:
 
         uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                 "Requested to spill InMemIterator but did not opt in to external sorting",
-                opts.tempDir);
+                opts.extSortAllowed);
 
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-            *(opts.tempDir), internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+            opts.tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
         auto spillsFile =
-            std::make_shared<SorterBase::File>(nextFileName(*(opts.tempDir)), opts.sorterFileStats);
+            std::make_shared<SorterBase::File>(nextFileName(opts.tempDir), opts.sorterFileStats);
         SortedFileWriter<Key, Value> writer(opts, spillsFile, settings);
 
         for (size_t i = _index; i < _data.size(); ++i) {
@@ -703,7 +703,7 @@ protected:
             iterators.swap(this->_iters);
 
             std::shared_ptr<File> newSpillsFile = std::make_shared<File>(
-                nextFileName(*(this->_opts.tempDir)), this->_opts.sorterFileStats);
+                nextFileName(this->_opts.tempDir), this->_opts.sorterFileStats);
 
             LOGV2_DEBUG(6033103,
                         1,
@@ -724,7 +724,7 @@ protected:
                 minRequiredDiskSpace = std::max(
                     minRequiredDiskSpace,
                     static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
-                uassertStatusOK(ensureSufficientDiskSpaceForSpilling(*(this->_opts.tempDir),
+                uassertStatusOK(ensureSufficientDiskSpaceForSpilling(this->_opts.tempDir,
                                                                      minRequiredDiskSpace));
 
                 LOGV2_DEBUG(6033102,
@@ -815,7 +815,7 @@ public:
                   const Comparator& comp,
                   const Settings& settings = Settings())
         : MergeableSorter<Key, Value, Comparator>(opts, fileName, comp, settings) {
-        invariant(opts.tempDir);
+        invariant(opts.extSortAllowed);
 
         uassert(16815,
                 str::stream() << "Unexpected empty file: " << this->_file->path().string(),
@@ -934,7 +934,7 @@ private:
             return;
         }
 
-        if (!this->_opts.tempDir) {
+        if (!this->_opts.extSortAllowed) {
             // This error message only applies to sorts from user queries made through the find or
             // aggregation commands. Other clients, such as bulk index builds, should suppress this
             // error, either by allowing external sorting or by catching and throwing a more
@@ -948,7 +948,7 @@ private:
 
         // Ensure there is sufficient disk space for spilling
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-            *(this->_opts.tempDir), internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+            this->_opts.tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
         sort();
 
@@ -1293,7 +1293,7 @@ private:
 
         invariant(!_done);
 
-        if (!this->_opts.tempDir) {
+        if (!this->_opts.extSortAllowed) {
             // This error message only applies to sorts from user queries made through the find or
             // aggregation commands. Other clients should suppress this error, either by allowing
             // external sorting or by catching and throwing a more appropriate error.
@@ -1355,9 +1355,9 @@ template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts)
     : SorterBase(opts.sorterTracker),
       _opts(opts),
-      _file(opts.tempDir ? std::make_shared<SorterBase::File>(sorter::nextFileName(*(opts.tempDir)),
-                                                              opts.sorterFileStats)
-                         : nullptr) {
+      _file(opts.extSortAllowed ? std::make_shared<SorterBase::File>(
+                                      sorter::nextFileName(opts.tempDir), opts.sorterFileStats)
+                                : nullptr) {
     if (opts.useMemPool) {
         _memPool.emplace(sorter::makeMemPool());
     }
@@ -1367,9 +1367,10 @@ template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts, const std::string& fileName)
     : SorterBase(opts.sorterTracker),
       _opts(opts),
-      _file(std::make_shared<SorterBase::File>(*(opts.tempDir) + "/" + fileName,
-                                               opts.sorterFileStats)) {
-    invariant(opts.tempDir);
+      _file(
+          std::make_shared<SorterBase::File>(opts.tempDir + "/" + fileName, opts.sorterFileStats)) {
+    invariant(opts.extSortAllowed);
+    invariant(!opts.tempDir.empty());
     invariant(!fileName.empty());
     if (opts.useMemPool) {
         _memPool.emplace(sorter::makeMemPool());
@@ -1555,6 +1556,10 @@ SortedStorageWriter<Key, Value>::SortedStorageWriter(const SortOptions& opts,
     uassert(16946,
             "Attempting to use external sort from mongos. This is not allowed.",
             !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
+
+    uassert(17148,
+            "Attempting to use external sort without setting SortOptions::tempDir",
+            !opts.tempDir.empty());
 }
 
 //
@@ -1673,9 +1678,9 @@ BoundedSorter<Key, Value, Comparator, BoundMaker>::BoundedSorter(const SortOptio
       _checkInput(checkInput),
       _opts(opts),
       _heap(Greater{&compare}),
-      _file(opts.tempDir ? std::make_shared<typename SorterBase::File>(
-                               sorter::nextFileName(*(opts.tempDir)), opts.sorterFileStats)
-                         : nullptr) {}
+      _file(opts.extSortAllowed ? std::make_shared<typename SorterBase::File>(
+                                      sorter::nextFileName(opts.tempDir), opts.sorterFileStats)
+                                : nullptr) {}
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
 void BoundedSorter<Key, Value, Comparator, BoundMaker>::add(Key key, Value value) {
@@ -1820,10 +1825,10 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill(size_t maxMemoryU
     uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
             str::stream() << "Sort exceeded memory limit of " << maxMemoryUsageBytes
                           << " bytes, but did not opt in to external sorting.",
-            _opts.tempDir);
+            _opts.extSortAllowed);
 
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-        *(_opts.tempDir), internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed()));
+        _opts.tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed()));
 
     this->_stats.incrementSpilledKeyValuePairs(_heap.size());
     this->_stats.incrementSpilledRanges();
@@ -1868,6 +1873,9 @@ std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::make(const SortOptions& 
                                                              const Settings& settings) {
     sorter::checkNoExternalSortOnMongos(opts);
 
+    uassert(17149,
+            "Attempting to use external sort without setting SortOptions::tempDir",
+            !(opts.extSortAllowed && opts.tempDir.empty()));
     switch (opts.limit) {
         case 0:
             return std::make_unique<sorter::NoLimitSorter<Key, Value, Comparator>>(
