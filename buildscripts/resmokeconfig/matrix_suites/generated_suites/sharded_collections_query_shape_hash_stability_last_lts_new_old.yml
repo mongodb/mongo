@@ -104,7 +104,7 @@ selector:
     - jstests/core/index/express.js
     - jstests/core/query/idhack.js
     - jstests/core/query/explain/explain_all_plans_execution_stats.js
-    - jstests/core/timeseries/ddl/rename_system_buckets_collections.js
+    - jstests/core/timeseries/ddl/rename_timeseries.js
     - jstests/core/timeseries/write/timeseries_delete_with_meta.js
     - jstests/core/timeseries/ddl/timeseries_collection_uuid.js
   exclude_with_any_tags:

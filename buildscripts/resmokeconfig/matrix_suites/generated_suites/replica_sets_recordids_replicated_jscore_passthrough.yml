@@ -56,7 +56,7 @@ selector:
     - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
     - jstests/core/write/bulk/bulk_write_timeseries_basic.js
     - jstests/core/ddl/convert_to_capped.js
-    - jstests/core/timeseries/ddl/rename_system_buckets_collections.js
+    - jstests/core/timeseries/ddl/rename_timeseries.js
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/plan_cache/cache_correctness_pbt.js
     - jstests/core/query/run_all_plans_pbt.js
