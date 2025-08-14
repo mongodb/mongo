@@ -301,15 +301,12 @@ class _TransitionThread(threading.Thread):
             rs_fixture.replset_name,
         )
         node.mongod.stop(mode=fixture_interface.TeardownMode.TERMINATE)
+        temporary_options = {}
         if is_config_server:
-            node.mongod_options["configsvr"] = ""
-        else:
-            node.mongod_options.pop("configsvr", None)
+            temporary_options["configsvr"] = ""
         if enable_maintenance_mode:
-            node.mongod_options["replicaSetConfigShardMaintenanceMode"] = ""
-        else:
-            node.mongod_options.pop("replicaSetConfigShardMaintenanceMode", None)
-        rs_fixture.restart_node(node)
+            temporary_options["replicaSetConfigShardMaintenanceMode"] = ""
+        rs_fixture.restart_node(node, temporary_options)
         self.logger.info(fixture_interface.create_fixture_table(rs_fixture))
         self.logger.info(
             "Restarted mongod on port %d of replica set '%s'.",

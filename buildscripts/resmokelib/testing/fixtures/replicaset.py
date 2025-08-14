@@ -951,7 +951,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # into Rollback (which causes it to close any open connections).
             return False
 
-    def restart_node(self, chosen):
+    def restart_node(self, chosen, temporary_flags={}):
         """Restart the new step up node."""
         self.logger.info(
             "Waiting for the old primary on port %d of replica set '%s' to exit.",
@@ -986,11 +986,15 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # original preserve_dbpath to restore after restarting the mongod.
         original_preserve_dbpath = chosen.preserve_dbpath
         chosen.preserve_dbpath = True
+        original_flags = chosen.mongod_options
         try:
+            for key, value in temporary_flags.items():
+                chosen.mongod_options[key] = value
             chosen.setup()
             self.logger.info(interface.create_fixture_table(self))
             chosen.await_ready()
         finally:
+            chosen.mongod_options = original_flags
             chosen.preserve_dbpath = original_preserve_dbpath
 
     def get_secondaries(self):
