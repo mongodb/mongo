@@ -79,4 +79,52 @@ std::vector<std::unique_ptr<CellBlock>> extractCellBlocksFromBsons(
  */
 std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
                                                       CellBlock::PathRequest pathReqs);
+
+struct FilterPositionInfoRecorder {
+    FilterPositionInfoRecorder() : outputArr(std::make_unique<HeterogeneousBlock>()) {}
+
+    void recordValue(TypeTags tag, Value val);
+    void emptyArraySeen();
+    void newDoc();
+    void endDoc();
+    std::unique_ptr<HeterogeneousBlock> extractValues();
+
+    std::vector<int32_t> posInfo;
+    bool isNewDoc = false;
+    bool arraySeen = false;
+    std::unique_ptr<HeterogeneousBlock> outputArr;
+};
+
+struct ProjectionPositionInfoRecorder {
+    ProjectionPositionInfoRecorder() : outputArr(std::make_unique<HeterogeneousBlock>()) {}
+
+    void recordValue(TypeTags tag, Value val);
+    void newDoc();
+    void endDoc();
+    void startArray();
+    void endArray();
+    std::unique_ptr<HeterogeneousBlock> extractValues();
+
+    std::unique_ptr<HeterogeneousBlock> outputArr;
+    std::vector<std::unique_ptr<value::Array>> arrayStack;
+    bool isNewDoc = false;
+};
+
+struct BsonWalkNode {
+    FilterPositionInfoRecorder* filterPosInfoRecorder = nullptr;
+
+    std::vector<ProjectionPositionInfoRecorder*> childProjRecorders;
+    ProjectionPositionInfoRecorder* projRecorder = nullptr;
+
+    // Children which are Get nodes.
+    StringMap<std::unique_ptr<BsonWalkNode>> getChildren;
+
+    // Child which is a Traverse node.
+    std::unique_ptr<BsonWalkNode> traverseChild;
+
+    void add(const CellBlock::Path& path,
+             FilterPositionInfoRecorder* recorder,
+             ProjectionPositionInfoRecorder* outProjBlockRecorder,
+             size_t pathIdx = 0);
+};
 }  // namespace mongo::sbe::value

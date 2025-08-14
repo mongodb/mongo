@@ -33,174 +33,143 @@
 #include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe::value {
-namespace {
-struct FilterPositionInfoRecorder {
-    FilterPositionInfoRecorder() : outputArr(std::make_unique<HeterogeneousBlock>()) {}
 
-    void recordValue(TypeTags tag, Value val) {
-        auto [cpyTag, cpyVal] = copyValue(tag, val);
+void FilterPositionInfoRecorder::recordValue(TypeTags tag, Value val) {
+    auto [cpyTag, cpyVal] = copyValue(tag, val);
+    outputArr->push_back(cpyTag, cpyVal);
+    posInfo.back()++;
+    isNewDoc = false;
+}
+
+void FilterPositionInfoRecorder::emptyArraySeen() {
+    arraySeen = true;
+}
+
+void FilterPositionInfoRecorder::newDoc() {
+    posInfo.push_back(0);
+    isNewDoc = true;
+    arraySeen = false;
+}
+
+void FilterPositionInfoRecorder::endDoc() {
+    if (isNewDoc) {
+        // We recorded no values for this doc. There are two possibilities:
+        // (1) there is/are only empty array(s) at this path, which were traversed.
+        //     Example: document {a: {b: []}}, path Get(a)/Traverse/Get(b)/Traverse/Id.
+        // (2) There are no values at this path.
+        //     Example: document {a: {b:1}} searching for path Get(a)/Traverse/Get(c)/Id.
+        //
+        // It is important that we distinguish these two cases for MQL's sake.
+        if (arraySeen) {
+            // This represents case (1). We record this by adding no values to our output and
+            // leaving the position info value as '0'.
+
+            // Do nothing.
+        } else {
+            // This represents case (2). We record this by adding an explicit Nothing value and
+            // indicate that there's one value for this document. This matches the behavior of the
+            // scalar traverseF primitive.
+            outputArr->push_back(value::TypeTags::Nothing, Value(0));
+            posInfo.back()++;
+        }
+    }
+}
+
+std::unique_ptr<HeterogeneousBlock> FilterPositionInfoRecorder::extractValues() {
+    auto out = std::move(outputArr);
+    outputArr = std::make_unique<HeterogeneousBlock>();
+    return out;
+}
+
+void ProjectionPositionInfoRecorder::recordValue(TypeTags tag, Value val) {
+    isNewDoc = false;
+
+    auto [cpyTag, cpyVal] = copyValue(tag, val);
+    if (arrayStack.empty()) {
         outputArr->push_back(cpyTag, cpyVal);
-        posInfo.back()++;
-        isNewDoc = false;
+    } else {
+        arrayStack.back()->push_back(cpyTag, cpyVal);
+    }
+}
+
+void ProjectionPositionInfoRecorder::newDoc() {
+    isNewDoc = true;
+}
+
+void ProjectionPositionInfoRecorder::endDoc() {
+    if (isNewDoc) {
+        // We didn't record anything for the last document, so add a Nothing to our block.
+        outputArr->push_back(TypeTags::Nothing, Value(0));
+    }
+    isNewDoc = false;
+}
+
+void ProjectionPositionInfoRecorder::startArray() {
+    isNewDoc = false;
+    arrayStack.push_back(std::make_unique<Array>());
+}
+
+void ProjectionPositionInfoRecorder::endArray() {
+    invariant(!arrayStack.empty());
+
+    if (arrayStack.size() > 1) {
+        // For a nested array, we cram it into its parent.
+        auto releasedArray = arrayStack.back().release();
+        arrayStack.pop_back();
+        arrayStack.back()->push_back(TypeTags::Array, bitcastFrom<Array*>(releasedArray));
+    } else {
+        outputArr->push_back(TypeTags::Array, bitcastFrom<Array*>(arrayStack.front().release()));
+
+        arrayStack.clear();
+    }
+}
+
+std::unique_ptr<HeterogeneousBlock> ProjectionPositionInfoRecorder::extractValues() {
+    auto out = std::move(outputArr);
+    outputArr = std::make_unique<HeterogeneousBlock>();
+    return out;
+}
+
+void BsonWalkNode::add(const CellBlock::Path& path,
+                       FilterPositionInfoRecorder* recorder,
+                       ProjectionPositionInfoRecorder* outProjBlockRecorder,
+                       size_t pathIdx /*= 0*/) {
+    if (pathIdx == 0) {
+        // Check some invariants about the path.
+        tassert(7953501, "Cannot be given empty path", !path.empty());
+        tassert(7953502, "Path must end with Id", holds_alternative<CellBlock::Id>(path.back()));
     }
 
-    void emptyArraySeen() {
-        arraySeen = true;
-    }
-
-    void newDoc() {
-        posInfo.push_back(0);
-        isNewDoc = true;
-        arraySeen = false;
-    }
-
-    void endDoc() {
-        if (isNewDoc) {
-            // We recorded no values for this doc. There are two possibilities:
-            // (1) there is/are only empty array(s) at this path, which were traversed.
-            //     Example: document {a: {b: []}}, path Get(a)/Traverse/Get(b)/Traverse/Id.
-            // (2) There are no values at this path.
-            //     Example: document {a: {b:1}} searching for path Get(a)/Traverse/Get(c)/Id.
-            //
-            // It is important that we distinguish these two cases for MQL's sake.
-            if (arraySeen) {
-                // This represents case (1). We record this by adding no values to our output and
-                // leaving the position info value as '0'.
-
-                // Do nothing.
-            } else {
-                // This represents case (2). We record this by adding an explicit Nothing value and
-                // indicate that there's one value for this document. This matches the behavior of
-                // the scalar traverseF primitive.
-                outputArr->push_back(value::TypeTags::Nothing, Value(0));
-                posInfo.back()++;
-            }
+    if (holds_alternative<CellBlock::Get>(path[pathIdx])) {
+        auto& get = std::get<CellBlock::Get>(path[pathIdx]);
+        auto [it, inserted] =
+            getChildren.insert(std::pair(get.field, std::make_unique<BsonWalkNode>()));
+        it->second->add(path, recorder, outProjBlockRecorder, pathIdx + 1);
+    } else if (holds_alternative<CellBlock::Traverse>(path[pathIdx])) {
+        invariant(pathIdx != 0);
+        if (!traverseChild) {
+            traverseChild = std::make_unique<BsonWalkNode>();
         }
-    }
-
-    std::unique_ptr<HeterogeneousBlock> extractValues() {
-        auto out = std::move(outputArr);
-        outputArr = std::make_unique<HeterogeneousBlock>();
-        return out;
-    }
-
-    std::vector<int32_t> posInfo;
-    bool isNewDoc = false;
-    bool arraySeen = false;
-    std::unique_ptr<HeterogeneousBlock> outputArr;
-};
-
-struct ProjectionPositionInfoRecorder {
-    ProjectionPositionInfoRecorder() : outputArr(std::make_unique<HeterogeneousBlock>()) {}
-
-    void recordValue(TypeTags tag, Value val) {
-        isNewDoc = false;
-
-        auto [cpyTag, cpyVal] = copyValue(tag, val);
-        if (arrayStack.empty()) {
-            outputArr->push_back(cpyTag, cpyVal);
-        } else {
-            arrayStack.back()->push_back(cpyTag, cpyVal);
-        }
-    }
-
-    void newDoc() {
-        isNewDoc = true;
-    }
-
-    void endDoc() {
-        if (isNewDoc) {
-            // We didn't record anything for the last document, so add a Nothing to our block.
-            outputArr->push_back(TypeTags::Nothing, Value(0));
-        }
-        isNewDoc = false;
-    }
-
-    void startArray() {
-        isNewDoc = false;
-        arrayStack.push_back(std::make_unique<Array>());
-    }
-
-    void endArray() {
-        invariant(!arrayStack.empty());
-
-        if (arrayStack.size() > 1) {
-            // For a nested array, we cram it into its parent.
-            auto releasedArray = arrayStack.back().release();
-            arrayStack.pop_back();
-            arrayStack.back()->push_back(TypeTags::Array, bitcastFrom<Array*>(releasedArray));
-        } else {
-            outputArr->push_back(TypeTags::Array,
-                                 bitcastFrom<Array*>(arrayStack.front().release()));
-
-            arrayStack.clear();
-        }
-    }
-
-    std::unique_ptr<HeterogeneousBlock> extractValues() {
-        auto out = std::move(outputArr);
-        outputArr = std::make_unique<HeterogeneousBlock>();
-        return out;
-    }
-
-    std::unique_ptr<HeterogeneousBlock> outputArr;
-    std::vector<std::unique_ptr<value::Array>> arrayStack;
-    bool isNewDoc = false;
-};
-
-struct BsonWalkNode {
-    FilterPositionInfoRecorder* filterPosInfoRecorder = nullptr;
-
-    std::vector<ProjectionPositionInfoRecorder*> childProjRecorders;
-    ProjectionPositionInfoRecorder* projRecorder = nullptr;
-
-    // Children which are Get nodes.
-    StringMap<std::unique_ptr<BsonWalkNode>> getChildren;
-
-    // Child which is a Traverse node.
-    std::unique_ptr<BsonWalkNode> traverseChild;
-
-    void add(const CellBlock::Path& path,
-             FilterPositionInfoRecorder* recorder,
-             ProjectionPositionInfoRecorder* outProjBlockRecorder,
-             size_t pathIdx = 0) {
-        if (pathIdx == 0) {
-            // Check some invariants about the path.
-            tassert(7953501, "Cannot be given empty path", !path.empty());
-            tassert(
-                7953502, "Path must end with Id", holds_alternative<CellBlock::Id>(path.back()));
+        if (outProjBlockRecorder) {
+            // Each node must know about all projection recorders below it, not just ones
+            // directly below.
+            childProjRecorders.push_back(outProjBlockRecorder);
         }
 
-        if (holds_alternative<CellBlock::Get>(path[pathIdx])) {
-            auto& get = std::get<CellBlock::Get>(path[pathIdx]);
-            auto [it, inserted] =
-                getChildren.insert(std::pair(get.field, std::make_unique<BsonWalkNode>()));
-            it->second->add(path, recorder, outProjBlockRecorder, pathIdx + 1);
-        } else if (holds_alternative<CellBlock::Traverse>(path[pathIdx])) {
-            invariant(pathIdx != 0);
-            if (!traverseChild) {
-                traverseChild = std::make_unique<BsonWalkNode>();
-            }
-            if (outProjBlockRecorder) {
-                // Each node must know about all projection recorders below it, not just ones
-                // directly below.
-                childProjRecorders.push_back(outProjBlockRecorder);
-            }
+        traverseChild->add(path, recorder, outProjBlockRecorder, pathIdx + 1);
+    } else if (holds_alternative<CellBlock::Id>(path[pathIdx])) {
+        invariant(pathIdx != 0);
 
-            traverseChild->add(path, recorder, outProjBlockRecorder, pathIdx + 1);
-        } else if (holds_alternative<CellBlock::Id>(path[pathIdx])) {
-            invariant(pathIdx != 0);
-
-            if (recorder) {
-                filterPosInfoRecorder = recorder;
-            }
-            if (outProjBlockRecorder) {
-                projRecorder = outProjBlockRecorder;
-            }
-            invariant(pathIdx == path.size() - 1);
+        if (recorder) {
+            filterPosInfoRecorder = recorder;
         }
+        if (outProjBlockRecorder) {
+            projRecorder = outProjBlockRecorder;
+        }
+        invariant(pathIdx == path.size() - 1);
     }
-};
+}
+namespace {
 
 template <class Cb>
 void walkField(
