@@ -87,17 +87,6 @@ std::size_t io(Stream& next_layer, stream_core& core, const Operation& op, asio:
 
                 // Operation is complete. Return result to caller.
                 core.engine_.map_error_code(ec);
-
-                // If an error is encountered, continue to flush the BIO to the ASIO socket so
-                // that any protocol_version Alert messages will be sent to the client
-                if (ec) {
-                    // We want to retain the original error code, so we use a temporary error
-                    // code here
-                    asio::error_code myEC;
-                    while (core.output_.size()) {
-                        core.output_ += asio::write(next_layer, core.output_, myEC);
-                    }
-                }
                 return bytes_transferred;
 
             default:

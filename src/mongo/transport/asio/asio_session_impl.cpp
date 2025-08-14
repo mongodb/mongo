@@ -795,6 +795,16 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
                        "SSL handshake received but server is started without SSL support"));
         }
 
+        auto tlsAlert = checkTLSRequest(buffer);
+        if (tlsAlert) {
+            return opportunisticWrite(getSocket(), asio::buffer(tlsAlert->data(), tlsAlert->size()))
+                .then([] {
+                    return Future<bool>::makeReady(
+                        Status(ErrorCodes::SSLHandshakeFailed,
+                               "SSL handshake failed, as client requested disabled protocol"));
+                });
+        }
+
         {
             stdx::lock_guard lg(_sslSocketLock);
             _sslSocket.emplace(std::move(_socket), *_sslContext->ingress, "");
