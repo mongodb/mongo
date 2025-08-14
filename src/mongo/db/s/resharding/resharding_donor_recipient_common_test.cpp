@@ -946,8 +946,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipIfApplicable) {
-    // Not set featureFlagReshardingSkipCloningAndApplyingIfApplicable to verify that it defaults to
-    // true.
+    RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
+        "featureFlagReshardingSkipCloningAndApplyingIfApplicable", true);
 
     testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
                                kThisShard.getShardId() /* primaryShard */,
