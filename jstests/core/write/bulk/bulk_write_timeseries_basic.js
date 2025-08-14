@@ -9,7 +9,6 @@
  *   # TODO SERVER-80796 Timeseries unordered error handling incompatible with proxy simulation.
  *   simulate_atlas_proxy_incompatible,
  *   requires_fcv_80,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {

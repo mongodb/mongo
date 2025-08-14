@@ -317,6 +317,8 @@ bool NamespaceString::isTemporaryReshardingCollection() const {
         coll().starts_with(kTemporaryReshardingCollectionPrefix);
 }
 
+// TODO SERVER-101784: Remove this once 9.0 is LTS and viewful time-series collections no longer
+// exist.
 bool NamespaceString::isTimeseriesBucketsCollection() const {
     return coll().starts_with(kTimeseriesBucketsCollectionPrefix);
 }
@@ -361,10 +363,14 @@ bool NamespaceString::isOutTmpBucketsCollection() const {
         getTimeseriesViewNamespace().coll().starts_with(kOutTmpCollectionPrefix);
 }
 
+// TODO SERVER-101784: Remove this once 9.0 is LTS and viewful time-series collections no longer
+// exist.
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
     return {dbName(), std::string{kTimeseriesBucketsCollectionPrefix} + coll()};
 }
 
+// TODO SERVER-101784: Remove this once 9.0 is LTS and viewful time-series collections no longer
+// exist.
 NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
     invariant(isTimeseriesBucketsCollection(), ns());
     return {dbName(), coll().substr(kTimeseriesBucketsCollectionPrefix.size())};

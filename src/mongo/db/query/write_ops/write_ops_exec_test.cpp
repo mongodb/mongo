@@ -357,7 +357,10 @@ TEST_F(WriteOpsExecTest, InsertFailsIfTimeseriesCollectionCreatedDuringInsert) {
     BSONObj docToInsert(fromjson(R"({"t":{"$date":"2022-06-06T15:34:00.000Z"}, "x":1})"));
     insertCmdReq.setDocuments({docToInsert});
     // At this point, our collection does not exist, so we proceed to the normal insert path.
-    ASSERT_FALSE(timeseries::isTimeseriesViewRequest(opCtx, insertCmdReq).first);
+    auto [preConditions, _] = timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+        opCtx, ns, insertCmdReq, /*expectedUUID=*/boost::none);
+    ASSERT_FALSE(preConditions.isTimeseriesCollection());
+    ASSERT_FALSE(preConditions.exists());
     // After this check, a concurrent operation could create a time-series collection with the same
     // namespace.
     auto tsOptions = TimeseriesOptions("t");
@@ -378,14 +381,14 @@ TEST_F(WriteOpsExecTest, InsertFailsIfTimeseriesCollectionCreatedDuringInsert) {
     // collection that has both bucket documents and regular documents.
     ASSERT_THROWS_CODE(insertBatchAndHandleErrors(opCtx,
                                                   insertCmdReq.getNamespace(),
-                                                  insertCmdReq.getCollectionUUID(),
+                                                  preConditions,
                                                   insertCmdReq.getOrdered(),
                                                   batch,
                                                   OperationSource::kStandard,
                                                   &lastOpFixer,
                                                   &out),
                        DBException,
-                       10551700);
+                       10685100);
 }
 
 class OpObserverMock : public OpObserverNoop {
@@ -457,7 +460,8 @@ TEST_F(WriteOpsExecOplogTest, VerifySingleInsertOplogDoesntBatch) {
     write_ops::InsertCommandRequest insertCmdReq(ns);
     BSONObj docToInsert(fromjson("{_id: 0, foo: 1}"));
     insertCmdReq.setDocuments({docToInsert});
-    auto result = write_ops_exec::performInserts(opCtx, insertCmdReq, OperationSource::kStandard);
+    auto result = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
     ASSERT_EQ(1, result.results.size());
     ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
 
@@ -476,7 +480,8 @@ TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertOplogDoesBatch) {
     std::vector<BSONObj> docsToInsert{
         fromjson("{_id: 0, foo: 1}"), fromjson("{_id: 1, bar: 1}"), fromjson("{_id: 2, baz: 1}")};
     insertCmdReq.setDocuments(docsToInsert);
-    auto result = write_ops_exec::performInserts(opCtx, insertCmdReq, OperationSource::kStandard);
+    auto result = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
     ASSERT_EQ(3, result.results.size());
     ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
     ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());
@@ -504,7 +509,8 @@ TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertCappedOplogDoesntBatch) {
     std::vector<BSONObj> docsToInsert{
         fromjson("{_id: 0, foo: 1}"), fromjson("{_id: 1, bar: 1}"), fromjson("{_id: 2, baz: 1}")};
     insertCmdReq.setDocuments(docsToInsert);
-    auto result = write_ops_exec::performInserts(opCtx, insertCmdReq, OperationSource::kStandard);
+    auto result = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
     ASSERT_EQ(3, result.results.size());
     ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
     ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());
@@ -531,7 +537,8 @@ TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertMultipleBatches) {
                                       fromjson("{_id: 2, baz: 1}"),
                                       fromjson("{_id: 3, bif: 1}")};
     insertCmdReq.setDocuments(docsToInsert);
-    auto result = write_ops_exec::performInserts(opCtx, insertCmdReq, OperationSource::kStandard);
+    auto result = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
     ASSERT_EQ(4, result.results.size());
     ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
     ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());
@@ -560,7 +567,8 @@ TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertBatchedAndUnbatched) {
     std::vector<BSONObj> docsToInsert{
         fromjson("{_id: 0, foo: 1}"), fromjson("{_id: 1, bar: 1}"), fromjson("{_id: 2, baz: 1}")};
     insertCmdReq.setDocuments(docsToInsert);
-    auto result = write_ops_exec::performInserts(opCtx, insertCmdReq, OperationSource::kStandard);
+    auto result = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
     ASSERT_EQ(3, result.results.size());
     ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
     ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());

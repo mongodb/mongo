@@ -40,7 +40,10 @@ namespace mongo::timeseries::write_ops {
  * writes succeeded.
  */
 mongo::write_ops::InsertCommandReply performTimeseriesWrites(
-    OperationContext* opCtx, const mongo::write_ops::InsertCommandRequest& request, CurOp* curOp);
+    OperationContext* opCtx,
+    const mongo::write_ops::InsertCommandRequest& request,
+    const timeseries::CollectionPreConditions& preConditions,
+    CurOp* curOp);
 
 
 /**
@@ -48,6 +51,8 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
  * writes succeeded. Same as above, but generates its own curOp.
  */
 mongo::write_ops::InsertCommandReply performTimeseriesWrites(
-    OperationContext* opCtx, const mongo::write_ops::InsertCommandRequest& request);
+    OperationContext* opCtx,
+    const mongo::write_ops::InsertCommandRequest& request,
+    const timeseries::CollectionPreConditions& preConditions);
 
 }  // namespace mongo::timeseries::write_ops

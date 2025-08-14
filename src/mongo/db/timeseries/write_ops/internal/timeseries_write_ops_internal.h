@@ -80,6 +80,7 @@ NamespaceString ns(const mongo::write_ops::InsertCommandRequest& request);
 void performUnorderedTimeseriesWritesWithRetries(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
+    const CollectionPreConditions& preConditions,
     size_t start,
     size_t numDocs,
     std::vector<mongo::write_ops::WriteError>* errors,
@@ -94,6 +95,7 @@ void performUnorderedTimeseriesWritesWithRetries(
  */
 size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
                                       const mongo::write_ops::InsertCommandRequest& request,
+                                      const CollectionPreConditions& preConditions,
                                       std::vector<mongo::write_ops::WriteError>* errors,
                                       boost::optional<repl::OpTime>* opTime,
                                       boost::optional<OID>* electionId,
@@ -156,6 +158,7 @@ void processErrorsForSubsetOfBatch(
 bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
+    const CollectionPreConditions& preConditions,
     size_t startIndex,
     size_t numDocsToStage,
     boost::optional<UUID>& optUuid,
@@ -168,6 +171,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
 bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnoptimized(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
+    const CollectionPreConditions& preConditions,
     size_t startIndex,
     size_t numDocsToStage,
     const std::vector<size_t>& docsToRetry,

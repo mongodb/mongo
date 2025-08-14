@@ -533,7 +533,7 @@ bool getFleCrudProcessed(OperationContext* opCtx,
  */
 bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                 const NamespaceString& nss,
-                                const boost::optional<mongo::UUID>& collectionUUID,
+                                const timeseries::CollectionPreConditions& preConditions,
                                 bool ordered,
                                 std::vector<InsertStatement>& batch,
                                 OperationSource source,
@@ -562,19 +562,11 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             collection.emplace(mongo::acquireCollection(
                 opCtx,
                 CollectionAcquisitionRequest::fromOpCtx(
-                    opCtx, nss, AcquisitionPrerequisites::kWrite, collectionUUID),
+                    opCtx, nss, AcquisitionPrerequisites::kWrite, preConditions.expectedUUID()),
                 fixLockModeForSystemDotViewsChanges(nss, MODE_IX)));
+            timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+                opCtx, preConditions, *collection);
             if (collection->exists()) {
-                uassert(10551700,
-                        "Collection was created as time-series collection since the beginning of "
-                        "the insert, cannot insert to it like a normal collection",
-                        !(gFeatureFlagCreateViewlessTimeseriesCollections
-                              .isEnabledUseLatestFCVWhenUninitialized(
-                                  VersionContext::getDecoration(opCtx),
-                                  serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                          collection->getCollectionPtr()->isTimeseriesCollection() &&
-                          source == OperationSource::kStandard && !isRawDataOperation(opCtx)));
-
                 break;
             }
 
@@ -640,8 +632,9 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         // 3) we acquire this time-series collection to insert into in the regular collection write
         // path.
         // We should fail the insert in this scenario to avoid writing normal documents into a
-        // time-series collection.
-        if (ex.code() == 10551700) {
+        // time-series collection. We also fail in any scenario where it originally was a
+        // time-series/normal collection and was re-created as the alternative.
+        if (ex.code() == 10685100 || ex.code() == 106851001) {
             throw;
         }
     }
@@ -1161,12 +1154,20 @@ size_t getTunedMaxBatchSize(OperationContext* opCtx,
 }
 }  // namespace
 
-WriteResult performInserts(OperationContext* opCtx,
-                           const write_ops::InsertCommandRequest& wholeOp,
-                           OperationSource source) {
+WriteResult performInserts(
+    OperationContext* opCtx,
+    const write_ops::InsertCommandRequest& wholeOp,
+    boost::optional<const timeseries::CollectionPreConditions&> preConditionsOptional,
+    OperationSource source) {
     auto actualNs = wholeOp.getNamespace();
+
+    timeseries::CollectionPreConditions preConditions = preConditionsOptional
+        ? *preConditionsOptional
+        : timeseries::CollectionPreConditions::getCollectionPreConditions(
+              opCtx, wholeOp.getNamespace(), wholeOp.getCollectionUUID());
+
     if (isRawDataOperation(opCtx)) {
-        actualNs = timeseries::isTimeseriesViewRequest(opCtx, wholeOp).second;
+        actualNs = preConditions.getTargetNs(wholeOp.getNamespace());
     }
 
     // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
@@ -1274,7 +1275,7 @@ WriteResult performInserts(OperationContext* opCtx,
 
         out.canContinue = insertBatchAndHandleErrors(opCtx,
                                                      actualNs,
-                                                     wholeOp.getCollectionUUID(),
+                                                     preConditions,
                                                      wholeOp.getOrdered(),
                                                      batch,
                                                      source,

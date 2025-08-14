@@ -41,6 +41,7 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
@@ -207,6 +208,7 @@ TimeseriesSingleWriteResult performTimeseriesInsertFromBatch(
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performInserts(opCtx,
                                        write_ops_utils::makeTimeseriesInsertOpFromBatch(batch, nss),
+                                       /*preConditions=*/boost::none,
                                        OperationSource::kTimeseriesInsert),
         request);
 }
@@ -576,6 +578,7 @@ void getStmtIdVectorFromRequest(OperationContext* opCtx,
 bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
+    const CollectionPreConditions& preConditions,
     std::vector<mongo::write_ops::WriteError>* errors,
     StageWritesStatus& stageStatus) {
     invariant(errors->empty());
@@ -601,9 +604,13 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
         // ShardVersion mismatch can be detected, before checking for other errors.
         const auto bucketsAcq = acquireAndValidateBucketsCollection(
             opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(
-                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
+            CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                    internal::ns(request),
+                                                    AcquisitionPrerequisites::kRead,
+                                                    preConditions.expectedUUID()),
             MODE_IS);
+        CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+            opCtx, preConditions, bucketsAcq);
 
         // We want to ensure that the catalog instance after the scope of the acquisition is the
         // same as before the acquisition. Acquiring the collection involves stashing the
@@ -698,12 +705,14 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
  */
 bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
                                               const mongo::write_ops::InsertCommandRequest& request,
+                                              const CollectionPreConditions& preConditions,
                                               std::vector<mongo::write_ops::WriteError>* errors,
                                               boost::optional<repl::OpTime>* opTime,
                                               boost::optional<OID>* electionId,
                                               bool* containsRetry) {
     StageWritesStatus stageStatus{StageWritesStatus::kSuccess};
-    auto batches = stageOrderedWritesToBucketCatalog(opCtx, request, errors, stageStatus);
+    auto batches =
+        stageOrderedWritesToBucketCatalog(opCtx, request, preConditions, errors, stageStatus);
 
     switch (stageStatus) {
         case StageWritesStatus::kContainsRetry:
@@ -744,6 +753,7 @@ bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
 std::vector<size_t> performUnorderedTimeseriesWrites(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
+    const timeseries::CollectionPreConditions& preConditions,
     size_t start,
     size_t numDocs,
     std::vector<size_t>& docsToRetry,
@@ -763,10 +773,10 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
 
     if (*containsRetry || !docsToRetry.empty()) {
         batches = stageUnorderedWritesToBucketCatalogUnoptimized(
-            opCtx, request, start, numDocs, docsToRetry, optUuid, errors);
+            opCtx, request, preConditions, start, numDocs, docsToRetry, optUuid, errors);
     } else {
-        batches =
-            stageUnorderedWritesToBucketCatalog(opCtx, request, start, numDocs, optUuid, errors);
+        batches = stageUnorderedWritesToBucketCatalog(
+            opCtx, request, preConditions, start, numDocs, optUuid, errors);
     }
 
     tassert(9213700,
@@ -1110,6 +1120,7 @@ commit_result::Result commitTimeseriesBucketForBatch(
 void performUnorderedTimeseriesWritesWithRetries(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
+    const CollectionPreConditions& preConditions,
     size_t start,
     size_t numDocs,
     std::vector<mongo::write_ops::WriteError>* errors,
@@ -1121,6 +1132,7 @@ void performUnorderedTimeseriesWritesWithRetries(
     do {
         docsToRetry = performUnorderedTimeseriesWrites(opCtx,
                                                        request,
+                                                       preConditions,
                                                        start,
                                                        numDocs,
                                                        docsToRetry,
@@ -1137,12 +1149,13 @@ void performUnorderedTimeseriesWritesWithRetries(
 
 size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
                                       const mongo::write_ops::InsertCommandRequest& request,
+                                      const CollectionPreConditions& preConditions,
                                       std::vector<mongo::write_ops::WriteError>* errors,
                                       boost::optional<repl::OpTime>* opTime,
                                       boost::optional<OID>* electionId,
                                       bool* containsRetry) {
     if (performOrderedTimeseriesWritesAtomically(
-            opCtx, request, errors, opTime, electionId, containsRetry)) {
+            opCtx, request, preConditions, errors, opTime, electionId, containsRetry)) {
         if (!errors->empty()) {
             invariant(errors->size() == 1);
             return errors->front().getIndex();
@@ -1152,7 +1165,7 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
 
     for (size_t i = 0; i < request.getDocuments().size(); ++i) {
         performUnorderedTimeseriesWritesWithRetries(
-            opCtx, request, i, 1, errors, opTime, electionId, containsRetry);
+            opCtx, request, preConditions, i, 1, errors, opTime, electionId, containsRetry);
         if (!errors->empty()) {
             return i;
         }
@@ -1202,6 +1215,7 @@ void processErrorsForSubsetOfBatch(
 bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
+    const CollectionPreConditions& preConditions,
     size_t startIndex,
     size_t numDocsToStage,
     boost::optional<UUID>& optUuid,
@@ -1224,9 +1238,14 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
         // ShardVersion mismatch can be detected, before checking for other errors.
         const auto bucketsAcq = acquireAndValidateBucketsCollection(
             opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(
-                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
+            CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                    internal::ns(request),
+                                                    AcquisitionPrerequisites::kRead,
+                                                    preConditions.expectedUUID()),
             MODE_IS);
+
+        CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+            opCtx, preConditions, bucketsAcq);
 
         // We want to ensure that the catalog instance after the scope of the acquisition is the
         // same as before the acquisition. Acquiring the collection involves stashing the
@@ -1310,6 +1329,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
 bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnoptimized(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
+    const CollectionPreConditions& preConditions,
     size_t startIndex,
     size_t numDocsToStage,
     const std::vector<size_t>& docsToRetry,
@@ -1333,9 +1353,14 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnopti
         // ShardVersion mismatch can be detected, before checking for other errors.
         const auto bucketsAcq = acquireAndValidateBucketsCollection(
             opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(
-                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
+            CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                    internal::ns(request),
+                                                    AcquisitionPrerequisites::kRead,
+                                                    preConditions.expectedUUID()),
             MODE_IS);
+
+        CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+            opCtx, preConditions, bucketsAcq);
 
         // We want to ensure that the catalog instance after the scope of the acquisition is the
         // same as before the acquisition. Acquiring the collection involves stashing the

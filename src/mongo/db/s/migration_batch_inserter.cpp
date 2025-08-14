@@ -191,8 +191,8 @@ void MigrationBatchInserter::run(Status status) const try {
                 opCtx,
                 DocumentValidationSettings::kDisableSchemaValidation |
                     DocumentValidationSettings::kDisableInternalValidation);
-            const auto reply =
-                write_ops_exec::performInserts(opCtx, insertOp, OperationSource::kFromMigrate);
+            const auto reply = write_ops_exec::performInserts(
+                opCtx, insertOp, /*preConditions=*/boost::none, OperationSource::kFromMigrate);
             for (unsigned long i = 0; i < reply.results.size(); ++i) {
                 uassertStatusOKWithContext(
                     reply.results[i],

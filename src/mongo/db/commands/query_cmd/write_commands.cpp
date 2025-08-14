@@ -306,12 +306,15 @@ public:
                     return insertReply;
                 }
             }
-
-            if (timeseries::isTimeseriesRequest(opCtx, request())) {
+            auto [preConditions, isTimeseriesLogicalRequest] =
+                timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+                    opCtx, ns(), request(), request().getCollectionUUID());
+            if (isTimeseriesLogicalRequest) {
                 // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's
                 // constructor.
                 try {
-                    return timeseries::write_ops::performTimeseriesWrites(opCtx, request());
+                    return timeseries::write_ops::performTimeseriesWrites(
+                        opCtx, request(), preConditions);
                 } catch (DBException& ex) {
                     ex.addContext(str::stream()
                                   << "time-series insert failed: " << ns().toStringForErrorMsg());
@@ -326,7 +329,7 @@ public:
                 hangInsertBeforeWrite.pauseWhileSet();
             }
 
-            auto reply = write_ops_exec::performInserts(opCtx, request());
+            auto reply = write_ops_exec::performInserts(opCtx, request(), preConditions);
 
             write_ops::InsertCommandReply insertReply;
             populateReply(opCtx,

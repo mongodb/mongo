@@ -60,6 +60,7 @@
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/util/str.h"
 
@@ -204,8 +205,14 @@ Status NonShardServerProcessInterface::insertTimeseries(
     const WriteConcernOptions& wc,
     boost::optional<OID> targetEpoch) {
     try {
+        auto [preConditions, _] =
+            timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+                expCtx->getOperationContext(),
+                ns,
+                *insertCommand,
+                insertCommand->getCollectionUUID());
         auto insertReply = timeseries::write_ops::performTimeseriesWrites(
-            expCtx->getOperationContext(), *insertCommand);
+            expCtx->getOperationContext(), *insertCommand, preConditions);
 
         checkWriteErrors(insertReply.getWriteCommandReplyBase());
     } catch (DBException& ex) {

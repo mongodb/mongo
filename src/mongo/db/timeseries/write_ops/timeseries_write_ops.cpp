@@ -40,7 +40,9 @@
 namespace mongo::timeseries::write_ops {
 
 mongo::write_ops::InsertCommandReply performTimeseriesWrites(
-    OperationContext* opCtx, const mongo::write_ops::InsertCommandRequest& request) {
+    OperationContext* opCtx,
+    const mongo::write_ops::InsertCommandRequest& request,
+    const timeseries::CollectionPreConditions& preConditions) {
 
     auto& curOp = *CurOp::get(opCtx);
     ON_BLOCK_EXIT([&] {
@@ -59,6 +61,8 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         auto requestNs = internal::ns(request);
+        // TODO SERVER-101784: Remove the following translation once 9.0 is LTS and viewful
+        // time-series collections no longe rexist.
         curOp.setNS(lk,
                     requestNs.isTimeseriesBucketsCollection()
                         ? requestNs.getTimeseriesViewNamespace()
@@ -69,19 +73,14 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
         curOp.debug().additiveMetrics.incrementNinserted(0);
     }
 
-    return performTimeseriesWrites(opCtx, request, &curOp);
+    return performTimeseriesWrites(opCtx, request, preConditions, &curOp);
 }
 
 mongo::write_ops::InsertCommandReply performTimeseriesWrites(
-    OperationContext* opCtx, const mongo::write_ops::InsertCommandRequest& request, CurOp* curOp) {
-    // If an expected collection UUID is provided, always fail because the user-facing time-series
-    // namespace does not have a UUID.
-    checkCollectionUUIDMismatch(opCtx,
-                                request.getNamespace().isTimeseriesBucketsCollection()
-                                    ? request.getNamespace().getTimeseriesViewNamespace()
-                                    : request.getNamespace(),
-                                nullptr,
-                                request.getCollectionUUID());
+    OperationContext* opCtx,
+    const mongo::write_ops::InsertCommandRequest& request,
+    const timeseries::CollectionPreConditions& preConditions,
+    CurOp* curOp) {
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot insert into a time-series collection in a multi-document "
@@ -99,10 +98,11 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
 
     if (request.getOrdered()) {
         baseReply.setN(internal::performOrderedTimeseriesWrites(
-            opCtx, request, &errors, &opTime, &electionId, &containsRetry));
+            opCtx, request, preConditions, &errors, &opTime, &electionId, &containsRetry));
     } else {
         internal::performUnorderedTimeseriesWritesWithRetries(opCtx,
                                                               request,
+                                                              preConditions,
                                                               0,
                                                               request.getDocuments().size(),
                                                               &errors,

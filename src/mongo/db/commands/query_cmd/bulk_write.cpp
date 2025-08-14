@@ -662,11 +662,13 @@ void handleGroupedTimeseriesInserts(OperationContext* opCtx,
                                     size_t firstOpIdx,
                                     const std::vector<BSONObj>& docs,
                                     const NamespaceInfoEntry& nsInfoEntry,
+                                    const timeseries::CollectionPreConditions& preConditions,
                                     CurOp* curOp,
                                     write_ops_exec::WriteResult& out) {
     size_t numOps = docs.size();
     auto request = getConsecutiveInsertRequest(req, firstOpIdx, docs, nsInfoEntry);
-    auto insertReply = timeseries::write_ops::performTimeseriesWrites(opCtx, request, curOp);
+    auto insertReply =
+        timeseries::write_ops::performTimeseriesWrites(opCtx, request, preConditions, curOp);
     populateWriteResultWithInsertReply(numOps, req.getOrdered(), insertReply, out);
 }
 
@@ -693,6 +695,10 @@ bool handleGroupedInserts(OperationContext* opCtx,
     const auto nsIdx = firstInsert->getNsInfoIdx();
     const auto& nsEntry = nsInfo[nsIdx];
     const auto& nsString = nsEntry.getNs();
+
+    auto [preConditions, isTimeseriesLogicalRequest] =
+        timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+            opCtx, nsEntry.getNs(), nsEntry, nsEntry.getCollectionUUID());
 
     write_ops_exec::WriteResult out;
     out.results.reserve(numOps);
@@ -736,11 +742,10 @@ bool handleGroupedInserts(OperationContext* opCtx,
     setCurOpInfoAndEnsureStarted(opCtx, &curOp, LogicalOp::opInsert, nsEntry, insertDocsObj);
 
     // Handle timeseries inserts.
-    if (auto [isTimeseriesViewRequest, _] = timeseries::isTimeseriesViewRequest(opCtx, nsEntry);
-        isTimeseriesViewRequest) {
+    if (isTimeseriesLogicalRequest) {
         try {
             handleGroupedTimeseriesInserts(
-                opCtx, req, firstOpIdx, insertDocs, nsEntry, &curOp, out);
+                opCtx, req, firstOpIdx, insertDocs, nsEntry, preConditions, &curOp, out);
             responses.addInsertReplies(opCtx, firstOpIdx, out);
             return out.canContinue;
         } catch (DBException& ex) {
@@ -797,7 +802,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
 
         out.canContinue = write_ops_exec::insertBatchAndHandleErrors(opCtx,
                                                                      nsString,
-                                                                     nsEntry.getCollectionUUID(),
+                                                                     preConditions,
                                                                      req.getOrdered(),
                                                                      batch,
                                                                      OperationSource::kStandard,
@@ -1373,8 +1378,13 @@ public:
             auto& req = request();
 
             if (isRawDataOperation(opCtx)) {
+                // TODO SERVER-101784: Remove the following translation once 9.0 is LTS and we no
+                // longer have viewful time-series collections.
                 for (auto& nsEntry : req.getNsInfo()) {
-                    nsEntry.setNs(timeseries::isTimeseriesViewRequest(opCtx, nsEntry).second);
+                    auto preConditions =
+                        timeseries::CollectionPreConditions::getCollectionPreConditions(
+                            opCtx, nsEntry.getNs(), /*expectedUUID=*/boost::none);
+                    nsEntry.setNs(preConditions.getTargetNs(nsEntry.getNs()));
                 }
             }
 
@@ -1842,10 +1852,10 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
             // The returned namespaceForSharding will be the timeseries system bucket collection if
             // the request is made on a timeseries collection. Otherwise, it will stay unchanged
             // (i.e. the namespace from the client request).
-            auto [_, namespaceForSharding] = timeseries::isTimeseriesViewRequest(opCtx, nsInfo);
-
+            auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+                opCtx, nsInfo.getNs(), /*expectedUUID=*/boost::none);
             OperationShardingState::setShardRole(
-                opCtx, namespaceForSharding, shardVersion, databaseVersion);
+                opCtx, preConditions.getTargetNs(nsInfo.getNs()), shardVersion, databaseVersion);
         }
 
         if (nsInfo.getEncryptionInformation().has_value()) {

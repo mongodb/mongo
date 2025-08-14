@@ -36,6 +36,7 @@
 #include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/unittest/unittest.h"
@@ -118,10 +119,12 @@ TEST_F(TimeseriesWriteOpsTest, TimeseriesWritesMismatchedUUID) {
     auto insertStatements = std::vector<InsertStatement>{InsertStatement{fromjson("{_id: 0}")}};
     auto fixer = write_ops_exec::LastOpFixer(_opCtx);
     write_ops_exec::WriteResult result;
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), UUID::gen());
     ASSERT_THROWS_CODE(
         write_ops_exec::insertBatchAndHandleErrors(_opCtx,
                                                    _nsNoMeta,
-                                                   UUID::gen(),
+                                                   preConditions,
                                                    false,
                                                    insertStatements,
                                                    OperationSource::kTimeseriesInsert,
@@ -148,10 +151,12 @@ TEST_F(TimeseriesWriteOpsTest, BatchInsertMissingCollection) {
         std::vector<InsertStatement>{InsertStatement{fromjson("{_id: 0, foo: 1}")}};
     auto fixer = write_ops_exec::LastOpFixer(_opCtx);
     write_ops_exec::WriteResult result;
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        _opCtx, nss, /*expectedUUID=*/boost::none);
     auto shouldInsertMore =
         write_ops_exec::insertBatchAndHandleErrors(_opCtx,
                                                    nss,
-                                                   boost::none,
+                                                   preConditions,
                                                    true,
                                                    insertStatements,
                                                    OperationSource::kTimeseriesInsert,
@@ -168,7 +173,7 @@ TEST_F(TimeseriesWriteOpsTest, BatchInsertMissingCollection) {
     shouldInsertMore =
         write_ops_exec::insertBatchAndHandleErrors(_opCtx,
                                                    nss,
-                                                   boost::none,
+                                                   preConditions,
                                                    true,
                                                    insertStatements,
                                                    OperationSource::kTimeseriesInsert,
@@ -185,7 +190,8 @@ TEST_F(TimeseriesWriteOpsTest, PerformInsertsNoCollection) {
     write_ops::InsertCommandRequest request(nss);
     request.setDocuments({fromjson("{_id: 0, foo: 1}")});
     auto source = OperationSource::kTimeseriesInsert;
-    auto writeResult = write_ops_exec::performInserts(_opCtx, request, source);
+    auto writeResult =
+        write_ops_exec::performInserts(_opCtx, request, /*preConditions=*/boost::none, source);
     ASSERT_FALSE(writeResult.canContinue);
     ASSERT_EQ(1, writeResult.results.size());
     ASSERT_EQ(ErrorCodes::NamespaceNotFound, writeResult.results[0].getStatus());
@@ -209,14 +215,20 @@ TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesWritesNoCollection) {
     auto nss = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_ops_test", "system.buckets.perform_timeseries_writes_no_collection");
     write_ops::InsertCommandRequest request(nss);
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        _opCtx, nss, /*expectedUUID=*/boost::none);
     ASSERT_THROWS_CODE(
-        timeseries::write_ops::performTimeseriesWrites(_opCtx, request), DBException, 8555700);
+        timeseries::write_ops::performTimeseriesWrites(_opCtx, request, preConditions),
+        DBException,
+        8555700);
 
     write_ops::InsertCommandRequest requestUnordered(nss);
     requestUnordered.setOrdered(false);
 
     ASSERT_THROWS_CODE(
-        timeseries::write_ops::performTimeseriesWrites(_opCtx, request), DBException, 8555700);
+        timeseries::write_ops::performTimeseriesWrites(_opCtx, request, preConditions),
+        DBException,
+        8555700);
 }
 
 }  // namespace

@@ -105,21 +105,24 @@ void CollectionPreConditions::checkAcquisitionAgainstPreConditions(
 
     const auto& nss = acquisition.nss();
 
-    // If we are operating on a legacy time-series collection view namespace, we pass a nullptr into
-    // the checkCollectionUUIDMismatch machinery so that we always throw CollectionUUIDMismatch if
-    // an expectedUUID is specified.
+    // We expect the collection acquisition to be the primary place where we check the acquired uuid
+    // against the expectedUUID. For viewful time-series collections where an expectedUUID is passed
+    // in while performing a request on the view namespace, we have the additional expected behavior
+    // that we will unconditionally return a CollectionUUIDMismatch error, since a view cannot have
+    // a collection UUID. TODO SERVER-101784: Remove this check once 9.0 is LTS and viewful
+    // time-series collections are no longer around.
+    //
+    // We also have an additional safeguard against a scenario where an expectedUUID was passed in
+    // for our request, but the expectedUUID was not passed into the acquisition.
     if (preConditions.getIsTimeseriesLogicalRequest() &&
         preConditions.isLegacyTimeseriesCollection()) {
         checkCollectionUUIDMismatch(opCtx, nss, nullptr, preConditions.expectedUUID());
     } else if (preConditions.expectedUUID()) {
-        // This should have been caught when we went to acquire the collection. This provides some
-        // guardrails around the case where this check was missed.
         tassert(10811400,
                 str::stream() << "Collection UUID does not match that specified for collection "
                               << nss.toStringForErrorMsg() << ", expected "
                               << *preConditions.expectedUUID(),
-                !preConditions.expectedUUID() ||
-                    (acquisition.exists() && preConditions.expectedUUID() == acquisition.uuid()));
+                acquisition.exists() && preConditions.expectedUUID() == acquisition.uuid());
     }
 
     if (!preConditions.exists()) {

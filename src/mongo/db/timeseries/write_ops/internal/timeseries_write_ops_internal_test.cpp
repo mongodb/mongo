@@ -37,6 +37,7 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
@@ -137,8 +138,18 @@ void TimeseriesWriteOpsInternalTest::_testStageUnorderedWritesUnoptimized(
         _addExecutedStatementsToTransactionParticipant(executedStmtIds.get());
     }
 
+    auto [preConditions, _] = timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+        _opCtx, nss, request, /*expectedUUID=*/boost::none);
+
     auto batches = write_ops::internal::stageUnorderedWritesToBucketCatalogUnoptimized(
-        _opCtx, request, 0, request.getDocuments().size(), docsToRetry, optUuid, &errors);
+        _opCtx,
+        request,
+        preConditions,
+        0,
+        request.getDocuments().size(),
+        docsToRetry,
+        optUuid,
+        &errors);
     ASSERT_EQ(batches.size(), 1);
     auto batch = batches.front();
     ASSERT_EQ(batch->measurements.size(), expectedIndices.size());

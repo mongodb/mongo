@@ -61,9 +61,12 @@ export const $config = (function() {
                     // TODO (SERVER-85548): revisit 85557* error codes
                     8555700,
                     8555701,
+                    // The collection did not originally exist but has been created as a time-series
+                    // collection during our insert.
+                    10685100,
                     // The collection has been dropped and re-created as a time-series collection
                     // during our insert.
-                    10551700,
+                    10685101,
                     // Collection UUID changed during insert 974880*
                     9748800,
                     9748801,

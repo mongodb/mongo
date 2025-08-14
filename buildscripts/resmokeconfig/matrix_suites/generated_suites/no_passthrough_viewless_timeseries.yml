@@ -54,6 +54,11 @@ selector:
     - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket_legacy_flag.js
     - jstests/noPassthrough/timeseries/bucket_reopening/timeseries_direct_remove_reopen.js
     - jstests/noPassthrough/timeseries/bucket_reopening/timeseries_reopen_uncompressed_bucket_for_compression.js
+    - jstests/noPassthrough/timeseries/bulkwrite/bulkwrite_timeseries_insert_ordered_false.js
+    - jstests/noPassthrough/timeseries/bulkwrite/bulkwrite_timeseries_insert_ordered_true.js
+    - jstests/noPassthrough/timeseries/bulkwrite/bulkwrite_timeseries_retry_delete_and_update.js
+    - jstests/noPassthrough/timeseries/bulkwrite/bulkwrite_timeseries_retry_writes.js
+    - jstests/noPassthrough/timeseries/bulkwrite/bulkwrite_timeseries_retryable_writes_restart.js
     - jstests/noPassthrough/timeseries/create/initial_sync_recreate_timeseries_collection.js
     - jstests/noPassthrough/timeseries/create/timeseries_block_compressor_options.js
     - jstests/noPassthrough/timeseries/create/timeseries_server_parameters.js

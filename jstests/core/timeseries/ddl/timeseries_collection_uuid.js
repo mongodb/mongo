@@ -62,12 +62,6 @@ const checkResult = function(res, uuid) {
 };
 
 const testInsert = function(uuid, ordered) {
-    // TODO(SERVER-105501): Insert into a viewless timeseries by its correct UUID should work
-    if (bsonBinaryEqual(uuid, timeseriesCollUUID)) {
-        assert(areViewlessTimeseriesEnabled(db));
-        return;
-    }
-
     checkResult(testDB.runCommand({
         insert: collName,
         documents: [{t: ISODate()}],

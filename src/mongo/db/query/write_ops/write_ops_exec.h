@@ -114,7 +114,7 @@ bool getFleCrudProcessed(OperationContext* opCtx,
  */
 bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                 const NamespaceString& nss,
-                                const boost::optional<mongo::UUID>& collectionUUID,
+                                const timeseries::CollectionPreConditions& preConditions,
                                 bool ordered,
                                 std::vector<InsertStatement>& batch,
                                 OperationSource source,
@@ -194,9 +194,11 @@ void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp);
  * object is not passed in, a CollectionPreCondition object will still be constructed, but it will
  * be assumed that we are not performing a logical time-series operation.
  */
-WriteResult performInserts(OperationContext* opCtx,
-                           const write_ops::InsertCommandRequest& op,
-                           OperationSource source = OperationSource::kStandard);
+WriteResult performInserts(
+    OperationContext* opCtx,
+    const write_ops::InsertCommandRequest& op,
+    boost::optional<const timeseries::CollectionPreConditions&> preConditions = boost::none,
+    OperationSource source = OperationSource::kStandard);
 WriteResult performUpdates(
     OperationContext* opCtx,
     const write_ops::UpdateCommandRequest& op,
