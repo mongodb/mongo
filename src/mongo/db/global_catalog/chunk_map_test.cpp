@@ -88,7 +88,7 @@ std::map<ShardId, ChunkVersion> calculateShardVersions(
             svMap.emplace(chunk->getShardId(), chunk->getLastmod());
             continue;
         }
-        if (mapIt->second.isOlderThan(chunk->getLastmod())) {
+        if ((mapIt->second <=> chunk->getLastmod()) == std::partial_ordering::less) {
             mapIt->second = chunk->getLastmod();
         }
     }
@@ -334,7 +334,7 @@ TEST_F(ChunkMapTest, UpdateChunkMapRandom) {
 
     std::vector<std::shared_ptr<ChunkInfo>> updatedChunksInfo;
     for (auto& chunkPtr : chunksInfo) {
-        if (!chunkPtr->getLastmod().isOlderOrEqualThan(initialCollVersion)) {
+        if ((chunkPtr->getLastmod() <=> initialCollVersion) == std::partial_ordering::greater) {
             updatedChunksInfo.push_back(std::make_shared<ChunkInfo>(ChunkType{
                 uuid(), chunkPtr->getRange(), chunkPtr->getLastmod(), chunkPtr->getShardId()}));
         }

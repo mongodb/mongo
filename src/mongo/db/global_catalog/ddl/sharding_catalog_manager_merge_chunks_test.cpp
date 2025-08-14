@@ -161,7 +161,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     auto collPlacementVersion = versions.collectionPlacementVersion;
     auto shardPlacementVersion = versions.shardPlacementVersion;
 
-    ASSERT_TRUE(origVersion.isOlderThan(versions.shardPlacementVersion));
+    ASSERT_EQ(std::partial_ordering::less, origVersion <=> versions.shardPlacementVersion);
     ASSERT_EQ(shardPlacementVersion, collPlacementVersion);
 
     // Check for increment on mergedChunk's minor version
@@ -962,7 +962,8 @@ protected:
         auto getMaxChunkVersion = [](const std::vector<ChunkType>& routingTable) -> ChunkVersion {
             auto maxCollPlacementVersion = routingTable.front().getVersion();
             for (const auto& chunk : routingTable) {
-                if (maxCollPlacementVersion.isOlderThan(chunk.getVersion())) {
+                if ((maxCollPlacementVersion <=> chunk.getVersion()) ==
+                    std::partial_ordering::less) {
                     maxCollPlacementVersion = chunk.getVersion();
                 }
             }
@@ -995,7 +996,7 @@ protected:
 
         // Sort `chunksDiff` by minor version and check all intermediate versions are properly set
         std::sort(chunksDiff.begin(), chunksDiff.end(), [](ChunkType& l, ChunkType& r) {
-            return l.getVersion().isOlderThan(r.getVersion());
+            return (l.getVersion() <=> r.getVersion()) == std::partial_ordering::less;
         });
 
         int expectedMergedChunkMinorVersion = originalCollPlacementVersion.minorVersion() + 1;

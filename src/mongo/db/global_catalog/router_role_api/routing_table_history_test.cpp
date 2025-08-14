@@ -546,7 +546,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdate) {
 
     std::vector<ChunkType> updatedChunks;
     for (const auto& chunk : chunks) {
-        if (!chunk.getVersion().isOlderOrEqualThan(initialCollVersion)) {
+        if ((chunk.getVersion() <=> initialCollVersion) == std::partial_ordering::greater) {
             updatedChunks.push_back(chunk);
         }
     }

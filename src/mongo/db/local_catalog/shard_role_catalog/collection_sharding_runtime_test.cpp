@@ -100,7 +100,9 @@ const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
 class CollectionShardingRuntimeTest : public ShardServerTestFixture {
 public:
     static CollectionMetadata makeShardedMetadata(OperationContext* opCtx,
-                                                  UUID uuid = UUID::gen()) {
+                                                  UUID uuid = UUID::gen(),
+                                                  ShardId chunkShardId = ShardId("other"),
+                                                  ShardId collectionShardId = ShardId("0")) {
         const OID epoch = OID::gen();
         const Timestamp timestamp(Date_t::now());
 
@@ -110,7 +112,7 @@ public:
 
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
         auto chunk = ChunkType(
-            uuid, std::move(range), ChunkVersion({epoch, timestamp}, {1, 0}), ShardId("other"));
+            uuid, std::move(range), ChunkVersion({epoch, timestamp}, {1, 0}), chunkShardId);
         ChunkManager cm(makeStandaloneRoutingTableHistory(
                             RoutingTableHistory::makeNew(kTestNss,
                                                          uuid,
@@ -127,7 +129,7 @@ public:
                                                          {std::move(chunk)})),
                         boost::none);
 
-        return CollectionMetadata(std::move(cm), ShardId("0"));
+        return CollectionMetadata(std::move(cm), collectionShardId);
     }
 
     uint64_t getNumMetadataManagerChanges(CollectionShardingRuntime& csr) {
@@ -460,8 +462,15 @@ TEST_F(CollectionShardingRuntimeTest, ShardVersionCheckDetectsClusterTimeConflic
 TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanShardVersion) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
-    auto metadataInThePast = makeShardedMetadata(opCtx);
-    auto metadata = makeShardedMetadata(opCtx);
+    // By default, makeShardedMetadata assigns different shard IDs to the chunk ("other") and the
+    // collection ("0"), resulting in a placement version of {0,0}. For this test, we want to ensure
+    // the chunk and collection share the same shard ID ("0") to generate comparable chunk versions.
+    // This setup is required to correctly test invalidateRangePreserversOlderThanShardVersion,
+    // which compares shard placement versions for invalidation.
+    ShardId metadataShardId("0");
+    auto metadataInThePast =
+        makeShardedMetadata(opCtx, UUID::gen(), metadataShardId, metadataShardId);
+    auto metadata = makeShardedMetadata(opCtx, UUID::gen(), metadataShardId, metadataShardId);
     csr.setFilteringMetadata(opCtx, metadata);
     const auto optCurrMetadata = csr.getCurrentMetadataIfKnown();
     ASSERT_TRUE(optCurrMetadata);

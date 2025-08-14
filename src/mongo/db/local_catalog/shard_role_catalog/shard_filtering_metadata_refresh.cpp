@@ -385,16 +385,20 @@ void FilteringMetadataCache::forceCollectionPlacementRefresh(OperationContext* o
     auto isCollectionPlacementUpToDate = [&](boost::optional<CollectionMetadata> optMetadata) {
         if (optMetadata) {
             const auto& metadata = *optMetadata;
-            if (metadata.hasRoutingTable() &&
-                (cm.getVersion().isOlderOrEqualThan(metadata.getCollPlacementVersion()))) {
-                LOGV2_DEBUG(22063,
-                            1,
-                            "Skipping metadata refresh because collection already is up-to-date",
-                            logAttrs(nss),
-                            "latestCollectionPlacementVersion"_attr =
-                                metadata.getCollPlacementVersion(),
-                            "refreshedCollectionPlacementVersion"_attr = cm.getVersion());
-                return true;
+            if (metadata.hasRoutingTable()) {
+                auto compareResult = cm.getVersion() <=> metadata.getCollPlacementVersion();
+                if (compareResult == std::partial_ordering::less ||
+                    compareResult == std::partial_ordering::equivalent) {
+                    LOGV2_DEBUG(
+                        22063,
+                        1,
+                        "Skipping metadata refresh because collection already is up-to-date",
+                        logAttrs(nss),
+                        "latestCollectionPlacementVersion"_attr =
+                            metadata.getCollPlacementVersion(),
+                        "refreshedCollectionPlacementVersion"_attr = cm.getVersion());
+                    return true;
+                }
             }
         }
         return false;
@@ -1062,8 +1066,10 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatch(
                         metadata->getShardPlacementVersion();
                     // Don't need to remotely reload if the requested version is smaller than the
                     // known one. This means that the remote side is behind.
-                    if (chunkVersionReceived->isOlderOrEqualThan(
-                            currentCollectionPlacementVersion)) {
+                    auto compareResult =
+                        *chunkVersionReceived <=> currentCollectionPlacementVersion;
+                    if (compareResult == std::partial_ordering::less ||
+                        compareResult == std::partial_ordering::equivalent) {
                         return;
                     }
                 }

@@ -184,7 +184,7 @@ ChunkVersion calculateCollVersion(const std::map<ShardId, ChunkVersion>& shardVe
                             shardVersions.end(),
                             [](const std::pair<ShardId, ChunkVersion>& p1,
                                const std::pair<ShardId, ChunkVersion>& p2) {
-                                return p1.second.isOlderThan(p2.second);
+                                return (p1.second <=> p2.second) == std::partial_ordering::less;
                             })
         ->second;
 }
@@ -197,7 +197,7 @@ std::map<ShardId, ChunkVersion> calculateShardVersions(const std::vector<ChunkTy
             svMap.emplace(chunk.getShard(), chunk.getVersion());
             continue;
         }
-        if (mapIt->second.isOlderThan(chunk.getVersion())) {
+        if ((mapIt->second <=> chunk.getVersion()) == std::partial_ordering::less) {
             mapIt->second = chunk.getVersion();
         }
     }

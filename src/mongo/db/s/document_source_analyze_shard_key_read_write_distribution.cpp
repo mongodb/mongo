@@ -180,7 +180,9 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
 
-    ChunkVersion version({OID::gen(), validAfter}, {1, 0});
+    const OID epoch = OID::gen();
+
+    ChunkVersion version({epoch, validAfter}, {1, 0});
     auto lastChunkMax = shardKey.globalMin();
 
     auto appendChunk = [&](const BSONObj& chunkMin, const BSONObj& chunkMax) {
@@ -218,7 +220,7 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
                                                             false, /* unsplittable */
                                                             getDefaultCollator(opCtx, nss),
                                                             false /* unique */,
-                                                            OID::gen(),
+                                                            epoch,
                                                             validAfter,
                                                             boost::none /* timeseriesFields */,
                                                             boost::none /* reshardingFields */,

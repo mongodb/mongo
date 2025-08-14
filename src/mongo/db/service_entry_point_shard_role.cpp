@@ -1982,8 +1982,8 @@ StatusWith<bool> ExecCommandDatabase::_refreshIfNeeded(const Status& execError) 
         }
 
         if (stableLocalVersion &&
-            staleInfo->getVersionReceived().placementVersion().isOlderThan(
-                staleInfo->getVersionWanted()->placementVersion())) {
+            (staleInfo->getVersionReceived().placementVersion() <=>
+             staleInfo->getVersionWanted()->placementVersion()) == std::partial_ordering::less) {
             // Shard is recovered and the router is staler than the shard.
             return false;
         }

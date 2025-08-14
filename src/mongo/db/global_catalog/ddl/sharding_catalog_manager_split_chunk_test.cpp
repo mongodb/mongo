@@ -134,7 +134,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
         auto collPlacementVersion = versions.collectionPlacementVersion;
         auto shardPlacementVersion = versions.shardPlacementVersion;
 
-        ASSERT_TRUE(origVersion.isOlderThan(shardPlacementVersion));
+        ASSERT_EQ(std::partial_ordering::less, origVersion <=> shardPlacementVersion);
         ASSERT_EQ(collPlacementVersion, shardPlacementVersion);
 
         // Check for increment on mergedChunk's minor version

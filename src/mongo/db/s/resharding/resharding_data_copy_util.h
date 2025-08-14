@@ -200,8 +200,8 @@ auto staleConfigShardLoop(OperationContext* opCtx, Callable&& callable) {
         if (auto sce = ex.extraInfo<StaleConfigInfo>()) {
 
             if (sce->getVersionWanted() &&
-                sce->getVersionReceived().placementVersion().isOlderThan(
-                    sce->getVersionWanted()->placementVersion())) {
+                (sce->getVersionReceived().placementVersion() <=>
+                 sce->getVersionWanted()->placementVersion()) == std::partial_ordering::less) {
                 // The shard is recovered and the router is staler than the shard, so we cannot
                 // retry locally.
                 throw;

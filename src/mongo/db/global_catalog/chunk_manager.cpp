@@ -134,7 +134,8 @@ std::vector<std::shared_ptr<ChunkInfo>> flatten(const std::vector<ChunkType>& ch
     for (size_t i = 1; i < changedChunkInfos.size(); ++i) {
         auto& chunk = changedChunkInfos[i];
         if (chunk->overlapsWith(*flattened.back())) {
-            if (flattened.back()->getLastmod().isOlderThan(chunk->getLastmod())) {
+            if ((flattened.back()->getLastmod() <=> chunk->getLastmod()) ==
+                std::partial_ordering::less) {
                 flattened.pop_back();
                 flattened.emplace_back(std::move(chunk));
             }
@@ -386,7 +387,8 @@ void ChunkMap::_updateShardVersionFromUpdateChunk(
         // _placementVersions map already contained an entry for this chunk shard
 
         // Update version for this shard
-        if (placementVersionIt->second.placementVersion.isOlderThan(newVersion)) {
+        if ((placementVersionIt->second.placementVersion <=> newVersion) ==
+            std::partial_ordering::less) {
             placementVersionIt->second.placementVersion = newVersion;
             versionUpdated = true;
         }
@@ -398,7 +400,9 @@ void ChunkMap::_updateShardVersionFromUpdateChunk(
     }
 
     // Update version for the entire collection
-    if (versionUpdated && _collectionPlacementVersion.isOlderThan(newVersion)) {
+    if (versionUpdated &&
+        (!_collectionPlacementVersion.isSet() ||
+         (_collectionPlacementVersion <=> newVersion) == std::partial_ordering::less)) {
         _collectionPlacementVersion =
             ChunkVersion{static_cast<CollectionGeneration>(_collectionPlacementVersion),
                          {newVersion.majorVersion(), newVersion.minorVersion()}};
@@ -445,12 +449,15 @@ ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks) const {
                 nextChunkPtr->getLastmod().getTimestamp() ==
                     _collectionPlacementVersion.getTimestamp());
 
+        auto compareResult = _collectionPlacementVersion <=> nextChunkPtr->getLastmod();
         uassert(626840,
                 str::stream()
                     << "Changed chunk " << nextChunkPtr->toString()
                     << " doesn't have version that's greater or equal than that of the collection "
                     << _collectionPlacementVersion.toString(),
-                _collectionPlacementVersion.isOlderOrEqualThan(nextChunkPtr->getLastmod()));
+                !_collectionPlacementVersion.isSet() ||
+                    (compareResult == std::partial_ordering::less ||
+                     compareResult == std::partial_ordering::equivalent));
 
         if (!newVectorPtr->empty()) {
             checkChunksAreContiguous(*newVectorPtr->back(), *nextChunkPtr);

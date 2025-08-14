@@ -848,8 +848,9 @@ ShardServerCatalogCacheLoaderImpl::_schedulePrimaryGetChunksSince(
                           << "'."};
     }
 
-    if (collAndChunks.changedChunks.back().getVersion().isNotComparableWith(maxLoaderVersion) ||
-        maxLoaderVersion.isOlderThan(collAndChunks.changedChunks.back().getVersion())) {
+    auto compareResult = maxLoaderVersion <=> collAndChunks.changedChunks.back().getVersion();
+    if (compareResult == std::partial_ordering::unordered ||
+        compareResult == std::partial_ordering::less) {
         _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
             opCtx,
             nss,
@@ -1020,7 +1021,8 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::_getLo
             // the overlap.
             auto persistedChangedChunksIt = persisted.changedChunks.begin();
             while (persistedChangedChunksIt != persisted.changedChunks.end() &&
-                   persistedChangedChunksIt->getVersion().isOlderThan(minEnqueuedVersion)) {
+                   (persistedChangedChunksIt->getVersion() <=> minEnqueuedVersion) ==
+                       std::partial_ordering::less) {
                 ++persistedChangedChunksIt;
             }
             persisted.changedChunks.erase(persistedChangedChunksIt, persisted.changedChunks.end());
@@ -1069,7 +1071,8 @@ std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::_
 
     auto changedChunksIt = collAndChunks.changedChunks.begin();
     while (changedChunksIt != collAndChunks.changedChunks.end() &&
-           changedChunksIt->getVersion().isOlderThan(catalogCacheSinceVersion)) {
+           (changedChunksIt->getVersion() <=> catalogCacheSinceVersion) ==
+               std::partial_ordering::less) {
         ++changedChunksIt;
     }
     collAndChunks.changedChunks.erase(collAndChunks.changedChunks.begin(), changedChunksIt);

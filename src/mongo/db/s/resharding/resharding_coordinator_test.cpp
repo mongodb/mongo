@@ -950,7 +950,8 @@ TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoSucceeds) {
     // to kPreparingToDonate.
     const auto postTransitionCollectionPlacementVersion =
         assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
-    ASSERT_TRUE(collectionPlacementVersion.isOlderThan(postTransitionCollectionPlacementVersion));
+    ASSERT_EQ(std::partial_ordering::less,
+              collectionPlacementVersion <=> postTransitionCollectionPlacementVersion);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, ThrowsWhenZoneSpecifiedDoesNotExist) {
@@ -1037,13 +1038,14 @@ TEST_F(ReshardingCoordinatorPersistenceTest, BasicStateTransitionSucceeds) {
     writeStateTransitionUpdateExpectSuccess(operationContext(), expectedCoordinatorDoc);
     auto finalOriginalCollectionPlacementVersion =
         assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
-    ASSERT_TRUE(initialOriginalCollectionPlacementVersion.isOlderThan(
-        finalOriginalCollectionPlacementVersion));
+    ASSERT_EQ(std::partial_ordering::less,
+              initialOriginalCollectionPlacementVersion <=>
+                  finalOriginalCollectionPlacementVersion);
 
     auto finalTempCollectionPlacementVersion =
         assertGet(getCollectionPlacementVersion(operationContext(), _tempNss));
-    ASSERT_TRUE(
-        initialTempCollectionPlacementVersion.isOlderThan(finalTempCollectionPlacementVersion));
+    ASSERT_EQ(std::partial_ordering::less,
+              initialTempCollectionPlacementVersion <=> finalTempCollectionPlacementVersion);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWithFetchTimestampSucceeds) {
@@ -1078,13 +1080,14 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWithFetchTimestampSu
 
     auto finalOriginalCollectionPlacementVersion =
         assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
-    ASSERT_TRUE(initialOriginalCollectionPlacementVersion.isOlderThan(
-        finalOriginalCollectionPlacementVersion));
+    ASSERT_EQ(std::partial_ordering::less,
+              initialOriginalCollectionPlacementVersion <=>
+                  finalOriginalCollectionPlacementVersion);
 
     auto finalTempCollectionPlacementVersion =
         assertGet(getCollectionPlacementVersion(operationContext(), _tempNss));
-    ASSERT_TRUE(
-        initialTempCollectionPlacementVersion.isOlderThan(finalTempCollectionPlacementVersion));
+    ASSERT_EQ(std::partial_ordering::less,
+              initialTempCollectionPlacementVersion <=> finalTempCollectionPlacementVersion);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToDecisionPersistedSucceeds) {
@@ -1147,8 +1150,9 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToDoneSucceeds) {
 
     auto finalOriginalCollectionPlacementVersion =
         assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
-    ASSERT_TRUE(initialOriginalCollectionPlacementVersion.isOlderThan(
-        finalOriginalCollectionPlacementVersion));
+    ASSERT_EQ(std::partial_ordering::less,
+              initialOriginalCollectionPlacementVersion <=>
+                  finalOriginalCollectionPlacementVersion);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToQuiescedSucceeds) {
@@ -1167,8 +1171,9 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToQuiescedSucceeds) 
 
     auto finalOriginalCollectionPlacementVersion =
         assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
-    ASSERT_TRUE(initialOriginalCollectionPlacementVersion.isOlderThan(
-        finalOriginalCollectionPlacementVersion));
+    ASSERT_EQ(std::partial_ordering::less,
+              initialOriginalCollectionPlacementVersion <=>
+                  finalOriginalCollectionPlacementVersion);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWhenCoordinatorDocDoesNotExistFails) {

@@ -40,6 +40,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 
+#include <compare>
 #include <cstdint>
 #include <iosfwd>
 #include <limits>
@@ -199,40 +200,57 @@ public:
         return !(otherVersion == *this);
     }
 
+    /**
+     * Three-way comparison operator for ChunkVersion.
+     * Returns:
+     * - partial_ordering::unordered if versions are not comparable
+     * - partial_ordering::less if this version is older than other
+     * - partial_ordering::greater if this version is newer than other
+     * - partial_ordering::equivalent if versions are equal
+     *
+     * Non-comparable versions (partial_ordering::unordered) include:
+     * - UNSHARDED versions
+     * - IGNORED versions
+     * - Versions from the same collection generation where at least one has unset placement version
+     * ({0,0})
+     * Note: Versions with unset placement from different collection generations can be compared. *
+     */
+    std::partial_ordering operator<=>(const ChunkVersion& otherVersion) const {
+        // Check for non-comparable versions (UNSHARDED, IGNORED)
+        if (*this == UNSHARDED() || otherVersion == UNSHARDED() || *this == IGNORED() ||
+            otherVersion == IGNORED()) {
+            return std::partial_ordering::unordered;
+        }
+
+        // Check for unset placement versions from the same collection generation
+        if ((!this->isSet() || !otherVersion.isSet()) && this->isSameCollection(otherVersion)) {
+            return std::partial_ordering::unordered;
+        }
+
+        if (getTimestamp() != otherVersion.getTimestamp()) {
+            return (getTimestamp() < otherVersion.getTimestamp()) ? std::partial_ordering::less
+                                                                  : std::partial_ordering::greater;
+        }
+
+        if (majorVersion() != otherVersion.majorVersion()) {
+            return (majorVersion() < otherVersion.majorVersion()) ? std::partial_ordering::less
+                                                                  : std::partial_ordering::greater;
+        }
+
+        return minorVersion() <=> otherVersion.minorVersion();
+    }
+
+    // Delete unsafe comparison operators. When any operand results in
+    // std::partial_ordering::unordered, these operators would return false,
+    // which can lead to incorrect logic and potential bugs.
+    bool operator<(const ChunkVersion& other) const = delete;
+    bool operator>(const ChunkVersion& other) const = delete;
+    bool operator<=(const ChunkVersion& other) const = delete;
+    bool operator>=(const ChunkVersion& other) const = delete;
+
     // Can we write to this data and not have a problem?
     bool isWriteCompatibleWith(const ChunkVersion& other) const {
         return isSameCollection(other) && isSamePlacement(other);
-    }
-
-    // Unsharded timestamp cannot be compared with other timestamps
-    bool isNotComparableWith(const ChunkVersion& other) const {
-        return *this == UNSHARDED() || other == UNSHARDED() || *this == IGNORED() ||
-            other == IGNORED();
-    }
-
-    /**
-     * Returns true if both versions are comparable (i.e. neither version is UNSHARDED) and the
-     * current version is older than the other one. Returns false otherwise.
-     */
-    bool isOlderThan(const ChunkVersion& otherVersion) const {
-        if (isNotComparableWith(otherVersion))
-            return false;
-
-        if (getTimestamp() != otherVersion.getTimestamp())
-            return getTimestamp() < otherVersion.getTimestamp();
-
-        if (majorVersion() != otherVersion.majorVersion())
-            return majorVersion() < otherVersion.majorVersion();
-
-        return minorVersion() < otherVersion.minorVersion();
-    }
-
-    /**
-     * Returns true if both versions are comparable (i.e. same epochs) and the current version is
-     * older or equal than the other one. Returns false otherwise.
-     */
-    bool isOlderOrEqualThan(const ChunkVersion& otherVersion) const {
-        return isOlderThan(otherVersion) || (*this == otherVersion);
     }
 
     static ChunkVersion parse(const BSONElement& element);

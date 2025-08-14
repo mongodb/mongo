@@ -120,8 +120,8 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
     // Advances the version in the cache if the chunk manager is not yet available or its version is
     // stale.
     if (!cri.hasRoutingTable() ||
-        cri.getCollectionVersion().placementVersion().isOlderThan(
-            shardVersion.placementVersion())) {
+        (cri.getCollectionVersion().placementVersion() <=> shardVersion.placementVersion()) ==
+            std::partial_ordering::less) {
         catalogCache->onStaleCollectionVersion(ns, boost::none /* wanted */);
 
         uasserted(ShardCannotRefreshDueToLocksHeldInfo(ns),

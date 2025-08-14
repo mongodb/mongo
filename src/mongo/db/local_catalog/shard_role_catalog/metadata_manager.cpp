@@ -202,7 +202,9 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
     const auto remoteCollPlacementVersion = remoteMetadata.getCollPlacementVersion();
     const auto activeCollPlacementVersion = activeMetadata.getCollPlacementVersion();
     // Do nothing if the remote version is older than or equal to the current active one
-    if (remoteCollPlacementVersion.isOlderOrEqualThan(activeCollPlacementVersion)) {
+    auto compareResult = remoteCollPlacementVersion <=> activeCollPlacementVersion;
+    if (compareResult == std::partial_ordering::less ||
+        compareResult == std::partial_ordering::equivalent) {
         LOGV2_DEBUG(21984,
                     1,
                     "Ignoring incoming metadata update for this namespace because the active "
@@ -282,8 +284,7 @@ void MetadataManager::invalidateRangePreserversOlderThanShardVersion(
     for (const auto& metadataTracker : _metadata) {
         if (metadataTracker->metadata) {
             auto placementVersion = metadataTracker->metadata->getShardPlacementVersion();
-            if (placementVersion.isNotComparableWith(shardVersion) ||
-                placementVersion.isOlderOrEqualThan(shardVersion)) {
+            if ((placementVersion <=> shardVersion) != std::partial_ordering::greater) {
                 metadataTracker->valid = false;
             } else {
                 break;

@@ -29,6 +29,7 @@
 
 #include "mongo/db/versioning_protocol/chunk_version.h"
 
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
@@ -39,6 +40,7 @@ namespace {
 TEST(ChunkVersionTest, EqualityOperators) {
     OID epoch = OID::gen();
     Timestamp timestamp = Timestamp(1);
+    Timestamp timestamp2 = Timestamp(2);
 
     ASSERT_EQ(ChunkVersion({epoch, Timestamp(1, 1)}, {3, 1}),
               ChunkVersion({epoch, Timestamp(1, 1)}, {3, 1}));
@@ -49,30 +51,26 @@ TEST(ChunkVersionTest, EqualityOperators) {
     ASSERT_NE(ChunkVersion({OID(), Timestamp(1, 1)}, {3, 1}),
               ChunkVersion({epoch, timestamp}, {3, 1}));
     ASSERT_NE(ChunkVersion({epoch, timestamp}, {4, 2}), ChunkVersion({epoch, timestamp}, {4, 1}));
-}
+    ASSERT_NE(ChunkVersion({epoch, timestamp}, {3, 1}), ChunkVersion({epoch, timestamp}, {4, 1}));
+    ASSERT_NE(ChunkVersion({epoch, timestamp}, {3, 1}), ChunkVersion({epoch, timestamp2}, {3, 1}));
 
-TEST(ChunkVersionTest, OlderThan) {
-    OID epoch = OID::gen();
-    Timestamp timestamp(1);
-    Timestamp newerTimestamp(2);
+    // Unset versions
+    ASSERT_EQ(ChunkVersion({OID(), Timestamp()}, {0, 0}),
+              ChunkVersion({OID(), Timestamp()}, {0, 0}));
+    ASSERT_NE(ChunkVersion({epoch, timestamp}, {1, 0}), ChunkVersion({OID(), Timestamp()}, {0, 0}));
 
-    ASSERT(ChunkVersion({epoch, timestamp}, {3, 1})
-               .isOlderThan(ChunkVersion({epoch, timestamp}, {4, 1})));
-    ASSERT(!ChunkVersion({epoch, timestamp}, {4, 1})
-                .isOlderThan(ChunkVersion({epoch, timestamp}, {3, 1})));
+    // Special versions
+    ASSERT_EQ(ChunkVersion::UNSHARDED(), ChunkVersion::UNSHARDED());
+    ASSERT_EQ(ChunkVersion::IGNORED(), ChunkVersion::IGNORED());
+    ASSERT_NE(ChunkVersion::UNSHARDED(), ChunkVersion::IGNORED());
 
-    ASSERT(ChunkVersion({epoch, timestamp}, {3, 1})
-               .isOlderThan(ChunkVersion({epoch, timestamp}, {3, 2})));
-    ASSERT(!ChunkVersion({epoch, timestamp}, {3, 2})
-                .isOlderThan(ChunkVersion({epoch, timestamp}, {3, 1})));
+    // UNSHARDED vs normal versions
+    ASSERT_NE(ChunkVersion::UNSHARDED(), ChunkVersion({epoch, timestamp}, {1, 0}));
+    ASSERT_NE(ChunkVersion({epoch, timestamp}, {1, 0}), ChunkVersion::UNSHARDED());
 
-    ASSERT(ChunkVersion({epoch, timestamp}, {3, 1})
-               .isOlderThan(ChunkVersion({OID::gen(), newerTimestamp}, {3, 1})));
-    ASSERT(!ChunkVersion({epoch, newerTimestamp}, {3, 1})
-                .isOlderThan(ChunkVersion({OID::gen(), timestamp}, {3, 1})));
-
-    ASSERT(!ChunkVersion::UNSHARDED().isOlderThan(ChunkVersion({epoch, timestamp}, {3, 1})));
-    ASSERT(!ChunkVersion({epoch, timestamp}, {3, 1}).isOlderThan(ChunkVersion::UNSHARDED()));
+    // IGNORED vs normal versions
+    ASSERT_NE(ChunkVersion::IGNORED(), ChunkVersion({epoch, timestamp}, {1, 0}));
+    ASSERT_NE(ChunkVersion({epoch, timestamp}, {1, 0}), ChunkVersion::IGNORED());
 }
 
 TEST(ChunkVersionTest, CreateWithLargeValues) {
@@ -111,6 +109,150 @@ TEST(ChunkVersionTest, ThrowsErrorIfOverflowIsAttemptedForMinorVersion) {
     ASSERT_EQ(epoch, version.epoch());
 
     ASSERT_THROWS_CODE(version.incMinor(), DBException, 31181);
+}
+
+DEATH_TEST_REGEX(ChunkVersionTest, Error_00SameCollectionTimestamp, "Tripwire assertion.*664720") {
+    OID epoch = OID::gen();
+    OID differentEpoch = OID::gen();
+    Timestamp timestamp(1);
+    ChunkVersion unsetVersionDifferentEpoch({differentEpoch, timestamp}, {0, 0});
+
+    // The error is thrown if collections have matching timestamps, but different epochs.
+    unsetVersionDifferentEpoch <=> ChunkVersion({epoch, timestamp}, {3, 1});
+}
+
+DEATH_TEST_REGEX(ChunkVersionTest, Error_00SameCollectionEpoch, "Tripwire assertion.*664721") {
+    OID epoch = OID::gen();
+    Timestamp timestamp(1);
+    Timestamp differentTimestamp(2);
+    ChunkVersion unsetVersionDifferentEpoch({epoch, differentTimestamp}, {0, 0});
+
+    // The error is thrown if collections different timestamps, but matching epochs.
+    unsetVersionDifferentEpoch <=> ChunkVersion({epoch, timestamp}, {3, 1});
+}
+
+TEST(ChunkVersionTest, ThreeWayComparisonOperator) {
+    OID epoch = OID::gen();
+    OID differentEpoch = OID::gen();
+    Timestamp timestamp(1);
+    Timestamp newerTimestamp(2);
+
+    // Test unordered cases - UNSHARDED versions
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion::UNSHARDED() <=> ChunkVersion({epoch, timestamp}, {3, 1}));
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion({epoch, timestamp}, {3, 1}) <=> ChunkVersion::UNSHARDED());
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion::UNSHARDED() <=> ChunkVersion::UNSHARDED());
+
+    // Test unordered cases - IGNORED versions
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion::IGNORED() <=> ChunkVersion({epoch, timestamp}, {3, 1}));
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion({epoch, timestamp}, {3, 1}) <=> ChunkVersion::IGNORED());
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion::IGNORED() <=> ChunkVersion::IGNORED());
+
+    // Test unordered cases - UNSHARDED vs IGNORED
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion::UNSHARDED() <=> ChunkVersion::IGNORED());
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion::IGNORED() <=> ChunkVersion::UNSHARDED());
+
+    // Test unordered cases - unset placement versions from same collection generation
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion({epoch, timestamp}, {0, 0}) <=>
+                  ChunkVersion({epoch, timestamp}, {3, 1}));
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion({epoch, timestamp}, {3, 1}) <=>
+                  ChunkVersion({epoch, timestamp}, {0, 0}));
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion({epoch, timestamp}, {0, 0}) <=>
+                  ChunkVersion({epoch, timestamp}, {0, 0}));
+
+    // Test equivalent cases
+    ASSERT_EQ(std::partial_ordering::equivalent,
+              ChunkVersion({epoch, timestamp}, {3, 1}) <=>
+                  ChunkVersion({epoch, timestamp}, {3, 1}));
+    ASSERT_EQ(std::partial_ordering::equivalent,
+              ChunkVersion({epoch, timestamp}, {5, 2}) <=>
+                  ChunkVersion({epoch, timestamp}, {5, 2}));
+
+    // Test timestamp comparison - less
+    ASSERT_EQ(std::partial_ordering::less,
+              ChunkVersion({epoch, timestamp}, {3, 1}) <=>
+                  ChunkVersion({differentEpoch, newerTimestamp}, {3, 1}));
+    ASSERT_EQ(std::partial_ordering::less,
+              ChunkVersion({epoch, timestamp}, {4, 2}) <=>
+                  ChunkVersion({differentEpoch, newerTimestamp}, {2, 1}));
+
+    // Test timestamp comparison - greater
+    ASSERT_EQ(std::partial_ordering::greater,
+              ChunkVersion({epoch, newerTimestamp}, {3, 1}) <=>
+                  ChunkVersion({differentEpoch, timestamp}, {3, 1}));
+    ASSERT_EQ(std::partial_ordering::greater,
+              ChunkVersion({epoch, newerTimestamp}, {2, 1}) <=>
+                  ChunkVersion({differentEpoch, timestamp}, {4, 2}));
+
+    // Test major version comparison - less (same timestamp)
+    ASSERT_EQ(std::partial_ordering::less,
+              ChunkVersion({epoch, timestamp}, {3, 1}) <=>
+                  ChunkVersion({epoch, timestamp}, {4, 1}));
+    ASSERT_EQ(std::partial_ordering::less,
+              ChunkVersion({epoch, timestamp}, {1, 5}) <=>
+                  ChunkVersion({epoch, timestamp}, {3, 2}));
+
+    // Test major version comparison - greater (same timestamp)
+    ASSERT_EQ(std::partial_ordering::greater,
+              ChunkVersion({epoch, timestamp}, {4, 1}) <=>
+                  ChunkVersion({epoch, timestamp}, {3, 1}));
+    ASSERT_EQ(std::partial_ordering::greater,
+              ChunkVersion({epoch, timestamp}, {5, 1}) <=>
+                  ChunkVersion({epoch, timestamp}, {2, 8}));
+
+    // Test minor version comparison - less (same timestamp and major version)
+    ASSERT_EQ(std::partial_ordering::less,
+              ChunkVersion({epoch, timestamp}, {3, 1}) <=>
+                  ChunkVersion({epoch, timestamp}, {3, 2}));
+    ASSERT_EQ(std::partial_ordering::less,
+              ChunkVersion({epoch, timestamp}, {5, 3}) <=>
+                  ChunkVersion({epoch, timestamp}, {5, 7}));
+
+    // Test minor version comparison - greater (same timestamp and major version)
+    ASSERT_EQ(std::partial_ordering::greater,
+              ChunkVersion({epoch, timestamp}, {3, 2}) <=>
+                  ChunkVersion({epoch, timestamp}, {3, 1}));
+    ASSERT_EQ(std::partial_ordering::greater,
+              ChunkVersion({epoch, timestamp}, {5, 7}) <=>
+                  ChunkVersion({epoch, timestamp}, {5, 3}));
+
+    // Test different collection generations
+    ASSERT_EQ(std::partial_ordering::less,
+              ChunkVersion({epoch, timestamp}, {3, 1}) <=>
+                  ChunkVersion({differentEpoch, timestamp}, {4, 1}));
+    ASSERT_EQ(std::partial_ordering::greater,
+              ChunkVersion({epoch, timestamp}, {4, 1}) <=>
+                  ChunkVersion({differentEpoch, timestamp}, {3, 1}));
+
+    // Test unset versions from different collection generations (should be comparable)
+    ASSERT_EQ(std::partial_ordering::less,
+              ChunkVersion({epoch, timestamp}, {0, 0}) <=>
+                  ChunkVersion({differentEpoch, newerTimestamp}, {3, 1}));
+    ASSERT_EQ(std::partial_ordering::less,
+              ChunkVersion({epoch, timestamp}, {4, 2}) <=>
+                  ChunkVersion({differentEpoch, newerTimestamp}, {0, 0}));
+    ASSERT_EQ(std::partial_ordering::greater,
+              ChunkVersion({differentEpoch, newerTimestamp}, {3, 1}) <=>
+                  ChunkVersion({epoch, timestamp}, {0, 0}));
+    ASSERT_EQ(std::partial_ordering::greater,
+              ChunkVersion({differentEpoch, newerTimestamp}, {0, 0}) <=>
+                  ChunkVersion({epoch, timestamp}, {4, 2}));
+    ASSERT_EQ(std::partial_ordering::less,
+              ChunkVersion({epoch, timestamp}, {0, 0}) <=>
+                  ChunkVersion({differentEpoch, newerTimestamp}, {0, 0}));
+    ASSERT_EQ(std::partial_ordering::greater,
+              ChunkVersion({differentEpoch, newerTimestamp}, {0, 0}) <=>
+                  ChunkVersion({epoch, timestamp}, {0, 0}));
 }
 
 }  // namespace

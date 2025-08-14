@@ -1612,8 +1612,9 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
                           << fromShard << " neither by recipient " << toShard,
             currentChunk.getShard() == fromShard);
 
-    if (migratedChunk.getVersion().isNotComparableWith(currentChunk.getVersion()) ||
-        migratedChunk.getVersion().isOlderThan(currentChunk.getVersion())) {
+    auto compareResult = migratedChunk.getVersion() <=> currentChunk.getVersion();
+    if (compareResult == std::partial_ordering::unordered ||
+        compareResult == std::partial_ordering::less) {
         return {ErrorCodes::ConflictingOperationInProgress,
                 str::stream()
                     << "Rejecting migration request because the version of the requested chunk "
@@ -2098,7 +2099,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
         matchingChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
             matchingChunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
 
-        if (version.isOlderThan(matchingChunk.getVersion())) {
+        if ((version <=> matchingChunk.getVersion()) == std::partial_ordering::less) {
             LOGV2(23885,
                   "ensureChunkVersionIsGreaterThan found that the chunk already has a higher "
                   "version; "

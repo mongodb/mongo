@@ -120,7 +120,8 @@ protected:
             chunkSplitInfo.shardKeyPattern.getKeyPattern().globalMax());
 
         const Timestamp timestamp{Timestamp(100, 1)};
-        ChunkVersion version({OID::gen(), timestamp}, {1, 0});
+        const OID epoch = OID::gen();
+        ChunkVersion version({epoch, timestamp}, {1, 0});
 
         std::vector<ChunkType> chunks;
         for (size_t i = 1; i < splitPointsIncludingEnds.size(); ++i) {
@@ -144,7 +145,7 @@ protected:
                                          false, /* unsplittable */
                                          std::move(defaultCollator) /* collator */,
                                          false /* unique */,
-                                         OID::gen(),
+                                         epoch,
                                          timestamp,
                                          boost::none /* timeseriesFields */,
                                          boost::none /* reshardingFields */,

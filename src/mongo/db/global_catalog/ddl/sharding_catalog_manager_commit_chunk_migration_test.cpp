@@ -172,7 +172,9 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
 
     // Verify that a collection placement version is returned
     auto cver = versions.collectionPlacementVersion;
-    ASSERT_TRUE(mver.isOlderOrEqualThan(cver));
+    auto compareResult = mver <=> cver;
+    ASSERT_TRUE(compareResult == std::partial_ordering::less ||
+                compareResult == std::partial_ordering::equivalent);
 
     // Verify the chunks ended up in the right shards.
     auto chunkDoc0 = uassertStatusOK(

@@ -173,17 +173,14 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
             const auto& wanted = si->getVersionWanted()->placementVersion();
             const auto& received = si->getVersionReceived().placementVersion();
 
-            // TODO (SERVER-96322): Remove this workaround once shard version {0,0} is considered a
-            // non-comparable shard version.
-            if (wanted.isSameCollection(received) && !wanted.isSet()) {
-                // When comparing the same incarnation of the collection, if the wanted version
-                // indicates the shard has no chunks (i.e. a chunk version with {0,0}), we can't
-                // reliably compare placement versions. Pessimistically, we'll assume the router is
-                // stale.
+            // If placement versions can't be reliably compared (e.g., when the shard has no
+            // chunks/{0,0}, or the received version is ChunkVersion::UNSHARDED()), we
+            // conservatively assume the router is stale.
+            auto compareResult = wanted <=> received;
+            if (compareResult == std::partial_ordering::unordered) {
                 return false;
             }
-
-            return wanted.isOlderThan(received);
+            return compareResult == std::partial_ordering::less;
         }();
         if (isShardStale && !_retryOnStaleShard) {
             uassertStatusOK(s);

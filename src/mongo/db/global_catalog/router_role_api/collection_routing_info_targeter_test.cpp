@@ -198,7 +198,8 @@ ChunkManager makeCustomChunkManager(const ShardKeyPattern& shardKeyPattern,
                                     shardKeyPattern.getKeyPattern().globalMin());
     splitPointsIncludingEnds.push_back(shardKeyPattern.getKeyPattern().globalMax());
     const Timestamp timestamp{Timestamp(0, 42)};
-    ChunkVersion version({OID::gen(), timestamp}, {1, 0});
+    const OID epoch = OID::gen();
+    ChunkVersion version({epoch, timestamp}, {1, 0});
     const auto uuid = UUID::gen();
     for (size_t i = 1; i < splitPointsIncludingEnds.size(); ++i) {
         ChunkType chunk(
@@ -220,7 +221,7 @@ ChunkManager makeCustomChunkManager(const ShardKeyPattern& shardKeyPattern,
                                                             false,  /* unsplittable */
                                                             {},     // collator
                                                             false,  // unique
-                                                            OID::gen(),
+                                                            epoch,
                                                             timestamp,
                                                             boost::none,  // time series fields
                                                             boost::none,  // resharding fields
