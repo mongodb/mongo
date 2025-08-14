@@ -794,6 +794,14 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ResourceYielderFactory::set(*serviceContext->getService(ClusterRole::RouterServer),
                                 std::make_unique<RouterResourceYielderFactory>());
 
+    // Since extensions modify the global parserMap, which is not thread-safe, they must be loaded
+    // prior to sharding initialization to avoid a data race. Once sharding is initialized, the
+    // CatalogCacheLoader will issue internal aggregations that can concurrently read from the
+    // parserMap.
+    if (!extension::host::loadExtensions(serverGlobalParams.extensions)) {
+        return ExitCode::badOptions;
+    }
+
     try {
         uassertStatusOK(
             initializeSharding(opCtx, &replicaSetChangeListener, &startupTimeElapsedBuilder));
@@ -900,10 +908,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                 service_liaison_router_callbacks::killCursorsWithMatchingSessions),
             std::make_unique<SessionsCollectionSharded>(),
             RouterSessionCatalog::reapSessionsOlderThan));
-
-    if (!extension::host::loadExtensions(serverGlobalParams.extensions)) {
-        return ExitCode::badOptions;
-    }
 
     transport::ServiceExecutor::startupAll(serviceContext);
 

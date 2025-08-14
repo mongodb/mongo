@@ -757,6 +757,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     BackupCursorHooks::initialize(serviceContext);
 
+    // Since extensions modify the global parserMap, which is not thread-safe, they must be loaded
+    // prior to starting the FTDC background thread (which reads from the parserMap) to avoid a data
+    // race.
+    if (!extension::host::loadExtensions(serverGlobalParams.extensions)) {
+        exitCleanly(ExitCode::badOptions);
+    }
+
     startMongoDFTDC(serviceContext);
 
     if (mongodGlobalParams.scriptingEnabled) {
@@ -1133,10 +1140,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     auto catalog = std::make_unique<stats::StatsCatalog>(
         serviceContext->getService(ClusterRole::ShardServer), std::move(cacheLoader));
     stats::StatsCatalog::set(serviceContext, std::move(catalog));
-
-    if (!extension::host::loadExtensions(serverGlobalParams.extensions)) {
-        exitCleanly(ExitCode::badOptions);
-    }
 
     // Startup options are written to the audit log at the end of startup so that cluster server
     // parameters are guaranteed to have been initialized from disk at this point.
