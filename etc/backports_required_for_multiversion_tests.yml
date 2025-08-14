@@ -486,6 +486,8 @@ last-continuous:
       ticket: SERVER-107211
     - test_file: jstests/replsets/v1_apply_ops_oplog_format.js
       ticket: SERVER-107211
+    - test_file: jstests/concurrency/fsm_workloads/query/yield/repl_set_resize_oplog.js
+      ticket: SERVER-94787
   suites: null
 last-lts:
   all:
@@ -1027,4 +1029,6 @@ last-lts:
       ticket: SERVER-107211
     - test_file: jstests/replsets/v1_apply_ops_oplog_format.js
       ticket: SERVER-107211
+    - test_file: jstests/concurrency/fsm_workloads/query/yield/repl_set_resize_oplog.js
+      ticket: SERVER-94787
   suites: null
