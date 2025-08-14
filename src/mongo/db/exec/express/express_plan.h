@@ -513,7 +513,7 @@ private:
 
     BSONObj _queryFilter;  // Owned BSON.
 
-    typename WrapInOptionalIfNeeded<CollectionType>::type _collection;
+    typename WrapInOptionalIfNeeded<CollectionType>::type _collection{};
     boost::optional<UUID> _collectionUUID;
     uint64_t _catalogEpoch{0};
     const IndexCatalogEntry* _indexCatalogEntry{nullptr};  // Unowned.
@@ -611,7 +611,7 @@ public:
 private:
     BSONObj _queryFilter;  // Owned BSON.
 
-    typename WrapInOptionalIfNeeded<CollectionType>::type _collection;
+    typename WrapInOptionalIfNeeded<CollectionType>::type _collection{};
     boost::optional<UUID> _collectionUUID;
     uint64_t _catalogEpoch{0};
 
@@ -859,7 +859,7 @@ private:
     const std::string _indexIdent;
     const std::string _indexName;
 
-    typename WrapInOptionalIfNeeded<CollectionType>::type _collection;
+    typename WrapInOptionalIfNeeded<CollectionType>::type _collection{};
     boost::optional<UUID> _collectionUUID;
     uint64_t _catalogEpoch{0};
     const IndexCatalogEntry* _indexCatalogEntry{nullptr};  // Unowned.
@@ -1207,7 +1207,7 @@ private:
     const OperationSource _source;
     const boost::optional<UUID> _sampleId;
 
-    WriteOperationStats* _stats;
+    WriteOperationStats* _stats{nullptr};
 };
 
 class DeleteOperation {
@@ -1279,7 +1279,7 @@ private:
     bool _fromMigrate;
     bool _returnDeleted;
 
-    WriteOperationStats* _stats;
+    WriteOperationStats* _stats{nullptr};
 };
 
 class DummyDeleteOperationForExplain {
@@ -1314,7 +1314,7 @@ public:
 private:
     bool _returnDeleted;
 
-    WriteOperationStats* _stats;
+    WriteOperationStats* _stats{nullptr};
 };
 
 class NoWriteOperation {
