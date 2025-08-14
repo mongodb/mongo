@@ -76,7 +76,7 @@ boost::optional<StringData> checkComparisonPredicateEligibility(
     //    1) time field cannot be empty.
     //    2) the only type less than null is MinKey, which is internal, so we don't need to guard
     //       GT and GTE.
-    //    3) for the buckets that might have mixed schema data, we'll compare the types of min and
+    //    3) if the collection might have mixed schema data, we'll compare the types of min and
     //       max when _creating_ the bucket-level predicate (that check won't help with missing).
     if (matchExprData.type() == BSONType::null)
         return "can't handle comparison to null"_sd;
@@ -114,7 +114,7 @@ boost::optional<StringData> checkComparisonPredicateEligibility(
     }
 
     if (isTimeField && matchExprData.type() != BSONType::date) {
-        // Users are not allowed to insert non-date measurements into time field. So this query
+        // Users are not allowed to insert non-date measurements into the time field. So this query
         // would not match anything. We do not need to optimize for this case.
         // TODO SERVER-84207: right now we will end up unpacking everything and applying the event
         // filter, which indeed would be either trivially true or trivially false but it won't be
@@ -151,8 +151,8 @@ std::unique_ptr<MatchExpression> makeOr(std::vector<std::unique_ptr<MatchExpress
  * type of `control.min.subpath` is not the same as `control.max.subpath` then we will match that
  * document.
  *
- * However, if the buckets collection has no mixed-schema data then this type-equality predicate is
- * unnecessary. In that case this function returns an empty, always-true predicate.
+ * However, if the timeseries collection has no mixed-schema data then this type-equality predicate
+ * is unnecessary. In that case this function returns an empty, always-true predicate.
  */
 std::unique_ptr<MatchExpression> createTypeEqualityPredicate(
     boost::intrusive_ptr<ExpressionContext> pExpCtx,

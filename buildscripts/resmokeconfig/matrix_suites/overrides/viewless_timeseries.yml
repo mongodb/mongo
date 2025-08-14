@@ -51,6 +51,7 @@
       roots:
         - jstests/sharding/analyze_shard_key/timeseries.js
         - jstests/sharding/libs/timeseries_update_multi_util.js
+        - jstests/sharding/query/sample_timeseries.js
         - jstests/sharding/resharding_timeseries/move_timeseries.js
         - jstests/sharding/resharding_timeseries/reshard_timeseries.js
         - jstests/sharding/resharding_timeseries/reshard_timeseries_disallow_writes.js
@@ -157,6 +158,7 @@
         - jstests/noPassthrough/timeseries/query/timeseries_nested_elem_match.js
         - jstests/noPassthrough/timeseries/query/timeseries_query_knob_sbe.js
         - jstests/noPassthrough/timeseries/query/timeseries_sample_on_buckets.js
+        - jstests/noPassthrough/timeseries/query/timeseries_sample.js
         - jstests/noPassthrough/timeseries/query/timeseries_sort.js
         - jstests/noPassthrough/timeseries/query/timeseries_sparse_fields.js
         - jstests/noPassthrough/timeseries/stats/timeseries_collStats.js

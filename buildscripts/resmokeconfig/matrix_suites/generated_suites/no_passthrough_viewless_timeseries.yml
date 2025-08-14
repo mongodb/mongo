@@ -85,6 +85,7 @@ selector:
     - jstests/noPassthrough/timeseries/query/timeseries_nested_elem_match.js
     - jstests/noPassthrough/timeseries/query/timeseries_query_knob_sbe.js
     - jstests/noPassthrough/timeseries/query/timeseries_sample_on_buckets.js
+    - jstests/noPassthrough/timeseries/query/timeseries_sample.js
     - jstests/noPassthrough/timeseries/query/timeseries_sort.js
     - jstests/noPassthrough/timeseries/query/timeseries_sparse_fields.js
     - jstests/noPassthrough/timeseries/stats/timeseries_collStats.js

@@ -446,7 +446,7 @@ boost::intrusive_ptr<Expression> rewriteGroupByElement(
     // We allow the $group stage to be rewritten if the _id field only consists of these 3 options:
     // 1. If the _id field is constant.
     // 2. If the _id field is an expression whose fieldPaths are at or under the metaField.
-    // 3. For fixed buckets collection, if the _id field is a $dateTrunc expressions on the
+    // 3. For a collection with fixed buckets, if the _id field is a $dateTrunc expressions on the
     // timeField.
     if (ExpressionConstant::isConstant(expr)) {
         return expr;
@@ -1630,9 +1630,9 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(DocumentSourceContain
         tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kFirstInputDocument) ||
         tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kLastInputDocument);
 
-    // If we lower the group at the bucket collection level to SBE we won't be able to unpack in
-    // SBE due to the current limitations of 'TsBucketToCellBlockStage', but we don't want to
-    // run this pipeline in hybrid mode because of the potential perf impact.
+    // If we lower the group to SBE to read raw buckets we won't be able to unpack in SBE due to the
+    // current limitations of 'TsBucketToCellBlockStage', but we don't want to run this pipeline in
+    // hybrid mode because of the potential perf impact.
     if (optimized) {
         getExpCtx()->setSbePipelineCompatibility(SbeCompatibility::notCompatible);
         _isSbeCompatible = false;
@@ -1833,8 +1833,8 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
 
         auto metaField = _sharedState->_bucketUnpacker.getMetaField();
         if (metaField && *metaField == keyField->front()) {
-            // Make sure we actually re-write the key field for the buckets collection so we can
-            // locate the index.
+            // Make sure we actually re-write the key field when reading raw timeseries buckets so
+            // we can locate the index.
             static const FieldPath baseMetaFieldPath{timeseries::kBucketMetaFieldName};
             nextNear->setKeyField(keyField->getPathLength() > 1
                                       ? baseMetaFieldPath.concat(keyField->tail())
@@ -1894,8 +1894,8 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
     // necessary.
     // If _eventFilter is true, a match was present which may impact the number of
     // documents we return from limit, hence we don't want to push limit.
-    // If _triedLimitPushDown is true, we have already done a limit push down and don't want to
-    // push again to avoid an infinite loop.
+    // If _triedLimitPushDownLocally is true, we have already done a limit push down and don't want
+    // to push again to avoid an infinite loop.
     if (!_sharedState->_eventFilter && !_triedLimitPushDownLocally) {
         if (auto limitPtr = dynamic_cast<DocumentSourceLimit*>(std::next(itr)->get()); limitPtr) {
             _triedLimitPushDownLocally = true;

@@ -393,12 +393,13 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
 
     const double kMaxSampleRatioForRandCursor = maxSampleRatioClusterParameter.getSampleCutoff();
 
-    if (!expCtx->getNamespaceString().isTimeseriesBucketsCollection()) {
+    const bool isTimeseriesCollection = coll.getCollectionPtr()->isTimeseriesCollection();
+    if (!isTimeseriesCollection) {
         if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
             return nullptr;
         }
     } else {
-        // Suppose that a time-series bucket collection is observed to contain 200 buckets, and the
+        // Suppose that a time-series collection is observed to contain 200 buckets, and the
         // 'gTimeseriesBucketMaxCount' parameter is set to 1000. If all buckets are full, then the
         // maximum possible measurment count would be 200 * 1000 = 200,000. While the
         // 'SampleFromTimeseriesBucket' plan is more efficient when the sample size is small
@@ -445,13 +446,12 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     // to a collection scan if the ratio of orphaned to owned documents encountered over the first
     // 100 works() is such that we would have chosen not to optimize.
     static const size_t kMaxPresampleSize = 100;
-    if (expCtx->getNamespaceString().isTimeseriesBucketsCollection()) {
-        // We can't take ARHASH optimization path for a direct $sample on the system.buckets
-        // collection because data is in compressed form. If we did have a direct $sample on the
-        // system.buckets collection, then the 'bucketUnpacker' would not be set up properly. We
-        // also should bail out early if a $sample is made against a time series collection that is
-        // empty. If we don't the 'minAdvancedToWorkRatio' can be nan/-nan depending on the
-        // architecture.
+    if (isTimeseriesCollection) {
+        // We can't take ARHASH optimization path for a direct $sample on raw timeseries buckets
+        // because the data is compressed. If we did have a direct $sample on the raw timeseries
+        // buckets, then the 'bucketUnpacker' would not be set up properly. We also should bail out
+        // early if a $sample is made against a time series collection that is empty. If we don't
+        // the 'minAdvancedToWorkRatio' can be nan/-nan depending on the architecture.
         if (!(bucketUnpacker && numRecords)) {
             return nullptr;
         }

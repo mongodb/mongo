@@ -68,12 +68,10 @@ namespace mongo {
  *       field: "location"
  *  }}
  *
- * The document to match should be a bucket document in an underlying system.buckets.collection
- * collection. Note that the 'field' value, "location", does not reflect the path in the matching
- * document but the path in the document in the corresponding timeseries collection, because the
- * document schma between the timeseries collection and the underlying bucket collection is
- * different.
- *
+ * The document to match should be a raw timeseries bucket document. Note that the 'field' value,
+ * "location", does not reflect the path in the matching document but the path in the document in
+ * the corresponding timeseries collection, because the document schema for raw timeseries buckets
+ * is different.
  */
 class InternalBucketGeoWithinMatchExpression final : public MatchExpression {
 public:

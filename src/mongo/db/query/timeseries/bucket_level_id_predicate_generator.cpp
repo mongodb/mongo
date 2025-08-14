@@ -90,9 +90,9 @@ auto constructObjectIdValue(const BSONElement& rhs, int bucketMaxSpanSeconds) {
         oid.init(date, maxOrMin == OIDInit::max);
         return oid;
     };
-    // Make an ObjectId corresponding to a date value adjusted by the max bucket value for the
-    // time series view that this query operates on. This predicate can be used in a comparison
-    // to gauge a max value for a given bucket, rather than a min value.
+    // Make an ObjectId corresponding to a date value adjusted by the max bucket value. This
+    // predicate can be used in a comparison to gauge a max value for a given bucket, rather than a
+    // min value.
     auto makeMaxAdjustedDateOID = [&](auto&& date, auto&& maxOrMin) {
         // Ensure we don't underflow.
         if (date.toDurationSinceEpoch() >= Seconds{bucketMaxSpanSeconds})
