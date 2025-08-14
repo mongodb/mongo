@@ -17,6 +17,7 @@ import {
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const collName = jsTestName();
+const bucketsCollName = "system.buckets." + collName;
 const coll = db.getCollection(collName);
 const bucketMaxSpanSecondsHours = 60 * 60 * 24 * 30;
 const bucketRoundingSecondsHours = 60 * 60 * 24;
@@ -49,13 +50,49 @@ assert.commandFailedWithCode(
     db.runCommand({"collMod": collName, "validator": {required: ["time"]}}),
     ErrorCodes.InvalidOptions);
 
+if (!areViewlessTimeseriesEnabled(db)) {
+    // Tries to set the validator for a time-series collection using the buckets namespace.
+    assert.commandFailedWithCode(
+        db.runCommand({"collMod": bucketsCollName, "validator": {required: ["time"]}}), [
+            ErrorCodes.InvalidNamespace,
+            // TODO SERVER-105548 Remove the following error code once 9.0 becomes LTS. Needed for
+            // multiversion compatibility. As of 8.3 calling collMod on the buckets namespace
+            // returns InvalidNamespace.
+            ErrorCodes.InvalidOptions
+        ]);
+}
+
 // Tries to set the validationLevel for a time-series collection.
 assert.commandFailedWithCode(db.runCommand({"collMod": collName, "validationLevel": "moderate"}),
                              ErrorCodes.InvalidOptions);
 
+if (!areViewlessTimeseriesEnabled(db)) {
+    // Tries to set the validationLevel for a time-series collection using the buckets namespace.
+    assert.commandFailedWithCode(
+        db.runCommand({"collMod": bucketsCollName, "validationLevel": "moderate"}), [
+            ErrorCodes.InvalidNamespace,
+            // TODO SERVER-105548 Remove the following error code once 9.0 becomes LTS. Needed for
+            // multiversion compatibility. As of 8.3 calling collMod on the buckets namespace
+            // returns InvalidNamespace.
+            ErrorCodes.InvalidOptions
+        ]);
+}
+
 // Tries to set the validationAction for a time-series collection.
 assert.commandFailedWithCode(db.runCommand({"collMod": collName, "validationAction": "warn"}),
                              ErrorCodes.InvalidOptions);
+
+if (!areViewlessTimeseriesEnabled(db)) {
+    // Tries to set the validationLevel for a time-series collection using the buckets namespace.
+    assert.commandFailedWithCode(
+        db.runCommand({"collMod": bucketsCollName, "validationAction": "warn"}), [
+            ErrorCodes.InvalidNamespace,
+            // TODO SERVER-105548 Remove the following error code once 9.0 becomes LTS. Needed for
+            // multiversion compatibility. As of 8.3 calling collMod on the buckets namespace
+            // returns InvalidNamespace.
+            ErrorCodes.InvalidOptions
+        ]);
+}
 
 // Tries to modify the view for a time-series collection.
 assert.commandFailedWithCode(db.runCommand({"collMod": collName, "viewOn": "foo", "pipeline": []}),

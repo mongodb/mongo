@@ -53,6 +53,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/idl/idl_parser.h"
@@ -139,11 +140,11 @@ public:
             auto catalogClient =
                 Grid::get(opCtx)->isInitialized() ? Grid::get(opCtx)->catalogClient() : nullptr;
             if (catalogClient && cmd.getTimeseries() && cmd.getTimeseries()->getGranularity()) {
-                auto bucketNss = nss.isTimeseriesBucketsCollection()
-                    ? nss
-                    : nss.makeTimeseriesBucketsNamespace();
+                auto preConditions =
+                    timeseries::CollectionPreConditions::getCollectionPreConditions(
+                        opCtx, nss, /*expectedUUID=*/boost::none);
                 try {
-                    auto coll = catalogClient->getCollection(opCtx, bucketNss);
+                    auto coll = catalogClient->getCollection(opCtx, preConditions.getTargetNs(nss));
                     uassert(ErrorCodes::NotImplemented,
                             str::stream()
                                 << "Cannot update granularity of a sharded time-series collection.",
