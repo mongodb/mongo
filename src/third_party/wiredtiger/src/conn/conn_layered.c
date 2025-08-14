@@ -1111,6 +1111,8 @@ __disagg_delete_or_fail(WT_SESSION_IMPL *session, const char *fname, bool fail)
           "use 'disaggregated.local_files_action=delete' to remove it.",
           fname);
 
+    __wt_verbose_warning(
+      session, WT_VERB_METADATA, "Removing local file due to disagg mode: %s", fname);
     WT_RET(__wt_fs_remove(session, fname, false, false));
 
     return (0);

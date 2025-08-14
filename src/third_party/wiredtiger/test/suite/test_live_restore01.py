@@ -52,6 +52,17 @@ class test_live_restore01(backup_base):
         shutil.rmtree("DEST")
         os.mkdir("DEST")
 
+    def expect_failure_rounds(self, config_strs:list, interval_s:float, expected_error):
+        for config_str in config_strs[:-1]:
+            self.open_conn("DEST", config=config_str)
+            if interval_s > 0:
+                import time
+                time.sleep(interval_s)
+            self.close_conn()
+        self.expect_failure(config_strs[-1], expected_error)
+        shutil.rmtree("DEST")
+        os.mkdir("DEST")
+
     def test_live_restore01(self):
         # Close the default connection.
 
@@ -103,6 +114,14 @@ class test_live_restore01(backup_base):
 
         # Specify statistics are disabled.
         self.expect_failure("statistics=(none),live_restore=(enabled=true,path=SOURCE)", "/Statistics must be enabled when live restore is active./")
+
+        self.expect_failure("live_restore=(enabled=true,path=SOURCE),disaggregated=(page_log=palm)", "/Live restore is not compatible with disaggregated storage mode/")
+        # Specify the multi round live_restore start and end
+        # WT-15089
+        self.expect_failure_rounds([
+            "live_restore=(enabled=true,path=SOURCE,threads_max=0)",
+            "live_restore=(enabled=false)"
+        ], 0.1, "/Cannot start in non-live restore mode while a live restore is in progress!/")
 
         # Expect a failure if statistics are disabled via a reconfigure call.
         self.open_conn("DEST", config="live_restore=(enabled=true,path=SOURCE)")

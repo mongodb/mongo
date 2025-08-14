@@ -265,12 +265,27 @@ static int
 __rec_find_and_save_delete_hs_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
   WT_ROW *rip, WTI_UPDATE_SELECT *upd_select)
 {
-    WT_UPDATE *delete_tombstone, *delete_upd;
+    WT_UPDATE *delete_tombstone, *delete_upd, *triggering_prepare_upd;
+    uint8_t prepare_state;
+    bool find_triggering_prepare;
 
     delete_tombstone = NULL;
-
-    for (delete_upd = upd_select->tombstone != NULL ? upd_select->tombstone : upd_select->upd;
+    find_triggering_prepare = F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
+      WT_TIME_WINDOW_HAS_START_PREPARE(&upd_select->tw);
+    /*
+     * If we're in preserve_prepared mode and have a prepared time window, look for the prepared
+     * update that triggered the history store deletion. This helps us determine if we should delay
+     * the deletion until the prepared update is committed/rolled back and stable.
+     */
+    for (delete_upd = upd_select->tombstone != NULL ? upd_select->tombstone : upd_select->upd,
+        triggering_prepare_upd = NULL;
          delete_upd != NULL; delete_upd = delete_upd->next) {
+        if (find_triggering_prepare && delete_upd->type != WT_UPDATE_RESERVE) {
+            WT_ACQUIRE_READ(prepare_state, delete_upd->prepare_state);
+            if (prepare_state != WT_PREPARE_INIT)
+                triggering_prepare_upd = delete_upd;
+        }
+
         if (delete_upd->txnid == WT_TXN_ABORTED)
             continue;
 
@@ -279,6 +294,22 @@ __rec_find_and_save_delete_hs_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT
               F_ISSET(delete_upd, WT_UPDATE_HS | WT_UPDATE_RESTORED_FROM_HS),
               "Attempting to remove an update from the history store in WiredTiger, but the "
               "update was missing.");
+            find_triggering_prepare = false;
+            if (triggering_prepare_upd != NULL) {
+                uint64_t txnid;
+                WT_ACQUIRE_READ(txnid, triggering_prepare_upd->txnid);
+                if (txnid == WT_TXN_ABORTED)
+                    txnid = triggering_prepare_upd->upd_saved_txnid;
+                /*
+                 * It must be the operation on this prepared update that triggered us to delete the
+                 * update from the history store. If it is the same prepared update we are writing
+                 * to disk, don't delete the update from the history store now. We need to wait the
+                 * prepared update to become stable.
+                 */
+                if (txnid == upd_select->tw.start_txn)
+                    break;
+            }
+
             if (delete_upd->type == WT_UPDATE_TOMBSTONE)
                 delete_tombstone = delete_upd;
             else {

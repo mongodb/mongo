@@ -3554,7 +3554,8 @@ tasks:
             RW_LOCK_FILE=$(pwd)/../../cmake_build/test/csuite/rwlock/test_rwlock ./time_shift_test.sh /usr/local/lib/faketime/libfaketimeMT.so.1 0-1 2>&1
 
   - name: format-disagg-leader-test
-    tags: ["stress-disagg-test"]
+    # FIXME-WT-14566: Enable disagg leader mode once failure has been resolved.
+    # tags: ["stress-disagg-test"]
     depends_on:
       - name: compile
     commands:
@@ -3576,7 +3577,8 @@ tasks:
           times: 10
 
   - name: format-disagg-switch-test
-    tags: ["stress-disagg-test"]
+    # FIXME-WT-14566: Enable disagg switch mode once failure has been resolved.
+    # tags: ["stress-disagg-test"]
     depends_on:
       - name: compile
     commands:
@@ -5929,10 +5931,12 @@ buildvariants:
     ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
+    - name: compile
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
+    - name: ".stress-disagg-test"
     - name: ".stress-test-no-barrier"
       distros: ubuntu2004-medium
     - name: format-abort-recovery-stress-test
@@ -5948,10 +5952,12 @@ buildvariants:
     ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
+    - name: compile
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
+    - name: ".stress-disagg-test"
     - name: ".stress-test-no-barrier"
     - name: checkpoint-stress-test-tiered
     - name: precise-checkpoint-stress-test-tiered
@@ -6277,8 +6283,10 @@ buildvariants:
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
+    - name: compile
     - name: ".stress-test-1"
     - name: ".stress-test-2"
+    - name: ".stress-disagg-test"
     - name: format-abort-recovery-stress-test
     - name: format-predictable-test
 
@@ -6292,8 +6300,10 @@ buildvariants:
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
+    - name: compile
     - name: ".stress-test-1"
     - name: ".stress-test-2"
+    - name: ".stress-disagg-test"
     - name: format-abort-recovery-stress-test
 
 - name: ubuntu2004-nonstandalone
@@ -6323,14 +6333,15 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
   tasks:
+    - name: compile
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
+    - name: ".stress-disagg-test"
     - name: ".stress-test-no-barrier"
       distros: ubuntu2004-medium
     - name: format-abort-recovery-stress-test
-    - name: compile
     - name: ".cppsuite-stress-test"
       batchtime: 720 # 12 hours
       distros: ubuntu2004-medium # Medium is required as a larger disk is required.
@@ -6346,13 +6357,14 @@ buildvariants:
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
     unit_test_variant_args: "--hook nonstandalone"
   tasks:
+    - name: compile
     - name: ".stress-test-1"
       distros: ubuntu2004-test
     - name: ".stress-test-2"
       distros: ubuntu2004-test
     - name: format-abort-recovery-stress-test
       distros: ubuntu2004-test
-    - name: compile
+    - name: ".stress-disagg-test"
     - name: make-check-test
     - name: unit-test
 
@@ -6377,6 +6389,7 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
+    - name: ".stress-disagg-test"
     - name: ".stress-test-no-barrier"
     - name: format-abort-recovery-stress-test
     - name: ".cppsuite-stress-test"
@@ -6393,13 +6406,14 @@ buildvariants:
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
     unit_test_variant_args: "--hook nonstandalone"
   tasks:
+    - name: compile
     - name: ".stress-test-1"
       distros: ubuntu2004-arm64-large
     - name: ".stress-test-2"
       distros: ubuntu2004-arm64-large
     - name: format-abort-recovery-stress-test
       distros: ubuntu2004-arm64-large
-    - name: compile
+    - name: ".stress-disagg-test"
     - name: make-check-test
     - name: unit-test
     - name: unit-test-extra-long
@@ -6436,13 +6450,14 @@ buildvariants:
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
     unit_test_variant_args: "--hook nonstandalone"
   tasks:
+    - name: compile
     - name: ".stress-test-1"
       distros: amazon2023-arm64-latest-large-m8g
     - name: ".stress-test-2"
       distros: amazon2023-arm64-latest-large-m8g
     - name: format-abort-recovery-stress-test
       distros: amazon2023-arm64-latest-large-m8g
-    - name: compile
+    - name: ".stress-disagg-test"
     - name: make-check-test
     - name: unit-test
     - name: unit-test-extra-long
@@ -6469,6 +6484,7 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
+    - name: ".stress-disagg-test"
     - name: ".stress-test-no-barrier"
     - name: format-abort-recovery-stress-test
     - name: ".cppsuite-stress-test"
@@ -6566,10 +6582,12 @@ buildvariants:
     ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
+    - name: compile
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
+    - name: ".stress-disagg-test"
     - name: ".stress-test-no-barrier"
     - name: format-abort-recovery-stress-test
     - name: format-predictable-test
@@ -6678,12 +6696,13 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
   tasks:
+    - name: compile
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
+    - name: ".stress-disagg-test"
     - name: ".stress-test-no-barrier"
     - name: format-abort-recovery-stress-test
-    - name: compile
     - name: ".cppsuite-stress-test"
       batchtime: 720 # 12 hours

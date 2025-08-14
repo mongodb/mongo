@@ -822,12 +822,11 @@ __txn_release(WT_SESSION_IMPL *session)
 
 /*
  * __txn_prepare_rollback_restore_hs_update --
- *     Restore the history store update to the update chain before roll back prepared update evicted
- *     to disk
+ *     Restore the history store update to the update chain.
  */
 static int
 __txn_prepare_rollback_restore_hs_update(
-  WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_PAGE *page, WT_UPDATE *upd_chain)
+  WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_PAGE *page, WT_UPDATE *upd_chain, bool commit)
 {
     WT_DECL_ITEM(hs_value);
     WT_DECL_RET;
@@ -849,6 +848,13 @@ __txn_prepare_rollback_restore_hs_update(
     /* Get current value. */
     WT_ERR(hs_cursor->get_value(hs_cursor, &hs_stop_durable_ts, &durable_ts, &type_full, hs_value));
 
+    /*
+     * No need to restore the history store update if we want to commit the prepared update and the
+     * record has a valid stop point.
+     */
+    if (commit && hs_stop_durable_ts != WT_TS_MAX)
+        goto done;
+
     /* The value older than the prepared update in the history store must be a full value. */
     WT_ASSERT(session, (uint8_t)type_full == WT_UPDATE_STANDARD);
 
@@ -863,7 +869,7 @@ __txn_prepare_rollback_restore_hs_update(
      * Set the flag to indicate that this update has been restored from history store for the
      * rollback of a prepared transaction.
      */
-    F_SET(upd, WT_UPDATE_RESTORED_FROM_HS | WT_UPDATE_TO_DELETE_FROM_HS);
+    F_SET(upd, WT_UPDATE_RESTORED_FROM_HS | WT_UPDATE_TO_DELETE_FROM_HS | WT_UPDATE_HS);
     total_size += size;
 
     __wt_verbose_debug2(session, WT_VERB_TRANSACTION,
@@ -873,7 +879,10 @@ __txn_prepare_rollback_restore_hs_update(
       __wt_timestamp_to_string(upd->prepare_ts, ts_string[1]),
       __wt_timestamp_to_string(upd->upd_durable_ts, ts_string[2]));
 
-    /* If the history store record has a valid stop time point, append it. */
+    /*
+     * If the history store record has a valid stop time point and we want to rollback the prepared
+     * update, append it.
+     */
     if (hs_stop_durable_ts != WT_TS_MAX) {
         WT_ASSERT(session, hs_tw->stop_ts != WT_TS_MAX);
         WT_ERR(__wt_upd_alloc(session, NULL, WT_UPDATE_TOMBSTONE, &tombstone, &size));
@@ -885,7 +894,7 @@ __txn_prepare_rollback_restore_hs_update(
          * Set the flag to indicate that this update has been restored from history store for the
          * rollback of a prepared transaction.
          */
-        F_SET(tombstone, WT_UPDATE_RESTORED_FROM_HS | WT_UPDATE_TO_DELETE_FROM_HS);
+        F_SET(tombstone, WT_UPDATE_RESTORED_FROM_HS | WT_UPDATE_TO_DELETE_FROM_HS | WT_UPDATE_HS);
         total_size += size;
 
         __wt_verbose_debug2(session, WT_VERB_TRANSACTION,
@@ -917,90 +926,8 @@ err:
         WT_ASSERT(session, tombstone == NULL || upd == tombstone);
         __wt_free_update_list(session, &upd);
     }
+done:
     __wt_scr_free(session, &hs_value);
-    return (ret);
-}
-
-/*
- * __txn_fixup_hs_update --
- *     Fix the history store update with the max stop time point if we commit the prepared update.
- */
-static int
-__txn_fixup_hs_update(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor)
-{
-    WT_DECL_ITEM(hs_value);
-    WT_DECL_RET;
-    WT_TIME_WINDOW *hs_tw, tw;
-    WT_TXN *txn;
-    wt_timestamp_t hs_durable_ts, hs_stop_durable_ts;
-    uint64_t type_full;
-    bool txn_error, txn_prepare_ignore_api_check;
-
-    hs_tw = NULL;
-    txn = session->txn;
-
-    __wt_hs_upd_time_window(hs_cursor, &hs_tw);
-
-    /*
-     * If the history update already has a stop time point there is no work to do. This happens if a
-     * deleted key is reinserted by a prepared update.
-     */
-    if (WT_TIME_WINDOW_HAS_STOP(hs_tw))
-        return (0);
-
-    WT_RET(__wt_scr_alloc(session, 0, &hs_value));
-
-    /*
-     * Transaction error is cleared temporarily as cursor functions are not allowed after an error
-     * or a prepared transaction.
-     */
-    txn_error = F_ISSET(txn, WT_TXN_ERROR);
-    F_CLR(txn, WT_TXN_ERROR);
-
-    /*
-     * The API layer will immediately return an error if the WT_TXN_PREPARE flag is set before
-     * attempting cursor operations. However, we can't clear the WT_TXN_PREPARE flag because a
-     * function in the eviction flow may attempt to forcibly rollback the transaction if it is not
-     * marked as a prepared transaction. The flag WT_TXN_PREPARE_IGNORE_API_CHECK is set so that
-     * cursor operations can proceed without having to clear the WT_TXN_PREPARE flag.
-     */
-    txn_prepare_ignore_api_check = F_ISSET(txn, WT_TXN_PREPARE_IGNORE_API_CHECK);
-    F_SET(txn, WT_TXN_PREPARE_IGNORE_API_CHECK);
-
-    /* Get current value. */
-    WT_ERR(
-      hs_cursor->get_value(hs_cursor, &hs_stop_durable_ts, &hs_durable_ts, &type_full, hs_value));
-
-    /* The old stop timestamp must be max. */
-    WT_ASSERT(session, hs_stop_durable_ts == WT_TS_MAX);
-    /* The value older than the prepared update in the history store must be a full value. */
-    WT_ASSERT(session, (uint8_t)type_full == WT_UPDATE_STANDARD);
-
-    /*
-     * Set the stop time point to be the committing transaction's time point and copy the start time
-     * point from the current history store update.
-     */
-    tw.stop_ts = txn->commit_timestamp;
-    tw.durable_stop_ts = txn->durable_timestamp;
-    tw.stop_txn = txn->id;
-    WT_TIME_WINDOW_COPY_START(&tw, hs_tw);
-
-    /*
-     * We need to update the stop durable timestamp stored in the history store value.
-     *
-     * Pack the value using cursor api.
-     */
-    hs_cursor->set_value(hs_cursor, &tw, tw.durable_stop_ts, tw.durable_start_ts,
-      (uint64_t)WT_UPDATE_STANDARD, hs_value);
-    WT_ERR(hs_cursor->update(hs_cursor));
-
-err:
-    if (!txn_prepare_ignore_api_check)
-        F_CLR(txn, WT_TXN_PREPARE_IGNORE_API_CHECK);
-    if (txn_error)
-        F_SET(txn, WT_TXN_ERROR);
-    __wt_scr_free(session, &hs_value);
-
     return (ret);
 }
 
@@ -1190,15 +1117,13 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     WT_UPDATE *head_upd;
     uint8_t hs_recno_key_buf[WT_INTPACK64_MAXSIZE], *p, resolve_case;
     char ts_string[3][WT_TS_INT_STRING_SIZE];
-    bool has_hs_record, tw_found;
+    bool tw_found;
 
     hs_cursor = NULL;
     txn = session->txn;
-    has_hs_record = false;
 #define RESOLVE_UPDATE_CHAIN 0
 #define RESOLVE_PREPARE_ON_DISK 1
-#define RESOLVE_PREPARE_EVICTION_FAILURE 2
-#define RESOLVE_IN_MEMORY 3
+#define RESOLVE_IN_MEMORY 2
     WT_NOT_READ(resolve_case, RESOLVE_UPDATE_CHAIN);
 
     WT_RET(__txn_search_prepared_op(session, op, cursorp, &upd));
@@ -1272,7 +1197,10 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
      *
      * 1) Prepared updates are on the update chain and hasn't been reconciled to write to data
      *    store.
-     *     Simply resolve the prepared updates in memory.
+     *     commit: if we have inserted the older update to the history store with a max stop point,
+     *             mark it to be deleted from the history store.
+     *     rollback: if we have inserted the older update
+     *               to the history store, mark it to be deleted from the history store.
      *
      * 2) Prepared updates are written to the data store.
      *     If there is no older updates written to the history store:
@@ -1280,23 +1208,13 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
      *         rollback: delete the whole key.
      *
      *     If there are older updates written to the history store:
-     *         commit: fix the stop timestamp of the newest update in the history store if it has a
-     *                 max timestamp.
-     *         rollback: restore the newest update in the history store to the data store and mark
-     *                   it to be deleted from the history store in the future reconciliation.
-     *
-     * 3) Prepared updates are successfully reconciled to a new disk image in eviction but the
-     *    eviction fails and the updates are restored back to the old disk image.
-     *     If there is no older updates written to the history store:
-     *         commit: simply resolve the prepared updates in memory.
-     *         rollback: delete the whole key.
-     *
-     *     If there are older updates written to the history store:
-     *          commit: fix the stop timestamp of the newest update in the history store if it has a
-     *                  max timestamp.
-     *          rollback: mark the data update (or tombstone and data update) that is older
-     *                    than the prepared updates to be deleted from the history store in the
-     *                    future reconciliation.
+     *         commit: restore the newest history store update with a max stop time point and mark
+     *                 it to be deleted to fix it in the future reconciliation. When the commit
+     *                 becomes stable, we reinsert the history store record to the history store
+     *                 with the correct stop time point.
+     *         rollback: restore the newest update in the history store to the data store
+     *                   and mark it to be deleted from the history store in the future
+     *                   reconciliation.
      *
      * 4) We are running an in-memory database:
      *     commit: resolve the prepared updates in memory.
@@ -1313,23 +1231,6 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         (upd->next != NULL && upd->upd_durable_ts == upd->next->upd_durable_ts &&
           upd->txnid == upd->next->txnid && upd->upd_start_ts == upd->next->upd_start_ts)))
         resolve_case = RESOLVE_PREPARE_ON_DISK;
-    /*
-     * If the first committed update older than the prepared update has already been marked to be
-     * deleted from the history store, we are in the case that there was an older prepared update
-     * that was rolled back.
-     *
-     * 1) We have a prepared update Up and an update U on the update chain initially.
-     * 2) An eviction writes Up to the disk and U to the history store.
-     * 3) The eviction fails and everything is restored.
-     * 4) We rollback Up and mark U to be deleted from the history store.
-     * 5) We add another prepared update to the update chain.
-     *
-     * Check the WT_UPDATE_TO_DELETE_FROM_HS to see if we have already handled the older prepared
-     * update or not. Ignore if it is already handled.
-     */
-    else if (first_committed_upd != NULL && F_ISSET(first_committed_upd, WT_UPDATE_HS) &&
-      !F_ISSET(first_committed_upd, WT_UPDATE_TO_DELETE_FROM_HS))
-        resolve_case = RESOLVE_PREPARE_EVICTION_FAILURE;
     else if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) || F_ISSET(btree, WT_BTREE_IN_MEMORY))
         resolve_case = RESOLVE_IN_MEMORY;
     else
@@ -1340,47 +1241,26 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         /*
          * If checkpoint writes a prepared update to disk, we may end up here with the first
          * committed update already in the history store. Mark it to be deleted from the history
-         * store.
+         * store. Another case we may end up here is when an eviction failed and the update chain
+         * with prepared updates are restored back to the old disk image.
          */
         if (first_committed_upd != NULL && F_ISSET(first_committed_upd, WT_UPDATE_HS) &&
           !F_ISSET(first_committed_upd, WT_UPDATE_TO_DELETE_FROM_HS)) {
             WT_ASSERT(session, F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED));
-            if (!commit) {
+            if (commit) {
+                /*
+                 * For the commit case, we only need to delete the history store record if it
+                 * doesn't have a stop point.
+                 */
+                if (first_committed_upd->type != WT_UPDATE_TOMBSTONE)
+                    __wt_txn_mark_upd_to_delete_from_hs(session, first_committed_upd);
+            } else
                 __wt_txn_mark_upd_to_delete_from_hs(session, first_committed_upd);
-                break;
-            }
-
-            goto fix_hs;
         }
 
         break;
 
-    case RESOLVE_PREPARE_EVICTION_FAILURE:
-        /*
-         * If we see the first committed update has been moved to the history store, we must have
-         * done a successful reconciliation on the page but failed to evict it. Also reconciliation
-         * could not possibly empty the page because the prepared update is not globally visible.
-         * Therefore, reconciliation must have either split the page or done a page rewrite.
-         *
-         * In this case, we still need to resolve the prepared update as if we have successfully
-         * evicted the page because the value older than the prepared update has been written to the
-         * history store with the max timestamp.
-         */
-        WT_ASSERT(session,
-          page->modify->rec_result == WT_PM_REC_MULTIBLOCK ||
-            page->modify->rec_result == WT_PM_REC_REPLACE);
-        /*
-         * Marked the update older than the prepared update that is already in the history store to
-         * be deleted from the history store.
-         */
-        if (!commit) {
-            __wt_txn_mark_upd_to_delete_from_hs(session, first_committed_upd);
-            break;
-        }
-
-        /* Fall through. */
     case RESOLVE_PREPARE_ON_DISK:
-fix_hs:
         /*
          * Open a history store table cursor and scan the history store for the given btree and key
          * with maximum start timestamp to let the search point to the last version of the key.
@@ -1410,17 +1290,10 @@ fix_hs:
          */
         WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_before(session, hs_cursor), true);
 
-        /* We should only get not found if the prepared update is on disk. */
-        WT_ASSERT(session, ret != WT_NOTFOUND || resolve_case == RESOLVE_PREPARE_ON_DISK);
-        if (ret == 0) {
-            has_hs_record = true;
-            /*
-             * Restore the history store update to the update chain if we are rolling back the
-             * prepared update written to the disk image.
-             */
-            if (!commit && resolve_case == RESOLVE_PREPARE_ON_DISK)
-                WT_ERR(__txn_prepare_rollback_restore_hs_update(session, hs_cursor, page, upd));
-        } else {
+        if (ret == 0)
+            /* Restore the history store update to the update chain. */
+            WT_ERR(__txn_prepare_rollback_restore_hs_update(session, hs_cursor, page, upd, commit));
+        else {
             ret = 0;
             /*
              * Allocate a tombstone and prepend it to the row so when we reconcile the update chain
@@ -1478,13 +1351,6 @@ fix_hs:
 
     /* Mark the page dirty once the prepared updates are resolved. */
     __wt_page_modify_set(session, page);
-
-    /*
-     * Fix the history store record's stop time point if we are committing the prepared update and
-     * the previous update is written to the history store.
-     */
-    if (commit && has_hs_record)
-        WT_ERR(__txn_fixup_hs_update(session, hs_cursor));
 
 prepare_verify:
     /*

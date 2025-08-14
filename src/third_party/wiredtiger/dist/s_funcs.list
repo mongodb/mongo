@@ -5,6 +5,12 @@ __bit_ffs
 __bit_nclr
 __ovfl_discard_dump
 __ovfl_reuse_dump
+__wt_4b_pack_posint1
+__wt_4b_pack_posint2
+__wt_4b_size_posint1
+__wt_4b_size_posint2
+__wt_4b_unpack_posint1
+__wt_4b_unpack_posint2
 __wt_bloom_create
 __wt_bloom_drop
 __wt_bloom_finalize
@@ -27,14 +33,17 @@ __wt_debug_set_verbose
 __wt_debug_tree
 __wt_debug_tree_all
 __wt_debug_tree_shape
-# FIXME-13125 should be used by waitable_atomic
-__wt_futex_wake
+__wt_decode_positive_as_signed
+__wt_encode_signed_as_positive
 __wt_futex_wait
+__wt_futex_wake
 __wt_lex_compare
 __wt_lex_compare_skip
 __wt_log_scan
 __wt_nlpo2
 __wt_nlpo2_round
+__wt_page_from_npos
+__wt_page_from_npos_for_read
 __wt_session_breakpoint
 __wt_strcat
 __wt_stream_set_no_buffer
@@ -55,5 +64,3 @@ wiredtiger_unpack_item
 wiredtiger_unpack_start
 wiredtiger_unpack_str
 wiredtiger_unpack_uint
-__wt_page_from_npos
-__wt_page_from_npos_for_read

@@ -175,6 +175,7 @@ GetLastError
 GetModuleHandleExW
 GetProcAddress
 Getters
+Golomb
 HANDLEOPS
 HFS
 HOTBACKUP
@@ -219,6 +220,7 @@ LOGSCAN
 LOGSLOT
 LRU
 LSB
+LSBs
 LSM
 LSN
 LSNs
@@ -245,6 +247,7 @@ MOVEFILE
 MRXB
 MRXBOPC
 MSAN
+MSB
 MSDN
 MSVC
 MSan
@@ -542,6 +545,7 @@ bitcnt
 bitfield
 bitfields
 bitflip
+bitpack
 bitstr
 bitstring
 bitwise
@@ -558,6 +562,7 @@ bool
 boolean
 booleans
 boption
+bpack
 br
 breakpoint
 bs
@@ -589,6 +594,7 @@ ccc
 ccr
 cd
 ce
+ceil
 celsius
 centric
 cerr
@@ -656,6 +662,7 @@ cryptographic
 cstring
 csuite
 ctime
+ctx
 ctype
 curbackup
 curbt
@@ -759,6 +766,7 @@ encodings
 encryptor
 encryptors
 endian
+enomem
 enum
 env
 eof
@@ -1049,6 +1057,7 @@ msg
 msvc
 multiblock
 multicycle
+multiline
 multiprocess
 multithreaded
 multithreading
@@ -1129,6 +1138,7 @@ ori
 origstartrecno
 os
 ostream
+overcount
 oversized
 ovfl
 ownp
@@ -1231,6 +1241,7 @@ relocked
 repl
 repositioned
 repositions
+reproducibility
 requeue
 resizable
 ret
@@ -1245,6 +1256,7 @@ rng
 rol
 rotN
 rotn
+roundtrip
 rpc
 rts
 ru
@@ -1454,6 +1466,7 @@ vPodir
 vW
 va
 validator
+vals
 valuep
 valuev
 vanishingly

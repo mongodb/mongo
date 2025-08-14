@@ -620,7 +620,8 @@ typedef uint64_t wt_timestamp_t;
 #include "../evict/evict_inline.h" /* required by misc_inline.h */
 #include "ctype_inline.h"          /* required by packing_inline.h */
 #include "intpack_inline.h"        /* required by cell_inline.h, packing_inline.h */
-#include "misc_inline.h"           /* required by mutex_inline.h */
+#include "int4bitpack_inline.h"
+#include "misc_inline.h" /* required by mutex_inline.h */
 
 #include "generation_inline.h" /* required by txn_inline.h */
 #include "buf_inline.h"        /* required by cell_inline.h */

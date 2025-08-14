@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger
+import wiredtiger, wttest
 from prepare_util import test_prepare_preserve_prepare_base
 
 # Test eviction free updates with prepared transactions
@@ -34,12 +34,12 @@ from prepare_util import test_prepare_preserve_prepare_base
 class test_prepare37(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare37'
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_commit_prepare(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
-        if 'disagg' in self.hook_names:
-            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
+
         create_params = 'key_format=i,value_format=S'
         self.session.create(self.uri, create_params)
 
@@ -146,12 +146,11 @@ class test_prepare37(test_prepare_preserve_prepare_base):
         self.assertEqual(read_cursor[20], "committed_value_20_1")
         self.session.rollback_transaction()
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_rollback_prepare(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
-        if 'disagg' in self.hook_names:
-            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
         create_params = 'key_format=i,value_format=S'
         self.session.create(self.uri, create_params)
 
@@ -253,12 +252,12 @@ class test_prepare37(test_prepare_preserve_prepare_base):
         self.assertEqual(read_cursor[20], "committed_value_20_1")
         self.session.rollback_transaction()
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_commit_prepare_delete(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
-        if 'disagg' in self.hook_names:
-            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
+
         create_params = 'key_format=i,value_format=S'
         self.session.create(self.uri, create_params)
 
@@ -362,12 +361,12 @@ class test_prepare37(test_prepare_preserve_prepare_base):
         self.assertEqual(read_cursor[20], "committed_value_20_1")
         self.session.rollback_transaction()
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_rollback_prepare_delete(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
-        if 'disagg' in self.hook_names:
-            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
+
         create_params = 'key_format=i,value_format=S'
         self.session.create(self.uri, create_params)
 

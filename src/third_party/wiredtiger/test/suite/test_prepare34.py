@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger
+import wiredtiger, wttest
 from prepare_util import test_prepare_preserve_prepare_base
 
 # Tests checkpoint behavior for prepared modify operations:
@@ -37,6 +37,7 @@ from prepare_util import test_prepare_preserve_prepare_base
 class test_prepare34(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare34'
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_rollback_prepare_modify(self):
         """
         Test that prepared transactions containing modify operations that are rolled back
@@ -46,9 +47,6 @@ class test_prepare34(test_prepare_preserve_prepare_base):
         # Set initial timestamps
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
-
-        if 'disagg' in self.hook_names:
-            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
 
         uri = 'table:test_prepare34'
         create_params = 'key_format=i,value_format=S'
@@ -123,7 +121,7 @@ class test_prepare34(test_prepare_preserve_prepare_base):
             self.assertEqual(value, cursor[i])
         self.session.rollback_transaction()
 
-
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_commit_prepare_modify(self):
         """
         Test that prepared transactions containing modify operations that are rolled back
@@ -133,8 +131,6 @@ class test_prepare34(test_prepare_preserve_prepare_base):
         # Set initial timestamps
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
-        if 'disagg' in self.hook_names:
-            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
 
         create_params = 'key_format=i,value_format=S'
         self.session.create(self.uri, create_params)

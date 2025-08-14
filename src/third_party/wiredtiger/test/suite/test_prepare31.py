@@ -10,7 +10,7 @@
 # binary, for any purpose, commercial or non-commercial, and by any
 # means.
 #
-# In jself.urisdictions that recognize copyright laws, the author or authors
+# In jurisdictions that recognize copyright laws, the author or authors
 # of this software dedicate any and all copyright interest in the
 # software to the public domain. We make this dedication for the benefit
 # of the public at large and to the detriment of our heirs and
@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger
+import wiredtiger, wttest
 from prepare_util import test_prepare_preserve_prepare_base
 
 # Tests checkpoint behavior with aborted prepared transactions based on stable timestamp:
@@ -91,10 +91,10 @@ class test_prepare31(test_prepare_preserve_prepare_base):
         self.assertEqual(rec_time_window_prepared, expected_value)
         stat_cursor.close()
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_skip_aborted_prepare_update_if_stable_rollback_timestamp(self):
         self.setup_initial_data(self.uri)
-        if 'disagg' in self.hook_names:
-            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
+
         # Create and rollback a prepared transaction
         self.create_prepared_transaction(self.uri, prepare_ts=70, rollback_ts=80)
 
@@ -107,10 +107,10 @@ class test_prepare31(test_prepare_preserve_prepare_base):
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
         }, self.uri)
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_skip_aborted_prepare_update_if_prepare_timestamp_not_stable(self):
         self.setup_initial_data(self.uri)
-        if 'disagg' in self.hook_names:
-            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
+
         # Create and rollback a prepared transaction
         self.create_prepared_transaction(self.uri, prepare_ts=70, rollback_ts=80)
 
@@ -120,10 +120,10 @@ class test_prepare31(test_prepare_preserve_prepare_base):
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
         }, self.uri)
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_write_prepare_update_if_rollback_timestamp_not_stable(self):
         self.setup_initial_data(self.uri)
-        if 'disagg' in self.hook_names:
-            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
+
         # Create and rollback a prepared transaction
         self.create_prepared_transaction(self.uri, prepare_ts=70, rollback_ts=80)
 

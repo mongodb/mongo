@@ -26,14 +26,8 @@
 static inline int
 __block_disagg_addr_pack_version(uint8_t **pp, size_t maxlen)
 {
-    uint8_t *p;
-    p = *pp;
-
-    WT_SIZE_CHECK_PACK(1, maxlen);
-    *p++ = WT_BLOCK_DISAGG_ADDR_VERSION | (WT_BLOCK_DISAGG_ADDR_VERSION_MIN << 4);
-
-    *pp = p;
-    return (0);
+    return (__wt_4b_pack_posint2(pp, maxlen ? *pp + maxlen : NULL, WT_BLOCK_DISAGG_ADDR_VERSION,
+      WT_BLOCK_DISAGG_ADDR_VERSION_MIN));
 }
 
 /*
@@ -44,16 +38,12 @@ static inline int
 __block_disagg_addr_unpack_version(
   const uint8_t **pp, size_t maxlen, uint8_t *version, uint8_t *version_min)
 {
-    uint8_t version_byte;
-    const uint8_t *p;
-    p = *pp;
-
-    WT_SIZE_CHECK_UNPACK(1, maxlen);
-    version_byte = *p++;
-    *version = version_byte & 0x0f;
-    *version_min = version_byte >> 4;
-
-    *pp += 1;
+    uint64_t version_ = 0,
+             version_min_ =
+               0; /* Just to suppress gcc "may be used uninitialized in this function" */
+    WT_RET(__wt_4b_unpack_posint2(pp, maxlen ? *pp + maxlen : NULL, &version_, &version_min_));
+    *version = (uint8_t)version_;
+    *version_min = (uint8_t)version_min_;
     return (0);
 }
 
@@ -102,7 +92,8 @@ __wti_block_disagg_addr_unpack(WT_SESSION_IMPL *session, const uint8_t **buf, si
 {
     uint64_t base_lsn, base_lsn_delta, flags, lsn, page_id, size, unsupported_flags;
     uint32_t checksum;
-    uint8_t version, version_min;
+    uint8_t version = 0,
+            version_min = 0; /* Just to suppress gcc "may be used uninitialized in this function" */
     const uint8_t *begin;
 
     begin = *buf;

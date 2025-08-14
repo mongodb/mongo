@@ -2769,6 +2769,10 @@ __conn_config_file_system(WT_SESSION_IMPL *session, const char *cfg[])
         if (F_ISSET(conn, WT_CONN_IN_MEMORY))
             WT_RET_MSG(
               session, EINVAL, "Live restore is not compatible with an in-memory connections");
+        WT_RET(__wt_config_gets(session, cfg, "disaggregated.page_log", &cval));
+        if (cval.len != 0)
+            WT_RET_MSG(
+              session, EINVAL, "Live restore is not compatible with disaggregated storage mode");
 #ifdef _MSC_VER
         /* FIXME-WT-14051 Add support for Windows */
         WT_RET_MSG(session, EINVAL, "Live restore is not supported on Windows");

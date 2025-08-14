@@ -803,8 +803,15 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
             if (txnid == WT_TXN_ABORTED)
                 continue;
 
-            /* We must have deleted any update left in the history store. */
-            WT_ASSERT(session, !F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS));
+            /*
+             * We must have deleted any update left in the history store except if the preserve
+             * prepared config is enabled as we cannot delete them until the associated prepare
+             * commit or rollback becomes stable.
+             */
+            WT_ASSERT(session,
+              !F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS) ||
+                (F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) &&
+                  WT_TIME_WINDOW_HAS_START_PREPARE(&list->tw)));
 
             /* Detect any update without a timestamp. */
             if (prev_upd != NULL && prev_upd->upd_start_ts < upd->upd_start_ts) {
