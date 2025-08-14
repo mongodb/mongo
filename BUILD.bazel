@@ -290,7 +290,7 @@ mongo_install(
         "@platforms//os:windows": ["@windows_sasl//:bins"],
         "//conditions:default": [],
     }) + select({
-        "//bazel/config:extensions_buildable": [":dist_test_extensions"],
+        "@platforms//os:linux": [":dist_test_extensions"],
         "//conditions:default": [],
     }) + select({
         "//bazel/config:include_mongot_enabled": ["//:mongot_folder"],
