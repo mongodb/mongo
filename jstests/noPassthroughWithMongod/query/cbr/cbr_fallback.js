@@ -56,6 +56,8 @@ function testPartialIndex() {
     // 1. Fetch(a) -> Ixscan(b)
     // 2. Fetch(b) -> Ixscan(a)
     // 3. Fetch -> IxIntersect [IxScan(a), Ixscan(b)]
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}));
     assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: {a: {$gt: 10}}}));
     assert.commandWorked(coll.createIndex({b: 1}));
     const explain = coll.find({a: 20, b: 20}).explain();
@@ -244,4 +246,6 @@ try {
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}));
 }

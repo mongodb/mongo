@@ -28,6 +28,7 @@ const expectedParamDefaults = {
     internalQueryForceIntersectionPlans: false,
     internalQueryPlannerEnableIndexIntersection: true,
     internalQueryPlannerEnableHashIntersection: false,
+    internalQueryPlannerEnableSortIndexIntersection: false,
     internalQueryPlanOrChildrenIndependently: true,
     internalQueryMaxScansToExplode: 200,
     internalQueryMaxBlockingSortMemoryUsageBytes: 100 * 1024 * 1024,

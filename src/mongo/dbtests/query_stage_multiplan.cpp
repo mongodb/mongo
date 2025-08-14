@@ -488,9 +488,10 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
         .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollectionPtr());
 
-    // Force index intersection.
+    // Force index intersection and enable AND_SORTED intersection.
     bool forceIxisectOldValue = internalQueryForceIntersectionPlans.load();
     internalQueryForceIntersectionPlans.store(true);
+    internalQueryPlannerEnableSortIndexIntersection.store(true);
 
     // Plan.
     auto plannerParams = makePlannerParams(collection, *cq);

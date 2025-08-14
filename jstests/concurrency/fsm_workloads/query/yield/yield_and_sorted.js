@@ -49,6 +49,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.data.originalQueryPlannerEnableHashIntersection = {};
+    $config.data.originalQueryPlannerEnableSortIndexIntersection = {};
     $config.data.originalQueryPlannerEnableIndexIntersection = {};
     $config.data.originalQueryForceIntersectionPlans = {};
 
@@ -63,14 +64,19 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             this.originalQueryPlannerEnableHashIntersection[db.getMongo().host] = res1.was;
             const res2 = assert.commandWorked(db.adminCommand({
                 setParameter: 1,
+                internalQueryPlannerEnableSortIndexIntersection: true,
+            }));
+            this.originalQueryForceIntersectionPlans[db.getMongo().host] = res2.was;
+            const res3 = assert.commandWorked(db.adminCommand({
+                setParameter: 1,
                 internalQueryPlannerEnableIndexIntersection: true,
             }));
-            this.originalQueryPlannerEnableIndexIntersection[db.getMongo().host] = res2.was;
-            const res3 = assert.commandWorked(db.adminCommand({
+            this.originalQueryPlannerEnableIndexIntersection[db.getMongo().host] = res3.was;
+            const res4 = assert.commandWorked(db.adminCommand({
                 setParameter: 1,
                 internalQueryForceIntersectionPlans: true,
             }));
-            this.originalQueryForceIntersectionPlans[db.getMongo().host] = res3.was;
+            this.originalQueryForceIntersectionPlans[db.getMongo().host] = res4.was;
         });
     };
 
@@ -82,6 +88,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 setParameter: 1,
                 internalQueryPlannerEnableHashIntersection:
                     this.originalQueryPlannerEnableHashIntersection[db.getMongo().host],
+            }));
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                internalQueryPlannerEnableSortIndexIntersection:
+                    this.originalQueryPlannerEnableSortIndexIntersection[db.getMongo().host],
             }));
             assert.commandWorked(db.adminCommand({
                 setParameter: 1,

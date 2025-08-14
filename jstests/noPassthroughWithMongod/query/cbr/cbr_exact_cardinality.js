@@ -71,6 +71,7 @@ function testAndHash() {
         db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}));
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: true}));
+
     assert(coll.drop());
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(coll.createIndex({b: 1}));
@@ -116,6 +117,8 @@ function testAndSorted() {
     // plan is at least enumerated.
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}));
     assert(coll.drop());
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(coll.createIndex({b: 1}));
@@ -131,6 +134,8 @@ function testAndSorted() {
     assertCorrectCardinality({a: 1, b: 1});
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: false}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}));
 }
 
 function testRootedOr() {
@@ -261,4 +266,6 @@ try {
         db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: false}));
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: false}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}));
 }

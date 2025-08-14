@@ -69,6 +69,7 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1625,6 +1626,9 @@ TEST_F(CachePlanSelectionTest, CachedPlanForCompoundMultikeyIndexCanCompoundBoun
 
 TEST_F(CachePlanSelectionTest,
        CachedPlanForSelfIntersectionOfMultikeyIndexPointRangesCannotIntersectBounds) {
+    // Enable a merge sort based index intersection plan to be generated.
+    RAIIServerParameterControllerForTest truncateFeatureFlag{
+        "internalQueryPlannerEnableSortIndexIntersection", true};
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
@@ -1668,6 +1672,9 @@ TEST_F(CachePlanSelectionTest,
 
 
 TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionOfMultikeyIndexesWhenUsingElemMatch) {
+    // Enable a merge sort based index intersection plan to be generated.
+    RAIIServerParameterControllerForTest truncateFeatureFlag{
+        "internalQueryPlannerEnableSortIndexIntersection", true};
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 

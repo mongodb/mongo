@@ -5,7 +5,10 @@ import {getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyz
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 
-// Enable and force index intersections plans.
+// Enable sort-based index intersection and force index intersections plans.
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}));
+
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}));
 
 function runAndSortedTests() {
