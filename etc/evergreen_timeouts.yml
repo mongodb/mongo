@@ -78,3 +78,43 @@ overrides:
   ubuntu1804-asan:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
+
+  enterprise-rhel-83-s390x:
+    - task: ^archive_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^compile_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^stitch_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^crypt_.*
+      exec_timeout: 840 # 14 hours
+
+  enterprise-rhel-83-s390x-shared:
+    - task: ^archive_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^compile_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^stitch_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^crypt_.*
+      exec_timeout: 840 # 14 hours
+
+  enterprise-rhel-9-s390x:
+    - task: ^archive_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^compile_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^stitch_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^crypt_.*
+      exec_timeout: 840 # 14 hours
+
+  enterprise-rhel-9-s390x-shared:
+    - task: ^archive_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^compile_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^stitch_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^crypt_.*
+      exec_timeout: 840 # 14 hours

@@ -137,6 +137,7 @@ variables:
   - func: "apply compile expansions"
   - func: "set task expansion macros"
   - func: "f_expansions_write"
+  - func: "override task timeout"
   teardown_task:
   - func: "f_expansions_write"
   - func: "attach scons logs"
@@ -209,6 +210,7 @@ variables:
   - func: "apply compile expansions"
   - func: "set task expansion macros"
   - func: "f_expansions_write"
+  - func: "override task timeout"
   teardown_task:
   - func: "attach scons logs"
   - func: "send scons cedar report"
@@ -715,6 +717,30 @@ functions:
     params:
       exec_timeout_secs: ${exec_timeout_secs}
       timeout_secs: ${timeout_secs}
+
+  "override task timeout":
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/run_python_script.sh"
+          - "evergreen/generate_override_timeout.py"
+          - "--variant_name"
+          - "${compile_variant}"
+          - "--task_name"
+          - "${task_name}"
+    - *f_expansions_write
+    - command: expansions.update
+      params:
+        ignore_missing_file: true
+        file: src/override_task_timeout.yml
+    - *f_expansions_write
+    - command: timeout.update
+      params:
+        exec_timeout_secs: ${override_task_timeout}
+        timeout_secs: ${override_task_timeout}
+    - *f_expansions_write
 
   ### Set expansion macros used in each task.
   "set task expansion macros": &set_task_expansion_macros
@@ -8435,6 +8461,7 @@ task_groups:
   - func: "apply compile expansions"
   - func: "set task expansion macros"
   - func: "f_expansions_write"
+  - func: "override task timeout"
   teardown_task:
   - func: "attach scons logs"
   - func: "send scons cedar report"
