@@ -44,6 +44,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/validate/validate_gen.h"
 #include "mongo/db/views/view.h"
 #include "mongo/logv2/log.h"
@@ -171,74 +172,30 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
         shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
             RecoveryUnit::ReadSource::kProvided, *_validateTs);
 
-        try {
-            shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
-        } catch (const ExceptionFor<ErrorCodes::SnapshotTooOld>&) {
-            // This will throw SnapshotTooOld to indicate we cannot find an available snapshot at
-            // the provided timestamp. This is likely because minSnapshotHistoryWindowInSeconds has
-            // been changed to a lower value from the default of 5 minutes.
-            return Status(
-                ErrorCodes::NamespaceNotFound,
-                fmt::format("Cannot run background validation on collection {} because the "
-                            "snapshot history is no longer available",
-                            _nss.toStringForErrorMsg()));
-        }
+        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isActive());
+    }
 
-        _catalog = CollectionCatalog::get(opCtx);
-        _collection =
-            CollectionPtr(_catalog->establishConsistentCollection(opCtx, _nss, _validateTs));
-    } else {
-        _databaseLock.emplace(
+    // MODE_IS converts to "MaybeLockFree" for background validation when using this API.
+    auto [acquisition, wasRenamed] = timeseries::acquireCollectionWithBucketsLookup(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
             opCtx,
-            _nss.dbName(),
-            MODE_IX,
-            boost::none,
-            Date_t::max(),
-            Lock::DBLockSkipOptions{false,
-                                    false,
-                                    false,
-                                    getRepairMode() != RepairMode::kNone
-                                        ? rss::consensus::IntentRegistry::Intent::LocalWrite
-                                        : rss::consensus::IntentRegistry::Intent::Read});
-        _collectionLock.emplace(opCtx, _nss, MODE_X);
-        _catalog = CollectionCatalog::get(opCtx);
-        // TODO(SERVER-103401): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        _collection =
-            CollectionPtr::CollectionPtr_UNSAFE(_catalog->lookupCollectionByNamespace(opCtx, _nss));
-    }
-
-    if (!_collection) {
-        auto view = _catalog->lookupView(opCtx, _nss);
-        if (!view) {
-            return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Collection '" << _nss.toStringForErrorMsg()
-                                        << "' does not exist to validate.");
-        }
-
-        // For validation on time-series collections, we need to use the bucket namespace.
-        if (!view->timeseries()) {
-            return Status(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
-        }
-
+            _nss,
+            !isBackground() && getRepairMode() != RepairMode::kNone
+                ? AcquisitionPrerequisites::OperationType::kUnreplicatedWrite
+                : AcquisitionPrerequisites::OperationType::kRead),
+        isBackground() ? LockMode::MODE_IS : LockMode::MODE_X);
+    if (wasRenamed) {
         _nss = _nss.makeTimeseriesBucketsNamespace();
-        if (isBackground()) {
-            _collection =
-                CollectionPtr(_catalog->establishConsistentCollection(opCtx, _nss, _validateTs));
-        } else {
-            _collectionLock.emplace(opCtx, _nss, MODE_X);
-            // TODO(SERVER-103401): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            _collection = CollectionPtr::CollectionPtr_UNSAFE(
-                _catalog->lookupCollectionByNamespace(opCtx, _nss));
-        }
-
-        if (!_collection) {
-            return Status(ErrorCodes::NamespaceNotFound,
-                          fmt::format("Cannot validate a time-series collection without its "
-                                      "bucket collection {}.",
-                                      _nss.toStringForErrorMsg()));
-        }
     }
+
+    if (!acquisition.exists()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Collection '" << _nss.toStringForErrorMsg()
+                                    << "' does not exist to validate.");
+    }
+
+    _collection = std::move(acquisition);
 
     if (MONGO_unlikely(hangDuringValidationInitialization.shouldFail())) {
         LOGV2(7490901, "Hanging on fail point 'hangDuringValidationInitialization'");
@@ -262,11 +219,11 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
 
 void ValidateState::initializeCursors(OperationContext* opCtx) {
     _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
-        opCtx, _collection->getRecordStore(), &_dataThrottle);
+        opCtx, getCollection()->getRecordStore(), &_dataThrottle);
     _seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
-        opCtx, _collection->getRecordStore(), &_dataThrottle);
+        opCtx, getCollection()->getRecordStore(), &_dataThrottle);
 
-    const IndexCatalog* indexCatalog = _collection->getIndexCatalog();
+    const IndexCatalog* indexCatalog = getCollection()->getIndexCatalog();
     // The index iterator for ready indexes is timestamp-aware and will only return indexes that
     // are visible at our read time.
     const auto it = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);

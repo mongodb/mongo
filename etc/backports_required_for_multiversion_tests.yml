@@ -480,6 +480,8 @@ last-continuous:
       ticket: SERVER-82020
     - test_file: jstests/aggregation/expressions/reduce_overflow.js
       ticket: SERVER-102364
+    - test_file: jstests/sharding/validate_collection_shard_version.js
+      ticket: SERVER-87119
   suites: null
 last-lts:
   all:
@@ -1015,4 +1017,6 @@ last-lts:
       ticket: SERVER-95570
     - test_file: jstests/aggregation/expressions/reduce_overflow.js
       ticket: SERVER-102364
+    - test_file: jstests/sharding/validate_collection_shard_version.js
+      ticket: SERVER-87119
   suites: null

@@ -1459,6 +1459,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/stop_shard_draining_test.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/remove_shard_interoperability_tests.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/commit_shard_removal_test.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/validate_collection*.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/add_and_remove_shard_serializes_with_ddl.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/analyze_shard_key/OWNERS.yml

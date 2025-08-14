@@ -79,6 +79,9 @@ filters:
   - "commit_shard_removal_test.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "validate_collection*.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "add_and_remove_shard_serializes_with_ddl.js":
     approvers:
       - 10gen/server-catalog-and-routing
