@@ -54,6 +54,9 @@ filters:
   - "core_wildcard_indexes.yml":
     approvers:
       - 10gen/query-execution-write-exec
+  - "extensions*":
+    approvers:
+      - 10gen/query-integration-extensions
   - "fle*":
     approvers:
       - 10gen/query-integration-extensions

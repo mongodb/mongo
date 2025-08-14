@@ -160,6 +160,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/change_streams* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/clustered_collection_passthrough.yml @10gen/query-execution @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/core_wildcard_indexes.yml @10gen/query-execution-write-exec @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/extensions* @10gen/query-integration-extensions @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/fle* @10gen/query-integration-extensions @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/json_schema.yml @10gen/query-execution @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/query_stats* @10gen/query-integration-observability @svc-auto-approve-bot
@@ -812,6 +813,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/disk/OWNERS.yml
 /jstests/disk/**/* @10gen/server-storage-engine-api @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/extensions/OWNERS.yml
+/jstests/extensions/**/* @10gen/query-integration-extensions-api @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/fail_point/OWNERS.yml
 /jstests/fail_point/**/* @10gen/server-programmability @svc-auto-approve-bot
