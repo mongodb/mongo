@@ -105,10 +105,10 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
     insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "ShardCollectionWritesOplog");
 }
 
-void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
-                                      const DatabaseName& dbName,
-                                      const ShardId& oldPrimary,
-                                      const ShardId& newPrimary) {
+repl::MutableOplogEntry buildMovePrimaryOplogEntry(OperationContext* opCtx,
+                                                   const DatabaseName& dbName,
+                                                   const ShardId& oldPrimary,
+                                                   const ShardId& newPrimary) {
     repl::MutableOplogEntry oplogEntry;
     const auto dbNameStr =
         DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
@@ -122,7 +122,17 @@ void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
     oplogEntry.setOpTime(repl::OpTime());
     oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
-    insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "MovePrimaryWritesOplog");
+    return oplogEntry;
+}
+
+void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
+                                      const DatabaseName& dbName,
+                                      const ShardId& oldPrimary,
+                                      const ShardId& newPrimary) {
+    insertNotificationOplogEntries(
+        opCtx,
+        {buildMovePrimaryOplogEntry(opCtx, dbName, oldPrimary, newPrimary)},
+        "MovePrimaryWritesOplog");
 }
 
 void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
@@ -204,8 +214,8 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
     }
 }
 
-void notifyChangeStreamsOnNamespacePlacementChanged(OperationContext* opCtx,
-                                                    const NamespacePlacementChanged& notification) {
+repl::MutableOplogEntry buildNamespacePlacementChangedOplogEntry(
+    OperationContext* opCtx, const NamespacePlacementChanged& notification) {
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
     oplogEntry.setNss(notification.getNss());
@@ -217,9 +227,12 @@ void notifyChangeStreamsOnNamespacePlacementChanged(OperationContext* opCtx,
 
     const auto buildO2Field = [&] {
         BSONObjBuilder nsFieldBuilder;
-        nsFieldBuilder.append("db", notification.getNss().dbName().toStringForResourceId());
-        if (!notification.getNss().isDbOnly()) {
-            nsFieldBuilder.append("coll", notification.getNss().coll());
+        if (notification.getNss() != NamespaceString::kEmpty) {
+            nsFieldBuilder.append("db", notification.getNss().dbName().toStringForResourceId());
+
+            if (!notification.getNss().isDbOnly()) {
+                nsFieldBuilder.append("coll", notification.getNss().coll());
+            }
         }
 
         return BSON("namespacePlacementChanged" << 1 << "ns" << nsFieldBuilder.obj()
@@ -231,10 +244,15 @@ void notifyChangeStreamsOnNamespacePlacementChanged(OperationContext* opCtx,
     oplogEntry.setOpTime(repl::OpTime());
     oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
-    insertNotificationOplogEntries(
-        opCtx, {std::move(oplogEntry)}, "NamespacePlacementChangedWritesOplog");
+    return oplogEntry;
 }
 
+void notifyChangeStreamsOnNamespacePlacementChanged(OperationContext* opCtx,
+                                                    const NamespacePlacementChanged& notification) {
+    insertNotificationOplogEntries(opCtx,
+                                   {buildNamespacePlacementChangedOplogEntry(opCtx, notification)},
+                                   "NamespacePlacementChangedWritesOplog");
+}
 
 void notifyChangeStreamOnEndOfTransaction(OperationContext* opCtx,
                                           const LogicalSessionId& lsid,
@@ -249,15 +267,15 @@ void notifyChangeStreamOnEndOfTransaction(OperationContext* opCtx,
     insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "EndOfTransactionWritesOplog");
 }
 
-void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
-                                        const NamespaceString& collName,
-                                        const boost::optional<UUID>& collUUID,
-                                        const ShardId& donor,
-                                        const ShardId& recipient,
-                                        bool noMoreCollectionChunksOnDonor,
-                                        bool firstCollectionChunkOnRecipient) {
+std::vector<repl::MutableOplogEntry> buildMoveChunkOplogEntries(
+    OperationContext* opCtx,
+    const NamespaceString& collName,
+    const boost::optional<UUID>& collUUID,
+    const ShardId& donor,
+    const ShardId& recipient,
+    bool noMoreCollectionChunksOnDonor,
+    bool firstCollectionChunkOnRecipient) {
     const auto nss = NamespaceStringUtil::serialize(collName, SerializationContext::stateDefault());
-
     std::vector<repl::MutableOplogEntry> oplogEntries;
     {
         repl::MutableOplogEntry oplogEntry;
@@ -315,7 +333,25 @@ void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
         oplogEntries.push_back(std::move(legacyOplogEntry));
     }
 
-    insertNotificationOplogEntries(opCtx, std::move(oplogEntries), "ChunkMigrationWritesOplog");
+    return oplogEntries;
+}
+
+void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
+                                        const NamespaceString& collName,
+                                        const boost::optional<UUID>& collUUID,
+                                        const ShardId& donor,
+                                        const ShardId& recipient,
+                                        bool noMoreCollectionChunksOnDonor,
+                                        bool firstCollectionChunkOnRecipient) {
+    insertNotificationOplogEntries(opCtx,
+                                   buildMoveChunkOplogEntries(opCtx,
+                                                              collName,
+                                                              collUUID,
+                                                              donor,
+                                                              recipient,
+                                                              noMoreCollectionChunksOnDonor,
+                                                              firstCollectionChunkOnRecipient),
+                                   "ChunkMigrationWritesOplog");
 }
 
 }  // namespace mongo

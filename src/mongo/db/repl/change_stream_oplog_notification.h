@@ -34,6 +34,7 @@
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/uuid.h"
 
@@ -52,6 +53,14 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
                                           const CollectionSharded& notification);
 
 /**
+ * Builds no-op oplog entry corresponding to movePrimary event.
+ */
+repl::MutableOplogEntry buildMovePrimaryOplogEntry(OperationContext* opCtx,
+                                                   const DatabaseName& dbName,
+                                                   const ShardId& oldPrimary,
+                                                   const ShardId& newPrimary);
+
+/**
  * Writes a no-op oplog entry on movePrimary event.
  */
 void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
@@ -66,6 +75,22 @@ void notifyChangeStreamsOnReshardCollectionComplete(
     OperationContext* opCtx, const CollectionResharded& CollectionReshardedNotification);
 
 /**
+ * Builds no-op oplog entries corresponding to the completion of moveChunk/moveRange operation.
+ * Builds up to three oplog entries:
+ * - moveChunk
+ * - migrateLastChunkFromShard
+ * - migrateChunkToNewShard
+ */
+std::vector<repl::MutableOplogEntry> buildMoveChunkOplogEntries(
+    OperationContext* opCtx,
+    const NamespaceString& collName,
+    const boost::optional<UUID>& collUUID,
+    const ShardId& donor,
+    const ShardId& recipient,
+    bool noMoreCollectionChunksOnDonor,
+    bool firstCollectionChunkOnRecipient);
+
+/**
  * Writes a a series of no-op oplog entries to match the completion of a moveChunk/moveRange
  * operation.
  */
@@ -76,6 +101,12 @@ void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
                                         const ShardId& recipient,
                                         bool noMoreCollectionChunksOnDonor,
                                         bool firstCollectionChunkOnRecipient);
+
+/**
+ * Builds no-op oplog entry corresponding to NamespacePlacementChanged notification.
+ */
+repl::MutableOplogEntry buildNamespacePlacementChangedOplogEntry(
+    OperationContext* opCtx, const NamespacePlacementChanged& notification);
 
 /**
  * Writes a no-op oplog entry concerning the commit of a generic placement-changing operation
