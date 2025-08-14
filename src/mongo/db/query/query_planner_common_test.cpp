@@ -57,7 +57,7 @@ TEST_F(QueryPlannerCommonTest, ForwardScanDirectionIndexScan) {
     a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 1 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
     ixscan.bounds.fields.push_back(a);
-    ASSERT_TRUE(ixscan.bounds.isValidFor(BSON("a" << 1), 1));
+    ASSERT_TRUE(ixscan.bounds.isValidFor(BSON("a" << 1), 1, false));
 
     ASSERT_TRUE(QueryPlannerCommon::scanDirectionsEqual(&ixscan, 1));
     ASSERT_FALSE(QueryPlannerCommon::scanDirectionsEqual(&ixscan, -1));
@@ -69,7 +69,7 @@ TEST_F(QueryPlannerCommonTest, BackwardScanDirectionIndexScan) {
     a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 10 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys));
     ixscan.bounds.fields.push_back(a);
-    ASSERT_TRUE(ixscan.bounds.isValidFor(BSON("a" << 1), -1));
+    ASSERT_TRUE(ixscan.bounds.isValidFor(BSON("a" << 1), -1, false));
     ixscan.direction = -1;
 
     ASSERT_TRUE(QueryPlannerCommon::scanDirectionsEqual(&ixscan, -1));
@@ -82,7 +82,7 @@ TEST_F(QueryPlannerCommonTest, ForwardScanDirectionReversedIndexScan) {
     a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 10 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys));
     ixscan.bounds.fields.push_back(a);
-    ASSERT_TRUE(ixscan.bounds.isValidFor(BSON("a" << -1), 1));
+    ASSERT_TRUE(ixscan.bounds.isValidFor(BSON("a" << -1), 1, false));
 
     ASSERT_TRUE(QueryPlannerCommon::scanDirectionsEqual(&ixscan, 1));
     ASSERT_FALSE(QueryPlannerCommon::scanDirectionsEqual(&ixscan, -1));
@@ -95,7 +95,7 @@ TEST_F(QueryPlannerCommonTest, BackwardScanDirectionReversedIndexScan) {
     a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 1 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
     ixscan.bounds.fields.push_back(a);
-    ASSERT_TRUE(ixscan.bounds.isValidFor(BSON("a" << -1), -1));
+    ASSERT_TRUE(ixscan.bounds.isValidFor(BSON("a" << -1), -1, false));
     ixscan.direction = -1;
 
     ASSERT_TRUE(QueryPlannerCommon::scanDirectionsEqual(&ixscan, -1));

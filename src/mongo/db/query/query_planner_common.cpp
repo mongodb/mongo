@@ -91,7 +91,8 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node, bool reverseCollS
 
         isn->bounds = isn->bounds.reverse();
 
-        invariant(isn->bounds.isValidFor(isn->index.keyPattern, isn->direction),
+        invariant(isn->bounds.isValidFor(
+                      isn->index.keyPattern, isn->direction, isn->index.collator != nullptr),
                   str::stream() << "Invalid bounds: "
                                 << redact(isn->bounds.toString(isn->index.collator != nullptr)));
 
@@ -103,7 +104,8 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node, bool reverseCollS
 
         dn->bounds = dn->bounds.reverse();
 
-        invariant(dn->bounds.isValidFor(dn->index.keyPattern, dn->direction),
+        invariant(dn->bounds.isValidFor(
+                      dn->index.keyPattern, dn->direction, dn->index.collator != nullptr),
                   str::stream() << "Invalid bounds: "
                                 << redact(dn->bounds.toString(dn->index.collator != nullptr)));
 
