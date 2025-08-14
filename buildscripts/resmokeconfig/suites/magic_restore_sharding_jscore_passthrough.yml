@@ -74,9 +74,6 @@ selector:
 
     # Creates a non-replicated capped collection which causes snapshot reads to fail.
     - jstests/core_sharding/ddl/drop_collection_system_profile_through_mongos.js
-
-    # TODO SERVER-108224 Re-enable mochalite tests once the issue is resolved.
-    - jstests/core/index/express_projection.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

@@ -80,9 +80,6 @@ selector:
     # Expects to successfully drop invalid views. As drops are no-oped, the leftover
     # invalid views fail the data consistency checker.
     - jstests/core/catalog/list_catalog_stage_consistency.js
-
-    # TODO SERVER-108224 Re-enable mochalite tests once the issue is resolved.
-    - jstests/core/index/express_projection.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
