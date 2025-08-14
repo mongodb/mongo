@@ -32,6 +32,9 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
+#include "mongo/db/local_catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -47,7 +50,8 @@ public:
     using Response = DropIndexesReply;
 
     std::string help() const override {
-        return "Internal command for dropping indexes on participant shards. Do not call directly.";
+        return "Internal command for dropping indexes on participant shards. Do not call "
+               "directly.";
     }
 
     bool skipApiVersionCheck() const override {
@@ -97,13 +101,21 @@ public:
                     opCtx->getCancellationToken(),
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
                 alternativeOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-                alternativeOpCtx->setWriteConcern(opCtx->getWriteConcern());
+
+                ForwardableOperationMetadata forwardableOpMetadata(opCtx);
+                forwardableOpMetadata.setOn(alternativeOpCtx.get());
+
+                OperationShardingState::setShardRole(
+                    alternativeOpCtx.get(),
+                    ns(),
+                    OperationShardingState::get(opCtx).getShardVersion(ns()),
+                    OperationShardingState::get(opCtx).getDbVersion(ns().dbName()));
 
                 DBDirectClient client(alternativeOpCtx.get());
 
                 DropIndexes dropIndexesCmd(ns());
                 dropIndexesCmd.setDropIndexesRequest(req.getDropIndexesRequest());
-                dropIndexesCmd.setWriteConcern(opCtx->getWriteConcern());
+                setReadWriteConcern(opCtx, dropIndexesCmd, this);
 
                 commandSucceeded =
                     client.runCommand(ns().dbName(), dropIndexesCmd.toBSON(), response);
@@ -125,6 +137,8 @@ public:
                       "Successfully dropped indexes on participant shard",
                       "dropIndexesRequest"_attr = req.getDropIndexesRequest().toBSON());
             }
+
+            uassertStatusOK(getStatusFromCommandResult(response));
 
             Response dropIndexesResponse =
                 DropIndexesReply::parse(IDLParserContext("DropIndexesReply"), response);

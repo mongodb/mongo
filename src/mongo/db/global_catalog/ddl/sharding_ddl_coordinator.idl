@@ -46,6 +46,7 @@ enums:
             kMovePrimary: "movePrimary"
             kDropDatabase: "dropDatabase_V2"
             kDropCollection: "dropCollection_V2"
+            kDropIndexes: "dropIndexes"
             kRenameCollection: "renameCollection_V2"
             kCreateCollection: "createCollection_V4"
             kRefineCollectionShardKey: "refineCollectionShardKey_V2"

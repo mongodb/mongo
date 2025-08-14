@@ -49,6 +49,7 @@
 #include "mongo/db/global_catalog/ddl/create_database_coordinator.h"
 #include "mongo/db/global_catalog/ddl/drop_collection_coordinator.h"
 #include "mongo/db/global_catalog/ddl/drop_database_coordinator.h"
+#include "mongo/db/global_catalog/ddl/drop_indexes_coordinator.h"
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator.h"
 #include "mongo/db/global_catalog/ddl/move_primary_coordinator.h"
 #include "mongo/db/global_catalog/ddl/refine_collection_shard_key_coordinator.h"
@@ -101,6 +102,8 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             return std::make_shared<DropDatabaseCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kDropCollection:
             return std::make_shared<DropCollectionCoordinator>(service, std::move(initialState));
+        case DDLCoordinatorTypeEnum::kDropIndexes:
+            return std::make_shared<DropIndexesCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kRenameCollection:
             return std::make_shared<RenameCollectionCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kCreateCollection:
