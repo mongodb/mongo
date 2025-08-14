@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/stdx/exception.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/thread_safety_context.h"
 
 #include <algorithm>
@@ -49,7 +50,7 @@
 #define MONGO_HAS_SIGALTSTACK 0
 #endif
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 namespace support {
 
@@ -226,4 +227,4 @@ using std::this_thread::yield;        // NOLINT
 
 static_assert(std::is_move_constructible_v<stdx::thread>);
 static_assert(std::is_move_assignable_v<stdx::thread>);
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

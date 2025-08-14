@@ -33,12 +33,13 @@
 #include "mongo/base/status.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
 #include <memory>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * An executor supporting cancellation via a cancellation token.  Given an existing
@@ -102,4 +103,4 @@ private:
     ExecutorPtr _exec;
     CancellationSource _source;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

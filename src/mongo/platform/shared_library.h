@@ -30,13 +30,14 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Loads shared library or DLL at runtime
@@ -98,4 +99,4 @@ private:
     void* const _handle;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -86,7 +86,7 @@ InlineExecutor::~InlineExecutor() {
     }
 }
 
-void InlineExecutor::run(Predicate predicate, Interruptible* interruptible) {
+void InlineExecutor::run(std::function<bool()> predicate, Interruptible* interruptible) {
     while (!predicate()) {
         _state->tasks.pop(interruptible)(Status::OK());
     }

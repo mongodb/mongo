@@ -35,10 +35,11 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace executor {
 
 class TaskExecutor;
@@ -117,4 +118,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

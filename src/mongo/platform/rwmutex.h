@@ -33,8 +33,9 @@
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * A reader-writer mutex type that is optimized for frequent, short reads and infrequent writes.
@@ -47,10 +48,10 @@ namespace mongo {
  */
 class RWMutex {
 public:
-    using StateType = uint32_t;
-    static constexpr StateType kWriteIntentMask = 1 << 31;
-    static constexpr StateType kReadersCountMask = ~kWriteIntentMask;
-    static constexpr StateType kReadersOverflowMask = 1 << 30;
+    using StateType MONGO_MOD_FILE_PRIVATE = uint32_t;
+    MONGO_MOD_FILE_PRIVATE static constexpr StateType kWriteIntentMask = 1 << 31;
+    MONGO_MOD_FILE_PRIVATE static constexpr StateType kReadersCountMask = ~kWriteIntentMask;
+    MONGO_MOD_FILE_PRIVATE static constexpr StateType kReadersOverflowMask = 1 << 30;
 
     void lock() {
         _writeMutex.lock();
@@ -218,4 +219,4 @@ void resetGlobalLockRegistry_forTest();
 
 }  // namespace write_rarely_rwmutex_details
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

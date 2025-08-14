@@ -31,12 +31,13 @@
 
 #include "mongo/config.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <new>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
 // libc++ 8.0 and later define __cpp_lib_hardware_interference_size but don't actually implement it
@@ -70,4 +71,4 @@ template <typename T>
 #endif  // launder
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

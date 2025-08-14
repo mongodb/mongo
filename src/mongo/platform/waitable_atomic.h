@@ -31,6 +31,7 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/chrono.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstring>
@@ -38,7 +39,7 @@
 
 #include <boost/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 namespace waitable_atomic_details {
 
@@ -318,7 +319,7 @@ public:
     }
 
 private:
-    friend bool hasWaiters_forTest(const WaitableAtomic& wa) {
+    MONGO_MOD_PRIVATE friend bool hasWaiters_forTest(const WaitableAtomic& wa) {
         return wa._waitFlag.load() & 1;
     }
 
@@ -343,4 +344,4 @@ private:
     mutable BasicWaitableAtomic<uint32_t> _waitFlag = 0;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

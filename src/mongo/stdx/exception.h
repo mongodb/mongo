@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <atomic>
 #include <exception>
 #include <utility>
@@ -44,7 +46,8 @@
 // NOTE: Our wrapper is not initialization order safe.  It is not safe to set the terminate handler
 // until main has started.
 
-namespace mongo::stdx {
+namespace MONGO_MOD_PUB mongo {
+namespace stdx {
 
 // In order to grant `mongo::stdx::thread` access to the dispatch method, we need to know this
 // class's name.  A forward-decl header would be overkill for this singular special case.
@@ -67,4 +70,5 @@ terminate_handler get_terminate() noexcept;
 using ::std::get_terminate;  // NOLINT
 using ::std::set_terminate;  // NOLINT
 #endif
-}  // namespace mongo::stdx
+}  // namespace stdx
+}  // namespace MONGO_MOD_PUB mongo

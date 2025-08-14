@@ -31,6 +31,8 @@
 
 // This file depends on internal implementation details in abseil. In a library upgrade you may have
 // to re-write this file significantly.
+#include "mongo/util/modules.h"
+
 #include <absl/container/internal/hash_function_defaults.h>
 
 /**
@@ -44,7 +46,7 @@
  * }
  */
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 template <typename Key>
 using DefaultHasher = absl::container_internal::hash_default_hash<Key>;
 
@@ -63,4 +65,4 @@ template <typename Hasher, typename Key>
 using EnsureTrustedHasher =
     std::conditional_t<IsTrustedHasher<Hasher, Key>::value, Hasher, HashImprover<Hasher, Key>>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

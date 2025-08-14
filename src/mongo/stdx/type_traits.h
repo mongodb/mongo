@@ -30,19 +30,20 @@
 #pragma once
 
 #include "mongo/config.h"
+#include "mongo/util/modules.h"
 
 #include <type_traits>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
 using ::std::enable_if_t;
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
 
 // TODO: Deal with importing this from C++20, when the time comes.
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
 using std::type_identity;
@@ -57,12 +58,12 @@ template <typename T>
 using remove_cvref_t = typename remove_cvref<T>::type;
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
 
 
 // TODO: Re-evaluate which of these we need when making the cutover to C++17.
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
 namespace detail {
@@ -96,7 +97,7 @@ template <typename B1, typename... B>
 struct conjunction<B1, B...> : std::conditional_t<bool(B1::value), stdx::conjunction<B...>, B1> {};
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
 
 // TS2's `std::experimental::is_detected` and related traits.
 // See https://en.cppreference.com/w/cpp/experimental/is_detected
@@ -126,7 +127,8 @@ struct conjunction<B1, B...> : std::conditional_t<bool(B1::value), stdx::conjunc
 // here until such time as it's available in `std::` or the trait
 // creation niche is filled by simpler language features (e.g.
 // `concept`) and we all migrate off of direct SFINAE.
-namespace mongo::stdx {
+namespace MONGO_MOD_PUB mongo {
+namespace stdx {
 namespace detail {
 template <typename Default, typename AlwaysVoid, template <class...> class Op, typename... Args>
 struct Detector {
@@ -174,4 +176,5 @@ using is_detected_convertible = std::is_convertible<detected_t<Op, Args...>, To>
 template <typename To, template <class...> class Op, typename... Args>
 constexpr bool is_detected_convertible_v = is_detected_convertible<To, Op, Args...>::value;
 
-}  // namespace mongo::stdx
+}  // namespace stdx
+}  // namespace MONGO_MOD_PUB mongo

@@ -35,6 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <climits>
@@ -45,7 +46,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Wrapper class for the MongoDB Decimal128 data type. Sample usage:
@@ -649,4 +650,4 @@ struct DataType::Handler<Decimal128> {
     static constexpr size_t kSizeOfDecimal = 2 * sizeof(uint64_t);
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

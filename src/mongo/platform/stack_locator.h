@@ -28,6 +28,7 @@
  */
 
 #include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 
@@ -40,7 +41,7 @@
 #endif
 #endif
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  *  Provides access to the current stack bounds and remaining
@@ -121,4 +122,4 @@ private:
     const void* _capturedStackPointer = nullptr;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

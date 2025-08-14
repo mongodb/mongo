@@ -36,6 +36,7 @@
 #include <cstdint>
 
 namespace mongo {
+
 /**
  * Methods to compress and decompress 64-bit integers into variable integers
  *

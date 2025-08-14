@@ -246,7 +246,7 @@ def get_visibility(
 ) -> GetVisibilityResult:
     if c.kind != CursorKind.NAMESPACE:
         last_non_ns_parent = c
-    is_internal_namespace = c.kind == CursorKind.NAMESPACE and DETAIL_REGEX.match(c.spelling)
+    is_internal_namespace = c.kind == CursorKind.NAMESPACE and DETAIL_REGEX.search(c.spelling)
     in_complete_header = normpath_for_file(c) in complete_headers
 
     # ideally this would be in an if c.has_attrs() block, but that seems to not work in all cases.
@@ -648,6 +648,9 @@ def find_usages(mod: str, c: Cursor, context: DecoratedCursor | None):
     # just resolve all defaulted methods to the type and continue from there.
     if ref.is_default_method():
         ref = ref.semantic_parent
+
+    if ref.spelling.startswith("__builtin_"):
+        return
 
     # assert not c.location.file or mod_for_file(c.location.file) == mod
     ref = DecoratedCursor.normalize(ref)

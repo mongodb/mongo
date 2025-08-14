@@ -33,6 +33,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
 #include <cstdint>
@@ -40,7 +41,7 @@
 #include <mutex>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace executor {
 
 class NetworkInterfaceMock;
@@ -94,4 +95,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

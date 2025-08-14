@@ -32,13 +32,14 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/parking_lot.h"
 
 #include <atomic>
 #include <condition_variable>
 #include <list>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 namespace stdx {
 
@@ -97,4 +98,4 @@ private:
 
 using condition_variable_any = stdx::condition_variable;
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

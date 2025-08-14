@@ -48,6 +48,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <functional>
@@ -61,7 +62,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 namespace executor {
 
@@ -313,4 +314,4 @@ inline std::unique_ptr<TaskExecutorCursor> makeTaskExecutorCursor(
 }
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

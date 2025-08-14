@@ -34,10 +34,11 @@
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace executor {
 
 /**
@@ -50,7 +51,7 @@ std::shared_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
 /**
  * Useful fixture class for tests that use a ThreadPoolTaskExecutor.
  */
-class ThreadPoolExecutorTest : public TaskExecutorTest {
+class MONGO_MOD_OPEN ThreadPoolExecutorTest : public TaskExecutorTest {
 public:
     /**
      * This default constructor supports the use of this class as a base class for a test fixture.
@@ -74,4 +75,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

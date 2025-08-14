@@ -33,12 +33,13 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace executor {
 
 /**
@@ -75,8 +76,8 @@ public:
      */
     void shutdownAndJoin();
 
-    void shutdown_forTest();
-    void join_forTest();
+    MONGO_MOD_PUB void shutdown_forTest();
+    MONGO_MOD_PUB void join_forTest();
 
     /**
      * Adds 'executors' and 'fixedExecutor' to the pool. May be called at most once to initialize an
@@ -132,4 +133,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

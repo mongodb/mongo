@@ -35,13 +35,15 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/producer_consumer_queue.h"
 
 #include <functional>
 #include <memory>
 
-namespace mongo::executor {
+namespace MONGO_MOD_PUB mongo {
+namespace executor {
 
 /**
  * An RAII type to run tasks inline. Multiple threads may schedule tasks on this executor, but only
@@ -60,7 +62,7 @@ public:
     /**
      * Maintains the shared state between producers and the consumer.
      */
-    struct State {
+    struct MONGO_MOD_FILE_PRIVATE State {
         MultiProducerSingleConsumerQueue<OutOfLineExecutor::Task> tasks;
     };
 
@@ -85,8 +87,8 @@ public:
      * May throw if interrupted, or if a scheduled task throws.
      * May only be called from the thread that owns this `InlineExecutor`.
      */
-    using Predicate = std::function<bool()>;
-    void run(Predicate predicate, Interruptible* interruptible = Interruptible::notInterruptible());
+    void run(std::function<bool()> predicate,
+             Interruptible* interruptible = Interruptible::notInterruptible());
 
     /*
      * A wrapper to make this executor compatible with our `AsyncTry` APIs.
@@ -111,4 +113,5 @@ private:
     std::shared_ptr<OutOfLineExecutor> _executor;
 };
 
-}  // namespace mongo::executor
+}  // namespace executor
+}  // namespace MONGO_MOD_PUB mongo

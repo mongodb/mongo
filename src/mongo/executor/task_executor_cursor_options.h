@@ -34,8 +34,9 @@
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/executor/task_executor_cursor_parameters_gen.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace executor {
 
 /**
@@ -43,7 +44,7 @@ namespace executor {
  * a TaskExecutorCursor uses to configure GetMore requests and toggle pre-fetching of those
  * GetMores.
  */
-class TaskExecutorCursorGetMoreStrategy {
+class MONGO_MOD_OPEN TaskExecutorCursorGetMoreStrategy {
 public:
     /**
      * Generates a BSONObj that represents the next getMore command to be dispatched. Some
@@ -137,4 +138,4 @@ struct TaskExecutorCursorOptions {
     std::shared_ptr<PlanYieldPolicy> yieldPolicy;
 };
 }  // namespace executor
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

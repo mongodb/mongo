@@ -156,7 +156,7 @@ template <>
 constexpr inline bool isNamedCode<ErrorCodes::$ec.name> = true;
 //#end for
 
-MONGO_COMPILER_NORETURN void throwExceptionForStatus(const Status& status);
+MONGO_MOD_NEEDS_REPLACEMENT MONGO_COMPILER_NORETURN void throwExceptionForStatus(const Status& status);
 
 //
 // ErrorCategoriesFor

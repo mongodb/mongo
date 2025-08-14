@@ -29,21 +29,24 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <string>
 
 #include <absl/numeric/int128.h>
 
-using uint128_t = absl::uint128;
-using int128_t = absl::int128;
-
-namespace absl {
+namespace MONGO_MOD_PUB absl {
 
 std::string toString(const uint128& v);
 std::string toString(const int128& v);
 
-}  // namespace absl
+}  // namespace MONGO_MOD_PUB absl
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
+
+using uint128_t = absl::uint128;
+using int128_t = absl::int128;
+
 template <typename T>
 struct make_unsigned : public std::make_unsigned<T> {};
 
@@ -61,8 +64,8 @@ struct make_signed<uint128_t> {
 };
 
 template <typename T>
-using make_unsigned_t = typename make_unsigned<T>::type;
+using make_unsigned_t MONGO_MOD_PUB = typename make_unsigned<T>::type;
 
 template <typename T>
-using make_signed_t = typename make_signed<T>::type;
-}  // namespace mongo
+using make_signed_t MONGO_MOD_PUB = typename make_signed<T>::type;
+}  // namespace MONGO_MOD_PUB mongo

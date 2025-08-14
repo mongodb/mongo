@@ -32,12 +32,13 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/util/modules.h"
 
 #include <atomic>
 #include <cstring>
 #include <type_traits>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 namespace atomic_detail {
 
@@ -83,7 +84,7 @@ public:
     /**
      * Gets the current value of this Atomic.
      */
-    WordType load() const {
+    MONGO_MOD_PUB WordType load() const {
         MONGO_COMPILER_DIAGNOSTIC_PUSH
         MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_READ
         return _value.load();
@@ -93,21 +94,21 @@ public:
     /**
      * Gets the current value of this Atomic using relaxed memory order.
      */
-    WordType loadRelaxed() const {
+    MONGO_MOD_PUB WordType loadRelaxed() const {
         return _value.load(std::memory_order_relaxed);
     }
 
     /**
      * Sets the value of this Atomic to "newValue".
      */
-    void store(WordType newValue) {
+    MONGO_MOD_PUB void store(WordType newValue) {
         _value.store(newValue);
     }
 
     /**
      * Sets the value of this Atomic to "newValue" using relaxed memory order.
      */
-    void storeRelaxed(WordType newValue) {
+    MONGO_MOD_PUB void storeRelaxed(WordType newValue) {
         _value.store(newValue, std::memory_order_relaxed);
     }
 
@@ -116,7 +117,7 @@ public:
      *
      * Returns the old value.
      */
-    WordType swap(WordType newValue) {
+    MONGO_MOD_PUB WordType swap(WordType newValue) {
         return _value.exchange(newValue);
     }
 
@@ -128,7 +129,7 @@ public:
      *
      * Returns true if swap successful, false otherwise
      */
-    bool compareAndSwap(WordType* expected, WordType newValue) {
+    MONGO_MOD_PUB bool compareAndSwap(WordType* expected, WordType newValue) {
         // NOTE: Subtle: compare_exchange mutates its first argument.
         return _value.compare_exchange_strong(*expected, newValue);
     }
@@ -152,7 +153,7 @@ protected:
     using Parent::_value;
 
 public:
-    using WordType = typename Parent::WordType;
+    using WordType MONGO_MOD_PUB = typename Parent::WordType;
     using Parent::Parent;
 
     /**
@@ -160,7 +161,7 @@ public:
      *
      * Returns the value of this before incrementing.
      */
-    WordType fetchAndAdd(WordType increment) {
+    MONGO_MOD_PUB WordType fetchAndAdd(WordType increment) {
         return _value.fetch_add(increment);
     }
 
@@ -168,7 +169,7 @@ public:
      * Like "fetchAndAdd", but with relaxed memory order. Appropriate where relative
      * order of operations doesn't matter. A stat counter, for example.
      */
-    WordType fetchAndAddRelaxed(WordType increment) {
+    MONGO_MOD_PUB WordType fetchAndAddRelaxed(WordType increment) {
         return _value.fetch_add(increment, std::memory_order_relaxed);
     }
 
@@ -176,7 +177,7 @@ public:
      * Get the current value of this, subtract "decrement" and store it, atomically.
      * Returns the value of this before decrementing.
      */
-    WordType fetchAndSubtract(WordType decrement) {
+    MONGO_MOD_PUB WordType fetchAndSubtract(WordType decrement) {
         return _value.fetch_sub(decrement);
     }
 
@@ -184,7 +185,7 @@ public:
      * Like "fetchAndSubtract", but with relaxed memory order. Appropriate where relative
      * order of operations doesn't matter. A stat counter, for example.
      */
-    WordType fetchAndSubtractRelaxed(WordType decrement) {
+    MONGO_MOD_PUB WordType fetchAndSubtractRelaxed(WordType decrement) {
         return _value.fetch_sub(decrement, std::memory_order_relaxed);
     }
 
@@ -192,7 +193,7 @@ public:
      * Get the current value of this, add "increment" and store it, atomically.
      * Returns the value of this after incrementing.
      */
-    WordType addAndFetch(WordType increment) {
+    MONGO_MOD_PUB WordType addAndFetch(WordType increment) {
         return fetchAndAdd(increment) + increment;
     }
 
@@ -200,7 +201,7 @@ public:
      * Get the current value of this, subtract "decrement" and store it, atomically.
      * Returns the value of this after decrementing.
      */
-    WordType subtractAndFetch(WordType decrement) {
+    MONGO_MOD_PUB WordType subtractAndFetch(WordType decrement) {
         return fetchAndSubtract(decrement) - decrement;
     }
 };
@@ -220,7 +221,7 @@ public:
      *
      * Returns the value of this before bitand-ing.
      */
-    WordType fetchAndBitAnd(WordType bits) {
+    MONGO_MOD_PUB WordType fetchAndBitAnd(WordType bits) {
         return _value.fetch_and(bits);
     }
 
@@ -229,7 +230,7 @@ public:
      *
      * Returns the value of this before bitor-ing.
      */
-    WordType fetchAndBitOr(WordType bits) {
+    MONGO_MOD_PUB WordType fetchAndBitOr(WordType bits) {
         return _value.fetch_or(bits);
     }
 
@@ -238,7 +239,7 @@ public:
      *
      * Returns the value of this before bitxor-ing.
      */
-    WordType fetchAndBitXor(WordType bits) {
+    MONGO_MOD_PUB WordType fetchAndBitXor(WordType bits) {
         return _value.fetch_xor(bits);
     }
 };
@@ -259,4 +260,4 @@ public:
     using atomic_detail::Base<T>::Base;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
