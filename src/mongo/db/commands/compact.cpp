@@ -134,8 +134,12 @@ public:
         auto collectionCatalog = CollectionCatalog::get(opCtx);
 
         CollectionPtr collection = [&]() {
-            // TODO(SERVER-103401): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
+            // Here and below, using the UNSAFE API is not a problem:
+            // - The catalog snapshot is held open.
+            // - Failures to locate the on-disk collection are handled at the storage-engine layer.
+            // - We are unable to use the safe APIs (establishConsistentCollection or
+            //   AcquireCollection) since the storage snapshot is abandoned at the storage-engine
+            //   layer as part of running compact.
             if (CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
                     collectionCatalog->lookupCollectionByNamespace(opCtx, collectionNss))) {
                 return collection;
@@ -143,8 +147,6 @@ public:
 
             // Check if this is a time-series collection.
             auto bucketsNs = collectionNss.makeTimeseriesBucketsNamespace();
-            // TODO(SERVER-103401): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
             if (CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
                     collectionCatalog->lookupCollectionByNamespace(opCtx, bucketsNs))) {
                 return collection;
