@@ -19,7 +19,9 @@ class TestFindSuites(unittest.TestCase):
         self.assertEqual(
             0,
             resmoke_process.returncode,
-            msg="find-suites subcommand did not execute successfully.",
+            # Give a very verbose failure message - this can be read by users well
+            # outside of resmoke-areas in case of failures on malformatted yaml configs
+            msg=f"find-suites subcommand did not execute successfully:\n\n{resmoke_process.stdout}",
         )
 
         self.assertTrue(resmoke_process.stdout, msg="find-suites output must not be empty")

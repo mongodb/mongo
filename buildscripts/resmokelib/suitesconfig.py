@@ -93,6 +93,12 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
                 if not fail_on_missing_selector:
                     continue
             raise
+        except KeyError as e:
+            # For example, `test_kind` might be missing from their yaml config
+            loggers.ROOT_EXECUTOR_LOGGER.error(
+                "Error occurred while processing suite '%s': Field %s not found.", suite_name, e
+            )
+            raise
     return test_membership
 
 
