@@ -18,14 +18,6 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
     if (implementation === "openssl") {
         expectedRegex =
             /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: .*tlsv1 alert protocol version/;
-
-        // OpenSSL does not send alerts and TLS 1.3 is too difficult to identify as incompatible
-        // because it shows up in a TLS extension.
-        if (!sslProviderSupportsTLS1_1()) {
-            expectedRegex =
-                /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: .*stream truncated/;
-        }
-
     } else if (implementation === "windows") {
         expectedRegex =
             /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: .*The function requested is not supported/;
@@ -64,7 +56,11 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
 // the server's oldest supported protocol
 if (!sslProviderSupportsTLS1_1()) {
     // On platforms that disable TLS 1.1, assume they have TLS 1.3 for this test.
+    // Server disables TLS 1.2, client disables TLS 1.3
     runTest("TLS1_2", "TLS1_3");
+
+    // Server disables TLS 1.3, client disables TLS 1.2
+    runTest("TLS1_3", "TLS1_2");
 } else {
     runTest("TLS1_0", "TLS1_1,TLS1_2");
 }
