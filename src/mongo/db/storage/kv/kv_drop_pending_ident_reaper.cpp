@@ -186,6 +186,10 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
     }
 
     for (auto& [dropTimestamp, identInfo] : toDrop) {
+        // Dropping tables can be expensive since it involves disk operations. If the table also
+        // needs a checkpoint, that adds even more overhead.
+        opCtx->checkForInterrupt();
+
         auto status = _tryToDrop(lock, opCtx, dropTimestamp, *identInfo);
         if (status == ErrorCodes::ObjectIsBusy) {
             LOGV2_PROD_ONLY(6936300,
