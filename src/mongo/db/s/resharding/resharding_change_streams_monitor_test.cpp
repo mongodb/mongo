@@ -514,8 +514,10 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecuto
     executor->shutdown();
 
     ASSERT_EQ(monitor->awaitFinalChangeEvent().getNoThrow(), ErrorCodes::ShutdownInProgress);
+
     // The cleanup should still succeed.
     monitor->awaitCleanup().get();
+
     // Verify that the cursor got killed.
     ASSERT_FALSE(hasOpenCursor(tempNss, monitor->makeAggregateComment(reshardingUUID)));
     awaitCompletion.get();
@@ -524,6 +526,11 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecuto
 TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
     createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
+
+    // Hang monitor0 after creating its cursor to simulate a leftover cursor.
+    auto hangFp =
+        globalFailPointRegistry().find("hangReshardingChangeStreamsMonitorAfterCreatingCursor");
+    auto timesEntered = hangFp->setMode(FailPoint::nTimes, 1);
 
     // Start a monitor.
     auto monitor0 = std::make_shared<ReshardingChangeStreamsMonitor>(
@@ -536,11 +543,13 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
         return hasOpenCursor(tempNss, monitor0->makeAggregateComment(reshardingUUID));
     });
 
+    hangFp->waitForTimesEntered(timesEntered + 1);
+
     // Start another monitor and make it run to completion successfully.
     auto executor1 = makeTaskExecutor("New");
     auto cleanupExecutor1 = makeCleanupTaskExecutor("New");
     auto cancelSource1 = CancellationSource();
-    auto factory1 = CancelableOperationContextFactory(cancelSource.token(), markKilledExecutor);
+    auto factory1 = CancelableOperationContextFactory(cancelSource1.token(), markKilledExecutor);
 
     auto monitor1 = std::make_shared<ReshardingChangeStreamsMonitor>(
         reshardingUUID, tempNss, startAtTime, boost::none /* startAfterResumeToken */, callback);

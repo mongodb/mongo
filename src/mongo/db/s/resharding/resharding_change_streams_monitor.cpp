@@ -48,6 +48,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failReshardingChangeStreamsMonitorAfterProcessingBatch);
 MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeReceivingNextBatch);
+MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorAfterCreatingCursor);
 
 const StringData kAggregateCommentFieldName = "reshardingChangeStreamsMonitor"_sd;
 const StringData kCommonUUIDFieldName = "commonUUID"_sd;
@@ -185,6 +186,7 @@ SemiFuture<void> ReshardingChangeStreamsMonitor::startMonitoring(
                       "reshardingUUID"_attr = _reshardingUUID,
                       "startAtOperationTime"_attr = _startAtOperationTime);
             }
+
             return _consumeChangeEvents(executor, cancelToken, factory);
         })
         .onCompletion([this, anchor = shared_from_this()](Status status) {
@@ -372,6 +374,8 @@ ExecutorFuture<void> ReshardingChangeStreamsMonitor::_consumeChangeEvents(
                auto opCtx = factory.makeOperationContext(&cc());
                DBDirectClient client(opCtx.get());
                auto cursor = _makeDBClientCursor(&client);
+
+               hangReshardingChangeStreamsMonitorAfterCreatingCursor.pauseWhileSet();
 
                while (!batch.shouldDispose()) {
                    if (cursor->more()) {
