@@ -134,9 +134,15 @@ boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
     const auto tenantId = change_stream_serverless_helpers::resolveTenantId(
         VersionContext::getDecoration(pExpCtx->getOperationContext()),
         pExpCtx->getNamespaceString().tenantId());
+
+    // Change stream pre-images aren't supported in multi-tenant environments.
+    tassert(10915400,
+            "Failed to lookup pre-image given change stream pre-images aren't supported in "
+            "multi-tenant environments",
+            tenantId == boost::none);
     auto lookedUpDoc = pExpCtx->getMongoProcessInterface()->lookupSingleDocumentLocally(
         pExpCtx,
-        NamespaceString::makePreImageCollectionNSS(tenantId),
+        NamespaceString::kChangeStreamPreImagesNamespace,
         Document{{ChangeStreamPreImage::kIdFieldName, preImageId}});
 
     // Return boost::none to signify that we failed to find the pre-image.

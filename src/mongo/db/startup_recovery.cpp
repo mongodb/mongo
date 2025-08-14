@@ -485,11 +485,10 @@ void cleanupChangeCollectionAfterUncleanShutdown(OperationContext* opCtx,
 }
 
 // Returns the timestamp at which pre-images should be truncated for recovery.
-Timestamp getPreImageTruncateTimestampForRecovery(OperationContext* opCtx,
-                                                  boost::optional<TenantId> tenantId) {
+Timestamp getPreImageTruncateTimestampForRecovery(OperationContext* opCtx) {
     const auto currentTime = change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx);
-    auto originalExpirationDate =
-        change_stream_pre_image_util::getPreImageOpTimeExpirationDate(opCtx, tenantId, currentTime);
+    auto originalExpirationDate = change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
+        opCtx, boost::none, currentTime);
     boost::optional<Date_t> operationTimeExpirationDate = boost::none;
     if (originalExpirationDate) {
         // Pre-image expiration is based on either 'operationTime', or '_id.ts'. However, after
@@ -512,18 +511,6 @@ Timestamp getPreImageTruncateTimestampForRecovery(OperationContext* opCtx,
                               std::numeric_limits<unsigned>::max())}
         : Timestamp();
 
-    if (tenantId) {
-        // Multi-tenant environment, pre-images only expire by 'operationTime'.
-        invariant(operationTimeExpirationDate);
-        LOGV2_DEBUG(
-            7803701,
-            0,
-            "Computed timestamp to truncate pre-images at for tenant after unclean shutdown",
-            "truncateAtTimestamp"_attr = operationTimeExpirationTSEstimate,
-            "tenantId"_attr = tenantId);
-        return operationTimeExpirationTSEstimate;
-    }
-
     // Pre-images expired when "_id.ts" < oldest oplog timestamp OR "_id.ts" <= the
     // estimated timestamp for the 'operationTime' expiration date.
     const auto oldestOplogTimestamp =
@@ -538,18 +525,17 @@ Timestamp getPreImageTruncateTimestampForRecovery(OperationContext* opCtx,
     return expirationTimestamp;
 }
 
-void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
-                                                    boost::optional<TenantId> tenantId) {
+void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx) {
     writeConflictRetry(
         opCtx,
         "cleanupPreImagesCollectionAfterUncleanShutdown",
-        NamespaceString::makePreImageCollectionNSS(tenantId),
+        NamespaceString::kChangeStreamPreImagesNamespace,
         [&] {
             shard_role_details::getRecoveryUnit(opCtx)->allowAllUntimestampedWrites();
             const auto preImagesColl =
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
-                                      NamespaceString::makePreImageCollectionNSS(tenantId),
+                                      NamespaceString::kChangeStreamPreImagesNamespace,
                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kUnreplicatedWrite),
@@ -564,7 +550,7 @@ void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
             }
 
             const auto approximateExpirationTimestamp =
-                getPreImageTruncateTimestampForRecovery(opCtx, tenantId);
+                getPreImageTruncateTimestampForRecovery(opCtx);
             change_stream_pre_image_util::truncatePreImagesByTimestampExpirationApproximation(
                 opCtx, preImagesColl, approximateExpirationTimestamp);
         });
@@ -1012,12 +998,13 @@ void recoverChangeStreamCollections(OperationContext* opCtx,
 
     const auto tenantIds = change_stream_serverless_helpers::getConfigDbTenants(opCtx);
     if (tenantIds.empty()) {
-        // Change collections are exclusive to multi-tenant environments.
-        cleanupPreImagesCollectionAfterUncleanShutdown(opCtx, boost::none);
+        // Change stream pre-images collections are exclusive to dedicated environments.
+        cleanupPreImagesCollectionAfterUncleanShutdown(opCtx);
         return;
     }
+
     for (const auto& tenantId : tenantIds) {
-        cleanupPreImagesCollectionAfterUncleanShutdown(opCtx, tenantId);
+        // Change collections are exclusive to multi-tenant environments.
         cleanupChangeCollectionAfterUncleanShutdown(opCtx, tenantId);
     }
 }

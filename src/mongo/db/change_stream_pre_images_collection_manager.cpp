@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/change_stream_pre_image_util.h"
-#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
@@ -100,38 +99,6 @@ MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
 
 const auto getPreImagesCollectionManager =
     ServiceContext::declareDecoration<ChangeStreamPreImagesCollectionManager>();
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getDeleteExpiredPreImagesExecutor(
-    OperationContext* opCtx,
-    CollectionAcquisition preImageColl,
-    const MatchExpression* filterPtr,
-    Timestamp maxRecordIdTimestamp,
-    UUID currentCollectionUUID) {
-    auto params = std::make_unique<DeleteStageParams>();
-    params->isMulti = true;
-
-    std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams;
-    batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
-    RecordIdBound minRecordId =
-        change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(
-            currentCollectionUUID);
-    RecordIdBound maxRecordId =
-        RecordIdBound(change_stream_pre_image_util::toRecordId(ChangeStreamPreImageId(
-            currentCollectionUUID, maxRecordIdTimestamp, std::numeric_limits<int64_t>::max())));
-
-    return InternalPlanner::deleteWithCollectionScan(
-        opCtx,
-        std::move(preImageColl),
-        std::move(params),
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        InternalPlanner::Direction::FORWARD,
-        std::move(minRecordId),
-        std::move(maxRecordId),
-        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
-        std::move(batchedDeleteParams),
-        filterPtr,
-        filterPtr != nullptr);
-}
 }  // namespace
 
 BSONObj ChangeStreamPreImagesCollectionManager::PurgingJobStats::toBSON() const {
@@ -157,14 +124,11 @@ ChangeStreamPreImagesCollectionManager& ChangeStreamPreImagesCollectionManager::
     return getPreImagesCollectionManager(opCtx->getServiceContext());
 }
 
-void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
-    OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(OperationContext* opCtx) {
     uassert(5868501,
             "Failpoint failPreimagesCollectionCreation enabled. Throwing exception",
             !MONGO_unlikely(failPreimagesCollectionCreation.shouldFail()));
-    const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(
-        change_stream_serverless_helpers::resolveTenantId(VersionContext::getDecoration(opCtx),
-                                                          tenantId));
+    const auto preImagesCollectionNamespace = NamespaceString::kChangeStreamPreImagesNamespace;
 
     CollectionOptions preImagesCollectionOptions;
 
@@ -180,28 +144,7 @@ void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
             status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
 
-void ChangeStreamPreImagesCollectionManager::dropPreImagesCollection(
-    OperationContext* opCtx, boost::optional<TenantId> tenantId) {
-    const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(
-        change_stream_serverless_helpers::resolveTenantId(VersionContext::getDecoration(opCtx),
-                                                          tenantId));
-    DropReply dropReply;
-    const auto status =
-        dropCollection(opCtx,
-                       preImagesCollectionNamespace,
-                       &dropReply,
-                       DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-    uassert(status.code(),
-            str::stream() << "Failed to drop the pre-images collection: "
-                          << preImagesCollectionNamespace.toStringForErrorMsg()
-                          << causedBy(status.reason()),
-            status.isOK() || status.code() == ErrorCodes::NamespaceNotFound);
-
-    _truncateManager.dropAllMarkersForTenant(tenantId);
-}
-
 void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* opCtx,
-                                                            boost::optional<TenantId> tenantId,
                                                             const ChangeStreamPreImage& preImage) {
     tassert(6646200,
             "Expected to be executed in a write unit of work",
@@ -211,9 +154,7 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
                           << preImage.getId().getApplyOpsIndex(),
             preImage.getId().getApplyOpsIndex() >= 0);
 
-    const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(
-        change_stream_serverless_helpers::resolveTenantId(VersionContext::getDecoration(opCtx),
-                                                          tenantId));
+    const auto preImagesCollectionNamespace = NamespaceString::kChangeStreamPreImagesNamespace;
 
     // This lock acquisition can block on a stronger lock held by another operation modifying
     // the pre-images collection. There are no known cases where an operation holding an
@@ -228,11 +169,6 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
                                      AcquisitionPrerequisites::kUnreplicatedWrite),
         MODE_IX);
 
-    if (preImagesCollectionNamespace.tenantId() &&
-        !change_stream_serverless_helpers::isChangeStreamEnabled(
-            opCtx, *preImagesCollectionNamespace.tenantId())) {
-        return;
-    }
     tassert(6646201,
             "The change stream pre-images collection is not present",
             changeStreamPreImagesCollection.exists());
@@ -255,10 +191,8 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
             _docsInserted.fetchAndAddRelaxed(1);
         });
 
-    // This is a no-op until the 'tenantId' is registered with the 'truncateManager' in the
-    // expired pre-image removal path.
     auto bytesInserted = insertStatement.doc.objsize();
-    _truncateManager.updateMarkersOnInsert(opCtx, tenantId, preImage, bytesInserted);
+    _truncateManager.updateMarkersOnInsert(opCtx, boost::none, preImage, bytesInserted);
 }
 
 void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImagesRemovalPass(
@@ -269,19 +203,7 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
     ServiceContext::UniqueOperationContext opCtx;
     try {
         opCtx = client->makeOperationContext();
-        size_t numberOfRemovals = 0;
-
-        if (change_stream_serverless_helpers::isChangeCollectionsModeActive(
-                VersionContext::getDecoration(opCtx.get()))) {
-            const auto tenantIds =
-                change_stream_serverless_helpers::getConfigDbTenants(opCtx.get());
-            for (const auto& tenantId : tenantIds) {
-                numberOfRemovals += _deleteExpiredPreImagesWithTruncate(opCtx.get(), tenantId);
-            }
-        } else {
-            numberOfRemovals =
-                _deleteExpiredPreImagesWithTruncate(opCtx.get(), boost::none /** tenantId **/);
-        }
+        size_t numberOfRemovals = _deleteExpiredPreImagesWithTruncate(opCtx.get());
 
         if (numberOfRemovals > 0) {
             LOGV2_DEBUG(5869104,
@@ -309,9 +231,9 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
 }
 
 size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTruncate(
-    OperationContext* opCtx, boost::optional<TenantId> tenantId) {
-    const auto truncateStats =
-        _truncateManager.truncateExpiredPreImages(opCtx, std::move(tenantId));
+    OperationContext* opCtx) {
+    // TODO SERVER-108851: Remove multitenancy support.
+    const auto truncateStats = _truncateManager.truncateExpiredPreImages(opCtx, boost::none);
 
     _purgingJobStats.maxTimestampEligibleForTruncate.store(
         truncateStats.maxTimestampEligibleForTruncate);

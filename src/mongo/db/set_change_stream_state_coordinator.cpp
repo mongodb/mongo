@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
-#include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_state_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -97,8 +96,7 @@ public:
         const auto setChangeStreamParameter = ChangeStreamStateParameters::parse(
             IDLParserContext("ChangeStreamStateParameters"), _stateDoc.getCommand());
 
-        // A tenant's change collection and the pre-images collection are always associated with a
-        // tenant id.
+        // A tenant's change collection is always associated with a tenant id.
         const auto tenantId = _stateDoc.getId().getTenantId();
         tassert(6664100, "Tenant id is missing", tenantId);
 
@@ -111,29 +109,21 @@ public:
 
 private:
     /**
-     * Enables the change stream in the serverless by creating the change collection and the
-     * pre-image collection.
+     * Enables the change stream in the serverless by creating the change collection.
      */
     void _enableChangeStream(OperationContext* opCtx, const TenantId& tenantId) {
         auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
         changeCollectionManager.createChangeCollection(opCtx, tenantId);
-
-        ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx,
-                                                                                     tenantId);
-
         // Wait until the create requests are majority committed.
         waitUntilMajorityForWrite(opCtx);
     }
 
     /**
-     * Disables the change stream in the serverless by dropping the change collection and the
-     * pre-image collection.
+     * Disables the change stream in the serverless by dropping the change collection.
      */
     void _disableChangeStream(OperationContext* opCtx, const TenantId& tenantId) {
         auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
         changeCollectionManager.dropChangeCollection(opCtx, tenantId);
-
-        ChangeStreamPreImagesCollectionManager::get(opCtx).dropPreImagesCollection(opCtx, tenantId);
 
         // Wait until the drop requests are majority committed.
         waitUntilMajorityForWrite(opCtx);

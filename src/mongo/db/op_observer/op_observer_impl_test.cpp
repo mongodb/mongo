@@ -304,7 +304,7 @@ protected:
         reset(opCtx, NamespaceString::kRsOplogNamespace);
         reset(opCtx, NamespaceString::kSessionTransactionsTableNamespace);
         reset(opCtx, NamespaceString::kConfigImagesNamespace);
-        reset(opCtx, NamespaceString::makePreImageCollectionNSS(boost::none));
+        reset(opCtx, NamespaceString::kChangeStreamPreImagesNamespace);
     }
 
     // Assert that the oplog has the expected number of entries, and return them
@@ -438,7 +438,7 @@ protected:
                                                  BSONObj* container) {
         auto preImagesCollection = acquireCollection(
             opCtx,
-            CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(boost::none),
+            CollectionAcquisitionRequest(NamespaceString::kChangeStreamPreImagesNamespace,
                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead),
