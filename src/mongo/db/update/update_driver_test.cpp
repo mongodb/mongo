@@ -178,6 +178,66 @@ TEST(Parse, SetOnInsert) {
     ASSERT_FALSE(driver.type() == UpdateDriver::UpdateType::kReplacement);
 }
 
+TEST(Parse, V1OplogUpdatesOnNonOplogApplicationPath) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver driver(expCtx);
+    // Oplog updates cannot be applied on the fromOplogApplication path
+    driver.setFromOplogApplication(false);
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        driver.parse(makeUpdateMod(fromjson("{$v: 1, $set: {a:1}}")), arrayFilters),
+        AssertionException,
+        ErrorCodes::FailedToParse,
+        "The $v update field is only recognized internally");
+}
+
+TEST(Parse, V2OplogUpdatesOnNonOplogApplicationPath) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver driver(expCtx);
+    // Oplog updates cannot be applied on the fromOplogApplication path
+    driver.setFromOplogApplication(false);
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        driver.parse(makeUpdateMod(fromjson("{$v: 2, diff: {i: {a:1}}}")), arrayFilters),
+        AssertionException,
+        ErrorCodes::FailedToParse,
+        "The $v update field is only recognized internally");
+}
+
+TEST(Parse, ExplicitV1OplogEntry) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver driver(expCtx);
+    // Oplog updates can only be applied on the fromOplogApplication path
+    driver.setFromOplogApplication(true);
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    ASSERT_DOES_NOT_THROW(
+        driver.parse(makeUpdateMod(fromjson("{$v: 1, $set: {a:1}}")), arrayFilters));
+    ASSERT_TRUE(driver.type() == UpdateDriver::UpdateType::kOperator);
+}
+
+TEST(Parse, ImplicitV1OplogEntry) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver driver(expCtx);
+    // Oplog updates can only be applied on the fromOplogApplication path
+    driver.setFromOplogApplication(true);
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    ASSERT_DOES_NOT_THROW(driver.parse(makeUpdateMod(fromjson("{$set: {a:1}}")), arrayFilters));
+    ASSERT_TRUE(driver.type() == UpdateDriver::UpdateType::kOperator);
+}
+
+TEST(Parse, V1WithDuplicateVersionField) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver driver(expCtx);
+    // Oplog updates can only be applied on the fromOplogApplication path
+    driver.setFromOplogApplication(true);
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        driver.parse(makeUpdateMod(fromjson("{$v: 1, $set: {a:1}, $v: 1}")), arrayFilters),
+        AssertionException,
+        ErrorCodes::BadValue,
+        "Duplicate $v in oplog update document");
+}
+
 TEST(Collator, SetCollationUpdatesModifierInterfaces) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CollatorInterfaceMock reverseStringCollator(CollatorInterfaceMock::MockType::kReverseString);
