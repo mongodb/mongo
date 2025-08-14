@@ -94,8 +94,12 @@ def resmoke_suite_test(
             "--cedarReportFile=cedar_report.json",
             "--skipSymbolization",  # Symbolization is not yet functional, SERVER-103538
             "--installDir=dist-test/bin",
+            "--mongoVersionFile=$(location //:.resmoke_mongo_version.yml)",
         ],
-        "//conditions:default": ["--installDir=install-dist-test/bin"],
+        "//conditions:default": [
+            "--installDir=install-dist-test/bin",
+            "--mongoVersionFile=$(location //bazel/resmoke:resmoke_mongo_version)",
+        ],
     })
     native.py_test(
         name = name,
@@ -104,7 +108,6 @@ def resmoke_suite_test(
         srcs = [resmoke_shim],
         data = data + srcs + [
             generated_config,
-            "//bazel/resmoke:resmoke_mongo_version",
             "//bazel/resmoke:on_feature_flags",
             "//bazel/resmoke:off_feature_flags",
             "//bazel/resmoke:unreleased_ifr_flags",
@@ -114,8 +117,8 @@ def resmoke_suite_test(
             "//src/mongo/util/version:releases.yml",
             "//:generated_resmoke_config",
         ] + select({
-            "//bazel/resmoke:in_evergreen_enabled": ["//:installed-dist-test"],
-            "//conditions:default": ["//:install-dist-test"],
+            "//bazel/resmoke:in_evergreen_enabled": ["//:installed-dist-test", "//:.resmoke_mongo_version.yml"],
+            "//conditions:default": ["//:install-dist-test", "//bazel/resmoke:resmoke_mongo_version"],
         }),
         deps = deps + [
             resmoke,
@@ -127,7 +130,6 @@ def resmoke_suite_test(
             "--suites=$(location %s)" % native.package_relative_label(generated_config),
             "--multiversionDir=multiversion_binaries",
             "--continueOnFailure",
-            "--mongoVersionFile=$(location //bazel/resmoke:resmoke_mongo_version)",
             "--releasesFile=$(location //src/mongo/util/version:releases.yml)",
         ] + extra_args + resmoke_args,
         tags = tags + ["no-cache", "local", "resources:port_block:1"],
