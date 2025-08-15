@@ -68,6 +68,7 @@ structs:
                 optional: true
     ShardsvrRunSearchIndexCommandReply:
         description: "The response that the shard returns to mongos upon receiving a response from the search index manager"
+        is_command_reply: true
         fields:
             searchIndexManagerResponse:
                 type: SearchIndexManagerResponse
@@ -77,24 +78,6 @@ structs:
                 type: safeDouble
                 validator: {gte: 0.0, lte: 1.0}
                 optional: false
-            $configTime:
-                description: The time component that represents the config time.
-                type: timestamp
-                cpp_name: dollarConfigTime
-                optional: true
-            $topologyTime:
-                description: The time component that represents the topology time.
-                type: timestamp
-                cpp_name: dollarTopologyTime
-                optional: true
-            $clusterTime:
-                description: The time component that represents the cluster time.
-                type: ClusterTime
-                cpp_name: dollarClusterTime
-                optional: true
-            operationTime:
-                type: logicalTime
-                optional: true
 
 commands:
     shardsvrRunSearchIndexCommand:
