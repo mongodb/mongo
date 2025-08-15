@@ -1562,6 +1562,18 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "auto_get_rstl_for_stepup_stepdown",
+    srcs = ["auto_get_rstl_for_stepup_stepdown.cpp"],
+    hdrs = ["auto_get_rstl_for_stepup_stepdown.h"],
+    deps = [
+        "repl_coordinator_interface",
+        "//src/mongo/db:shard_role_api_stor_ex",
+        "//src/mongo/db/session:kill_sessions_local",
+        "//src/mongo/db/storage:execution_context",
+    ],
+)
+
+mongo_cc_library(
     name = "repl_coordinator_impl",
     srcs = [
         "check_quorum_for_config_change.cpp",
@@ -1584,6 +1596,7 @@ mongo_cc_library(
         "vote_requester.h",
     ],
     deps = [
+        "auto_get_rstl_for_stepup_stepdown",
         "data_replicator_external_state_impl",
         "delayable_timeout_callback",
         "intent_registry",

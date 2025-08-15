@@ -42,6 +42,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/auto_get_rstl_for_stepup_stepdown.h"
 #include "mongo/db/repl/delayable_timeout_callback.h"
 #include "mongo/db/repl/hello/hello_response.h"
 #include "mongo/db/repl/initial_sync/initial_syncer.h"
@@ -179,7 +180,7 @@ class SyncSourceFeedback;
 class StorageInterface;
 class TopologyCoordinator;
 
-class ReplicationCoordinatorImpl : public ReplicationCoordinator {
+class ReplicationCoordinatorImpl : public ReplicationCoordinator, public StepUpStepDownCoordinator {
     ReplicationCoordinatorImpl(const ReplicationCoordinatorImpl&) = delete;
     ReplicationCoordinatorImpl& operator=(const ReplicationCoordinatorImpl&) = delete;
 
@@ -521,12 +522,12 @@ public:
 
     // ==================== Private API ===================
     // Called by AutoGetRstlForStepUpStepDown before taking RSTL when making stepdown transitions
-    void autoGetRstlEnterStepDown();
+    void autoGetRstlEnterStepDown() final;
 
     // Called by AutoGetRstlForStepUpStepDown before releasing RSTL when making stepdown
     // transitions.  Also called in case of failure to acquire RSTL.  There will be one call to this
     // method for each call to autoGetRSTLEnterStepDown.
-    void autoGetRstlExitStepDown();
+    void autoGetRstlExitStepDown() final;
 
     // ================== Test support API ===================
 
@@ -773,119 +774,6 @@ private:
         kActionRollbackOrRemoved,
         kActionFollowerModeStateChange,
         kActionStartSingleNodeElection
-    };
-
-    // This object acquires RSTL in X mode to perform state transition to (step up)/from (step down)
-    // primary. In order to acquire RSTL, it also starts "RstlKillOpthread" which kills conflicting
-    // operations (user/system) and aborts stashed running transactions.
-    class AutoGetRstlForStepUpStepDown {
-    public:
-        AutoGetRstlForStepUpStepDown(
-            ReplicationCoordinatorImpl* repl,
-            OperationContext* opCtx,
-            ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
-            Date_t deadline = Date_t::max());
-
-        ~AutoGetRstlForStepUpStepDown();
-
-        // Disallows copying.
-        AutoGetRstlForStepUpStepDown(const AutoGetRstlForStepUpStepDown&) = delete;
-        AutoGetRstlForStepUpStepDown& operator=(const AutoGetRstlForStepUpStepDown&) = delete;
-
-        /*
-         * Releases RSTL lock.
-         */
-        void rstlRelease();
-
-        /*
-         * Reacquires RSTL lock.
-         */
-        void rstlReacquire();
-
-        /*
-         * Returns _totalOpsKilled value.
-         */
-        size_t getTotalOpsKilled() const;
-
-        /*
-         * Increments _totalOpsKilled by val.
-         */
-        void incrementTotalOpsKilled(size_t val = 1);
-
-        /*
-         * Returns _totalOpsRunning value.
-         */
-        size_t getTotalOpsRunning() const;
-
-        /*
-         * Increments _totalOpsRunning by val.
-         */
-        void incrementTotalOpsRunning(size_t val = 1);
-
-        /*
-         * Returns the step up/step down opCtx.
-         */
-        const OperationContext* getOpCtx() const;
-
-    private:
-        /**
-         * It will spawn a new thread killOpThread to kill operations that conflict with state
-         * transitions (step up and step down).
-         */
-        void _startKillOpThread();
-
-        /**
-         * On state transition, we need to kill all write operations and all transactional
-         * operations, so that unprepared and prepared transactions can release or yield their
-         * locks. The required ordering between step up/step down steps are:
-         * 1) Enqueue RSTL in X mode.
-         * 2) Kill all conflicting operations.
-         *       - Write operation that takes global lock in IX and X mode.
-         *       - Read operations that takes global lock in S mode.
-         *       - Operations(read/write) that are blocked on prepare conflict.
-         * 3) Abort unprepared transactions.
-         * 4) Repeat step 2) and 3) until the step up/step down thread can acquire RSTL.
-         * 5) Yield locks of all prepared transactions. This applies only to step down as on
-         * secondary we currently yield locks for prepared transactions.
-         *
-         * Since prepared transactions don't hold RSTL, step 1) to step 3) make sure all
-         * running transactions that may hold RSTL finish, get killed or yield their locks,
-         * so that we can acquire RSTL at step 4). Holding the locks of prepared transactions
-         * until step 5) guarantees if any conflict operations (e.g. DDL operations) failed
-         * to be killed for any reason, we will get a deadlock instead of a silent data corruption.
-         *
-         * Loops continuously to kill all conflicting operations. And, aborts all stashed (inactive)
-         * transactions.
-         * Terminates once killSignaled is set true.
-         */
-        void _killOpThreadFn();
-
-        /*
-         * Signals killOpThread to stop killing operations.
-         */
-        void _stopAndWaitForKillOpThread();
-
-        ReplicationCoordinatorImpl* const _replCord;  // not owned.
-        // step up/step down opCtx.
-        OperationContext* const _opCtx;  // not owned.
-        // This field is optional because we need to start killOpThread to kill operations after
-        // RSTL enqueue.
-        boost::optional<ReplicationStateTransitionLockGuard> _rstlLock;
-        // Thread that will run killOpThreadFn().
-        std::unique_ptr<stdx::thread> _killOpThread;
-        // Tracks number of operations killed on step up / step down.
-        size_t _totalOpsKilled = 0;
-        // Tracks number of operations left running on step up / step down.
-        size_t _totalOpsRunning = 0;
-        // Protects killSignaled and stopKillingOps cond. variable.
-        stdx::mutex _mutex;
-        // Signals thread about the change of killSignaled value.
-        stdx::condition_variable _stopKillingOps;
-        // Once this is set to true, the killOpThreadFn method will terminate.
-        bool _killSignaled = false;
-        // The state transition that is in progress. Should never be set to rollback within this
-        // class.
-        ReplicationCoordinator::OpsKillingStateTransitionEnum _stateTransition;
     };
 
     struct Waiter {
@@ -1557,14 +1445,6 @@ private:
      * Schedules stepdown to run with the global exclusive lock.
      */
     executor::TaskExecutor::EventHandle _stepDownStart();
-
-    /**
-     * kill all conflicting operations that are blocked either on prepare conflict or have taken
-     * global lock not in MODE_IS. The conflicting operations can be either user or system
-     * operations marked as killable.
-     */
-    void _killConflictingOpsOnStepUpAndStepDown(AutoGetRstlForStepUpStepDown* arsc,
-                                                ErrorCodes::Error reason);
 
     /**
      * Completes a step-down of the current node.  Must be run with a global
