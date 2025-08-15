@@ -35,12 +35,13 @@
 #include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/shared_library.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
-#include "mongo/util/version.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -163,18 +164,15 @@ void ExtensionLoader::load(const std::string& extensionPath) {
     // with the host API version.
     assertVersionCompatibility(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED, extHandle.getVersion());
 
-    // Retrieve the VersionInfoInterface and convert to MongoDBVersion to pass across the API
-    // header. During unit testing, use FallbackVersionInfo.
-    const auto& serverVersion = mongo::VersionInfoInterface::instance(
-        TestingProctor::instance().isEnabled()
-            ? VersionInfoInterface::NotEnabledAction::kFallback
-            : VersionInfoInterface::NotEnabledAction::kAbortProcess);
+    // Get the max wire version of the server. During unit testing, return max wire version 0.
+    const auto& maxWireVersion = TestingProctor::instance().isEnabled()
+        ? 0
+        : (mongo::WireSpec::getWireSpec(getGlobalServiceContext())
+               .getIncomingInternalClient()
+               .maxWireVersion);
 
-    ::MongoExtensionHostPortal portal{extHandle.getVersion(),
-                                      MongoDBVersion{serverVersion.majorVersion(),
-                                                     serverVersion.minorVersion(),
-                                                     serverVersion.patchVersion()},
-                                      registerStageDescriptor};
+    ::MongoExtensionHostPortal portal{
+        extHandle.getVersion(), maxWireVersion, registerStageDescriptor};
     extHandle.initialize(&portal);
 
     // Add the 'SharedLibrary' pointer to our loaded extensions array to keep it alive for the

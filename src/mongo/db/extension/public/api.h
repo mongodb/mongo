@@ -212,22 +212,16 @@ typedef struct MongoExtensionLogicalAggregationStageVTable {
 } MongoExtensionLogicalAggregationStageVTable;
 
 /**
- * Represents the MongoDB server version in a type that can be passed across the API boundary.
- */
-typedef struct {
-    int major;
-    int minor;
-    int patch;
-} MongoDBVersion;
-
-/**
  * MongoExtensionHostPortal serves as the entry point for extensions to integrate with the
  * server. It exposes a function pointer, registerStageDescriptor, which allows extensions to
  * register custom aggregation stages.
  */
 typedef struct MongoExtensionHostPortal {
     MongoExtensionAPIVersion hostExtensionsAPIVersion;
-    MongoDBVersion hostMongoDBVersion;
+    // Wire versions in MongoDB are stored in an enum. Each service context will have both a min and
+    // a max wire version; the extension should only need the max wire version in order to determine
+    // if new server features have been added.
+    int hostMongoDBMaxWireVersion;
     MongoExtensionStatus* (*registerStageDescriptor)(
         const MongoExtensionAggregationStageDescriptor* descriptor);
 } MongoExtensionHostPortal;

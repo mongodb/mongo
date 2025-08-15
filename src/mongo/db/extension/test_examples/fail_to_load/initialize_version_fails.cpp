@@ -37,11 +37,11 @@ public:
         const bool extensionAPIVersionValid =
             portal->hostExtensionsAPIVersion.major == MONGODB_EXTENSION_API_MAJOR_VERSION &&
             portal->hostExtensionsAPIVersion.minor <= MONGODB_EXTENSION_API_MINOR_VERSION;
-        // Does not align with FallbackVersionInfo and errors out, for testing purposes only.
-        const bool serverVersionValid = portal->hostMongoDBVersion.major > 0;
+        // Unit tests are given maxWireVersion 0 by default, so this will always error.
+        const bool wireVersionValid = portal->hostMongoDBMaxWireVersion > 0;
         uassert(10726600,
                 "MongoExtensionHostPortal contains incompatible versions",
-                extensionAPIVersionValid && serverVersionValid);
+                extensionAPIVersionValid && wireVersionValid);
     }
 };
 
