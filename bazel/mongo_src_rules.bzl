@@ -441,12 +441,15 @@ def mongo_cc_library(
         features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
 
     if "modules/enterprise" in native.package_name():
-        enterprise_compatible = select({
+        target_compatible_with += select({
             "//bazel/config:build_enterprise_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
         })
-    else:
-        enterprise_compatible = []
+    elif "modules/atlas" in native.package_name():
+        target_compatible_with += select({
+            "//bazel/config:build_atlas_enabled": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        })
 
     if "third_party" in native.package_name():
         tags = tags + ["third_party"]
@@ -533,7 +536,7 @@ def mongo_cc_library(
         target_compatible_with = select({
             "//bazel/config:shared_archive_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
-        }) + target_compatible_with + enterprise_compatible,
+        }) + target_compatible_with,
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         exec_properties = exec_properties,
         **kwargs
@@ -562,7 +565,7 @@ def mongo_cc_library(
         defines = defines,
         includes = includes,
         features = SKIP_ARCHIVE_FEATURE + features,
-        target_compatible_with = target_compatible_with + enterprise_compatible,
+        target_compatible_with = target_compatible_with,
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         exec_properties = exec_properties,
         **kwargs
@@ -602,7 +605,7 @@ def mongo_cc_library(
                                                        hex32(hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT)))],
             "//conditions:default": [],
         }),
-        target_compatible_with = shared_library_compatible_with + target_compatible_with + enterprise_compatible,
+        target_compatible_with = shared_library_compatible_with + target_compatible_with,
         dynamic_deps = dynamic_deps,
         shared_lib_name = shared_lib_name,
         features = select({
@@ -701,7 +704,7 @@ def _mongo_cc_binary_and_test(
         features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
 
     if "modules/enterprise" in native.package_name():
-        enterprise_compatible = select({
+        target_compatible_with += select({
             "//bazel/config:build_enterprise_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
         })
@@ -711,8 +714,6 @@ def _mongo_cc_binary_and_test(
                 "//bazel/config:ssl_enabled": [],
                 "//conditions:default": ["@platforms//:incompatible"],
             })
-    else:
-        enterprise_compatible = []
 
     copts = get_copts(name, native.package_name(), copts, skip_windows_crt_flags)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
@@ -802,7 +803,7 @@ def _mongo_cc_binary_and_test(
             "//bazel/config:linkstatic_disabled": deps,
             "//conditions:default": [],
         }),
-        "target_compatible_with": target_compatible_with + enterprise_compatible,
+        "target_compatible_with": target_compatible_with,
         "additional_linker_inputs": additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         "exec_properties": exec_properties | select({
             "//bazel/config:remote_link_enabled": {},
