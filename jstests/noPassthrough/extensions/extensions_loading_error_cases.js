@@ -1,13 +1,23 @@
 /**
  * Tests error cases when using the --loadExtensions startup parameter on mongos and mongod.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * This includes testing cases where the host rejects the parsed options, file does not exist, and
+ * two cases where the extension is rejected by the host during loading.
+ *
+ * @tags: [
+ *   featureFlagExtensionsAPI,
+ *   # TODO SERVER-109351 Re-enable aubsan coverage by resolving memory leak
+ *   incompatible_aubsan,
+ * ]
  */
-
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
+const pathToMissingSymbolExtension = MongoRunner.getExtensionPath("libno_symbol_bad_extension.so");
+const pathToDuplicateStageExtension =
+    MongoRunner.getExtensionPath("libduplicate_stage_descriptor_bad_extension.so");
+
 // Create a ShardingTest so that we have a config DB for mongos to point to in our test. We don't
 // use ShardingTest directly because repeated failed ShardingTest startups causes issues in the test
 // environment. This also reduces the amount of times we have to start a whole sharded cluster in
@@ -52,6 +62,10 @@ if (isLinux()) {
     runTest({options: {loadExtensions: 12345}});
     // Path to extension does not exist.
     runTest({options: {loadExtensions: "path/does/not/exist.so"}});
+    // Path to extension with an .so that is missing the get_mongodb_extension symbol.
+    runTest({options: {loadExtensions: pathToMissingSymbolExtension}});
+    // Path to extension that attempts to register duplicate stage descriptors.
+    runTest({options: {loadExtensions: pathToDuplicateStageExtension}});
 } else {
     // Startup should fail because we are attempting to load an extension on a platform that is not
     // linux.

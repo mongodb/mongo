@@ -76,45 +76,53 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
                        AssertionException,
                        10615500);
 
-    // malformed1_extension is missing the get_mongodb_extension symbol definition.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed1_mongo_extension.so")),
+    // no_symbol_bad_extension is missing the get_mongodb_extension symbol definition.
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libno_symbol_bad_extension.so")),
                        AssertionException,
                        10615501);
 
-    // malformed2_extension returns null from get_mongodb_extension.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed2_mongo_extension.so")),
-                       AssertionException,
-                       10615503);
+    // null_mongo_extension_bad_extension returns null from get_mongodb_extension.
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(getExtensionPath("libnull_mongo_extension_bad_extension.so")),
+        AssertionException,
+        10615503);
 
-    // malformed3_extension has an incompatible major version (plus 1).
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed3_mongo_extension.so")),
-                       AssertionException,
-                       10615504);
+    // major_version_too_high_bad_extension has an incompatible major version (plus 1).
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(getExtensionPath("libmajor_version_too_high_bad_extension.so")),
+        AssertionException,
+        10615504);
 
-    // malformed4_extension has an incompatible major version (minus 1).
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed4_mongo_extension.so")),
-                       AssertionException,
-                       10615504);
+    // major_version_too_low_bad_extension has an incompatible major version (minus 1).
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(getExtensionPath("libmajor_version_too_low_bad_extension.so")),
+        AssertionException,
+        10615504);
 
-    // malformed5_extension has an incompatible minor version.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed5_mongo_extension.so")),
-                       AssertionException,
-                       10615505);
+    // minor_version_too_high_bad_extension has an incompatible minor version.
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(getExtensionPath("libminor_version_too_high_bad_extension.so")),
+        AssertionException,
+        10615505);
 
-    // malformed6_extension has a null initialization function.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed6_mongo_extension.so")),
-                       AssertionException,
-                       10615506);
+    // null_initialize_function_bad_extension has a null initialization function.
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(getExtensionPath("libnull_initialize_function_bad_extension.so")),
+        AssertionException,
+        10615506);
 
-    // malformed7_extension has the maximum uint32_t value as its major version.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed7_mongo_extension.so")),
-                       AssertionException,
-                       10615504);
+    // major_version_max_int_bad_extension has the maximum uint32_t value as its major version.
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(getExtensionPath("libmajor_version_max_int_bad_extension.so")),
+        AssertionException,
+        10615504);
 
-    // malformed8_extension attempts to register the same stage descriptor multiple times.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed8_mongo_extension.so")),
-                       AssertionException,
-                       10696402);
+    // duplicate_stage_descriptor_bad_extension attempts to register the same stage descriptor
+    // multiple times.
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(getExtensionPath("libduplicate_stage_descriptor_bad_extension.so")),
+        AssertionException,
+        10696402);
 }
 
 // TODO SERVER-109108: Switch this to use the foo extension once we can reset state in between
@@ -189,20 +197,20 @@ TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterSucceeds) {
 
 TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterFails) {
     ASSERT_THROWS_CODE(
-        ExtensionLoader::load(getExtensionPath("libhostVersionFails_mongo_extension.so")),
+        ExtensionLoader::load(getExtensionPath("libhost_version_fails_bad_extension.so")),
         AssertionException,
         10615503);
 }
 
-TEST_F(LoadExtensionsTest, LoadExtensionInitializeVersionFails) {
+TEST_F(LoadExtensionsTest, LoadExtensioninitialize_version_fails) {
     ASSERT_THROWS_CODE(
-        ExtensionLoader::load(getExtensionPath("libinitializeVersionFails_mongo_extension.so")),
+        ExtensionLoader::load(getExtensionPath("libinitialize_version_fails_bad_extension.so")),
         AssertionException,
         10726600);
 }
 
-DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullStageDescriptor, "10596400") {
-    ExtensionLoader::load(getExtensionPath("libnullStageDescriptor_mongo_extension.so"));
+DEATH_TEST_F(LoadExtensionsTest, LoadExtensionnull_stage_descriptor, "10596400") {
+    ExtensionLoader::load(getExtensionPath("libnull_stage_descriptor_bad_extension.so"));
 }
 
 TEST(LoadExtensionTest, LoadExtensionTwoStagesSucceeds) {

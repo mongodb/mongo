@@ -430,6 +430,10 @@ mongo_install(
 extensions_with_config(
     name = "dist_test_extensions",
     srcs = [
+        # Any extension that we intend to load in extensions passthrough tests and in the
+        # extension-enabled variant MUST have the "_mongo_extension" suffix for the
+        # find_extensions.sh script to recognize it.
+
         # TODO SERVER-108821: Remove the comment below once extension stages are no longer
         # listed by $listMqlEntities.
         # Any extension added here will result in the with-extensions Evergreen variant
@@ -440,6 +444,11 @@ extensions_with_config(
         # TODO SERVER-109108: Remove this entry when the bar extension is no longer needed.
         "//src/mongo/db/extension/test_examples:bar_mongo_extension",
         "//src/mongo/db/extension/test_examples:foo_mongo_extension",
+
+        # Any extension that is just loaded in a no-passthrough test MUST NOT have the
+        # "_mongo_extension" suffix.
+        "//src/mongo/db/extension/test_examples:no_symbol_bad_extension",
+        "//src/mongo/db/extension/test_examples:duplicate_stage_descriptor_bad_extension",
     ],
 )
 

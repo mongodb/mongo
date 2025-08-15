@@ -36,4 +36,4 @@ public:
 };
 
 // No definition of get_mongodb_extension() here, which is intentional to simulate a malformed
-// extension.
+// extension missing the export of the get_mongodb_extension symbol.

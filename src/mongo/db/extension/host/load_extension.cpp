@@ -50,40 +50,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::extension::host {
-
-stdx::unordered_map<std::string, std::unique_ptr<SharedLibrary>> ExtensionLoader::loadedExtensions;
-
-bool loadExtensions(const std::vector<std::string>& extensionPaths) {
-    if (extensionPaths.empty()) {
-        return true;
-    }
-
-    if (!feature_flags::gFeatureFlagExtensionsAPI.isEnabled()) {
-        LOGV2_ERROR(10668500,
-                    "Extensions are not allowed with the current configuration. You may need to "
-                    "enable featureFlagExtensionsAPI.");
-        return false;
-    }
-
-    for (const auto& extension : extensionPaths) {
-        LOGV2(10668501, "Loading extension", "filePath"_attr = extension);
-
-        try {
-            ExtensionLoader::load(extension);
-        } catch (...) {
-            LOGV2_ERROR(10668502,
-                        "Error loading extension",
-                        "filePath"_attr = extension,
-                        "status"_attr = exceptionToStatus());
-            return false;
-        }
-
-        LOGV2(10668503, "Successfully loaded extension", "filePath"_attr = extension);
-    }
-
-    return true;
-}
-
 namespace {
 void assertVersionCompatibility(const ::MongoExtensionAPIVersionVector* hostVersions,
                                 const ::MongoExtensionAPIVersion& extensionVersion) {
@@ -145,10 +111,43 @@ ExtensionHandle getMongoExtension(SharedLibrary& extensionLib, const std::string
 }
 }  // namespace
 
+stdx::unordered_map<std::string, std::unique_ptr<SharedLibrary>> ExtensionLoader::loadedExtensions;
+
+bool loadExtensions(const std::vector<std::string>& extensionPaths) {
+    if (extensionPaths.empty()) {
+        return true;
+    }
+
+    if (!feature_flags::gFeatureFlagExtensionsAPI.isEnabled()) {
+        LOGV2_ERROR(10668500,
+                    "Extensions are not allowed with the current configuration. You may need to "
+                    "enable featureFlagExtensionsAPI.");
+        return false;
+    }
+
+    for (const auto& extension : extensionPaths) {
+        LOGV2(10668501, "Loading extension", "filePath"_attr = extension);
+
+        try {
+            ExtensionLoader::load(extension);
+        } catch (...) {
+            LOGV2_ERROR(10668502,
+                        "Error loading extension",
+                        "filePath"_attr = extension,
+                        "status"_attr = exceptionToStatus());
+            return false;
+        }
+
+        LOGV2(10668503, "Successfully loaded extension", "filePath"_attr = extension);
+    }
+
+    return true;
+}
+
 void ExtensionLoader::load(const std::string& extensionPath) {
     uassert(10845400,
-            str::stream() << "Loading extension '" << extensionPath
-                          << "' failed: " << "Extension has already been loaded",
+            str::stream() << "Loading extension '" << extensionPath << "' failed: "
+                          << "Extension has already been loaded",
             !loadedExtensions.contains(extensionPath));
 
     StatusWith<std::unique_ptr<SharedLibrary>> swExtensionLib =

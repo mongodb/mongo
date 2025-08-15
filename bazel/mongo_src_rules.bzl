@@ -1494,3 +1494,87 @@ def mongo_cc_fuzzer_test(
         exec_properties = exec_properties,
         **kwargs
     )
+
+# Note: For these extensions to load successfully in the server, they must be built with
+# --allocator=system. Otherwise, the extensions will get a local instance of tcmalloc which
+# fails to run properly because there isn't enough TLS space available for both the host and
+# extension's tcmalloc. In transitions.bzl, we define a Bazel transition for managing the allocator
+# and other extension-specific options.
+def mongo_cc_extension_shared_library(
+        name,
+        srcs = [],
+        deps = [],
+        header_deps = [],
+        visibility = None,
+        data = [],
+        tags = [],
+        copts = [],
+        linkopts = [],
+        includes = [],
+        linkstatic = False,
+        local_defines = [],
+        target_compatible_with = [],
+        defines = [],
+        additional_linker_inputs = [],
+        features = [],
+        exec_properties = {},
+        **kwargs):
+    mongo_cc_library(
+        name = name,
+        srcs = srcs,
+        deps = deps + [
+            "//src/mongo/db/extension/public:api",
+            "//src/mongo/db/extension/sdk:sdk_cpp",
+        ],
+        header_deps = header_deps,
+        visibility = visibility,
+        data = data,
+        tags = tags,
+        copts = copts,
+        linkopts = linkopts,
+        includes = includes,
+        linkstatic = linkstatic,
+        local_defines = local_defines,
+        defines = defines,
+        features = features,
+        exec_properties = exec_properties,
+        additional_linker_inputs = additional_linker_inputs + select({
+            "@platforms//os:linux": [
+                ":test_extensions.version_script.lds",
+            ],
+            "//conditions:default": [],
+        }) + select({
+            "@platforms//os:macos": [
+                ":test_extensions.exported_symbols_list.lds",
+            ],
+            "//conditions:default": [],
+        }),
+        # linkshared produces a shared library as the output.
+        # TODO SERVER-109255 Make sure the test extensions are statically linked, as we expect
+        # all extensions to be.
+        linkshared = True,
+        non_transitive_dyn_linkopts = select({
+            "@platforms//os:linux": [
+                "-Wl,--version-script=$(location :test_extensions.version_script.lds)",
+            ],
+            "//conditions:default": [],
+        }) + select({
+            "@platforms//os:macos": [
+                "-Wl,-exported_symbols_list,$(location :test_extensions.exported_symbols_list.lds)",
+            ],
+            "//conditions:default": [],
+        }),
+        skip_global_deps = [
+            # This is a globally injected dependency. We don't want a special allocator linked
+            # here. Instead, the allocator should be overriden at load time.
+            "allocator",
+            "libunwind",
+        ],
+        target_compatible_with = target_compatible_with + select({
+            "//bazel/config:shared_archive_or_link_dynamic": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }) + select({
+            "@platforms//os:linux": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }),
+    )
