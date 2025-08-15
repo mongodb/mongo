@@ -983,7 +983,7 @@ public:
         indexSpec = statusWithSpec.getValue();
 
         auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
-            writableColl->ns(), indexSpec, IndexBuildMethod::kForeground, UUID::gen());
+            writableColl->ns(), indexSpec, IndexBuildMethodEnum::kForeground, UUID::gen());
         uassertStatusOK(
             indexBuildBlock->init(opCtx,
                                   writableColl,

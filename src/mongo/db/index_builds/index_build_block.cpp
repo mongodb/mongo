@@ -66,8 +66,9 @@ namespace mongo {
 
 namespace {
 
-bool isBackgroundBuilding(IndexBuildMethod method) {
-    return method == IndexBuildMethod::kHybrid || method == IndexBuildMethod::kPrimaryDriven;
+bool isBackgroundBuilding(IndexBuildMethodEnum method) {
+    return method == IndexBuildMethodEnum::kHybrid ||
+        method == IndexBuildMethodEnum::kPrimaryDriven;
 }
 
 }  // namespace
@@ -75,7 +76,7 @@ bool isBackgroundBuilding(IndexBuildMethod method) {
 
 IndexBuildBlock::IndexBuildBlock(const NamespaceString& nss,
                                  const BSONObj& spec,
-                                 IndexBuildMethod method,
+                                 IndexBuildMethodEnum method,
                                  boost::optional<UUID> indexBuildUUID)
     : _nss(nss), _spec(spec.getOwned()), _method(method), _buildUUID(indexBuildUUID) {}
 
@@ -112,8 +113,9 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
     uassert(4945000,
             "Index catalog entry not found while attempting to resume index build",
             writableEntry);
-    uassert(
-        4945001, "Cannot resume a non-hybrid index build", _method == IndexBuildMethod::kHybrid);
+    uassert(4945001,
+            "Cannot resume a non-hybrid index build",
+            _method == IndexBuildMethodEnum::kHybrid);
 
     if (phase == IndexBuildPhaseEnum::kBulkLoad) {
         // A bulk cursor can only be opened on a fresh table, so we drop the table that was created
@@ -300,7 +302,7 @@ Status IndexBuildBlock::buildEmptyIndex(OperationContext* opCtx,
                                         BSONObj spec,
                                         StringData ident) {
     IndexBuildBlock indexBuildBlock(
-        collection->ns(), spec, IndexBuildMethod::kForeground, boost::none);
+        collection->ns(), spec, IndexBuildMethodEnum::kForeground, boost::none);
     if (auto status = indexBuildBlock.init(opCtx, collection, ident, /*forRecovery=*/false);
         !status.isOK()) {
         return status;

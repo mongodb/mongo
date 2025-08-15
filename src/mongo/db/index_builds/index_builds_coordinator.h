@@ -115,7 +115,7 @@ public:
      * Contains additional information required by 'startIndexBuild()'.
      */
     struct IndexBuildOptions {
-        IndexBuildMethod indexBuildMethod{IndexBuildMethod::kHybrid};
+        IndexBuildMethodEnum indexBuildMethod{IndexBuildMethodEnum::kHybrid};
         boost::optional<CommitQuorumOptions> commitQuorum;
         ApplicationMode applicationMode = ApplicationMode::kNormal;
         boost::optional<repl::OpTime> startIndexBuildOpTime;

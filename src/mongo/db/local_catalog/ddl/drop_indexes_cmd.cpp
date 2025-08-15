@@ -267,7 +267,7 @@ public:
         result.appendNumber("nIndexesWas", static_cast<long long>(indexes.size()));
 
         std::unique_ptr<MultiIndexBlock> indexer = std::make_unique<MultiIndexBlock>();
-        indexer->setIndexBuildMethod(IndexBuildMethod::kForeground);
+        indexer->setIndexBuildMethod(IndexBuildMethodEnum::kForeground);
         StatusWith<std::vector<BSONObj>> swIndexesToRebuild(ErrorCodes::UnknownError,
                                                             "Uninitialized");
         writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss, [&] {

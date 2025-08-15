@@ -113,8 +113,8 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
         // member won't be available to be queried by anyone until it's caught up with the primary.
         // The only reason to do this is to force the index document insertion to not yield the
         // locks as yielding a MODE_X/MODE_S lock isn't allowed.
-        _secondaryIndexesBlock->setIndexBuildMethod(IndexBuildMethod::kForeground);
-        _idIndexBlock->setIndexBuildMethod(IndexBuildMethod::kForeground);
+        _secondaryIndexesBlock->setIndexBuildMethod(IndexBuildMethodEnum::kForeground);
+        _idIndexBlock->setIndexBuildMethod(IndexBuildMethodEnum::kForeground);
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         return writeConflictRetry(
             _opCtx.get(), "CollectionBulkLoader::init", _acquisition.nss(), [&] {

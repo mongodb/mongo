@@ -913,7 +913,9 @@ public:
     }
 
     StringData indexNameOplogField() const {
-        return shouldReplicateLocalCatalogIdentifers(_opCtx) ? "o.spec.name" : "o.name";
+        return shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(_opCtx))
+            ? "o.spec.name"
+            : "o.name";
     }
 
 private:
@@ -3074,12 +3076,14 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
     // supports 2 phase index build.
     indexStartTs = op.getTimestamp();
     indexCreateTs =
-        repl::OplogEntry(
-            queryOplog(BSON(
-                "op" << "c"
-                     << "ns" << nss.getCommandNS().ns_forTest() << "o.createIndexes" << nss.coll()
-                     << (shouldReplicateLocalCatalogIdentifers(_opCtx) ? "o.spec.name" : "o.name")
-                     << "user_1_db_1")))
+        repl::OplogEntry(queryOplog(BSON("op" << "c"
+                                              << "ns" << nss.getCommandNS().ns_forTest()
+                                              << "o.createIndexes" << nss.coll()
+                                              << (shouldReplicateLocalCatalogIdentifers(
+                                                      VersionContext::getDecoration(_opCtx))
+                                                      ? "o.spec.name"
+                                                      : "o.name")
+                                              << "user_1_db_1")))
             .getTimestamp();
     indexCompleteTs = indexCreateTs;
 

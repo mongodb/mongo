@@ -53,7 +53,7 @@ const OpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
 MONGO_FAIL_POINT_DEFINE(addDestinedRecipient);
 MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 
-bool shouldReplicateLocalCatalogIdentifers(OperationContext* opCtx) {
+bool shouldReplicateLocalCatalogIdentifers(const VersionContext& vCtx) {
     if (disagg::gDisaggregatedStorageEnabled) {
         // Disaggregated storage relies on consistent catalog storage. Safe-guard if FCV is not yet
         // initialized despite the feature being enabled.
@@ -61,8 +61,13 @@ bool shouldReplicateLocalCatalogIdentifers(OperationContext* opCtx) {
     }
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     return fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot);
+        feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(vCtx, fcvSnapshot);
+}
+
+bool isPrimaryDrivenIndexBuildEnabled(const VersionContext& vCtx) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(vCtx, fcvSnapshot);
 }
 
 /**

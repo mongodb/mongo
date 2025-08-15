@@ -319,7 +319,7 @@ public:
      */
     bool isBackgroundBuilding() const;
 
-    void setIndexBuildMethod(IndexBuildMethod indexBuildMethod);
+    void setIndexBuildMethod(IndexBuildMethodEnum indexBuildMethod);
 
     /**
      * Appends the current state information of the index build to the builder.
@@ -373,7 +373,7 @@ private:
 
     std::vector<IndexToBuild> _indexes;
 
-    IndexBuildMethod _method = IndexBuildMethod::kHybrid;
+    IndexBuildMethodEnum _method = IndexBuildMethodEnum::kHybrid;
 
     bool _ignoreUnique = false;
 

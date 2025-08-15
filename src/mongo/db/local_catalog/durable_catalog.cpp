@@ -333,7 +333,8 @@ Status createIndex(OperationContext* opCtx,
     auto kvEngine = storageEngine->getEngine();
     invariant(collectionOptions.uuid);
 
-    bool replicateLocalCatalogIdentifiers = shouldReplicateLocalCatalogIdentifers(opCtx);
+    bool replicateLocalCatalogIdentifiers =
+        shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx));
     if (replicateLocalCatalogIdentifiers) {
         // If a previous attempt at creating this index was rolled back, the ident may still be drop
         // pending. Complete that drop before creating the index if so.

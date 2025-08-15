@@ -121,7 +121,8 @@ void AuthOpObserver::onCreateCollection(
         repl::MutableOplogEntry::makeCreateCollObject(collectionName, options, idIndex);
 
     BSONObj o2;
-    if (createCollCatalogIdentifier.has_value() && shouldReplicateLocalCatalogIdentifers(opCtx)) {
+    if (createCollCatalogIdentifier.has_value() &&
+        shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
         o2 = repl::MutableOplogEntry::makeCreateCollObject2(
             createCollCatalogIdentifier->catalogId,
             createCollCatalogIdentifier->ident,
