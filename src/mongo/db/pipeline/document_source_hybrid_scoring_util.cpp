@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
@@ -37,6 +38,7 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_score.h"
 #include "mongo/db/pipeline/document_source_score_fusion.h"
@@ -433,6 +435,191 @@ void assertForeignCollectionIsNotTimeseries(const NamespaceString& nss,
     }
 }
 
+boost::intrusive_ptr<DocumentSource> buildReplaceRootStage(
+    const StringData internalFieldsDocsName,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return DocumentSourceReplaceRoot::createFromBson(
+        BSON("$replaceWith" << BSON(internalFieldsDocsName << "$$ROOT")).firstElement(), expCtx);
+}
+
+BSONObj groupDocsByIdAcrossInputPipeline(const StringData internalFieldsDocsName,
+                                         const StringData internalFieldsName,
+                                         const std::vector<std::string>& pipelineNames,
+                                         const bool includeScoreDetails) {
+    // For each sub-pipeline, build the following obj:
+    // name_score: {$max: {ifNull: ["$name_score", 0]}}
+    // If scoreDetails is enabled, build:
+    // If $rankFusion:
+    // <INTERNAL_FIELDS>.name_rank: {$max: {ifNull: ["$<INTERNAL_FIELDS>.name_rank", 0]}}
+    // If $scoreFusion:
+    // <INTERNAL_FIELDS>.name_rawScore: {$max: {ifNull: ["$<INTERNAL_FIELDS>.name_rawScore", 0]}}
+    // Both $rankFusion and $scoreFusion:
+    // <INTERNAL_FIELDS>.name_scoreDetails: {$mergeObjects: $<INTERNAL_FIELDS>.name_scoreDetails}
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder groupBob(bob.subobjStart("$group"_sd));
+        groupBob.append("_id", "$" + internalFieldsDocsName + "._id");
+        groupBob.append(internalFieldsDocsName, BSON("$first" << ("$" + internalFieldsDocsName)));
+
+        BSONObjBuilder internalFieldsBob(groupBob.subobjStart(internalFieldsName));
+        BSONObjBuilder pushBob(internalFieldsBob.subobjStart("$push"_sd));
+
+        for (const auto& pipelineName : pipelineNames) {
+            const std::string scoreName =
+                hybrid_scoring_util::getScoreFieldFromPipelineName(pipelineName);
+            pushBob.append(
+                scoreName,
+                BSON("$ifNull" << BSON_ARRAY(
+                         fmt::format("${}",
+                                     hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                                         internalFieldsName, scoreName))
+                         << 0)));
+            if (includeScoreDetails) {
+                if (internalFieldsName == DocumentSourceRankFusion::kRankFusionInternalFieldsName) {
+                    const std::string rankName = fmt::format("{}_rank", pipelineName);
+                    pushBob.append(
+                        rankName,
+                        BSON("$ifNull" << BSON_ARRAY(
+                                 fmt::format(
+                                     "${}",
+                                     hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                                         internalFieldsName, rankName))
+                                 << 0)));
+                } else if (internalFieldsName ==
+                           DocumentSourceScoreFusion::kScoreFusionInternalFieldsName) {
+                    const std::string rawScoreName = fmt::format("{}_rawScore", pipelineName);
+                    pushBob.append(
+                        rawScoreName,
+                        BSON("$ifNull" << BSON_ARRAY(
+                                 fmt::format(
+                                     "${}",
+                                     hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                                         internalFieldsName, rawScoreName))
+                                 << 0)));
+                }
+
+                const std::string scoreDetailsName = fmt::format("{}_scoreDetails", pipelineName);
+                pushBob.append(scoreDetailsName,
+                               fmt::format("${}",
+                                           hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                                               internalFieldsName, scoreDetailsName)));
+            }
+        }
+        pushBob.done();
+        internalFieldsBob.done();
+        groupBob.done();
+    }
+    bob.done();
+    return bob.obj();
+}
+
+BSONObj projectReduceInternalFields(const StringData internalFieldsDocsName,
+                                    const StringData internalFieldsName,
+                                    const std::vector<std::string>& pipelineNames,
+                                    const bool includeScoreDetails) {
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder projectBob(bob.subobjStart("$project"_sd));
+        projectBob.append(internalFieldsDocsName, 1);
+
+        BSONObjBuilder internalFieldsBob(projectBob.subobjStart(internalFieldsName));
+        BSONObjBuilder reduceBob(internalFieldsBob.subobjStart("$reduce"_sd));
+
+        reduceBob.append("input", "$" + internalFieldsName);
+
+        BSONObjBuilder initialValueBob(reduceBob.subobjStart("initialValue"_sd));
+        for (const auto& pipelineName : pipelineNames) {
+            initialValueBob.append(fmt::format("{}_score", pipelineName), 0);
+            if (includeScoreDetails) {
+                if (internalFieldsName == DocumentSourceRankFusion::kRankFusionInternalFieldsName) {
+                    initialValueBob.append(fmt::format("{}_rank", pipelineName), 0);
+                } else if (internalFieldsName ==
+                           DocumentSourceScoreFusion::kScoreFusionInternalFieldsName) {
+                    initialValueBob.append(fmt::format("{}_rawScore", pipelineName), 0);
+                }
+                initialValueBob.append(fmt::format("{}_scoreDetails", pipelineName), BSONObj{});
+            }
+        }
+        initialValueBob.done();
+
+        BSONObjBuilder inBob(reduceBob.subobjStart("in"_sd));
+        for (const auto& pipelineName : pipelineNames) {
+            initialValueBob.append(
+                fmt::format("{}_score", pipelineName),
+                BSON("$max" << BSON_ARRAY(fmt::format("$$value.{}_score", pipelineName)
+                                          << fmt::format("$$this.{}_score", pipelineName))));
+            if (includeScoreDetails) {
+                if (internalFieldsName == DocumentSourceRankFusion::kRankFusionInternalFieldsName) {
+                    initialValueBob.append(
+                        fmt::format("{}_rank", pipelineName),
+                        BSON("$max" << BSON_ARRAY(fmt::format("$$value.{}_rank", pipelineName)
+                                                  << fmt::format("$$this.{}_rank", pipelineName))));
+                } else if (internalFieldsName ==
+                           DocumentSourceScoreFusion::kScoreFusionInternalFieldsName) {
+                    initialValueBob.append(
+                        fmt::format("{}_rawScore", pipelineName),
+                        BSON("$max"
+                             << BSON_ARRAY(fmt::format("$$value.{}_rawScore", pipelineName)
+                                           << fmt::format("$$this.{}_rawScore", pipelineName))));
+                }
+                initialValueBob.append(
+                    fmt::format("{}_scoreDetails", pipelineName),
+                    BSON("$mergeObjects"
+                         << BSON_ARRAY(fmt::format("$$value.{}_scoreDetails", pipelineName)
+                                       << fmt::format("$$this.{}_scoreDetails", pipelineName))));
+            }
+        }
+        inBob.done();
+
+        reduceBob.done();
+        internalFieldsBob.done();
+        projectBob.done();
+    }
+    bob.done();
+    return bob.obj();
+}
+
+BSONObj promoteEmbeddedDocsObject(const StringData internalFieldsDocsName) {
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder replaceRootBob(bob.subobjStart("$replaceRoot"_sd));
+        BSONObjBuilder newRootBob(replaceRootBob.subobjStart("newRoot"_sd));
+
+        BSONArrayBuilder mergeObjectsArrayBab;
+        mergeObjectsArrayBab.append("$" + internalFieldsDocsName);
+        mergeObjectsArrayBab.append("$$ROOT");
+        mergeObjectsArrayBab.done();
+
+        newRootBob.append("$mergeObjects", mergeObjectsArrayBab.arr());
+        newRootBob.done();
+        replaceRootBob.done();
+    }
+    bob.done();
+    return bob.obj();
+}
+
+BSONObj projectRemoveEmbeddedDocsObject(const StringData internalFieldsDocsName) {
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder projectBob(bob.subobjStart("$project"_sd));
+        projectBob.append(internalFieldsDocsName, 0);
+        projectBob.done();
+    }
+    bob.done();
+    return bob.obj();
+}
+
+BSONObj projectRemoveInternalFieldsObject(const StringData internalFieldsName) {
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder projectBob(bob.subobjStart("$project"_sd));
+        projectBob.append(internalFieldsName, 0);
+        projectBob.done();
+    }
+    bob.done();
+    return bob.obj();
+}
+
 namespace score_details {
 
 std::pair<std::string, BSONObj> constructScoreDetailsForGrouping(const std::string pipelineName) {
@@ -449,5 +636,72 @@ std::string stringifyExpression(boost::optional<IDLAnyType> expression) {
     std::replace(exprString.begin(), exprString.end(), '\"', '\'');
     return exprString;
 }
+
+boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
+    const StringData internalFieldsName,
+    const std::vector<std::string>& pipelineNames,
+    const StringMap<double>& weights,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        {
+            BSONObjBuilder internalFieldsBob(addFieldsBob.subobjStart(internalFieldsName));
+            {
+                BSONArrayBuilder calculatedScoreDetailsArr;
+                for (const auto& pipelineName : pipelineNames) {
+                    const std::string internalFieldsPipelineName =
+                        hybrid_scoring_util::applyInternalFieldPrefixToFieldName(internalFieldsName,
+                                                                                 pipelineName);
+                    const std::string scoreDetailsFieldName =
+                        fmt::format("${}_scoreDetails", pipelineName);
+                    double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
+                    BSONObjBuilder mergeObjectsArrSubObj;
+                    mergeObjectsArrSubObj.append("inputPipelineName"_sd, pipelineName);
+                    if (internalFieldsName ==
+                        DocumentSourceRankFusion::kRankFusionInternalFieldsName) {
+                        std::string internalFieldsInputPipelineRankPath =
+                            fmt::format("${}_rank", internalFieldsPipelineName);
+                        mergeObjectsArrSubObj.append("rank"_sd,
+                                                     internalFieldsInputPipelineRankPath);
+                        // In the scoreDetails output, for any input pipeline that didn't output a
+                        // document in the
+                        // result, the default "rank" will be "NA" and the weight will be omitted to
+                        // make it clear to the user that the final score for that document result
+                        // did not take into account its input pipeline's rank/weight.
+                        mergeObjectsArrSubObj.append(
+                            "weight",
+                            BSON("$cond" << BSON_ARRAY(
+                                     BSON("$eq" << BSON_ARRAY(internalFieldsInputPipelineRankPath
+                                                              << "NA"))
+                                     << "$$REMOVE" << weight)));
+                    } else if (internalFieldsName ==
+                               DocumentSourceScoreFusion::kScoreFusionInternalFieldsName) {
+                        mergeObjectsArrSubObj.append(
+                            "inputPipelineRawScore"_sd,
+                            fmt::format("${}_rawScore", internalFieldsPipelineName));
+                        mergeObjectsArrSubObj.append("weight"_sd, weight);
+                        mergeObjectsArrSubObj.append(
+                            "value"_sd, fmt::format("${}_score", internalFieldsPipelineName));
+                    }
+                    mergeObjectsArrSubObj.done();
+                    BSONArrayBuilder mergeObjectsArr;
+                    mergeObjectsArr.append(mergeObjectsArrSubObj.obj());
+                    mergeObjectsArr.append(
+                        fmt::format("${}.{}_scoreDetails", internalFieldsName, pipelineName));
+                    mergeObjectsArr.done();
+                    BSONObj mergeObjectsObj = BSON("$mergeObjects"_sd << mergeObjectsArr.arr());
+                    calculatedScoreDetailsArr.append(mergeObjectsObj);
+                }
+                calculatedScoreDetailsArr.done();
+                internalFieldsBob.append("calculatedScoreDetails", calculatedScoreDetailsArr.arr());
+            }
+            internalFieldsBob.done();
+        }
+    }
+    const BSONObj spec = bob.obj();
+    return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
+}
+
 }  // namespace score_details
 }  // namespace mongo::hybrid_scoring_util

@@ -65,6 +65,16 @@ class DocumentSourceScoreFusion final {
 public:
     static constexpr StringData kStageName = "$scoreFusion"_sd;
 
+    // Name of single top-level field object used to track all internal fields we need
+    // intermediate to the desugar.
+    // One field object that holds all internal intermediate variables during desugar,
+    // like each input pipeline's individual score or scoreDetails.
+    static constexpr StringData kScoreFusionInternalFieldsName =
+        "_internal_scoreFusion_internal_fields"_sd;
+
+    // One field object to encapsulate the unmodified user's doc from the queried collection.
+    static constexpr StringData kScoreFusionDocsFieldName = "_internal_scoreFusion_docs"_sd;
+
     /**
      * Returns a list of stages to execute hybrid scoring with score fusion.
      */

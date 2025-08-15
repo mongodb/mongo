@@ -157,7 +157,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowedBasicRankFusion) {
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -167,7 +167,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowedBasicRankFusion) {
                             "order": 1
                         },
                         "output": {
-                            "agatha_rank": {
+                            "_internal_rankFusion_internal_fields.agatha_rank": {
                                 "$rank": {}
                             }
                         }
@@ -175,54 +175,120 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowedBasicRankFusion) {
                 },
                 {
                     "$addFields": {
-                        "agatha_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$agatha_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": 1
-                                }
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.agatha_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
                         }
                     }
                 },
                 {
                     "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
                         },
-                        "agatha_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$agatha_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "agatha_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.agatha_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                }
                             }
                         },
                         "$willBeMerged": false
                     }
                 },
                 {
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "agatha_score": {
+                                        "$const": 0
+                                    }
+                                },
+                                "in": {
+                                    "agatha_score": {
+                                        "$max": [
+                                            "$$value.agatha_score",
+                                            "$$this.agatha_score"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.agatha_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.agatha_rank"
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
                     "$addFields": {
                         "score": {
                             "$add": [
-                                "$agatha_score"
+                                "$_internal_rankFusion_internal_fields.agatha_score"
                             ]
                         }
                     }
@@ -234,8 +300,9 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowedBasicRankFusion) {
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
@@ -441,10 +508,10 @@ TEST_F(DocumentSourceRankFusionTest,
         DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
     const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "expectedStages": [
+    // The expected desugar is too large for the compiler so we need to split it up.
+    const std::string expectedStages = std::string(R"({
+            "expectedStages": [)") +
+        std::string(R"(
                 {
                     "$match": {
                         "author": "Agatha Christie"
@@ -459,7 +526,7 @@ TEST_F(DocumentSourceRankFusionTest,
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -469,7 +536,7 @@ TEST_F(DocumentSourceRankFusionTest,
                             "order": 1
                         },
                         "output": {
-                            "matchAuthor_rank": {
+                            "_internal_rankFusion_internal_fields.matchAuthor_rank": {
                                 "$rank": {}
                             }
                         }
@@ -477,48 +544,54 @@ TEST_F(DocumentSourceRankFusionTest,
                 },
                 {
                     "$addFields": {
-                        "matchAuthor_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$matchAuthor_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": 1
-                                }
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "matchAuthor_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
                         }
                     }
-                },
+                },)") +
+        std::string(R"(
                 {
                     "$unionWith": {
                         "coll": "pipeline_test",
                         "pipeline": [
                             {
-                                "$search": { 
-                                    "mongotQuery": { 
-                                        "index": "search_index", 
-                                        "text": { "query": "mystery", "path": "genres" } 
-                                    }, 
-                                    "requiresSearchSequenceToken": false, 
-                                    "requiresSearchMetaCursor": true 
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
                                 }
                             },
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -528,7 +601,7 @@ TEST_F(DocumentSourceRankFusionTest,
                                         "order": 1
                                     },
                                     "output": {
-                                        "matchGenres_rank": {
+                                        "_internal_rankFusion_internal_fields.matchGenres_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -536,33 +609,36 @@ TEST_F(DocumentSourceRankFusionTest,
                             },
                             {
                                 "$addFields": {
-                                    "matchGenres_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$matchGenres_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 1
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "matchGenres_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.matchGenres_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             }
                         ]
                     }
-                },
+                },)") +
+        std::string(R"(
                 {
                     "$unionWith": {
                         "coll": "pipeline_test",
@@ -583,7 +659,7 @@ TEST_F(DocumentSourceRankFusionTest,
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -593,7 +669,7 @@ TEST_F(DocumentSourceRankFusionTest,
                                         "order": 1
                                     },
                                     "output": {
-                                        "matchPlot_rank": {
+                                        "_internal_rankFusion_internal_fields.matchPlot_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -601,79 +677,194 @@ TEST_F(DocumentSourceRankFusionTest,
                             },
                             {
                                 "$addFields": {
-                                    "matchPlot_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$matchPlot_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 1
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "matchPlot_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.matchPlot_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             }
                         ]
                     }
-                },
+                },)") +
+        std::string(R"(
                 {
                     "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
                         },
-                        "matchAuthor_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchAuthor_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "matchGenres_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchGenres_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "matchPlot_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchPlot_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "matchAuthor_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchAuthor_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "matchGenres_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchGenres_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "matchPlot_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchPlot_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                }
                             }
                         },
                         "$willBeMerged": false
                     }
                 },
                 {
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "matchAuthor_score": {
+                                        "$const": 0
+                                    },
+                                    "matchGenres_score": {
+                                        "$const": 0
+                                    },
+                                    "matchPlot_score": {
+                                        "$const": 0
+                                    }
+                                },
+                                "in": {
+                                    "matchAuthor_score": {
+                                        "$max": [
+                                            "$$value.matchAuthor_score",
+                                            "$$this.matchAuthor_score"
+                                        ]
+                                    },
+                                    "matchGenres_score": {
+                                        "$max": [
+                                            "$$value.matchGenres_score",
+                                            "$$this.matchGenres_score"
+                                        ]
+                                    },
+                                    "matchPlot_score": {
+                                        "$max": [
+                                            "$$value.matchPlot_score",
+                                            "$$this.matchPlot_score"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_rankFusion_internal_fields": {
+                            "matchAuthor_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchAuthor_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank"
+                                ]
+                            },
+                            "matchGenres_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchGenres_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchGenres_rank"
+                                ]
+                            },
+                            "matchPlot_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchPlot_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchPlot_rank"
+                                ]
+                            }
+                        }
+                    }
+                },)") +
+        std::string(R"(
+                {
                     "$addFields": {
                         "score": {
                             "$add": [
-                                "$matchAuthor_score",
-                                "$matchGenres_score",
-                                "$matchPlot_score"
+                                "$_internal_rankFusion_internal_fields.matchAuthor_score",
+                                "$_internal_rankFusion_internal_fields.matchGenres_score",
+                                "$_internal_rankFusion_internal_fields.matchPlot_score"
                             ]
                         }
                     }
@@ -685,13 +876,14 @@ TEST_F(DocumentSourceRankFusionTest,
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
-        })",
-        asOneObj);
+        })");
+    ASSERT_BSONOBJ_EQ_AUTO(expectedStages, asOneObj);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchMetaUsed) {
@@ -931,7 +1123,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -941,7 +1133,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                             "order": 1
                         },
                         "output": {
-                            "agatha_rank": {
+                            "_internal_rankFusion_internal_fields.agatha_rank": {
                                 "$rank": {}
                             }
                         }
@@ -949,27 +1141,29 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                 },
                 {
                     "$addFields": {
-                        "agatha_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$agatha_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": 1
-                                }
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.agatha_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
                         }
                     }
                 },
@@ -1004,7 +1198,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -1014,7 +1208,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                                         "order": 1
                                     },
                                     "output": {
-                                        "geo_rank": {
+                                        "_internal_rankFusion_internal_fields.geo_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -1022,27 +1216,29 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                             },
                             {
                                 "$addFields": {
-                                    "geo_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$geo_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 1
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "geo_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.geo_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             }
@@ -1051,76 +1247,117 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                 },
                 {
                     "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
                         },
-                        "agatha_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$agatha_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "geo_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$geo_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "agatha_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.agatha_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "geo_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.geo_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                }
                             }
                         },
                         "$willBeMerged": false
                     }
                 },
                 {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$agatha_score",
-                                "$geo_score"
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "agatha_score": {
+                                        "$const": 0
+                                    },
+                                    "geo_score": {
+                                        "$const": 0
+                                    }
+                                },
+                                "in": {
+                                    "agatha_score": {
+                                        "$max": [
+                                            "$$value.agatha_score",
+                                            "$$this.agatha_score"
+                                        ]
+                                    },
+                                    "geo_score": {
+                                        "$max": [
+                                            "$$value.geo_score",
+                                            "$$this.geo_score"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
                             ]
                         }
                     }
                 },
                 {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
                     "$addFields": {
-                        "agatha_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$agatha_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$agatha_rank"
-                            ]
-                        },
-                        "geo_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$geo_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$geo_rank"
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.agatha_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.agatha_rank"
+                                ]
+                            },
+                            "geo_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.geo_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.geo_rank"
+                                ]
+                            }
                         }
                     }
                 },
@@ -1128,21 +1365,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                     "$setMetadata": {
                         "score": {
                             "$add": [
-                                "$agatha_score",
-                                "$geo_score"
+                                "$_internal_rankFusion_internal_fields.agatha_score",
+                                "$_internal_rankFusion_internal_fields.geo_score"
                             ]
                         }
                     }
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
@@ -1606,7 +1846,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -1616,7 +1856,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                             "order": 1
                         },
                         "output": {
-                            "matchAuthor_rank": {
+                            "_internal_rankFusion_internal_fields.matchAuthor_rank": {
                                 "$rank": {}
                             }
                         }
@@ -1624,27 +1864,29 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                 },
                 {
                     "$addFields": {
-                        "matchAuthor_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$matchAuthor_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": 5
-                                }
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "matchAuthor_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
                         }
                     }
                 },
@@ -1668,7 +1910,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -1678,7 +1920,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                                         "order": 1
                                     },
                                     "output": {
-                                        "matchGenres_rank": {
+                                        "_internal_rankFusion_internal_fields.matchGenres_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -1686,27 +1928,29 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                             },
                             {
                                 "$addFields": {
-                                    "matchGenres_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$matchGenres_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 3
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "matchGenres_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.matchGenres_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 3
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             }
@@ -1715,76 +1959,117 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                 },
                 {
                     "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
                         },
-                        "matchAuthor_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchAuthor_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "matchGenres_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchGenres_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "matchAuthor_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchAuthor_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "matchGenres_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchGenres_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                }
                             }
                         },
                         "$willBeMerged": false
                     }
                 },
                 {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$matchAuthor_score",
-                                "$matchGenres_score"
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "matchAuthor_score": {
+                                        "$const": 0
+                                    },
+                                    "matchGenres_score": {
+                                        "$const": 0
+                                    }
+                                },
+                                "in": {
+                                    "matchAuthor_score": {
+                                        "$max": [
+                                            "$$value.matchAuthor_score",
+                                            "$$this.matchAuthor_score"
+                                        ]
+                                    },
+                                    "matchGenres_score": {
+                                        "$max": [
+                                            "$$value.matchGenres_score",
+                                            "$$this.matchGenres_score"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
                             ]
                         }
                     }
                 },
                 {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
                     "$addFields": {
-                        "matchAuthor_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchAuthor_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$matchAuthor_rank"
-                            ]
-                        },
-                        "matchGenres_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchGenres_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$matchGenres_rank"
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "matchAuthor_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchAuthor_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank"
+                                ]
+                            },
+                            "matchGenres_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchGenres_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchGenres_rank"
+                                ]
+                            }
                         }
                     }
                 },
@@ -1792,21 +2077,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                     "$setMetadata": {
                         "score": {
                             "$add": [
-                                "$matchAuthor_score",
-                                "$matchGenres_score"
+                                "$_internal_rankFusion_internal_fields.matchAuthor_score",
+                                "$_internal_rankFusion_internal_fields.matchGenres_score"
                             ]
                         }
                     }
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
@@ -1871,7 +2159,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -1881,7 +2169,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                             "order": 1
                         },
                         "output": {
-                            "matchAuthor_rank": {
+                            "_internal_rankFusion_internal_fields.matchAuthor_rank": {
                                 "$rank": {}
                             }
                         }
@@ -1889,27 +2177,29 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                 },
                 {
                     "$addFields": {
-                        "matchAuthor_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$matchAuthor_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": 5
-                                }
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "matchAuthor_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
                         }
                     }
                 },
@@ -1933,7 +2223,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -1943,7 +2233,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                                         "order": 1
                                     },
                                     "output": {
-                                        "matchGenres_rank": {
+                                        "_internal_rankFusion_internal_fields.matchGenres_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -1951,27 +2241,29 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                             },
                             {
                                 "$addFields": {
-                                    "matchGenres_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$matchGenres_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 3
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "matchGenres_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.matchGenres_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 3
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             }
@@ -1980,76 +2272,117 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                 },
                 {
                     "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
                         },
-                        "matchAuthor_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchAuthor_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "matchGenres_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchGenres_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "matchAuthor_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchAuthor_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "matchGenres_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchGenres_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                }
                             }
                         },
                         "$willBeMerged": false
                     }
                 },
                 {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$matchAuthor_score",
-                                "$matchGenres_score"
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "matchAuthor_score": {
+                                        "$const": 0
+                                    },
+                                    "matchGenres_score": {
+                                        "$const": 0
+                                    }
+                                },
+                                "in": {
+                                    "matchAuthor_score": {
+                                        "$max": [
+                                            "$$value.matchAuthor_score",
+                                            "$$this.matchAuthor_score"
+                                        ]
+                                    },
+                                    "matchGenres_score": {
+                                        "$max": [
+                                            "$$value.matchGenres_score",
+                                            "$$this.matchGenres_score"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
                             ]
                         }
                     }
                 },
                 {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
                     "$addFields": {
-                        "matchAuthor_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchAuthor_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$matchAuthor_rank"
-                            ]
-                        },
-                        "matchGenres_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchGenres_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$matchGenres_rank"
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "matchAuthor_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchAuthor_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank"
+                                ]
+                            },
+                            "matchGenres_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchGenres_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchGenres_rank"
+                                ]
+                            }
                         }
                     }
                 },
@@ -2057,21 +2390,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                     "$setMetadata": {
                         "score": {
                             "$add": [
-                                "$matchAuthor_score",
-                                "$matchGenres_score"
+                                "$_internal_rankFusion_internal_fields.matchAuthor_score",
+                                "$_internal_rankFusion_internal_fields.matchGenres_score"
                             ]
                         }
                     }
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
@@ -2158,7 +2494,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -2168,7 +2504,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                             "order": 1
                         },
                         "output": {
-                            "matchAuthor_rank": {
+                            "_internal_rankFusion_internal_fields.matchAuthor_rank": {
                                 "$rank": {}
                             }
                         }
@@ -2176,27 +2512,29 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                 },
                 {
                     "$addFields": {
-                        "matchAuthor_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$matchAuthor_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": 5
-                                }
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "matchAuthor_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
                         }
                     }
                 },
@@ -2231,7 +2569,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -2241,7 +2579,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                                         "order": 1
                                     },
                                     "output": {
-                                        "matchDistance_rank": {
+                                        "_internal_rankFusion_internal_fields.matchDistance_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -2249,27 +2587,29 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                             },
                             {
                                 "$addFields": {
-                                    "matchDistance_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$matchDistance_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 0
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "matchDistance_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.matchDistance_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 0
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             }
@@ -2297,7 +2637,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -2307,7 +2647,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                                         "order": 1
                                     },
                                     "output": {
-                                        "matchGenres_rank": {
+                                        "_internal_rankFusion_internal_fields.matchGenres_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -2315,34 +2655,35 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                             },
                             {
                                 "$addFields": {
-                                    "matchGenres_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$matchGenres_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 3
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "matchGenres_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.matchGenres_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 3
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             }
                         ]
                     }
-                },)") +
-        std::string(R"(
+                },
                 {
                     "$unionWith": {
                         "coll": "pipeline_test",
@@ -2363,7 +2704,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -2373,7 +2714,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                                         "order": 1
                                     },
                                     "output": {
-                                        "matchPlot_rank": {
+                                        "_internal_rankFusion_internal_fields.matchPlot_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -2381,160 +2722,216 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                             },
                             {
                                 "$addFields": {
-                                    "matchPlot_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$matchPlot_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 0.3
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "matchPlot_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.matchPlot_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 0.3
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             }
                         ]
                     }
-                },
+                },)") +
+        std::string(R"(
                 {
                     "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
                         },
-                        "matchAuthor_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchAuthor_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "matchDistance_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchDistance_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "matchGenres_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchGenres_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "matchPlot_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchPlot_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "matchAuthor_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchAuthor_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "matchDistance_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchDistance_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "matchGenres_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchGenres_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "matchPlot_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchPlot_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                }
                             }
                         },
                         "$willBeMerged": false
                     }
-                },)") +
-        std::string(R"(
+                },
                 {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$matchAuthor_score",
-                                "$matchDistance_score",
-                                "$matchGenres_score",
-                                "$matchPlot_score"
-                            ]
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "matchAuthor_score": {
+                                        "$const": 0
+                                    },
+                                    "matchDistance_score": {
+                                        "$const": 0
+                                    },
+                                    "matchGenres_score": {
+                                        "$const": 0
+                                    },
+                                    "matchPlot_score": {
+                                        "$const": 0
+                                    }
+                                },
+                                "in": {
+                                    "matchAuthor_score": {
+                                        "$max": [
+                                            "$$value.matchAuthor_score",
+                                            "$$this.matchAuthor_score"
+                                        ]
+                                    },
+                                    "matchDistance_score": {
+                                        "$max": [
+                                            "$$value.matchDistance_score",
+                                            "$$this.matchDistance_score"
+                                        ]
+                                    },
+                                    "matchGenres_score": {
+                                        "$max": [
+                                            "$$value.matchGenres_score",
+                                            "$$this.matchGenres_score"
+                                        ]
+                                    },
+                                    "matchPlot_score": {
+                                        "$max": [
+                                            "$$value.matchPlot_score",
+                                            "$$this.matchPlot_score"
+                                        ]
+                                    }
+                                }
+                            }
                         }
                     }
                 },
                 {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
+                            ]
+                        }
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
                     "$addFields": {
-                        "matchAuthor_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchAuthor_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$matchAuthor_rank"
-                            ]
-                        },
-                        "matchDistance_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchDistance_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$matchDistance_rank"
-                            ]
-                        },
-                        "matchGenres_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchGenres_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$matchGenres_rank"
-                            ]
-                        },
-                        "matchPlot_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchPlot_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$matchPlot_rank"
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "matchAuthor_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchAuthor_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank"
+                                ]
+                            },
+                            "matchDistance_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchDistance_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchDistance_rank"
+                                ]
+                            },
+                            "matchGenres_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchGenres_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchGenres_rank"
+                                ]
+                            },
+                            "matchPlot_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchPlot_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchPlot_rank"
+                                ]
+                            }
                         }
                     }
                 },
@@ -2542,23 +2939,27 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                     "$setMetadata": {
                         "score": {
                             "$add": [
-                                "$matchAuthor_score",
-                                "$matchDistance_score",
-                                "$matchGenres_score",
-                                "$matchPlot_score"
+                                "$_internal_rankFusion_internal_fields.matchAuthor_score",
+                                "$_internal_rankFusion_internal_fields.matchDistance_score",
+                                "$_internal_rankFusion_internal_fields.matchGenres_score",
+                                "$_internal_rankFusion_internal_fields.matchPlot_score"
                             ]
                         }
                     }
-                },
+                },)") +
+        std::string(R"(
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
@@ -2633,7 +3034,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -2643,7 +3044,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                             "order": 1
                         },
                         "output": {
-                            "agatha_rank": {
+                            "_internal_rankFusion_internal_fields.agatha_rank": {
                                 "$rank": {}
                             }
                         }
@@ -2651,151 +3052,220 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                 },
                 {
                     "$addFields": {
-                        "agatha_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.agatha_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_scoreDetails": {
+                                "details": []
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
+                        },
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "agatha_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.agatha_score",
                                         {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$agatha_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
+                                            "$const": 0
                                         }
                                     ]
                                 },
+                                "agatha_rank": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.agatha_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "agatha_scoreDetails": "$_internal_rankFusion_internal_fields.agatha_scoreDetails"
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "agatha_score": {
+                                        "$const": 0
+                                    },
+                                    "agatha_rank": {
+                                        "$const": 0
+                                    },
+                                    "agatha_scoreDetails": {
+                                        "$const": {}
+                                    }
+                                },
+                                "in": {
+                                    "agatha_score": {
+                                        "$max": [
+                                            "$$value.agatha_score",
+                                            "$$this.agatha_score"
+                                        ]
+                                    },
+                                    "agatha_rank": {
+                                        "$max": [
+                                            "$$value.agatha_rank",
+                                            "$$this.agatha_rank"
+                                        ]
+                                    },
+                                    "agatha_scoreDetails": {
+                                        "$mergeObjects": [
+                                            "$$value.agatha_scoreDetails",
+                                            "$$this.agatha_scoreDetails"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.agatha_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.agatha_rank"
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$add": [
+                                "$_internal_rankFusion_internal_fields.agatha_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_rankFusion_internal_fields": {
+                            "calculatedScoreDetails": [
                                 {
-                                    "$const": 5
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "agatha"
+                                            },
+                                            "rank": "$_internal_rankFusion_internal_fields.agatha_rank",
+                                            "weight": {
+                                                "$cond": [
+                                                    {
+                                                        "$eq": [
+                                                            "$_internal_rankFusion_internal_fields.agatha_rank",
+                                                            {
+                                                                "$const": "NA"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "$$REMOVE",
+                                                    {
+                                                        "$const": 5
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "$_internal_rankFusion_internal_fields.agatha_scoreDetails"
+                                    ]
                                 }
                             ]
                         }
                     }
                 },
                 {
-                    "$addFields": {
-                        "agatha_scoreDetails": {
-                            "details": []
-                        }
-                    }
-                },
-                {
-                    "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
-                        },
-                        "agatha_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$agatha_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "agatha_rank": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$agatha_rank",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "agatha_scoreDetails": {
-                            "$mergeObjects": "$agatha_scoreDetails"
-                        },
-                        "$willBeMerged": false
-                    }
-                },
-                {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$agatha_score"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "agatha_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$agatha_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$agatha_rank"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "calculatedScoreDetails": [
-                            {
-                                "$mergeObjects": [
-                                    {
-                                        "inputPipelineName": {
-                                            "$const": "agatha"
-                                        },
-                                        "rank": "$agatha_rank",
-                                        "weight": {
-                                            "$cond": [
-                                                {
-                                                    "$eq": [
-                                                        "$agatha_rank",
-                                                        {
-                                                            "$const": "NA"
-                                                        }
-                                                    ]
-                                                },
-                                                "$$REMOVE",
-                                                {
-                                                    "$const": 5
-                                                }
-                                            ]
-                                        }
-                                    },
-                                    "$agatha_scoreDetails"
-                                ]
-                            }
-                        ]
-                    }
-                },
-                {
                     "$setMetadata": {
                         "scoreDetails": {
-                            "value": "$score",
+                            "value": {
+                                "$meta": "score"
+                            },
                             "description": {
                                 "$const": "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / (60 + rank))) across input pipelines from which this document is output, from:"
                             },
-                            "details": "$calculatedScoreDetails"
+                            "details": "$_internal_rankFusion_internal_fields.calculatedScoreDetails"
                         }
                     }
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
@@ -2854,7 +3324,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -2864,7 +3334,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring
                             "order": 1
                         },
                         "output": {
-                            "agatha_rank": {
+                            "_internal_rankFusion_internal_fields.agatha_rank": {
                                 "$rank": {}
                             }
                         }
@@ -2872,154 +3342,223 @@ TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring
                 },
                 {
                     "$addFields": {
-                        "agatha_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.agatha_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_scoreDetails": {
+                                "value": {
+                                    "$meta": "score"
+                                },
+                                "details": []
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
+                        },
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "agatha_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.agatha_score",
                                         {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$agatha_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
+                                            "$const": 0
                                         }
                                     ]
                                 },
+                                "agatha_rank": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.agatha_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "agatha_scoreDetails": "$_internal_rankFusion_internal_fields.agatha_scoreDetails"
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "agatha_score": {
+                                        "$const": 0
+                                    },
+                                    "agatha_rank": {
+                                        "$const": 0
+                                    },
+                                    "agatha_scoreDetails": {
+                                        "$const": {}
+                                    }
+                                },
+                                "in": {
+                                    "agatha_score": {
+                                        "$max": [
+                                            "$$value.agatha_score",
+                                            "$$this.agatha_score"
+                                        ]
+                                    },
+                                    "agatha_rank": {
+                                        "$max": [
+                                            "$$value.agatha_rank",
+                                            "$$this.agatha_rank"
+                                        ]
+                                    },
+                                    "agatha_scoreDetails": {
+                                        "$mergeObjects": [
+                                            "$$value.agatha_scoreDetails",
+                                            "$$this.agatha_scoreDetails"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.agatha_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.agatha_rank"
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$add": [
+                                "$_internal_rankFusion_internal_fields.agatha_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_rankFusion_internal_fields": {
+                            "calculatedScoreDetails": [
                                 {
-                                    "$const": 5
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "agatha"
+                                            },
+                                            "rank": "$_internal_rankFusion_internal_fields.agatha_rank",
+                                            "weight": {
+                                                "$cond": [
+                                                    {
+                                                        "$eq": [
+                                                            "$_internal_rankFusion_internal_fields.agatha_rank",
+                                                            {
+                                                                "$const": "NA"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "$$REMOVE",
+                                                    {
+                                                        "$const": 5
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "$_internal_rankFusion_internal_fields.agatha_scoreDetails"
+                                    ]
                                 }
                             ]
                         }
                     }
                 },
                 {
-                    "$addFields": {
-                        "agatha_scoreDetails": {
+                    "$setMetadata": {
+                        "scoreDetails": {
                             "value": {
                                 "$meta": "score"
                             },
-                            "details": []
-                        }
-                    }
-                },
-                {
-                    "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
-                        },
-                        "agatha_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$agatha_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "agatha_rank": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$agatha_rank",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "agatha_scoreDetails": {
-                            "$mergeObjects": "$agatha_scoreDetails"
-                        },
-                        "$willBeMerged": false
-                    }
-                },
-                {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$agatha_score"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "agatha_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$agatha_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$agatha_rank"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "calculatedScoreDetails": [
-                            {
-                                "$mergeObjects": [
-                                    {
-                                        "inputPipelineName": {
-                                            "$const": "agatha"
-                                        },
-                                        "rank": "$agatha_rank",
-                                        "weight": {
-                                            "$cond": [
-                                                {
-                                                    "$eq": [
-                                                        "$agatha_rank",
-                                                        {
-                                                            "$const": "NA"
-                                                        }
-                                                    ]
-                                                },
-                                                "$$REMOVE",
-                                                {
-                                                    "$const": 5
-                                                }
-                                            ]
-                                        }
-                                    },
-                                    "$agatha_scoreDetails"
-                                ]
-                            }
-                        ]
-                    }
-                },
-                {
-                    "$setMetadata": {
-                        "scoreDetails": {
-                            "value": "$score",
                             "description": {
                                 "$const": "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / (60 + rank))) across input pipelines from which this document is output, from:"
                             },
-                            "details": "$calculatedScoreDetails"
+                            "details": "$_internal_rankFusion_internal_fields.calculatedScoreDetails"
                         }
                     }
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
@@ -3067,9 +3606,10 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
         DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
     const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "expectedStages": [
+    // The expected desugar is too large for the compiler so we need to split it up.
+    const std::string expectedStages = std::string(R"({
+            "expectedStages": [)") +
+        std::string(R"(
                 {
                     "$match": {
                         "author": "Agatha Christie"
@@ -3084,7 +3624,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -3094,7 +3634,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                             "order": 1
                         },
                         "output": {
-                            "agatha_rank": {
+                            "_internal_rankFusion_internal_fields.agatha_rank": {
                                 "$rank": {}
                             }
                         }
@@ -3102,37 +3642,42 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                 },
                 {
                     "$addFields": {
-                        "agatha_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$agatha_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": 1
-                                }
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.agatha_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
                         }
                     }
                 },
                 {
                     "$addFields": {
-                        "agatha_scoreDetails": {
-                            "details": []
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_scoreDetails": {
+                                "details": []
+                            }
                         }
                     }
-                },
+                },)") +
+        std::string(R"(
                 {
                     "$unionWith": {
                         "coll": "pipeline_test",
@@ -3154,7 +3699,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -3164,7 +3709,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                                         "order": 1
                                     },
                                     "output": {
-                                        "searchPipe_rank": {
+                                        "_internal_rankFusion_internal_fields.searchPipe_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -3172,226 +3717,319 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                             },
                             {
                                 "$addFields": {
-                                    "searchPipe_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$searchPipe_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 2
-                                            }
-                                        ]
-                                    }
-                                }
-                            },
-                            {
-                                "$addFields": {
-                                    "searchPipe_scoreDetails": {
-                                        "$meta": "scoreDetails"
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                },
-                {
-                    "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
-                        },
-                        "agatha_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$agatha_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "agatha_rank": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$agatha_rank",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "agatha_scoreDetails": {
-                            "$mergeObjects": "$agatha_scoreDetails"
-                        },
-                        "searchPipe_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$searchPipe_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "searchPipe_rank": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$searchPipe_rank",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "searchPipe_scoreDetails": {
-                            "$mergeObjects": "$searchPipe_scoreDetails"
-                        },
-                        "$willBeMerged": false
-                    }
-                },
-                {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$agatha_score",
-                                "$searchPipe_score"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "agatha_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$agatha_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$agatha_rank"
-                            ]
-                        },
-                        "searchPipe_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$searchPipe_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$searchPipe_rank"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "calculatedScoreDetails": [
-                            {
-                                "$mergeObjects": [
-                                    {
-                                        "inputPipelineName": {
-                                            "$const": "agatha"
-                                        },
-                                        "rank": "$agatha_rank",
-                                        "weight": {
-                                            "$cond": [
+                                    "_internal_rankFusion_internal_fields": {
+                                        "searchPipe_score": {
+                                            "$multiply": [
                                                 {
-                                                    "$eq": [
-                                                        "$agatha_rank",
+                                                    "$divide": [
                                                         {
-                                                            "$const": "NA"
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
                                                         }
                                                     ]
                                                 },
-                                                "$$REMOVE",
-                                                {
-                                                    "$const": 1
-                                                }
-                                            ]
-                                        }
-                                    },
-                                    "$agatha_scoreDetails"
-                                ]
-                            },
-                            {
-                                "$mergeObjects": [
-                                    {
-                                        "inputPipelineName": {
-                                            "$const": "searchPipe"
-                                        },
-                                        "rank": "$searchPipe_rank",
-                                        "weight": {
-                                            "$cond": [
-                                                {
-                                                    "$eq": [
-                                                        "$searchPipe_rank",
-                                                        {
-                                                            "$const": "NA"
-                                                        }
-                                                    ]
-                                                },
-                                                "$$REMOVE",
                                                 {
                                                     "$const": 2
                                                 }
                                             ]
                                         }
-                                    },
-                                    "$searchPipe_scoreDetails"
-                                ]
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_rankFusion_internal_fields": {
+                                        "searchPipe_scoreDetails": {
+                                            "$meta": "scoreDetails"
+                                        }
+                                    }
+                                }
                             }
                         ]
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$group": {
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
+                        },
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "agatha_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.agatha_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "agatha_rank": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.agatha_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "agatha_scoreDetails": "$_internal_rankFusion_internal_fields.agatha_scoreDetails",
+                                "searchPipe_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.searchPipe_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "searchPipe_rank": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "searchPipe_scoreDetails": "$_internal_rankFusion_internal_fields.searchPipe_scoreDetails"
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "agatha_score": {
+                                        "$const": 0
+                                    },
+                                    "agatha_rank": {
+                                        "$const": 0
+                                    },
+                                    "agatha_scoreDetails": {
+                                        "$const": {}
+                                    },
+                                    "searchPipe_score": {
+                                        "$const": 0
+                                    },
+                                    "searchPipe_rank": {
+                                        "$const": 0
+                                    },
+                                    "searchPipe_scoreDetails": {
+                                        "$const": {}
+                                    }
+                                },
+                                "in": {
+                                    "agatha_score": {
+                                        "$max": [
+                                            "$$value.agatha_score",
+                                            "$$this.agatha_score"
+                                        ]
+                                    },
+                                    "agatha_rank": {
+                                        "$max": [
+                                            "$$value.agatha_rank",
+                                            "$$this.agatha_rank"
+                                        ]
+                                    },
+                                    "agatha_scoreDetails": {
+                                        "$mergeObjects": [
+                                            "$$value.agatha_scoreDetails",
+                                            "$$this.agatha_scoreDetails"
+                                        ]
+                                    },
+                                    "searchPipe_score": {
+                                        "$max": [
+                                            "$$value.searchPipe_score",
+                                            "$$this.searchPipe_score"
+                                        ]
+                                    },
+                                    "searchPipe_rank": {
+                                        "$max": [
+                                            "$$value.searchPipe_rank",
+                                            "$$this.searchPipe_rank"
+                                        ]
+                                    },
+                                    "searchPipe_scoreDetails": {
+                                        "$mergeObjects": [
+                                            "$$value.searchPipe_scoreDetails",
+                                            "$$this.searchPipe_scoreDetails"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.agatha_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.agatha_rank"
+                                ]
+                            },
+                            "searchPipe_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.searchPipe_rank"
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$add": [
+                                "$_internal_rankFusion_internal_fields.agatha_score",
+                                "$_internal_rankFusion_internal_fields.searchPipe_score"
+                            ]
+                        }
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$addFields": {
+                        "_internal_rankFusion_internal_fields": {
+                            "calculatedScoreDetails": [
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "agatha"
+                                            },
+                                            "rank": "$_internal_rankFusion_internal_fields.agatha_rank",
+                                            "weight": {
+                                                "$cond": [
+                                                    {
+                                                        "$eq": [
+                                                            "$_internal_rankFusion_internal_fields.agatha_rank",
+                                                            {
+                                                                "$const": "NA"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "$$REMOVE",
+                                                    {
+                                                        "$const": 1
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "$_internal_rankFusion_internal_fields.agatha_scoreDetails"
+                                    ]
+                                },
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "searchPipe"
+                                            },
+                                            "rank": "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                            "weight": {
+                                                "$cond": [
+                                                    {
+                                                        "$eq": [
+                                                            "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                                            {
+                                                                "$const": "NA"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "$$REMOVE",
+                                                    {
+                                                        "$const": 2
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "$_internal_rankFusion_internal_fields.searchPipe_scoreDetails"
+                                    ]
+                                }
+                            ]
+                        }
                     }
                 },
                 {
                     "$setMetadata": {
                         "scoreDetails": {
-                            "value": "$score",
+                            "value": {
+                                "$meta": "score"
+                            },
                             "description": {
                                 "$const": "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / (60 + rank))) across input pipelines from which this document is output, from:"
                             },
-                            "details": "$calculatedScoreDetails"
+                            "details": "$_internal_rankFusion_internal_fields.calculatedScoreDetails"
                         }
                     }
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
-        })",
-        asOneObj);
+        })");
+    ASSERT_BSONOBJ_EQ_AUTO(expectedStages, asOneObj);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameEmpty) {
@@ -3575,7 +4213,7 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "HASH<docs>": "$$ROOT"
+                            "HASH<_internal_rankFusion_docs>": "$$ROOT"
                         }
                     }
                 },
@@ -3585,7 +4223,7 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                             "HASH<order>": 1
                         },
                         "output": {
-                            "HASH<matchAuthor_rank>": {
+                            "HASH<_internal_rankFusion_internal_fields>.HASH<matchAuthor_rank>": {
                                 "$rank": {}
                             }
                         }
@@ -3593,21 +4231,23 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                 },
                 {
                     "$addFields": {
-                        "HASH<matchAuthor_score>": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        "?number",
-                                        {
-                                            "$add": [
-                                                "$HASH<matchAuthor_rank>",
-                                                "?number"
-                                            ]
-                                        }
-                                    ]
-                                },
-                                "?number"
-                            ]
+                        "HASH<_internal_rankFusion_internal_fields>": {
+                            "HASH<matchAuthor_score>": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            "?number",
+                                            {
+                                                "$add": [
+                                                    "$HASH<_internal_rankFusion_internal_fields>.HASH<matchAuthor_rank>",
+                                                    "?number"
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "?number"
+                                ]
+                            }
                         }
                     }
                 },
@@ -3630,7 +4270,7 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "HASH<docs>": "$$ROOT"
+                                        "HASH<_internal_rankFusion_docs>": "$$ROOT"
                                     }
                                 }
                             },
@@ -3640,7 +4280,7 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                                         "HASH<order>": 1
                                     },
                                     "output": {
-                                        "HASH<matchDistance_rank>": {
+                                        "HASH<_internal_rankFusion_internal_fields>.HASH<matchDistance_rank>": {
                                             "$rank": {}
                                         }
                                     }
@@ -3648,21 +4288,23 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                             },
                             {
                                 "$addFields": {
-                                    "HASH<matchDistance_score>": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    "?number",
-                                                    {
-                                                        "$add": [
-                                                            "$HASH<matchDistance_rank>",
-                                                            "?number"
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            "?number"
-                                        ]
+                                    "HASH<_internal_rankFusion_internal_fields>": {
+                                        "HASH<matchDistance_score>": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        "?number",
+                                                        {
+                                                            "$add": [
+                                                                "$HASH<_internal_rankFusion_internal_fields>.HASH<matchDistance_rank>",
+                                                                "?number"
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                "?number"
+                                            ]
+                                        }
                                     }
                                 }
                             }
@@ -3671,63 +4313,97 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                 },
                 {
                     "$group": {
-                        "_id": "$HASH<docs>.HASH<_id>",
-                        "HASH<docs>": {
-                            "$first": "$HASH<docs>"
+                        "_id": "$HASH<_internal_rankFusion_docs>.HASH<_id>",
+                        "HASH<_internal_rankFusion_docs>": {
+                            "$first": "$HASH<_internal_rankFusion_docs>"
                         },
-                        "HASH<matchAuthor_score>": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$HASH<matchAuthor_score>",
-                                    "?number"
-                                ]
-                            }
-                        },
-                        "HASH<matchDistance_score>": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$HASH<matchDistance_score>",
-                                    "?number"
-                                ]
+                        "HASH<_internal_rankFusion_internal_fields>": {
+                            "$push": {
+                                "HASH<matchAuthor_score>": {
+                                    "$ifNull": [
+                                        "$HASH<_internal_rankFusion_internal_fields>.HASH<matchAuthor_score>",
+                                        "?number"
+                                    ]
+                                },
+                                "HASH<matchDistance_score>": {
+                                    "$ifNull": [
+                                        "$HASH<_internal_rankFusion_internal_fields>.HASH<matchDistance_score>",
+                                        "?number"
+                                    ]
+                                }
                             }
                         }
                     }
                 },
                 {
-                    "$addFields": {
-                        "HASH<score>": {
-                            "$add": [
-                                "$HASH<matchAuthor_score>",
-                                "$HASH<matchDistance_score>"
+                    "$project": {
+                        "HASH<_id>": true,
+                        "HASH<_internal_rankFusion_docs>": true,
+                        "HASH<_internal_rankFusion_internal_fields>": {
+                            "$reduce": {
+                                "input": "$HASH<_internal_rankFusion_internal_fields>",
+                                "initialValue": "?object",
+                                "in": {
+                                    "HASH<matchAuthor_score>": {
+                                        "$max": [
+                                            "$$HASH<value>.HASH<matchAuthor_score>",
+                                            "$$HASH<this>.HASH<matchAuthor_score>"
+                                        ]
+                                    },
+                                    "HASH<matchDistance_score>": {
+                                        "$max": [
+                                            "$$HASH<value>.HASH<matchDistance_score>",
+                                            "$$HASH<this>.HASH<matchDistance_score>"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$HASH<_internal_rankFusion_docs>",
+                                "$$ROOT"
                             ]
                         }
                     }
                 },
                 {
+                    "$project": {
+                        "HASH<_internal_rankFusion_docs>": false,
+                        "HASH<_id>": true
+                    }
+                },
+                {
                     "$addFields": {
-                        "HASH<matchAuthor_rank>": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$HASH<matchAuthor_rank>",
-                                        "?number"
-                                    ]
-                                },
-                                "?string",
-                                "$HASH<matchAuthor_rank>"
-                            ]
-                        },
-                        "HASH<matchDistance_rank>": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$HASH<matchDistance_rank>",
-                                        "?number"
-                                    ]
-                                },
-                                "?string",
-                                "$HASH<matchDistance_rank>"
-                            ]
+                        "HASH<_internal_rankFusion_internal_fields>": {
+                            "HASH<matchAuthor_rank>": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$HASH<_internal_rankFusion_internal_fields>.HASH<matchAuthor_rank>",
+                                            "?number"
+                                        ]
+                                    },
+                                    "?string",
+                                    "$HASH<_internal_rankFusion_internal_fields>.HASH<matchAuthor_rank>"
+                                ]
+                            },
+                            "HASH<matchDistance_rank>": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$HASH<_internal_rankFusion_internal_fields>.HASH<matchDistance_rank>",
+                                            "?number"
+                                        ]
+                                    },
+                                    "?string",
+                                    "$HASH<_internal_rankFusion_internal_fields>.HASH<matchDistance_rank>"
+                                ]
+                            }
                         }
                     }
                 },
@@ -3735,21 +4411,24 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                     "$setMetadata": {
                         "score": {
                             "$add": [
-                                "$HASH<matchAuthor_score>",
-                                "$HASH<matchDistance_score>"
+                                "$HASH<_internal_rankFusion_internal_fields>.HASH<matchAuthor_score>",
+                                "$HASH<_internal_rankFusion_internal_fields>.HASH<matchDistance_score>"
                             ]
                         }
                     }
                 },
                 {
                     "$sort": {
-                        "HASH<score>": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "HASH<_id>": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$HASH<docs>"
+                    "$project": {
+                        "HASH<_internal_rankFusion_internal_fields>": false,
+                        "HASH<_id>": true
                     }
                 }
             ]
@@ -3815,7 +4494,7 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -3825,7 +4504,7 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                             "order": 1
                         },
                         "output": {
-                            "matchAuthor_rank": {
+                            "_internal_rankFusion_internal_fields.matchAuthor_rank": {
                                 "$rank": {}
                             }
                         }
@@ -3833,21 +4512,23 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                 },
                 {
                     "$addFields": {
-                        "matchAuthor_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        1,
-                                        {
-                                            "$add": [
-                                                "$matchAuthor_rank",
-                                                1
-                                            ]
-                                        }
-                                    ]
-                                },
-                                1
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "matchAuthor_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            1,
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank",
+                                                    1
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    1
+                                ]
+                            }
                         }
                     }
                 },
@@ -3874,7 +4555,7 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -3884,7 +4565,7 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                                         "order": 1
                                     },
                                     "output": {
-                                        "matchDistance_rank": {
+                                        "_internal_rankFusion_internal_fields.matchDistance_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -3892,21 +4573,23 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                             },
                             {
                                 "$addFields": {
-                                    "matchDistance_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    1,
-                                                    {
-                                                        "$add": [
-                                                            "$matchDistance_rank",
-                                                            1
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            1
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "matchDistance_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        1,
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.matchDistance_rank",
+                                                                1
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                1
+                                            ]
+                                        }
                                     }
                                 }
                             }
@@ -3915,63 +4598,101 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                 },
                 {
                     "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
                         },
-                        "matchAuthor_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchAuthor_score",
-                                    1
-                                ]
-                            }
-                        },
-                        "matchDistance_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchDistance_score",
-                                    1
-                                ]
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "matchAuthor_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchAuthor_score",
+                                        1
+                                    ]
+                                },
+                                "matchDistance_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchDistance_score",
+                                        1
+                                    ]
+                                }
                             }
                         }
                     }
                 },
                 {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$matchAuthor_score",
-                                "$matchDistance_score"
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "$const": {
+                                        "?": "?"
+                                    }
+                                },
+                                "in": {
+                                    "matchAuthor_score": {
+                                        "$max": [
+                                            "$$value.matchAuthor_score",
+                                            "$$this.matchAuthor_score"
+                                        ]
+                                    },
+                                    "matchDistance_score": {
+                                        "$max": [
+                                            "$$value.matchDistance_score",
+                                            "$$this.matchDistance_score"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
                             ]
                         }
                     }
                 },
                 {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
                     "$addFields": {
-                        "matchAuthor_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchAuthor_rank",
-                                        1
-                                    ]
-                                },
-                                "?",
-                                "$matchAuthor_rank"
-                            ]
-                        },
-                        "matchDistance_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchDistance_rank",
-                                        1
-                                    ]
-                                },
-                                "?",
-                                "$matchDistance_rank"
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "matchAuthor_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchAuthor_rank",
+                                            1
+                                        ]
+                                    },
+                                    "?",
+                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank"
+                                ]
+                            },
+                            "matchDistance_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchDistance_rank",
+                                            1
+                                        ]
+                                    },
+                                    "?",
+                                    "$_internal_rankFusion_internal_fields.matchDistance_rank"
+                                ]
+                            }
                         }
                     }
                 },
@@ -3979,21 +4700,24 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                     "$setMetadata": {
                         "score": {
                             "$add": [
-                                "$matchAuthor_score",
-                                "$matchDistance_score"
+                                "$_internal_rankFusion_internal_fields.matchAuthor_score",
+                                "$_internal_rankFusion_internal_fields.matchDistance_score"
                             ]
                         }
                     }
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
@@ -4046,7 +4770,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineRankFusionFullDesugaring) {
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -4056,7 +4780,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineRankFusionFullDesugaring) {
                             "order": 1
                         },
                         "output": {
-                            "agatha_rank": {
+                            "_internal_rankFusion_internal_fields.agatha_rank": {
                                 "$rank": {}
                             }
                         }
@@ -4064,75 +4788,112 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineRankFusionFullDesugaring) {
                 },
                 {
                     "$addFields": {
-                        "agatha_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$agatha_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": 5
-                                }
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.agatha_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
                         }
                     }
                 },
                 {
                     "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
                         },
-                        "agatha_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$agatha_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "agatha_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.agatha_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                }
                             }
                         },
                         "$willBeMerged": false
                     }
                 },
                 {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$agatha_score"
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "agatha_score": {
+                                        "$const": 0
+                                    }
+                                },
+                                "in": {
+                                    "agatha_score": {
+                                        "$max": [
+                                            "$$value.agatha_score",
+                                            "$$this.agatha_score"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
                             ]
                         }
                     }
                 },
                 {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
                     "$addFields": {
-                        "agatha_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$agatha_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$agatha_rank"
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.agatha_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.agatha_rank"
+                                ]
+                            }
                         }
                     }
                 },
@@ -4140,20 +4901,23 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineRankFusionFullDesugaring) {
                     "$setMetadata": {
                         "score": {
                             "$add": [
-                                "$agatha_score"
+                                "$_internal_rankFusion_internal_fields.agatha_score"
                             ]
                         }
                     }
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
@@ -4216,7 +4980,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -4226,7 +4990,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                             "order": 1
                         },
                         "output": {
-                            "agatha_rank": {
+                            "_internal_rankFusion_internal_fields.agatha_rank": {
                                 "$rank": {}
                             }
                         }
@@ -4234,27 +4998,29 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                 },
                 {
                     "$addFields": {
-                        "agatha_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$agatha_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": 1
-                                }
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.agatha_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
                         }
                     }
                 },
@@ -4278,7 +5044,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -4288,7 +5054,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                                         "order": 1
                                     },
                                     "output": {
-                                        "searchPipe_rank": {
+                                        "_internal_rankFusion_internal_fields.searchPipe_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -4296,27 +5062,29 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                             },
                             {
                                 "$addFields": {
-                                    "searchPipe_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$searchPipe_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 2
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "searchPipe_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 2
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             }
@@ -4325,76 +5093,117 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                 },
                 {
                     "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
                         },
-                        "agatha_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$agatha_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "searchPipe_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$searchPipe_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "agatha_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.agatha_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "searchPipe_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.searchPipe_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                }
                             }
                         },
                         "$willBeMerged": false
                     }
                 },
                 {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$agatha_score",
-                                "$searchPipe_score"
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "agatha_score": {
+                                        "$const": 0
+                                    },
+                                    "searchPipe_score": {
+                                        "$const": 0
+                                    }
+                                },
+                                "in": {
+                                    "agatha_score": {
+                                        "$max": [
+                                            "$$value.agatha_score",
+                                            "$$this.agatha_score"
+                                        ]
+                                    },
+                                    "searchPipe_score": {
+                                        "$max": [
+                                            "$$value.searchPipe_score",
+                                            "$$this.searchPipe_score"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
                             ]
                         }
                     }
                 },
                 {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
                     "$addFields": {
-                        "agatha_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$agatha_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$agatha_rank"
-                            ]
-                        },
-                        "searchPipe_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$searchPipe_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$searchPipe_rank"
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "agatha_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.agatha_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.agatha_rank"
+                                ]
+                            },
+                            "searchPipe_rank": {
+                                "$cond": [
+                                    {
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.searchPipe_rank"
+                                ]
+                            }
                         }
                     }
                 },
@@ -4402,21 +5211,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                     "$setMetadata": {
                         "score": {
                             "$add": [
-                                "$agatha_score",
-                                "$searchPipe_score"
+                                "$_internal_rankFusion_internal_fields.agatha_score",
+                                "$_internal_rankFusion_internal_fields.searchPipe_score"
                             ]
                         }
                     }
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]
@@ -4482,6 +5294,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
         DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
     const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    // The expected desugar is too large for the compiler so we need to split it up.
     const std::string expectedStages = std::string(R"({
             "expectedStages": [)") +
         std::string(R"({
@@ -4500,7 +5313,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                 {
                     "$replaceRoot": {
                         "newRoot": {
-                            "docs": "$$ROOT"
+                            "_internal_rankFusion_docs": "$$ROOT"
                         }
                     }
                 },
@@ -4510,7 +5323,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                             "order": 1
                         },
                         "output": {
-                            "matchWithTextScore_rank": {
+                            "_internal_rankFusion_internal_fields.matchWithTextScore_rank": {
                                 "$rank": {}
                             }
                         }
@@ -4518,40 +5331,45 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                 },
                 {
                     "$addFields": {
-                        "matchWithTextScore_score": {
-                            "$multiply": [
-                                {
-                                    "$divide": [
-                                        {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$add": [
-                                                "$matchWithTextScore_rank",
-                                                {
-                                                    "$const": 60
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": 3
-                                }
-                            ]
+                        "_internal_rankFusion_internal_fields": {
+                            "matchWithTextScore_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$_internal_rankFusion_internal_fields.matchWithTextScore_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 3
+                                    }
+                                ]
+                            }
                         }
                     }
                 },
                 {
                     "$addFields": {
-                        "matchWithTextScore_scoreDetails": {
-                            "value": {
-                                "$meta": "score"
-                            },
-                            "details": []
+                        "_internal_rankFusion_internal_fields": {
+                            "matchWithTextScore_scoreDetails": {
+                                "value": {
+                                    "$meta": "score"
+                                },
+                                "details": []
+                            }
                         }
                     }
-                },
+                },)") +
+        std::string(R"(
                 {
                     "$unionWith": {
                         "coll": "pipeline_test",
@@ -4570,7 +5388,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -4580,7 +5398,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                                         "order": 1
                                     },
                                     "output": {
-                                        "matchWithoutTextScore_rank": {
+                                        "_internal_rankFusion_internal_fields.matchWithoutTextScore_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -4588,34 +5406,38 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                             },
                             {
                                 "$addFields": {
-                                    "matchWithoutTextScore_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$matchWithoutTextScore_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 5
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "matchWithoutTextScore_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.matchWithoutTextScore_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 5
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             },
                             {
                                 "$addFields": {
-                                    "matchWithoutTextScore_scoreDetails": {
-                                        "details": []
+                                    "_internal_rankFusion_internal_fields": {
+                                        "matchWithoutTextScore_scoreDetails": {
+                                            "details": []
+                                        }
                                     }
                                 }
                             }
@@ -4644,7 +5466,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -4654,7 +5476,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                                         "order": 1
                                     },
                                     "output": {
-                                        "searchPipe_rank": {
+                                        "_internal_rankFusion_internal_fields.searchPipe_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -4662,40 +5484,45 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                             },
                             {
                                 "$addFields": {
-                                    "searchPipe_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$searchPipe_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 2
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "searchPipe_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 2
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             },
                             {
                                 "$addFields": {
-                                    "searchPipe_scoreDetails": {
-                                        "$meta": "scoreDetails"
+                                    "_internal_rankFusion_internal_fields": {
+                                        "searchPipe_scoreDetails": {
+                                            "$meta": "scoreDetails"
+                                        }
                                     }
                                 }
                             }
                         ]
                     }
-                },
+                },)") +
+        std::string(R"(
                 {
                     "$unionWith": {
                         "coll": "pipeline_test",
@@ -4716,7 +5543,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                             {
                                 "$replaceRoot": {
                                     "newRoot": {
-                                        "docs": "$$ROOT"
+                                        "_internal_rankFusion_docs": "$$ROOT"
                                     }
                                 }
                             },
@@ -4726,7 +5553,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                                         "order": 1
                                     },
                                     "output": {
-                                        "vectorSearchPipe_rank": {
+                                        "_internal_rankFusion_internal_fields.vectorSearchPipe_rank": {
                                             "$rank": {}
                                         }
                                     }
@@ -4734,37 +5561,41 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
                             },
                             {
                                 "$addFields": {
-                                    "vectorSearchPipe_score": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$add": [
-                                                            "$vectorSearchPipe_rank",
-                                                            {
-                                                                "$const": 60
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "$const": 4
-                                            }
-                                        ]
+                                    "_internal_rankFusion_internal_fields": {
+                                        "vectorSearchPipe_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                "$_internal_rankFusion_internal_fields.vectorSearchPipe_rank",
+                                                                {
+                                                                    "$const": 60
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 4
+                                                }
+                                            ]
+                                        }
                                     }
                                 }
                             },
                             {
                                 "$addFields": {
-                                    "vectorSearchPipe_scoreDetails": {
-                                        "value": {
-                                            "$meta": "score"
-                                        },
-                                        "details": []
+                                    "_internal_rankFusion_internal_fields": {
+                                        "vectorSearchPipe_scoreDetails": {
+                                            "value": {
+                                                "$meta": "score"
+                                            },
+                                            "details": []
+                                        }
                                     }
                                 }
                             }
@@ -4774,321 +5605,450 @@ TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
         std::string(R"(
                 {
                     "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
+                        "_id": "$_internal_rankFusion_docs._id",
+                        "_internal_rankFusion_docs": {
+                            "$first": "$_internal_rankFusion_docs"
                         },
-                        "matchWithTextScore_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchWithTextScore_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
+                        "_internal_rankFusion_internal_fields": {
+                            "$push": {
+                                "matchWithTextScore_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchWithTextScore_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "matchWithTextScore_rank": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchWithTextScore_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "matchWithTextScore_scoreDetails": "$_internal_rankFusion_internal_fields.matchWithTextScore_scoreDetails",
+                                "matchWithoutTextScore_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchWithoutTextScore_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "matchWithoutTextScore_rank": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.matchWithoutTextScore_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "matchWithoutTextScore_scoreDetails": "$_internal_rankFusion_internal_fields.matchWithoutTextScore_scoreDetails",
+                                "searchPipe_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.searchPipe_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "searchPipe_rank": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "searchPipe_scoreDetails": "$_internal_rankFusion_internal_fields.searchPipe_scoreDetails",
+                                "vectorSearchPipe_score": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.vectorSearchPipe_score",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "vectorSearchPipe_rank": {
+                                    "$ifNull": [
+                                        "$_internal_rankFusion_internal_fields.vectorSearchPipe_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                "vectorSearchPipe_scoreDetails": "$_internal_rankFusion_internal_fields.vectorSearchPipe_scoreDetails"
                             }
-                        },
-                        "matchWithTextScore_rank": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchWithTextScore_rank",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "matchWithTextScore_scoreDetails": {
-                            "$mergeObjects": "$matchWithTextScore_scoreDetails"
-                        },
-                        "matchWithoutTextScore_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchWithoutTextScore_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "matchWithoutTextScore_rank": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$matchWithoutTextScore_rank",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "matchWithoutTextScore_scoreDetails": {
-                            "$mergeObjects": "$matchWithoutTextScore_scoreDetails"
-                        },
-                        "searchPipe_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$searchPipe_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "searchPipe_rank": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$searchPipe_rank",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "searchPipe_scoreDetails": {
-                            "$mergeObjects": "$searchPipe_scoreDetails"
-                        },
-                        "vectorSearchPipe_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$vectorSearchPipe_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "vectorSearchPipe_rank": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$vectorSearchPipe_rank",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "vectorSearchPipe_scoreDetails": {
-                            "$mergeObjects": "$vectorSearchPipe_scoreDetails"
                         },
                         "$willBeMerged": false
                     }
+                },)") +
+        std::string(R"(
+                {
+                    "$project": {
+                        "_id": true,
+                        "_internal_rankFusion_docs": true,
+                        "_internal_rankFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_rankFusion_internal_fields",
+                                "initialValue": {
+                                    "matchWithTextScore_score": {
+                                        "$const": 0
+                                    },
+                                    "matchWithTextScore_rank": {
+                                        "$const": 0
+                                    },
+                                    "matchWithTextScore_scoreDetails": {
+                                        "$const": {}
+                                    },
+                                    "matchWithoutTextScore_score": {
+                                        "$const": 0
+                                    },
+                                    "matchWithoutTextScore_rank": {
+                                        "$const": 0
+                                    },
+                                    "matchWithoutTextScore_scoreDetails": {
+                                        "$const": {}
+                                    },
+                                    "searchPipe_score": {
+                                        "$const": 0
+                                    },
+                                    "searchPipe_rank": {
+                                        "$const": 0
+                                    },
+                                    "searchPipe_scoreDetails": {
+                                        "$const": {}
+                                    },
+                                    "vectorSearchPipe_score": {
+                                        "$const": 0
+                                    },
+                                    "vectorSearchPipe_rank": {
+                                        "$const": 0
+                                    },
+                                    "vectorSearchPipe_scoreDetails": {
+                                        "$const": {}
+                                    }
+                                },
+                                "in": {
+                                    "matchWithTextScore_score": {
+                                        "$max": [
+                                            "$$value.matchWithTextScore_score",
+                                            "$$this.matchWithTextScore_score"
+                                        ]
+                                    },
+                                    "matchWithTextScore_rank": {
+                                        "$max": [
+                                            "$$value.matchWithTextScore_rank",
+                                            "$$this.matchWithTextScore_rank"
+                                        ]
+                                    },
+                                    "matchWithTextScore_scoreDetails": {
+                                        "$mergeObjects": [
+                                            "$$value.matchWithTextScore_scoreDetails",
+                                            "$$this.matchWithTextScore_scoreDetails"
+                                        ]
+                                    },
+                                    "matchWithoutTextScore_score": {
+                                        "$max": [
+                                            "$$value.matchWithoutTextScore_score",
+                                            "$$this.matchWithoutTextScore_score"
+                                        ]
+                                    },
+                                    "matchWithoutTextScore_rank": {
+                                        "$max": [
+                                            "$$value.matchWithoutTextScore_rank",
+                                            "$$this.matchWithoutTextScore_rank"
+                                        ]
+                                    },
+                                    "matchWithoutTextScore_scoreDetails": {
+                                        "$mergeObjects": [
+                                            "$$value.matchWithoutTextScore_scoreDetails",
+                                            "$$this.matchWithoutTextScore_scoreDetails"
+                                        ]
+                                    },
+                                    "searchPipe_score": {
+                                        "$max": [
+                                            "$$value.searchPipe_score",
+                                            "$$this.searchPipe_score"
+                                        ]
+                                    },
+                                    "searchPipe_rank": {
+                                        "$max": [
+                                            "$$value.searchPipe_rank",
+                                            "$$this.searchPipe_rank"
+                                        ]
+                                    },
+                                    "searchPipe_scoreDetails": {
+                                        "$mergeObjects": [
+                                            "$$value.searchPipe_scoreDetails",
+                                            "$$this.searchPipe_scoreDetails"
+                                        ]
+                                    },
+                                    "vectorSearchPipe_score": {
+                                        "$max": [
+                                            "$$value.vectorSearchPipe_score",
+                                            "$$this.vectorSearchPipe_score"
+                                        ]
+                                    },
+                                    "vectorSearchPipe_rank": {
+                                        "$max": [
+                                            "$$value.vectorSearchPipe_rank",
+                                            "$$this.vectorSearchPipe_rank"
+                                        ]
+                                    },
+                                    "vectorSearchPipe_scoreDetails": {
+                                        "$mergeObjects": [
+                                            "$$value.vectorSearchPipe_scoreDetails",
+                                            "$$this.vectorSearchPipe_scoreDetails"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
                 {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$matchWithTextScore_score",
-                                "$matchWithoutTextScore_score",
-                                "$searchPipe_score",
-                                "$vectorSearchPipe_score"
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_rankFusion_docs",
+                                "$$ROOT"
                             ]
                         }
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_rankFusion_docs": false,
+                        "_id": true
                     }
                 },)") +
         std::string(R"(
                 {
                     "$addFields": {
-                        "matchWithTextScore_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchWithTextScore_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$matchWithTextScore_rank"
-                            ]
-                        },
-                        "matchWithoutTextScore_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$matchWithoutTextScore_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$matchWithoutTextScore_rank"
-                            ]
-                        },
-                        "searchPipe_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$searchPipe_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$searchPipe_rank"
-                            ]
-                        },
-                        "vectorSearchPipe_rank": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$vectorSearchPipe_rank",
-                                        {
-                                            "$const": 0
-                                        }
-                                    ]
-                                },
-                                {
-                                    "$const": "NA"
-                                },
-                                "$vectorSearchPipe_rank"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "calculatedScoreDetails": [
-                            {
-                                "$mergeObjects": [
+                        "_internal_rankFusion_internal_fields": {
+                            "matchWithTextScore_rank": {
+                                "$cond": [
                                     {
-                                        "inputPipelineName": {
-                                            "$const": "matchWithTextScore"
-                                        },
-                                        "rank": "$matchWithTextScore_rank",
-                                        "weight": {
-                                            "$cond": [
-                                                {
-                                                    "$eq": [
-                                                        "$matchWithTextScore_rank",
-                                                        {
-                                                            "$const": "NA"
-                                                        }
-                                                    ]
-                                                },
-                                                "$$REMOVE",
-                                                {
-                                                    "$const": 3
-                                                }
-                                            ]
-                                        }
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchWithTextScore_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
                                     },
-                                    "$matchWithTextScore_scoreDetails"
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchWithTextScore_rank"
                                 ]
                             },
-                            {
-                                "$mergeObjects": [
+                            "matchWithoutTextScore_rank": {
+                                "$cond": [
                                     {
-                                        "inputPipelineName": {
-                                            "$const": "matchWithoutTextScore"
-                                        },
-                                        "rank": "$matchWithoutTextScore_rank",
-                                        "weight": {
-                                            "$cond": [
-                                                {
-                                                    "$eq": [
-                                                        "$matchWithoutTextScore_rank",
-                                                        {
-                                                            "$const": "NA"
-                                                        }
-                                                    ]
-                                                },
-                                                "$$REMOVE",
-                                                {
-                                                    "$const": 5
-                                                }
-                                            ]
-                                        }
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.matchWithoutTextScore_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
                                     },
-                                    "$matchWithoutTextScore_scoreDetails"
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.matchWithoutTextScore_rank"
                                 ]
                             },
-                            {
-                                "$mergeObjects": [
+                            "searchPipe_rank": {
+                                "$cond": [
                                     {
-                                        "inputPipelineName": {
-                                            "$const": "searchPipe"
-                                        },
-                                        "rank": "$searchPipe_rank",
-                                        "weight": {
-                                            "$cond": [
-                                                {
-                                                    "$eq": [
-                                                        "$searchPipe_rank",
-                                                        {
-                                                            "$const": "NA"
-                                                        }
-                                                    ]
-                                                },
-                                                "$$REMOVE",
-                                                {
-                                                    "$const": 2
-                                                }
-                                            ]
-                                        }
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
                                     },
-                                    "$searchPipe_scoreDetails"
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.searchPipe_rank"
                                 ]
                             },
-                            {
-                                "$mergeObjects": [
+                            "vectorSearchPipe_rank": {
+                                "$cond": [
                                     {
-                                        "inputPipelineName": {
-                                            "$const": "vectorSearchPipe"
-                                        },
-                                        "rank": "$vectorSearchPipe_rank",
-                                        "weight": {
-                                            "$cond": [
-                                                {
-                                                    "$eq": [
-                                                        "$vectorSearchPipe_rank",
-                                                        {
-                                                            "$const": "NA"
-                                                        }
-                                                    ]
-                                                },
-                                                "$$REMOVE",
-                                                {
-                                                    "$const": 4
-                                                }
-                                            ]
-                                        }
+                                        "$eq": [
+                                            "$_internal_rankFusion_internal_fields.vectorSearchPipe_rank",
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
                                     },
-                                    "$vectorSearchPipe_scoreDetails"
+                                    {
+                                        "$const": "NA"
+                                    },
+                                    "$_internal_rankFusion_internal_fields.vectorSearchPipe_rank"
                                 ]
                             }
-                        ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$add": [
+                                "$_internal_rankFusion_internal_fields.matchWithTextScore_score",
+                                "$_internal_rankFusion_internal_fields.matchWithoutTextScore_score",
+                                "$_internal_rankFusion_internal_fields.searchPipe_score",
+                                "$_internal_rankFusion_internal_fields.vectorSearchPipe_score"
+                            ]
+                        }
                     }
                 },)") +
         std::string(R"(
+                {
+                    "$addFields": {
+                        "_internal_rankFusion_internal_fields": {
+                            "calculatedScoreDetails": [
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "matchWithTextScore"
+                                            },
+                                            "rank": "$_internal_rankFusion_internal_fields.matchWithTextScore_rank",
+                                            "weight": {
+                                                "$cond": [
+                                                    {
+                                                        "$eq": [
+                                                            "$_internal_rankFusion_internal_fields.matchWithTextScore_rank",
+                                                            {
+                                                                "$const": "NA"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "$$REMOVE",
+                                                    {
+                                                        "$const": 3
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "$_internal_rankFusion_internal_fields.matchWithTextScore_scoreDetails"
+                                    ]
+                                },
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "matchWithoutTextScore"
+                                            },
+                                            "rank": "$_internal_rankFusion_internal_fields.matchWithoutTextScore_rank",
+                                            "weight": {
+                                                "$cond": [
+                                                    {
+                                                        "$eq": [
+                                                            "$_internal_rankFusion_internal_fields.matchWithoutTextScore_rank",
+                                                            {
+                                                                "$const": "NA"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "$$REMOVE",
+                                                    {
+                                                        "$const": 5
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "$_internal_rankFusion_internal_fields.matchWithoutTextScore_scoreDetails"
+                                    ]
+                                },
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "searchPipe"
+                                            },
+                                            "rank": "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                            "weight": {
+                                                "$cond": [
+                                                    {
+                                                        "$eq": [
+                                                            "$_internal_rankFusion_internal_fields.searchPipe_rank",
+                                                            {
+                                                                "$const": "NA"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "$$REMOVE",
+                                                    {
+                                                        "$const": 2
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "$_internal_rankFusion_internal_fields.searchPipe_scoreDetails"
+                                    ]
+                                },
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "vectorSearchPipe"
+                                            },
+                                            "rank": "$_internal_rankFusion_internal_fields.vectorSearchPipe_rank",
+                                            "weight": {
+                                                "$cond": [
+                                                    {
+                                                        "$eq": [
+                                                            "$_internal_rankFusion_internal_fields.vectorSearchPipe_rank",
+                                                            {
+                                                                "$const": "NA"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "$$REMOVE",
+                                                    {
+                                                        "$const": 4
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "$_internal_rankFusion_internal_fields.vectorSearchPipe_scoreDetails"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
                 {
                     "$setMetadata": {
                         "scoreDetails": {
-                            "value": "$score",
+                            "value": {
+                                "$meta": "score"
+                            },
                             "description": {
                                 "$const": "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / (60 + rank))) across input pipelines from which this document is output, from:"
                             },
-                            "details": "$calculatedScoreDetails"
+                            "details": "$_internal_rankFusion_internal_fields.calculatedScoreDetails"
                         }
                     }
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
+                    "$project": {
+                        "_internal_rankFusion_internal_fields": false,
+                        "_id": true
                     }
                 }
             ]

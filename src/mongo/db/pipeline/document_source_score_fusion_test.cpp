@@ -6194,7 +6194,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationNoneMe
         asOneObj);
 }
 
-TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
+TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineVectorSearchScoreDetailsDesugaring) {
     auto spec = fromjson(R"({
          $scoreFusion: {
              input: {

@@ -340,9 +340,10 @@ const coll = db[jsTestName()];
 
 (function testCombinationExpressionOnMultiplePipelinesWithNoNormAndDocsVar() {
     // Pipeline returns an array of documents, each with the score that $scoreFusion computed. Note
-    // that $docs.single is a valid root field specification because "single" is a field on the
+    // that $single is a valid root field specification because "single" is a field on the
     // original input document. The avg will be computed with respect to the following three fields:
-    // "single", "double", and "single" (again) where the last field "single" is a collection field.
+    // "single", "double", and "single" (again) where the last field "single" is a root document
+    // field multiplied by another root document field called multiplier.
     const actualResults = coll.aggregate([
                                   {
                                       $scoreFusion: {
@@ -386,7 +387,7 @@ const coll = db[jsTestName()];
     assert.eq(actualResults, expectedResults);
 
     // Pipeline returns an array of documents, each with the score that $scoreFusion computed. Note
-    // that the "$docs.dne" does not evaluate to anything because dne is not a field on the original
+    // that the "$dne" does not evaluate to anything because dne is not a field on the original
     // input document so the avg will be computed with respect to only the "$$single" and "$$double"
     // variables. Should ignore the invalid root document field/string and only compute the average
     // over the valid specified fields ($single and $double).
@@ -440,6 +441,35 @@ const coll = db[jsTestName()];
     // Assert that every document returned by $scoreFusion is scored as expected using the
     // "avg" combination.expression.
     assert.eq(actualResultsWithPoorlyStatedVar, expectedResultsForUndefinedDocsField);
+
+    // Pipeline returns an array of documents, each with the score that $scoreFusion computed. Note
+    // that the "$_internal_scoreFusion_docs.single" variable should not be able to reference the
+    // internal field (which only exists briefly during desugaring and is then removed) and
+    // therefore does not evaluate to anything and will not be factored into the avg computation.
+    // Should ignore the invalid root document field/string and only compute the average over the
+    // valid specified fields ($single and $double).
+    const actualResultsWithInternallyStatedVar =
+        coll.aggregate([
+                {
+                    $scoreFusion: {
+                        input: {pipelines, normalization: "none"},
+                        combination: {
+                            method: "expression",
+                            expression: {
+                                $avg: ["$$single",
+                                       "$$double",
+                                       "$_internal_scoreFusion_docs.single"]
+                            }
+                        }
+                    }
+                },
+                projectScore
+            ])
+            .toArray();
+
+    // Assert that every document returned by $scoreFusion is scored as expected using the
+    // "avg" combination.expression.
+    assert.eq(actualResultsWithInternallyStatedVar, expectedResultsForUndefinedDocsField);
 })();
 
 //-------------------------------------------------------------------------------------------------
@@ -541,8 +571,8 @@ const coll = db[jsTestName()];
 
 // The $scoreFusion pipeline will be run as part of an aggregate command that also specify a new
 // command-level let variable, 'five' which has a value of 5.0. The expected behavior is that
-// combination.expression will execute as expected and sum the following fields: '$docs.single',
-// '$docs.double', and the variable '$$five'.
+// combination.expression will execute as expected and sum the following fields: '$single',
+// '$double', and the variable '$$five'.
 
 // The $scoreFusion pipeline sorts the documents in descending order by score (documents with the
 // highest computed scores ranked first). Assert that the documents are in the correct order and

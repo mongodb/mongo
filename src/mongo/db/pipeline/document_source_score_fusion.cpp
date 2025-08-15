@@ -152,25 +152,6 @@ static const std::string scoreFusionScoreDetailsDescription =
 // Stage name without the '$' prefix
 static const std::string scoreFusionStageName = "scoreFusion";
 
-// Name of single top-level field object used to track all internal fields we need
-// intermediate to the desugar.
-// One field object that holds all internal intermediate variables during desugar,
-// like each input pipeline's individual score or scoreDetails.
-static constexpr StringData kScoreFusionInternalFieldsName =
-    "_internal_scoreFusion_internal_fields"_sd;
-// One field object to encapsulate the unmodified user's doc from the queried collection.
-static constexpr StringData kScoreFusionDocsFieldName = "_internal_scoreFusion_docs"_sd;
-
-static std::string applyInternalFieldPrefixToFieldName(const StringData value) {
-    return fmt::format("{}.{}", kScoreFusionInternalFieldsName, value);
-}
-
-std::string getScoreFieldFromPipelineName(const StringData pipelineName,
-                                          bool includeDollarSign = false) {
-    return includeDollarSign ? fmt::format("${}_score", pipelineName)
-                             : fmt::format("{}_score", pipelineName);
-}
-
 // Below are helper functions that return stages or stage lists that represent sub-components
 // of the total $scoreFusion desugar. They are defined in an order close to how
 // they appear in the desugar read from top to bottom.
@@ -181,16 +162,6 @@ std::string getScoreFieldFromPipelineName(const StringData pipelineName,
 //   "<INTERNAL_FIELDS_DOCS>": { <unmodified document from collection> },
 //   "<INTERNAL_FIELDS>"; { <internal variable for intermediate processing > }
 // }
-
-/**
- * Builds and returns a $replaceRoot stage: {$replaceWith: {docs: "$$ROOT"}}.
- * This has the effect of storing the unmodified user's document in the path '$docs'.
- */
-boost::intrusive_ptr<DocumentSource> buildReplaceRootStage(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return DocumentSourceReplaceRoot::createFromBson(
-        BSON("$replaceWith" << BSON(kScoreFusionDocsFieldName << "$$ROOT")).firstElement(), expCtx);
-}
 
 /**
  * Builds and returns an $addFields stage that computes the weighted and normalized score
@@ -220,7 +191,9 @@ boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
         BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
         {
             const std::string internalFieldsInputPipelineScoreName =
-                applyInternalFieldPrefixToFieldName(fmt::format("{}_score", inputPipelineName));
+                hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                    DocumentSourceScoreFusion::kScoreFusionInternalFieldsName,
+                    fmt::format("{}_score", inputPipelineName));
             BSONObjBuilder scoreField(
                 addFieldsBob.subobjStart(internalFieldsInputPipelineScoreName));
             {
@@ -266,7 +239,9 @@ boost::intrusive_ptr<DocumentSource> buildRawScoreAddFieldsStage(
     BSONObjBuilder bob;
     {
         const std::string internalFieldsInputPipelineRawScoreName =
-            applyInternalFieldPrefixToFieldName(fmt::format("{}_rawScore", inputPipelineName));
+            hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                DocumentSourceScoreFusion::kScoreFusionInternalFieldsName,
+                fmt::format("{}_rawScore", inputPipelineName));
         BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
         addFieldsBob.append(internalFieldsInputPipelineRawScoreName, BSON("$meta" << "score"));
     }
@@ -277,8 +252,8 @@ boost::intrusive_ptr<DocumentSource> buildRawScoreAddFieldsStage(
 
 /**
  * Builds and returns an $addFields stage that materializes scoreDetails for an individual input
- * pipeline. The way we materialize scoreDetails depends on if the input pipeline generates "score"
- * or "scoreDetails" metadata.
+ * pipeline. The way we materialize scoreDetails depends on if the input pipeline generates
+ * "scoreDetails" metadata.
  *
  * Later, these individual input pipeline scoreDetails will be gathered together in order to build
  * scoreDetails for the overall $scoreFusion pipeline (see calculateFinalScoreDetails()).
@@ -287,8 +262,9 @@ boost::intrusive_ptr<DocumentSource> addInputPipelineScoreDetails(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const StringData inputPipelinePrefix,
     const bool inputGeneratesScoreDetails) {
-    const std::string scoreDetails =
-        applyInternalFieldPrefixToFieldName(fmt::format("{}_scoreDetails", inputPipelinePrefix));
+    const std::string scoreDetails = hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+        DocumentSourceScoreFusion::kScoreFusionInternalFieldsName,
+        fmt::format("{}_scoreDetails", inputPipelinePrefix));
     BSONObjBuilder bob;
     {
         BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
@@ -296,13 +272,14 @@ boost::intrusive_ptr<DocumentSource> addInputPipelineScoreDetails(
         if (inputGeneratesScoreDetails) {
             // If the input pipeline generates scoreDetails (for example, $search may generate
             // searchScoreDetails), then we'll use the existing details:
-            // {$addFields: {prefix_scoreDetails: details: {$meta: "scoreDetails"}}}}
+            // {$addFields: {<INTERNAL_FIELDS>.<inputPipelineName>_scoreDetails: details: {$meta:
+            // "scoreDetails"}}}}
             addFieldsBob.append(scoreDetails, BSON("details" << BSON("$meta" << "scoreDetails")));
         } else {
             // All $scoreFusion input pipelines must be scored (generate a score).
 
             // Build our own scoreDetails for the pipeline like:
-            // {$addFields: {prefix_scoreDetails: {details: []}}}
+            // {$addFields: {<INTERNAL_FIELDS>.<inputPipelineName>_scoreDetails: {details: []}}}
             addFieldsBob.append(scoreDetails, BSON("details" << BSONArrayBuilder().arr()));
         }
     }
@@ -354,7 +331,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildInputPipelineScoreDetails(
 boost::intrusive_ptr<DocumentSource> builtSetWindowFieldsStageForMinMaxScalerNormalization(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const StringData inputPipelineName) {
     const std::string internalFieldsScore =
-        applyInternalFieldPrefixToFieldName(getScoreFieldFromPipelineName(inputPipelineName));
+        hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+            DocumentSourceScoreFusion::kScoreFusionInternalFieldsName,
+            hybrid_scoring_util::getScoreFieldFromPipelineName(inputPipelineName));
     const std::string dollarScore = "$" + internalFieldsScore;
     SortPattern sortPattern{BSON(internalFieldsScore << -1), expCtx};
 
@@ -396,7 +375,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
         outputStages.push_back(firstInputPipeline->popFront());
     }
 
-    outputStages.emplace_back(buildReplaceRootStage(expCtx));
+    outputStages.emplace_back(hybrid_scoring_util::buildReplaceRootStage(
+        DocumentSourceScoreFusion::kScoreFusionDocsFieldName, expCtx));
     outputStages.emplace_back(
         buildScoreAddFieldsStage(expCtx, inputPipelineOneName, normalization, weight));
 
@@ -420,8 +400,15 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
 /**
  * Build the pipeline input to $unionWith (consists of a $replaceRoot and $addFields stage). Returns
  * a $unionWith stage that looks something like this:
- * { "$unionWith": { "coll": "pipeline_test", "pipeline": [inputPipeline stage(ex: $vectorSearch),
- * $replaceRoot stage, $addFields stage] } }
+ * { "$unionWith": { "coll": "pipeline_test", "pipeline": [inputPipeline stage (ex: $vectorSearch),
+ * $replaceRoot stage, $addFields stage (add field to track input pipeline's weighted score) ] } }
+ *
+ * If score details are enabled, then the pipeline stages under the $unionWith.pipeline field will
+ * also contain an $addFields stage that tracks the pipeline's scoreDetails.
+ *
+ * If $scoreFusion's normalization is "minMaxScaler," then the pipeline stages under the
+ * $unionWith.pipeline field will also contain an $_internalSetWindowFields stage that calculates
+ * the minMaxScaler value of the pipeline's score.
  */
 boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
     const StringData inputPipelineName,
@@ -431,7 +418,8 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
     const bool includeScoreDetails,
     const bool inputGeneratesScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    oneInputPipeline->pushBack(buildReplaceRootStage(expCtx));
+    oneInputPipeline->pushBack(hybrid_scoring_util::buildReplaceRootStage(
+        DocumentSourceScoreFusion::kScoreFusionDocsFieldName, expCtx));
     oneInputPipeline->pushBack(
         buildScoreAddFieldsStage(expCtx, inputPipelineName, normalization, weight));
     if (includeScoreDetails) {
@@ -454,278 +442,6 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
     BSONObj inputToUnionWith =
         BSON("$unionWith" << BSON("coll" << collName << "pipeline" << bsonPipeline));
     return DocumentSourceUnionWith::createFromBson(inputToUnionWith.firstElement(), expCtx);
-}
-
-/**
- * Produces the BSON for a $group spec to group all the input documents across all pipelines by
- * '_id' and their internal fields (pipeline score, pipeline rawScore and pipeline scoreDetails).
- * If a document is not present in an input pipeline, its score for that input pipeline is set to 0.
- *
- * Note, because every field in a $group is defined by its own accumulator,
- * to preserve the structure of all our internal fields being encapsulated by in a single
- * field object, we first in this stage push each document's internal fields in the group
- * into an array using $push.
- *
- * After, the internal fields array is reduced to a single internal fields object
- * that represents the merger of all the internal fields across all documents across
- * all input pipelines of a matching '_id'.
- * Builds a $group like the following
- * (if scoreDetails included; otherwise omit rawScore/scoreDetails internal fields):
- *
- * {
- *     "$group": {
- *         "_id": "$<INTERNAL_FIELDS_DOCS>._id",
- *         "<INTERNAL_FIELDS_DOCS>": {
- *             "$first": "$<INTERNAL_FIELDS_DOCS>"
- *         },
- *         "<INTERNAL_FIELDS>": {
- *             "$push": {
- *                 "<pipeline1_name>_score": {
- *                     "$ifNull": [
- *                         "$<INTERNAL_FIELDS>.<pipeline1_name>_score", 0
- *                     ]
- *                 },
- *                 "<pipeline1_name>_rawScore": {
- *                     "$ifNull": [
- *                         "$<INTERNAL_FIELDS>.<pipeline1_name>_rawScore", 0
- *                     ]
- *                 },
- *                 "<pipeline1_name>_scoreDetails":
- *                    "$<INTERNAL_FIELDS>.<pipeline1_name>_scoreDetails",
- *                 "<pipeline2_name>_score": {
- *                     "$ifNull": [
- *                         "$_<INTERNAL_FIELDS>.<pipeline2_name>_score", 0
- *                 }
- *                 "<pipeline2_name>_rawScore": {
- *                     "$ifNull": [
- *                         "$<INTERNAL_FIELDS>.<pipeline2_name>_rawScore", 0
- *                     ]
- *                 },
- *                 "<pipeline2_name>_scoreDetails":
- *                    "$<INTERNAL_FIELDS>.<pipeline2_name>_scoreDetails"
- *           }
- *        }
- *     }
- *  }
- */
-BSONObj groupDocsByIdAcrossInputPipeline(const std::vector<std::string>& pipelineNames,
-                                         const bool includeScoreDetails) {
-    // For each sub-pipeline, build the following obj:
-    // name_score: {$max: {ifNull: ["$name_score", 0]}}
-    // If scoreDetails is enabled, build:
-    // <INTERNAL_FIELDS>.name_rawScore: {$max: {ifNull: ["$<INTERNAL_FIELDS>.name_rawScore", 0]}}
-    // <INTERNAL_FIELDS>.name_scoreDetails: {$mergeObjects: $<INTERNAL_FIELDS>.name_scoreDetails}
-    BSONObjBuilder bob;
-    {
-        BSONObjBuilder groupBob(bob.subobjStart("$group"_sd));
-        auto internalDocsField = kScoreFusionDocsFieldName;
-        groupBob.append("_id", "$" + internalDocsField + "._id");
-        groupBob.append(internalDocsField, BSON("$first" << ("$" + internalDocsField)));
-
-        BSONObjBuilder internalFieldsBob(groupBob.subobjStart(kScoreFusionInternalFieldsName));
-        BSONObjBuilder pushBob(internalFieldsBob.subobjStart("$push"_sd));
-
-        for (const auto& pipelineName : pipelineNames) {
-            const std::string scoreName = getScoreFieldFromPipelineName(pipelineName);
-            pushBob.append(
-                scoreName,
-                BSON("$ifNull" << BSON_ARRAY(
-                         fmt::format("${}", applyInternalFieldPrefixToFieldName(scoreName)) << 0)));
-            if (includeScoreDetails) {
-                const std::string rawScoreName = fmt::format("{}_rawScore", pipelineName);
-                pushBob.append(
-                    rawScoreName,
-                    BSON("$ifNull" << BSON_ARRAY(
-                             fmt::format("${}", applyInternalFieldPrefixToFieldName(rawScoreName))
-                             << 0)));
-
-                const std::string scoreDetailsName = fmt::format("{}_scoreDetails", pipelineName);
-                pushBob.append(
-                    scoreDetailsName,
-                    fmt::format("${}", applyInternalFieldPrefixToFieldName(scoreDetailsName)));
-            }
-        }
-        pushBob.done();
-        internalFieldsBob.done();
-        groupBob.done();
-    }
-    bob.done();
-    return bob.obj();
-}
-
-/**
- * Produces the BSON spec for a $project stage that reduces the <INTERNAL_FIELD> field array,
- * produced after the prior $group by '_id', into a single <INTERNAL_FIELD> object that
- * represents the merged <INTERNAL_FIELD> field objects across all input documents across
- * all input pipelines that have the same '_id'.
- *
- * Conceptually, it does the grouping accumulation of the <INTERNAL_FIELDS> sub-fields
- * of documents of matching '_id's, as $group can not accumulate sub-fields directly.
- *
- * Builds a $project like the following
- * (if scoreDetails included; otherwise omit rawScore/scoreDetails internal fields):
- *
- * {
- *     "$project": {
- *         "_id": true,
- *         "<INTERNAL_FIELDS_DOCS>": true,
- *         "<INTERNAL_FIELDS>": {
- *             "$reduce": {
- *                 "input": "$<INTERNAL_FIELDS_DOCS>",
- *                 "initialValue": {
- *                     "<pipeline1_name>_score": 0,
- *                     "<pipeline1_name>_rawScore": 0,
- *                     "<pipeline1_name>_scoreDetails": {},
- *                     "<pipeline2_name>_score": 0,
- *                     "<pipeline2_name>_rawScore": 0,
- *                     "<pipeline2_name>_scoreDetails": {}
- *                 },
- *                 "in": {
- *                     "<pipeline1_name>_score": {
- *                         "$max": [
- *                             "$$value.<pipeline1_name>_score",
- *                             "$$this.<pipeline1_name>_score"
- *                         ]
- *                     },
- *                     "<pipeline1_name>_rawScore": {
- *                         "$max": [
- *                             "$$value.<pipeline1_name>_rawScore",
- *                             "$$this.<pipeline1_name>_rawScore"
- *                         ]
- *                     },
- *                     "<pipeline1_name>_scoreDetails": {
- *                         "$mergeObjects": [
- *                             "$$value.<pipeline1_name>_scoreDetails",
- *                             "$$this.<pipeline1_name>_scoreDetails"
- *                         ]
- *                     }
- *                     "<pipeline2_name>_score": {
- *                         "$max": [
- *                             "$$value.<pipeline2_name>_score",
- *                             "$$this.<pipeline2_name>_score"
- *                         ]
- *                     },
- *                     "<pipeline2_name>_rawScore": {
- *                         "$max": [
- *                             "$$value.<pipeline2_name>_rawScore",
- *                             "$$this.<pipeline2_name>_rawScore"
- *                         ]
- *                     },
- *                     "<pipeline2_name>_scoreDetails": {
- *                         "$mergeObjects": [
- *                             "$$value.<pipeline2_name>_scoreDetails",
- *                             "$$this.<pipeline2_name>_scoreDetails"
- *                         ]
- *                     }
- *                 }
- *             }
- *         }
- *     }
- * }
- *
- */
-BSONObj projectReduceInternalFields(const std::vector<std::string>& pipelineNames,
-                                    const bool includeScoreDetails) {
-    BSONObjBuilder bob;
-    {
-        BSONObjBuilder projectBob(bob.subobjStart("$project"_sd));
-        projectBob.append(kScoreFusionDocsFieldName, 1);
-        auto internalFields = kScoreFusionInternalFieldsName;
-
-        BSONObjBuilder internalFieldsBob(projectBob.subobjStart(internalFields));
-        BSONObjBuilder reduceBob(internalFieldsBob.subobjStart("$reduce"_sd));
-
-        reduceBob.append("input", "$" + internalFields);
-
-        BSONObjBuilder initialValueBob(reduceBob.subobjStart("initialValue"_sd));
-        for (const auto& pipelineName : pipelineNames) {
-            initialValueBob.append(fmt::format("{}_score", pipelineName), 0);
-            if (includeScoreDetails) {
-                initialValueBob.append(fmt::format("{}_rawScore", pipelineName), 0);
-                initialValueBob.append(fmt::format("{}_scoreDetails", pipelineName), BSONObj{});
-            }
-        }
-        initialValueBob.done();
-
-        BSONObjBuilder inBob(reduceBob.subobjStart("in"_sd));
-        for (const auto& pipelineName : pipelineNames) {
-            initialValueBob.append(
-                fmt::format("{}_score", pipelineName),
-                BSON("$max" << BSON_ARRAY(fmt::format("$$value.{}_score", pipelineName)
-                                          << fmt::format("$$this.{}_score", pipelineName))));
-            if (includeScoreDetails) {
-                initialValueBob.append(
-                    fmt::format("{}_rawScore", pipelineName),
-                    BSON("$max" << BSON_ARRAY(fmt::format("$$value.{}_rawScore", pipelineName)
-                                              << fmt::format("$$this.{}_rawScore", pipelineName))));
-                initialValueBob.append(
-                    fmt::format("{}_scoreDetails", pipelineName),
-                    BSON("$mergeObjects"
-                         << BSON_ARRAY(fmt::format("$$value.{}_scoreDetails", pipelineName)
-                                       << fmt::format("$$this.{}_scoreDetails", pipelineName))));
-            }
-        }
-        inBob.done();
-
-        reduceBob.done();
-        internalFieldsBob.done();
-        projectBob.done();
-    }
-    bob.done();
-    return bob.obj();
-}
-
-/**
- * Builds the following BSON object, in order to promote the user's documents to the top-level while
- * still maintaining the internal processing fields.
- * {
- *   $replaceRoot: {
- *     newRoot: {
- *       $mergeObjects: [
- *         "$<INTERNAL_DOCS>",
- *         "$$ROOT"
- *       ]
- *     }
- *   }
- * }
- */
-BSONObj promoteEmbeddedDocsObject() {
-    BSONObjBuilder bob;
-    {
-        BSONObjBuilder replaceRootBob(bob.subobjStart("$replaceRoot"_sd));
-        BSONObjBuilder newRootBob(replaceRootBob.subobjStart("newRoot"_sd));
-
-        BSONArrayBuilder mergeObjectsArrayBab;
-        mergeObjectsArrayBab.append("$" + kScoreFusionDocsFieldName);
-        mergeObjectsArrayBab.append("$$ROOT");
-        mergeObjectsArrayBab.done();
-
-        newRootBob.append("$mergeObjects", mergeObjectsArrayBab.arr());
-        newRootBob.done();
-        replaceRootBob.done();
-    }
-    bob.done();
-    return bob.obj();
-}
-
-/**
- * Builds the following BSON object, in order to remove the internal docs subobject that hid the
- * user's documents.
- * {
- *   $project: {
- *      <INTERNAL_DOCS>: 0
- *   }
- * }
- */
-BSONObj projectRemoveEmbeddedDocsObject() {
-    BSONObjBuilder bob;
-    {
-        BSONObjBuilder projectBob(bob.subobjStart("$project"_sd));
-        projectBob.append(kScoreFusionDocsFieldName, 0);
-        projectBob.done();
-    }
-    bob.done();
-    return bob.obj();
 }
 
 /**
@@ -753,8 +469,10 @@ boost::intrusive_ptr<DocumentSource> buildSetFinalCombinedScoreStage(
             // pipeline score field. Ex: {geo_doc: "$geo_doc_score"}.
             BSONObjBuilder varsAndInFields;
             for (const auto& pipelineName : pipelineNames) {
-                std::string fieldScoreName = getScoreFieldFromPipelineName(
-                    applyInternalFieldPrefixToFieldName(pipelineName), true);
+                std::string fieldScoreName = hybrid_scoring_util::getScoreFieldFromPipelineName(
+                    hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                        DocumentSourceScoreFusion::kScoreFusionInternalFieldsName, pipelineName),
+                    true);
                 varsAndInFields.appendElements(BSON(pipelineName << fieldScoreName));
             }
             varsAndInFields.done();
@@ -782,8 +500,10 @@ boost::intrusive_ptr<DocumentSource> buildSetFinalCombinedScoreStage(
             // Construct an array of the score field path names for AccumulatorAvg.
             BSONArrayBuilder expressionFieldPaths;
             for (const auto& pipelineName : pipelineNames) {
-                std::string fieldScoreName = getScoreFieldFromPipelineName(
-                    applyInternalFieldPrefixToFieldName(pipelineName), true);
+                std::string fieldScoreName = hybrid_scoring_util::getScoreFieldFromPipelineName(
+                    hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                        DocumentSourceScoreFusion::kScoreFusionInternalFieldsName, pipelineName),
+                    true);
                 expressionFieldPaths.append(fieldScoreName);
             }
             expressionFieldPaths.done();
@@ -799,61 +519,6 @@ boost::intrusive_ptr<DocumentSource> buildSetFinalCombinedScoreStage(
     }
     return DocumentSourceSetMetadata::create(
         expCtx, metadataExpression, DocumentMetadataFields::MetaType::kScore);
-}
-
-/*
- * Builds an $addFields stage that constructs the value of the 'details' field array
- * in final top-level 'scoreDetails' object, and stores it in path
- * "$<INTERNAL_FIELDS>.calculatedScoreDetails".
- *
- * Later, this field is used to set the value of the 'details' key when setting the 'scoreDetails'
- * metadata field.
- */
-boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
-    const std::vector<std::string>& pipelineNames,
-    const StringMap<double>& weights,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-
-    BSONObjBuilder bob;
-    {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
-        {
-            BSONObjBuilder internalFieldsBob(
-                addFieldsBob.subobjStart(kScoreFusionInternalFieldsName));
-            {
-                BSONArrayBuilder calculatedScoreDetailsArr;
-                for (const auto& pipelineName : pipelineNames) {
-                    const std::string internalFieldsPipelineName =
-                        applyInternalFieldPrefixToFieldName(pipelineName);
-                    const std::string scoreDetailsFieldName =
-                        fmt::format("${}_scoreDetails", pipelineName);
-                    double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
-
-                    BSONObjBuilder mergeObjectsArrSubObj;
-                    mergeObjectsArrSubObj.append("inputPipelineName"_sd, pipelineName);
-                    mergeObjectsArrSubObj.append(
-                        "inputPipelineRawScore"_sd,
-                        fmt::format("${}_rawScore", internalFieldsPipelineName));
-                    mergeObjectsArrSubObj.append("weight"_sd, weight);
-                    mergeObjectsArrSubObj.append(
-                        "value"_sd, fmt::format("${}_score", internalFieldsPipelineName));
-                    mergeObjectsArrSubObj.done();
-                    BSONArrayBuilder mergeObjectsArr;
-                    mergeObjectsArr.append(mergeObjectsArrSubObj.obj());
-                    mergeObjectsArr.append(fmt::format(
-                        "${}.{}_scoreDetails", kScoreFusionInternalFieldsName, pipelineName));
-                    mergeObjectsArr.done();
-                    BSONObj mergeObjectsObj = BSON("$mergeObjects"_sd << mergeObjectsArr.arr());
-                    calculatedScoreDetailsArr.append(mergeObjectsObj);
-                }
-                calculatedScoreDetailsArr.done();
-                internalFieldsBob.append("calculatedScoreDetails", calculatedScoreDetailsArr.arr());
-            }
-            internalFieldsBob.done();
-        }
-    }
-    const BSONObj spec = bob.obj();
-    return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
 }
 
 /**
@@ -896,29 +561,13 @@ boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
                          << scoreFusionScoringOptions.getNormalizationString(
                                 scoreFusionScoringOptions.getNormalizationMethod())
                          << "combination" << combinationBob.obj() << "details"
-                         << "$" + applyInternalFieldPrefixToFieldName("calculatedScoreDetails")),
+                         << "$" +
+                     hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                                DocumentSourceScoreFusion::kScoreFusionInternalFieldsName,
+                                "calculatedScoreDetails")),
             expCtx->variablesParseState),
         DocumentMetadataFields::kScoreDetails);
     return setScoreDetails;
-}
-
-/**
- * Builds the following BSON object, in order to remove the internal processing fields subobject.
- * {
- *   $project: {
- *      <INTERNAL_FIELDS>: 0
- *   }
- * }
- */
-BSONObj projectRemoveInternalFieldsObject() {
-    BSONObjBuilder bob;
-    {
-        BSONObjBuilder projectBob(bob.subobjStart("$project"_sd));
-        projectBob.append(kScoreFusionInternalFieldsName, 0);
-        projectBob.done();
-    }
-    bob.done();
-    return bob.obj();
 }
 
 /**
@@ -942,19 +591,36 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
 
     // Group all the documents across the different $unionWiths for each input pipeline.
     scoreAndMergeStages.emplace_back(DocumentSourceGroup::createFromBson(
-        groupDocsByIdAcrossInputPipeline(pipelineNames, includeScoreDetails).firstElement(),
+        hybrid_scoring_util::groupDocsByIdAcrossInputPipeline(
+            DocumentSourceScoreFusion::kScoreFusionDocsFieldName,
+            DocumentSourceScoreFusion::kScoreFusionInternalFieldsName,
+            pipelineNames,
+            includeScoreDetails)
+            .firstElement(),
         expCtx));
 
     // Combine all internal processing fields into one blob.
     scoreAndMergeStages.emplace_back(DocumentSourceProject::createFromBson(
-        projectReduceInternalFields(pipelineNames, includeScoreDetails).firstElement(), expCtx));
+        hybrid_scoring_util::projectReduceInternalFields(
+            DocumentSourceScoreFusion::kScoreFusionDocsFieldName,
+            DocumentSourceScoreFusion::kScoreFusionInternalFieldsName,
+            pipelineNames,
+            includeScoreDetails)
+            .firstElement(),
+        expCtx));
 
     // Promote the user's documents back to the top-level so that we can evaluate the expression
     // potentially using fields from the user's documents.
     scoreAndMergeStages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
-        promoteEmbeddedDocsObject().firstElement(), expCtx));
+        hybrid_scoring_util::promoteEmbeddedDocsObject(
+            DocumentSourceScoreFusion::kScoreFusionDocsFieldName)
+            .firstElement(),
+        expCtx));
     scoreAndMergeStages.emplace_back(DocumentSourceProject::createFromBson(
-        projectRemoveEmbeddedDocsObject().firstElement(), expCtx));
+        hybrid_scoring_util::projectRemoveEmbeddedDocsObject(
+            DocumentSourceScoreFusion::kScoreFusionDocsFieldName)
+            .firstElement(),
+        expCtx));
 
     // Set the final score.
     scoreAndMergeStages.emplace_back(
@@ -969,7 +635,11 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     // Calculate score details, if necessary.
     if (includeScoreDetails) {
         auto addFieldsScoreDetails =
-            constructCalculatedFinalScoreDetails(pipelineNames, weights, expCtx);
+            hybrid_scoring_util::score_details::constructCalculatedFinalScoreDetails(
+                DocumentSourceScoreFusion::kScoreFusionInternalFieldsName,
+                pipelineNames,
+                weights,
+                expCtx);
         auto setScoreDetails = constructScoreDetailsMetadata(metadata, expCtx);
         scoreAndMergeStages.splice(scoreAndMergeStages.end(),
                                    {std::move(addFieldsScoreDetails), std::move(setScoreDetails)});
@@ -977,7 +647,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
 
     // Remove the internal fields object.
     auto removeInternalFieldsProject = DocumentSourceProject::createFromBson(
-        projectRemoveInternalFieldsObject().firstElement(), expCtx);
+        hybrid_scoring_util::projectRemoveInternalFieldsObject(
+            DocumentSourceScoreFusion::kScoreFusionInternalFieldsName)
+            .firstElement(),
+        expCtx);
     scoreAndMergeStages.splice(scoreAndMergeStages.end(),
                                {std::move(sort), std::move(removeInternalFieldsProject)});
     return scoreAndMergeStages;

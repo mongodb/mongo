@@ -87,6 +87,18 @@ static const std::string rankFusionScoreDetailsDescription =
 // Stage name without the '$' prefix
 static const std::string rankFusionStageName = "rankFusion";
 
+// Below are helper functions that return stages or stage lists that represent sub-components
+// of the total $rankFusion desugar. They are defined in an order close to how
+// they appear in the desugar read from top to bottom.
+// Generally, during the intermediate processing of $rankFusion, the docs moving through
+// the pipeline look like:
+// {
+//   "_id": ...,
+//   "<INTERNAL_FIELDS_DOCS>": { <unmodified document from collection> },
+//   "<INTERNAL_FIELDS>"; { <internal variable for intermediate processing > }
+// }
+
+
 /**
  * Checks that the input pipeline is a valid ranked pipeline. This means it is either one of
  * $search, $vectorSearch, $geoNear, $rankFusion, $scoreFusion (which have ordered output) or has an
@@ -154,35 +166,45 @@ boost::intrusive_ptr<DocumentSource> setWindowFields(const auto& expCtx,
 }
 
 /**
- * Builds and returns an $addFields stage, like the following:
+ * Builds and returns an $addFields stage that computes the weighted and normalized score
+ * of this input pipeline. The computed score is stored in the field
+ * "<INTERNAL_FIELDS>.<inputPipelineName>_score".
  * {$addFields:
- *     {prefix_score:
+ *     {<INTERNAL_FIELDS>.<inputPipelineName>_score:
  *         {multiply:
  *             [{$divide: [1, {$add: [rank, rankConstant]}]}]
  *         },
  *     }
  * }
  */
-boost::intrusive_ptr<DocumentSource> addScoreField(
+boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const StringData prefix,
+    const StringData inputPipelineName,
     const int rankConstant,
     const double weight) {
-    const std::string score = fmt::format("{}_score", prefix);
-    const std::string rankPath = fmt::format("${}_rank", prefix);
-    const std::string scorePath = fmt::format("${}", score);
-
     BSONObjBuilder bob;
     {
         BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
         {
-            BSONObjBuilder scoreField(addFieldsBob.subobjStart(score));
+            const std::string internalFieldsInputPipelineScoreName =
+                hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                    DocumentSourceRankFusion::kRankFusionInternalFieldsName,
+                    fmt::format("{}_score", inputPipelineName));
+            BSONObjBuilder scoreField(
+                addFieldsBob.subobjStart(internalFieldsInputPipelineScoreName));
             {
                 BSONArrayBuilder multiplyArray(scoreField.subarrayStart("$multiply"_sd));
                 // RRF Score = weight * (1 / (rank + rank constant)).
-                multiplyArray.append(
-                    BSON("$divide"
-                         << BSON_ARRAY(1 << BSON("$add" << BSON_ARRAY(rankPath << rankConstant)))));
+                multiplyArray.append(BSON(
+                    "$divide" << BSON_ARRAY(
+                        1 << BSON(
+                            "$add" << BSON_ARRAY(
+                                fmt::format(
+                                    "${}",
+                                    hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                                        DocumentSourceRankFusion::kRankFusionInternalFieldsName,
+                                        fmt::format("{}_rank", inputPipelineName)))
+                                << rankConstant)))));
                 multiplyArray.append(weight);
             }
         }
@@ -196,11 +218,11 @@ boost::intrusive_ptr<DocumentSource> addScoreField(
  * Builds and returns an $addFields stage that sets the rank to "NA" if its value is 0, like the
  * following:
  * {$addFields:
- *     {<prefix_rank>:
+ *     {<INTERNAL_FIELDS>.<inputPipelineName_rank>:
  *         {$cond: [
  *              {
  *                  $eq : [
- *                      "$<prefix>_rank",
+ *                      "$<INTERNAL_FIELDS>.<inputPipelineName>_rank",
  *                      {
  *                          $const: 0
  *                      }
@@ -209,7 +231,7 @@ boost::intrusive_ptr<DocumentSource> addScoreField(
  *              {
  *                  $const: "NA"
  *              },
- *              "$<prefix>_rank"
+ *              "$<INTERNAL_FIELDS>.<inputPipelineName>_rank"
  *          ]},
  *     }
  * }
@@ -218,16 +240,19 @@ boost::intrusive_ptr<DocumentSource> addScoreField(
  * scoreDetails output since the lower the rank, the higher the relevance of the document. Thus,
  * this stage changes the value of the rank field to "NA" when applicable.
  */
-boost::intrusive_ptr<DocumentSource> addRankField(
+boost::intrusive_ptr<DocumentSource> buildRankAddFieldsStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const std::vector<std::string>& pipelineNames) {
     BSONObjBuilder bob;
     {
         BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
         for (const auto& pipelineName : pipelineNames) {
-            const std::string rank = fmt::format("{}_rank", pipelineName);
-            const std::string rankPath = fmt::format("${}_rank", pipelineName);
-            addFieldsBob.append(rank,
+            const std::string internalFieldsInputPipelineRankName =
+                hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                    DocumentSourceRankFusion::kRankFusionInternalFieldsName,
+                    fmt::format("{}_rank", pipelineName));
+            const std::string rankPath = fmt::format("${}", internalFieldsInputPipelineRankName);
+            addFieldsBob.append(internalFieldsInputPipelineRankName,
                                 BSON("$cond" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY(rankPath << 0))
                                                            << BSON("$const" << "NA") << rankPath)));
         }
@@ -236,15 +261,6 @@ boost::intrusive_ptr<DocumentSource> addRankField(
 
     const auto spec = bob.obj();
     return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
-}
-
-/**
- * Builds and returns a $replaceRoot stage: {$replaceWith: {docs: "$$ROOT"}}.
- * This has the effect of storing the unmodified user's document in the path '$docs'.
- */
-boost::intrusive_ptr<DocumentSource> nestUserDocs(const auto& expCtx) {
-    return DocumentSourceReplaceRoot::createFromBson(
-        BSON("$replaceWith" << BSON("docs" << "$$ROOT")).firstElement(), expCtx);
 }
 
 /**
@@ -257,10 +273,12 @@ boost::intrusive_ptr<DocumentSource> nestUserDocs(const auto& expCtx) {
  */
 boost::intrusive_ptr<DocumentSource> addInputPipelineScoreDetails(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const StringData inputPipelinePrefix,
+    const StringData inputPipelineName,
     const bool inputGeneratesScore,
     const bool inputGeneratesScoreDetails) {
-    const std::string scoreDetails = fmt::format("{}_scoreDetails", inputPipelinePrefix);
+    const std::string scoreDetails = hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+        DocumentSourceRankFusion::kRankFusionInternalFieldsName,
+        fmt::format("{}_scoreDetails", inputPipelineName));
     BSONObjBuilder bob;
     {
         BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
@@ -268,15 +286,16 @@ boost::intrusive_ptr<DocumentSource> addInputPipelineScoreDetails(
         if (inputGeneratesScoreDetails) {
             // If the input pipeline generates scoreDetails (for example, $search may generate
             // searchScoreDetails), then we'll use the existing details:
-            // {$addFields: {prefix_scoreDetails: {$meta: "scoreDetails"}}}
-            // We don't grab {$meta: "score"} because we assume any existing scoreDetails already
-            // includes its own score at "scoreDetails.value".
+            // {$addFields: {<INTERNAL_FIELDS>.<inputPipelineName>_scoreDetails: {$meta:
+            // "scoreDetails"}}} We don't grab {$meta: "score"} because we assume any existing
+            // scoreDetails already includes its own score at "scoreDetails.value".
             addFieldsBob.append(scoreDetails, BSON("$meta" << "scoreDetails"));
         } else if (inputGeneratesScore) {
             // If the input pipeline does not generate scoreDetails but does generate a "score" (for
             // example, a $text query sorted on the text score), we'll build our own scoreDetails
             // for the pipeline like:
-            // {$addFields: {prefix_scoreDetails: {value: {$meta: "score"}, details: []}}}
+            // {$addFields: {<INTERNAL_FIELDS>.<inputPipelineName>_scoreDetails: {value: {$meta:
+            // "score"}, details: []}}}
             addFieldsBob.append(
                 scoreDetails,
                 BSON("value" << BSON("$meta" << "score") << "details" << BSONArrayBuilder().arr()));
@@ -285,7 +304,7 @@ boost::intrusive_ptr<DocumentSource> addInputPipelineScoreDetails(
             // pipeline with just a $sort), we don't have any interesting information to include in
             // scoreDetails (rank is added later). We'll still build empty scoreDetails to
             // reflect that:
-            // {$addFields: {prefix_scoreDetails: {details: []}}}
+            // {$addFields: {<INTERNAL_FIELDS>.<inputPipelineName>_scoreDetails: {details: []}}}
             addFieldsBob.append(scoreDetails, BSON("details" << BSONArrayBuilder().arr()));
         }
     }
@@ -293,8 +312,20 @@ boost::intrusive_ptr<DocumentSource> addInputPipelineScoreDetails(
     return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
 }
 
+/**
+ * Build stages for first pipeline.
+ * { ... stages of first pipeline ... }
+ * { "$replaceRoot": { "newRoot": { "<INTERNAL_DOCS>.": "$$ROOT" } } },
+ * { "$_internalSetWindowFields": {"sortBy": { "order": 1}, "output": {
+ * "$<INTERNAL_FIELDS>.<inputPipelineName>_rank": { "$rank": {} } } } },
+ * { "$addFields": { "<INTERNAL_FIELDS>.<inputPipelineName>_score": { "$multiply": [ {$divide: [1,
+ * {$add: [rank, rankConstant]}]}, {"$const": 5.0 } ] } } } // where 5.0 is the weight
+ *
+ * If scoreDetails is true, include the following stages:
+ * {$addFields: {<INTERNAL_FIELDS>.<inputPipelineName>_scoreDetails: ...} }
+ */
 std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
-    const StringData prefixOne,
+    const StringData firstInputPipelineName,
     const int rankConstant,
     const double weight,
     std::unique_ptr<Pipeline> pipeline,
@@ -307,78 +338,81 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
         outputStages.emplace_back(pipeline->popFront());
     }
 
-    outputStages.emplace_back(nestUserDocs(expCtx));
-    outputStages.emplace_back(setWindowFields(expCtx, fmt::format("{}_rank", prefixOne)));
-    outputStages.emplace_back(addScoreField(expCtx, prefixOne, rankConstant, weight));
+    outputStages.emplace_back(hybrid_scoring_util::buildReplaceRootStage(
+        DocumentSourceRankFusion::kRankFusionDocsFieldName, expCtx));
+    outputStages.emplace_back(
+        setWindowFields(expCtx,
+                        hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                            DocumentSourceRankFusion::kRankFusionInternalFieldsName,
+                            fmt::format("{}_rank", firstInputPipelineName))));
+    outputStages.emplace_back(
+        buildScoreAddFieldsStage(expCtx, firstInputPipelineName, rankConstant, weight));
 
     if (includeScoreDetails) {
         outputStages.push_back(addInputPipelineScoreDetails(
-            expCtx, prefixOne, inputGeneratesScore, inputGeneratesScoreDetails));
+            expCtx, firstInputPipelineName, inputGeneratesScore, inputGeneratesScoreDetails));
     }
     return outputStages;
 }
 
-BSONObj groupEachScore(const std::vector<std::string>& pipelineNames,
-                       const bool includeScoreDetails) {
-    // For each sub-pipeline, build the following obj:
-    // name_score: {$max: {ifNull: ["$name_score", 0]}}
-    // If scoreDetails is enabled, build:
-    // name_rank: {$max: {ifNull: ["$name_rank", 0]}}
-    // name_scoreDetails: {$mergeObjects: $name_scoreDetails}
-    BSONObjBuilder bob;
-    {
-        BSONObjBuilder groupBob(bob.subobjStart("$group"_sd));
-        groupBob.append("_id", "$docs._id");
-        groupBob.append("docs", BSON("$first" << "$docs"));
-
-        for (const auto& pipelineName : pipelineNames) {
-            const std::string scoreName = fmt::format("{}_score", pipelineName);
-            groupBob.append(
-                scoreName,
-                BSON("$max" << BSON("$ifNull" << BSON_ARRAY(fmt::format("${}", scoreName) << 0))));
-            // We only need to preserve the rank if we're calculating score details.
-            if (includeScoreDetails) {
-                const std::string rankName = fmt::format("{}_rank", pipelineName);
-                groupBob.append(rankName,
-                                BSON("$max" << BSON("$ifNull" << BSON_ARRAY(
-                                                        fmt::format("${}", rankName) << 0))));
-                const auto& [scoreDetailsName, scoreDetailsBson] =
-                    hybrid_scoring_util::score_details::constructScoreDetailsForGrouping(
-                        pipelineName);
-                groupBob.append(scoreDetailsName, scoreDetailsBson);
+/**
+ * Adds a field called "score" set to the value of the sum of all the added scores. This is used
+ instead of setting the score metadata when the rankFusionFeatureFlag is off.
+ * Ex:
+ *  {
+        "$addFields": {
+            "score": {
+                "$add": [
+                    "$<INTERNAL_FIELDS>.<inputPipelineName1>_score",
+                    "$<INTERNAL_FIELDS>.<inputPipelineName2>_score"
+                ]
             }
         }
-        groupBob.done();
-    }
-    bob.done();
-    return bob.obj();
-}
-
+    },
+ */
 BSONObj calculateFinalScore(const std::vector<std::string>& pipelineNames) {
     // Generate a $add object with an array of all the fields containing a score for a given
     // pipeline.
     const auto& allInputs = [&] {
         BSONObjBuilder addBob;
-
-        BSONArrayBuilder addArrBuilder(addBob.subarrayStart("$add"_sd));
-        for (const auto& pipelineName : pipelineNames) {
-            StringBuilder sb;
-            sb << "$" << pipelineName << "_score";
-            addArrBuilder.append(sb.str());
+        {
+            BSONArrayBuilder addArrBuilder(addBob.subarrayStart("$add"_sd));
+            for (const auto& pipelineName : pipelineNames) {
+                StringBuilder sb;
+                sb << "$" << DocumentSourceRankFusion::kRankFusionInternalFieldsName << "."
+                   << pipelineName << "_score";
+                addArrBuilder.append(sb.str());
+            }
+            addArrBuilder.done();
         }
-        addArrBuilder.done();
         return addBob.obj();
     };
     return BSON("$addFields" << BSON("score" << allInputs()));
 }
 
+/**
+ * Sets the score metadata to the value of the sum of all the added scores.
+ * Ex:
+ *  {
+        "$setMetadata": {
+            "score": {
+                "$add": [
+                    "$<INTERNAL_FIELDS>.<inputPipelineName1>_score",
+                    "$<INTERNAL_FIELDS>.<inputPipelineName2>_score"
+                ]
+            }
+        }
+    },
+ */
 boost::intrusive_ptr<DocumentSource> calculateFinalScoreMetadata(
     const auto& expCtx, const std::vector<std::string>& pipelineNames) {
     // Generate an array of all the fields containing a score for a given pipeline.
     Expression::ExpressionVector allInputScores;
     for (const auto& pipelineName : pipelineNames) {
         allInputScores.push_back(ExpressionFieldPath::createPathFromString(
-            expCtx.get(), pipelineName + "_score", expCtx->variablesParseState));
+            expCtx.get(),
+            DocumentSourceRankFusion::kRankFusionInternalFieldsName + "." + pipelineName + "_score",
+            expCtx->variablesParseState));
     }
 
     // Return a $setMetadata stage that sets score to an $add object that takes the generated array
@@ -390,8 +424,18 @@ boost::intrusive_ptr<DocumentSource> calculateFinalScoreMetadata(
         DocumentMetadataFields::MetaType::kScore);
 }
 
+/**
+ * Build the pipeline input to $unionWith (consists of a $replaceRoot and $addFields stage). Returns
+ * a $unionWith stage that looks something like this:
+ * { "$unionWith": { "coll": "pipeline_test", "pipeline": [inputPipeline stage (ex: $vectorSearch),
+ * $replaceRoot stage, $addFields stage (add field to track input pipeline's weighted score) ] } }
+ *
+ * If score details are enabled, then the pipeline stages under the $unionWith.pipeline field will
+ * also contain an $addFields stage that tracks the pipeline's scoreDetails.
+ *
+ */
 boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
-    const std::string& prefix,
+    const std::string& inputPipelineName,
     const int rankConstant,
     const double weight,
     std::unique_ptr<Pipeline> oneInputPipeline,
@@ -401,12 +445,18 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
     makeSureSortKeyIsOutput(oneInputPipeline->getSources());
-    oneInputPipeline->pushBack(nestUserDocs(expCtx));
-    oneInputPipeline->pushBack(setWindowFields(expCtx, fmt::format("{}_rank", prefix)));
-    oneInputPipeline->pushBack(addScoreField(expCtx, prefix, rankConstant, weight));
+    oneInputPipeline->pushBack(hybrid_scoring_util::buildReplaceRootStage(
+        DocumentSourceRankFusion::kRankFusionDocsFieldName, expCtx));
+    oneInputPipeline->pushBack(
+        setWindowFields(expCtx,
+                        hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                            DocumentSourceRankFusion::kRankFusionInternalFieldsName,
+                            fmt::format("{}_rank", inputPipelineName))));
+    oneInputPipeline->pushBack(
+        buildScoreAddFieldsStage(expCtx, inputPipelineName, rankConstant, weight));
     if (includeScoreDetails) {
         oneInputPipeline->pushBack(addInputPipelineScoreDetails(
-            expCtx, prefix, inputGeneratesScore, inputGeneratesScoreDetails));
+            expCtx, inputPipelineName, inputGeneratesScore, inputGeneratesScoreDetails));
     }
     std::vector<BSONObj> bsonPipeline = oneInputPipeline->serializeToBson();
 
@@ -419,7 +469,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
 
 /**
  * Constuct the scoreDetails metadata object. Looks like the following:
- * { "$setMetadata": {"scoreDetails": {"value": "$score", "description":
+ * { "$setMetadata": {"scoreDetails": {"value": {$meta: "score"}, "description":
  * {"scoreDetailsDescription..."}, "details": "$calculatedScoreDetails"}}},
  */
 boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
@@ -427,107 +477,123 @@ boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     boost::intrusive_ptr<DocumentSource> setScoreDetails = DocumentSourceSetMetadata::create(
         expCtx,
-        Expression::parseObject(expCtx.get(),
-                                BSON("value" << "$score"
-                                             << "description" << scoreDetailsDescription
-                                             << "details"
-                                             << "$calculatedScoreDetails"),
-                                expCtx->variablesParseState),
+        Expression::parseObject(
+            expCtx.get(),
+            BSON("value" << BSON("$meta" << "score") << "description" << scoreDetailsDescription
+                         << "details"
+                         << fmt::format("${}",
+                                        hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
+                                            DocumentSourceRankFusion::kRankFusionInternalFieldsName,
+                                            "calculatedScoreDetails"))),
+            expCtx->variablesParseState),
         DocumentMetadataFields::kScoreDetails);
     return setScoreDetails;
 }
-/*
- * Builds an $addFields stage that constructs the value of the 'details' field array
- * in final top-level 'scoreDetails' object, and stores it in the path "$calculatedScoreDetails".
+
+/**
+ * After all the pipelines have been executed and unioned, builds the $group stage to merge the
+ * scoreFields/apply score nulls behavior, calculate the final score field to add to each document,
+ * sorts the documents by score and id, and removes all internal processing fields.
+
+ * The $sort stage looks like this: { "$sort": { "score": {$meta: "score"}, "_id": 1 } }
  *
- * Later, this field is used to set the value of the 'details' key when setting the 'scoreDetails'
- * metadata field.
+ * When scoreDetails is enabled, the $score metadata will be set after the grouping behavior
+ * described above, then the final scoreDetails object will be calculated, the $scoreDetails
+ * metadata will be set, and then the $sort and final exclusion $project stages will follow.
  */
-boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
-    const std::vector<std::string>& pipelineNames,
-    const StringMap<double>& weights,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    std::vector<boost::intrusive_ptr<Expression>> detailsChildren;
-    for (const auto& pipelineName : pipelineNames) {
-        const std::string scoreDetailsFieldName = fmt::format("${}_scoreDetails", pipelineName);
-        double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
-
-        BSONObjBuilder mergeObjectsArrSubObj;
-        mergeObjectsArrSubObj.append("inputPipelineName"_sd, pipelineName);
-        mergeObjectsArrSubObj.append("rank"_sd, fmt::format("${}_rank", pipelineName));
-        // In the scoreDetails output, for any input pipeline that didn't output a document in the
-        // result, the default "rank" will be "NA" and the weight will be omitted to make it clear
-        // to the user that the final score for that document result did not take into account its
-        // input pipeline's rank/weight.
-        mergeObjectsArrSubObj.append(
-            "weight",
-            BSON("$cond" << BSON_ARRAY(
-                     BSON("$eq" << BSON_ARRAY(fmt::format("${}_rank", pipelineName) << "NA"))
-                     << "$$REMOVE" << weight)));
-        mergeObjectsArrSubObj.done();
-        BSONArrayBuilder mergeObjectsArr;
-        mergeObjectsArr.append(mergeObjectsArrSubObj.obj());
-        mergeObjectsArr.append(scoreDetailsFieldName);
-        mergeObjectsArr.done();
-        BSONObj mergeObjectsObj = BSON("$mergeObjects"_sd << mergeObjectsArr.arr());
-        boost::intrusive_ptr<Expression> mergeObjectsExpr =
-            ExpressionFromAccumulator<AccumulatorMergeObjects>::parse(
-                expCtx.get(), mergeObjectsObj.firstElement(), expCtx->variablesParseState);
-
-        detailsChildren.push_back(std::move(mergeObjectsExpr));
-    }
-
-    boost::intrusive_ptr<Expression> arrayExpr =
-        ExpressionArray::create(expCtx.get(), std::move(detailsChildren));
-
-    auto addFields = DocumentSourceAddFields::create(
-        "calculatedScoreDetails"_sd, std::move(arrayExpr), expCtx.get());
-    return addFields;
-}
-
 std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     const std::vector<std::string>& pipelineNames,
     const StringMap<double>& weights,
     const bool includeScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::list<boost::intrusive_ptr<DocumentSource>> scoreAndMergeStages;
+
+    // Group all the documents across the different $unionWiths for each input pipeline.
     auto group = DocumentSourceGroup::createFromBson(
-        groupEachScore(pipelineNames, includeScoreDetails).firstElement(), expCtx);
-    auto addFields = DocumentSourceAddFields::createFromBson(
-        calculateFinalScore(pipelineNames).firstElement(), expCtx);
-    auto overrideRanksOfZero = addRankField(expCtx, pipelineNames);
+        hybrid_scoring_util::groupDocsByIdAcrossInputPipeline(
+            DocumentSourceRankFusion::kRankFusionDocsFieldName,
+            DocumentSourceRankFusion::kRankFusionInternalFieldsName,
+            pipelineNames,
+            includeScoreDetails)
+            .firstElement(),
+        expCtx);
+    scoreAndMergeStages.push_back(group);
 
-    // Note that the scoreDetails fields go here in the pipeline. We create them below to be
-    // able to return them immediately once all stages are generated.
-    const SortPattern sortingPattern{BSON("score" << -1 << "_id" << 1), expCtx};
-    auto sort = DocumentSourceSort::create(expCtx, sortingPattern);
+    // Combine all internal processing fields into one blob.
+    scoreAndMergeStages.emplace_back(DocumentSourceProject::createFromBson(
+        hybrid_scoring_util::projectReduceInternalFields(
+            DocumentSourceRankFusion::kRankFusionDocsFieldName,
+            DocumentSourceRankFusion::kRankFusionInternalFieldsName,
+            pipelineNames,
+            includeScoreDetails)
+            .firstElement(),
+        expCtx));
 
-    auto restoreUserDocs =
-        DocumentSourceReplaceRoot::create(expCtx,
-                                          ExpressionFieldPath::createPathFromString(
-                                              expCtx.get(), "docs", expCtx->variablesParseState),
-                                          "documents",
-                                          SbeCompatibility::noRequirements);
+    // Promote the user's documents back to the top-level so that we can evaluate the expression
+    // potentially using fields from the user's documents.
+    scoreAndMergeStages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
+        hybrid_scoring_util::promoteEmbeddedDocsObject(
+            DocumentSourceRankFusion::kRankFusionDocsFieldName)
+            .firstElement(),
+        expCtx));
+    scoreAndMergeStages.emplace_back(DocumentSourceProject::createFromBson(
+        hybrid_scoring_util::projectRemoveEmbeddedDocsObject(
+            DocumentSourceRankFusion::kRankFusionDocsFieldName)
+            .firstElement(),
+        expCtx));
 
-    if (includeScoreDetails) {
-        boost::intrusive_ptr<DocumentSource> addFieldsDetails =
-            constructCalculatedFinalScoreDetails(pipelineNames, weights, expCtx);
-        auto setScoreDetails =
-            constructScoreDetailsMetadata(rankFusionScoreDetailsDescription, expCtx);
-        return {group,
-                addFields,
-                overrideRanksOfZero,
-                addFieldsDetails,
-                setScoreDetails,
-                sort,
-                restoreUserDocs};
-    }
+    // Override ranks with the value of 0.
+    scoreAndMergeStages.emplace_back(buildRankAddFieldsStage(expCtx, pipelineNames));
+
+    // Remove the internal fields object.
+    auto removeInternalFieldsProject = DocumentSourceProject::createFromBson(
+        hybrid_scoring_util::projectRemoveInternalFieldsObject(
+            DocumentSourceRankFusion::kRankFusionInternalFieldsName)
+            .firstElement(),
+        expCtx);
+
     // TODO SERVER-85426: Remove this check once all feature flags have been removed.
     if (feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // Set the final score.
         auto setScore = calculateFinalScoreMetadata(expCtx, pipelineNames);
-        return {group, addFields, overrideRanksOfZero, setScore, sort, restoreUserDocs};
+        const SortPattern sortingPatternScoreMetadata{
+            BSON("score" << BSON("$meta" << "score") << "_id" << 1), expCtx};
+        boost::intrusive_ptr<DocumentSourceSort> sortScoreMetadata =
+            DocumentSourceSort::create(expCtx, sortingPatternScoreMetadata);
+        if (includeScoreDetails) {
+            boost::intrusive_ptr<DocumentSource> addFieldsScoreDetails =
+                hybrid_scoring_util::score_details::constructCalculatedFinalScoreDetails(
+                    DocumentSourceRankFusion::kRankFusionInternalFieldsName,
+                    pipelineNames,
+                    weights,
+                    expCtx);
+            auto setScoreDetails =
+                constructScoreDetailsMetadata(rankFusionScoreDetailsDescription, expCtx);
+            scoreAndMergeStages.splice(scoreAndMergeStages.end(),
+                                       {std::move(setScore),
+                                        std::move(addFieldsScoreDetails),
+                                        std::move(setScoreDetails),
+                                        std::move(sortScoreMetadata),
+                                        std::move(removeInternalFieldsProject)});
+            return scoreAndMergeStages;
+        }
+        scoreAndMergeStages.splice(scoreAndMergeStages.end(),
+                                   {std::move(setScore),
+                                    std::move(sortScoreMetadata),
+                                    std::move(removeInternalFieldsProject)});
+        return scoreAndMergeStages;
     }
-    return {group, addFields, sort, restoreUserDocs};
+
+    auto addFields = DocumentSourceAddFields::createFromBson(
+        calculateFinalScore(pipelineNames).firstElement(), expCtx);
+    const SortPattern sortingPattern{BSON("score" << -1 << "_id" << 1), expCtx};
+    boost::intrusive_ptr<DocumentSourceSort> sort =
+        DocumentSourceSort::create(expCtx, sortingPattern);
+    scoreAndMergeStages.splice(
+        scoreAndMergeStages.end(),
+        {std::move(addFields), std::move(sort), std::move(removeInternalFieldsProject)});
+    return scoreAndMergeStages;
 }
 
 }  // namespace
