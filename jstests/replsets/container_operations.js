@@ -1,9 +1,9 @@
 /**
  * Tests that an applyOps command with a container insert and delete can be applied.
  *
- * TODO: (SERVER-109148): Fix the primary driven index build suite so that this test runs.
- * @tags: [requires_replication, featureFlagPrimaryDrivenIndexBuilds]
+ * @tags: [requires_replication]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
@@ -16,6 +16,14 @@ const primary = rst.getPrimary();
 const dbName = jsTestName();
 const collName = "coll";
 const primaryDB = primary.getDB(dbName);
+
+// TODO(SERVER-109349): Remove this check when the feature flag is removed.
+if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
+    jsTestLog(
+        "Skipping container_operations.js because featureFlagPrimaryDrivenIndexBuilds is disabled");
+    rst.stopSet();
+    quit();
+}
 
 const ciInnerOp = {
     op: "ci",
