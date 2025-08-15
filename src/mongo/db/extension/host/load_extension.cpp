@@ -47,8 +47,7 @@
 #include <stdexcept>
 #include <string>
 
-// TODO SERVER-107120 Use an extensions-specifc log component, if applicable.
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExtension
 
 namespace mongo::extension::host {
 namespace {

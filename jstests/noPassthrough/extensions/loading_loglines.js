@@ -26,10 +26,11 @@ const extOpts = {
 function assertExtensionsLoaded(conn) {
     const res = assert.commandWorked(conn.getDB("admin").runCommand({getLog: "global"}));
     const lines = res.log;
+    const extensionLogs = lines.filter(l => l.includes("EXTENSION"));
 
-    const loaded = lines.filter(l => l.includes("Loading extension"));
-    const success = lines.filter(l => l.includes("Successfully loaded extension"));
-    const errors = lines.filter(l => l.includes("Error loading extension"));
+    const loaded = extensionLogs.filter(l => l.includes("Loading extension"));
+    const success = extensionLogs.filter(l => l.includes("Successfully loaded extension"));
+    const errors = extensionLogs.filter(l => l.includes("Error loading extension"));
 
     assert.gt(loaded.length, 0, 'Did not see "Loading extension" in ' + conn + " log");
     assert.gt(success.length, 0, 'Did not see "Successfully loaded extension" in ' + conn + " log");
