@@ -58,6 +58,8 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/db/validate/validate_adaptor.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/logv2/log.h"
@@ -425,7 +427,21 @@ void _validateCatalogEntry(OperationContext* opCtx,
     addErrorIfUnequal(options.capped, collection->isCapped(), "is capped", results);
 
     BSONObj validatorDoc = collection->getValidatorDoc();
-    addErrorIfUnequal(options.validator.toString(), validatorDoc.toString(), "validator", results);
+    if (collection->isNewTimeseriesWithoutView()) {
+        if (!options.validator.isEmpty()) {
+            results->addError(str::stream()
+                              << "Viewless time-series collection had a schema validator set in "
+                                 "its metadata for collection "
+                              << validateState->nss().toStringForErrorMsg());
+        }
+        auto validator = timeseries::generateTimeseriesValidator(
+            timeseries::kTimeseriesControlLatestVersion,
+            collection->getTimeseriesOptions()->getTimeField());
+        addErrorIfUnequal(validator.toString(), validatorDoc.toString(), "validator", results);
+    } else {
+        addErrorIfUnequal(
+            options.validator.toString(), validatorDoc.toString(), "validator", results);
+    }
     if (!options.validator.isEmpty() && !validatorDoc.isEmpty()) {
         addErrorIfUnequal(options.validationAction,
                           collection->getValidationAction(),

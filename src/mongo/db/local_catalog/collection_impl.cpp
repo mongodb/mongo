@@ -97,6 +97,7 @@
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/db/version_context.h"
@@ -456,7 +457,17 @@ void CollectionImpl::_initCommon(OperationContext* opCtx) {
     invariant(!_indexCatalog->haveAnyIndexes());
 
     const auto& collectionOptions = _metadata->options;
-    auto validatorDoc = collectionOptions.validator.getOwned();
+    if (isNewTimeseriesWithoutView()) {
+        tassert(10576801,
+                str::stream() << "Viewless time-series collection had a schema validator set in "
+                                 "its metadata for collection "
+                              << ns().toStringForErrorMsg(),
+                collectionOptions.validator.isEmpty());
+    }
+    auto validatorDoc = (isNewTimeseriesWithoutView())
+        ? timeseries::generateTimeseriesValidator(timeseries::kTimeseriesControlLatestVersion,
+                                                  collectionOptions.timeseries->getTimeField())
+        : collectionOptions.validator.getOwned();
 
     // Enforce that the validator can be used on this namespace.
     uassertStatusOK(checkValidatorCanBeUsedOnNs(validatorDoc, _ns, _uuid));

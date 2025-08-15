@@ -80,6 +80,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/system_index.h"
+#include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
@@ -882,6 +883,26 @@ Collection* DatabaseImpl::_createCollection(
         CollectionWriter collWriter(collection);
         createSystemIndexes(opCtx, collWriter, fromMigrate);
     }
+
+    // We create the index on time and meta, which is used for query-based reopening, here for
+    // viewless time-series collections if we are creating the collection on a primary. This is done
+    // within the same WUOW as the collection creation. For legacy time-series collections this is
+    // done at a higher level.
+    if (collection->isNewTimeseriesWithoutView() && canAcceptWrites) {
+        CollectionWriter collWriter(collection);
+        auto validatedCollator = optionsWithUUID.collation;
+        if (!options.collation.isEmpty()) {
+            auto swCollator = validateCollator(opCtx, optionsWithUUID);
+
+            // The userCreateNS already has a uassertStatusOK and validateCollator is called in it,
+            // so we should have the case that the status of the swCollator is ok.
+            invariant(swCollator.getStatus());
+            validatedCollator = swCollator.getValue()->getSpec().toBSON();
+        }
+        uassertStatusOK(timeseries::createDefaultTimeseriesIndex(
+            opCtx, optionsWithUUID, collWriter, validatedCollator));
+    }
+
 
     return collection;
 }

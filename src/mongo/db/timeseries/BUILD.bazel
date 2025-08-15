@@ -284,6 +284,22 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "viewless_timeseries_collection_creation_helpers",
+    srcs = [
+        "viewless_timeseries_collection_creation_helpers.cpp",
+    ],
+    hdrs = [
+        "timeseries_constants.h",
+        "timeseries_index_schema_conversion_functions.h",
+        "viewless_timeseries_collection_creation_helpers.h",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "db_timeseries_test",
     srcs = [

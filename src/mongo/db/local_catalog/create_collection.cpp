@@ -81,6 +81,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -457,181 +458,19 @@ Status _createView(OperationContext* opCtx,
     });
 }
 
-Status _createDefaultTimeseriesIndex(OperationContext* opCtx,
-                                     CollectionWriter& collection,
-                                     BSONObj collation) {
-    auto tsOptions = collection->getCollectionOptions().timeseries;
-    if (!tsOptions->getMetaField()) {
-        return Status::OK();
-    }
-
-    StatusWith<BSONObj> swBucketsSpec = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
-        *tsOptions, BSON(*tsOptions->getMetaField() << 1 << tsOptions->getTimeField() << 1));
-    if (!swBucketsSpec.isOK()) {
-        return swBucketsSpec.getStatus();
-    }
-
-    const std::string indexName = str::stream()
-        << *tsOptions->getMetaField() << "_1_" << tsOptions->getTimeField() << "_1";
-
-    BSONObjBuilder builder;
-    builder.append("v", 2);
-    builder.append("name", indexName);
-    builder.append("key", swBucketsSpec.getValue());
-
-    // Add the collection collation when building the default timeseries index if the collation is
-    // non-empty.
-    if (!collation.isEmpty()) {
-        builder.append("collation", collation);
-    }
-
-    IndexBuildsCoordinator::createIndexesOnEmptyCollection(opCtx,
-                                                           collection,
-                                                           {builder.obj()},
-                                                           /*fromMigrate=*/false);
-    return Status::OK();
-}
-
-BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
-    if (bucketVersion != timeseries::kTimeseriesControlCompressedSortedVersion &&
-        bucketVersion != timeseries::kTimeseriesControlUncompressedVersion &&
-        bucketVersion != timeseries::kTimeseriesControlCompressedUnsortedVersion) {
-        MONGO_UNREACHABLE_TASSERT(10083502);
-    }
-    // '$jsonSchema' : {
-    //     bsonType: 'object',
-    //     required: ['_id', 'control', 'data'],
-    //     properties: {
-    //         _id: {bsonType: 'objectId'},
-    //         control: {
-    //             bsonType: 'object',
-    //             required: ['version', 'min', 'max'],
-    //             properties: {
-    //                 version: {bsonType: 'number'},
-    //                 min: {
-    //                     bsonType: 'object',
-    //                     required: ['%s'],
-    //                     properties: {'%s': {bsonType: 'date'}}
-    //                 },
-    //                 max: {
-    //                     bsonType: 'object',
-    //                     required: ['%s'],
-    //                     properties: {'%s': {bsonType: 'date'}}
-    //                 },
-    //                 closed: {bsonType: 'bool'},
-    //                 count: {bsonType: 'number', minimum: 1} // only if bucketVersion ==
-    //                 // timeseries::kTimeseriesControlCompressedSortedVersion or
-    //                 // timeseries::kTimeseriesControlCompressedUnsortedVersion
-    //             },
-    //             additionalProperties: false // only if bucketVersion ==
-    //             // timeseries::kTimeseriesControlCompressedSortedVersion or
-    //             // timeseries::kTimeseriesControlCompressedUnsortedVersion
-    //         },
-    //         data: {bsonType: 'object'},
-    //         meta: {}
-    //     },
-    //     additionalProperties: false
-    //   }
-    BSONObjBuilder validator;
-    BSONObjBuilder schema(validator.subobjStart("$jsonSchema"));
-    schema.append("bsonType", "object");
-    schema.append("required",
-                  BSON_ARRAY("_id" << "control"
-                                   << "data"));
-    {
-        BSONObjBuilder properties(schema.subobjStart("properties"));
-        {
-            BSONObjBuilder _id(properties.subobjStart("_id"));
-            _id.append("bsonType", "objectId");
-            _id.done();
-        }
-        {
-            BSONObjBuilder control(properties.subobjStart("control"));
-            control.append("bsonType", "object");
-            control.append("required",
-                           BSON_ARRAY("version" << "min"
-                                                << "max"));
-            {
-                BSONObjBuilder innerProperties(control.subobjStart("properties"));
-                {
-                    BSONObjBuilder version(innerProperties.subobjStart("version"));
-                    version.append("bsonType", "number");
-                    version.done();
-                }
-                {
-                    BSONObjBuilder min(innerProperties.subobjStart("min"));
-                    min.append("bsonType", "object");
-                    min.append("required", BSON_ARRAY(timeField));
-                    BSONObjBuilder minProperties(min.subobjStart("properties"));
-                    BSONObjBuilder timeFieldObj(minProperties.subobjStart(timeField));
-                    timeFieldObj.append("bsonType", "date");
-                    timeFieldObj.done();
-                    minProperties.done();
-                    min.done();
-                }
-
-                {
-                    BSONObjBuilder max(innerProperties.subobjStart("max"));
-                    max.append("bsonType", "object");
-                    max.append("required", BSON_ARRAY(timeField));
-                    BSONObjBuilder maxProperties(max.subobjStart("properties"));
-                    BSONObjBuilder timeFieldObj(maxProperties.subobjStart(timeField));
-                    timeFieldObj.append("bsonType", "date");
-                    timeFieldObj.done();
-                    maxProperties.done();
-                    max.done();
-                }
-                {
-                    BSONObjBuilder closed(innerProperties.subobjStart("closed"));
-                    closed.append("bsonType", "bool");
-                    closed.done();
-                }
-                if (bucketVersion == timeseries::kTimeseriesControlCompressedSortedVersion ||
-                    bucketVersion == timeseries::kTimeseriesControlCompressedUnsortedVersion) {
-                    BSONObjBuilder count(innerProperties.subobjStart("count"));
-                    count.append("bsonType", "number");
-                    count.append("minimum", 1);
-                    count.done();
-                }
-                innerProperties.done();
-            }
-            if (bucketVersion == timeseries::kTimeseriesControlCompressedSortedVersion ||
-                bucketVersion == timeseries::kTimeseriesControlCompressedUnsortedVersion) {
-                control.append("additionalProperties", false);
-            }
-            control.done();
-        }
-        {
-            BSONObjBuilder data(properties.subobjStart("data"));
-            data.append("bsonType", "object");
-            data.done();
-        }
-        properties.append("meta", BSONObj{});
-        properties.done();
-    }
-    schema.append("additionalProperties", false);
-    schema.done();
-    return validator.obj();
-}
-
-Status _createTimeseries(OperationContext* opCtx,
-                         const NamespaceString& ns,
-                         const CollectionOptions& optionsArg,
-                         const boost::optional<BSONObj>& idIndex,
-                         const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
+Status _createLegacyTimeseries(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const CollectionOptions& optionsArg,
+    const boost::optional<BSONObj>& idIndex,
+    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
 
     // This path should only be taken when a user creates a new time-series collection on the
     // primary. Secondaries replicate individual oplog entries.
     invariant(opCtx->writesAreReplicated());
 
-    const auto createViewlessTimeseriesColl =
-        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-
-    const auto& bucketsNs = (createViewlessTimeseriesColl || ns.isTimeseriesBucketsCollection())
-        ? ns
-        : ns.makeTimeseriesBucketsNamespace();
+    const auto& bucketsNs =
+        ns.isTimeseriesBucketsCollection() ? ns : ns.makeTimeseriesBucketsNamespace();
 
     Status bucketsAllowedStatus = userAllowedCreateNS(opCtx, bucketsNs);
     if (!bucketsAllowedStatus.isOK()) {
@@ -652,16 +491,6 @@ Status _createTimeseries(OperationContext* opCtx,
         return timeseriesOptionsValidateAndSetStatus;
     }
 
-    // Set the validator option to a JSON schema enforcing constraints on bucket documents.
-    // This validation is only structural to prevent accidental corruption by users and
-    // cannot cover all constraints. Leave the validationLevel and validationAction to their
-    // strict/error defaults.
-    auto timeField = options.timeseries->getTimeField();
-    int bucketVersion = timeseries::kTimeseriesControlLatestVersion;
-    auto validatorObj = createViewlessTimeseriesColl
-        ? BSONObj()
-        : _generateTimeseriesValidator(bucketVersion, timeField);
-
     bool existingBucketCollectionIsCompatible = false;
 
     Status ret = writeConflictRetry(opCtx, "createBucketCollection", bucketsNs, [&]() -> Status {
@@ -669,11 +498,14 @@ Status _createTimeseries(OperationContext* opCtx,
         Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
 
-        // Check if there already exist a Collection on the namespace we will later create a
-        // view on. We're not holding a Collection lock for this Collection so we may only check
-        // if the pointer is null or not. The answer may also change at any point after this
-        // call which is fine as we properly handle an orphaned bucket collection. This check is
-        // just here to prevent it from being created in the common case.
+        // Check if there already exists a Collection on the specified namespace. For legacy
+        // time-series collections, this is the namespace of the view that we will create on top of
+        // a buckets collection. For viewless time-series collection, this is just the name of the
+        // collection.
+        // For legacy time-series collections, we're not holding a Collection lock for this
+        // namespace so we may only check if the pointer is null or not. The answer may also change
+        // at any point after this call which is fine as we properly handle an orphaned bucket
+        // collection. This check is just here to prevent it from being created in the common case.
         Status status = catalog::checkIfNamespaceExists(opCtx, ns);
         if (!status.isOK()) {
             return status;
@@ -711,7 +543,15 @@ Status _createTimeseries(OperationContext* opCtx,
         // collection already exist we use these to validate that they are the same as being
         // requested here.
         CollectionOptions bucketsOptions = options;
-        bucketsOptions.validator = validatorObj;
+
+        // Set the validator option to a JSON schema enforcing constraints on bucket documents.
+        // This validation is only structural to prevent accidental corruption by users and
+        // cannot cover all constraints. Leave the validationLevel and validationAction to their
+        // strict/error defaults.
+        auto timeField = options.timeseries->getTimeField();
+        int bucketVersion = timeseries::kTimeseriesControlLatestVersion;
+        bucketsOptions.validator =
+            timeseries::generateTimeseriesValidator(bucketVersion, timeField);
 
         // TODO(SERVER-101611): Initialize timeseriesBucketingParametersHaveChanged to false
         // when TSBucketingParametersUnchanged is enabled. Currently, this is not done because the
@@ -742,8 +582,8 @@ Status _createTimeseries(OperationContext* opCtx,
             // upgrade.
             while (!existingBucketCollectionIsCompatible &&
                    bucketVersion > timeseries::kTimeseriesControlMinVersion) {
-                validatorObj = _generateTimeseriesValidator(--bucketVersion, timeField);
-                bucketsOptions.validator = validatorObj;
+                bucketsOptions.validator =
+                    timeseries::generateTimeseriesValidator(--bucketVersion, timeField);
 
                 existingBucketCollectionIsCompatible =
                     coll->getCollectionOptions().matchesStorageOptions(
@@ -768,14 +608,8 @@ Status _createTimeseries(OperationContext* opCtx,
 
         CollectionWriter collectionWriter(opCtx, bucketsNs);
 
-        // The collator validation occurs in userCreateNS and normalizes the collation (adding
-        // additional fields to the collation) when doing the validation.
-        //
-        // We call the collator validator but we need the normalized collator for the default
-        // timeseries index. We ensure that the collation is non-empty because validateCollator will
-        // return a nullptr.
         auto validatedCollator = bucketsOptions.collation;
-        if (!bucketsOptions.collation.isEmpty()) {
+        if (!options.collation.isEmpty()) {
             auto swCollator = db->validateCollator(opCtx, bucketsOptions);
 
             // The userCreateNS already has a uassertStatusOK and validateCollator is called in it,
@@ -784,7 +618,8 @@ Status _createTimeseries(OperationContext* opCtx,
             validatedCollator = swCollator.getValue()->getSpec().toBSON();
         }
 
-        uassertStatusOK(_createDefaultTimeseriesIndex(opCtx, collectionWriter, validatedCollator));
+        uassertStatusOK(timeseries::createDefaultTimeseriesIndex(
+            opCtx, bucketsOptions, collectionWriter, validatedCollator));
         wuow.commit();
         return Status::OK();
     });
@@ -797,8 +632,6 @@ Status _createTimeseries(OperationContext* opCtx,
         // If the 'temp' flag is true, we are in the $out stage, and should return without creating
         // the view defintion.
         options.temp ||
-        // We are creating the new viewless timeseries collection type. So skip creation of view.
-        createViewlessTimeseriesColl ||
         // If the request came directly on the bucket namesapce we do not need to create the view.
         ns.isTimeseriesBucketsCollection()) {
         return bucketCreationStatus;
@@ -904,10 +737,26 @@ Status _createCollection(
         if (!status.isOK()) {
             return status;
         }
-        wunit.commit();
 
+        wunit.commit();
         return Status::OK();
     });
+}
+
+Status _setBucketingParametersAndAddClusteredIndex(CollectionOptions& options) {
+    Status timeseriesOptionsValidateAndSetStatus =
+        timeseries::validateAndSetBucketingParameters(options.timeseries.get());
+    if (!timeseriesOptionsValidateAndSetStatus.isOK()) {
+        return timeseriesOptionsValidateAndSetStatus;
+    }
+    // Cluster time-series buckets collections by _id.
+    if (options.expireAfterSeconds) {
+        uassertStatusOK(index_key_validate::validateExpireAfterSeconds(
+            *options.expireAfterSeconds,
+            index_key_validate::ValidateExpireAfterSecondsMode::kClusteredTTLIndex));
+    }
+    options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
+    return Status::OK();
 }
 
 /**
@@ -958,6 +807,84 @@ StatusWith<CollectionOptions> parseCollectionOptionsFromCreateCmdObj(
     return collectionOptions;
 }
 
+Status createCollectionHelper(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const CollectionOptions& options,
+    const boost::optional<BSONObj>& idIndex,
+    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier = boost::none) {
+    auto status = userAllowedCreateNS(opCtx, ns);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    uassert(ErrorCodes::CommandNotSupported,
+            "'recordIdsReplicated' option may not be run without featureFlagRecordIdsReplicated "
+            "enabled",
+            !options.recordIdsReplicated ||
+                gFeatureFlagRecordIdsReplicated.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
+    const auto createViewlessTimeseriesColl =
+        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    uassert(ErrorCodes::InvalidOptions,
+            "the 'validator' option cannot be set when creating viewless time-series collection",
+            !createViewlessTimeseriesColl || !options.timeseries.has_value() ||
+                options.validator.isEmpty());
+
+    // TODO SERVER-109289: Investigate whether this is safe on viewless time-series collections.
+    uassert(
+        ErrorCodes::OperationNotSupportedInTransaction,
+        str::stream() << "Cannot create a time-series collection in a multi-document transaction.",
+        !options.timeseries || !opCtx->inMultiDocumentTransaction());
+
+    if (options.isView()) {
+        // system.profile will have new document inserts due to profiling. Inserts aren't supported
+        // on views.
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot create system.profile as a view",
+                !ns.isSystemDotProfile());
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot create a view in a multi-document "
+                                 "transaction.",
+                !opCtx->inMultiDocumentTransaction());
+        uassert(ErrorCodes::Error(6026500),
+                "The 'clusteredIndex' option is not supported with views",
+                !options.clusteredIndex);
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot create view with collection specific catalog "
+                "identifiers",
+                !catalogIdentifier.has_value());
+        return _createView(opCtx, ns, options);
+    } else if (options.timeseries && opCtx->writesAreReplicated() &&
+               !createViewlessTimeseriesColl) {
+        // system.profile must be a simple collection since new document insertions directly work
+        // against the usual collection API. See introspect.cpp for more details.
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot create system.profile as a timeseries collection",
+                !ns.isSystemDotProfile());
+        // This helper is designed for user-created time-series collections on primaries. If a
+        // time-series buckets collection is created explicitly or during replication, treat this as
+        // a normal collection creation.
+        return _createLegacyTimeseries(opCtx, ns, options, idIndex, catalogIdentifier);
+    } else {
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot create system collection " << ns.toStringForErrorMsg()
+                              << " within a transaction.",
+                !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
+        return _createCollection(opCtx,
+                                 ns,
+                                 options,
+                                 idIndex,
+                                 /*virtualCollectionOptions=*/boost::none,
+                                 catalogIdentifier);
+    }
+}
+
 }  // namespace
 
 Status createCollection(OperationContext* opCtx,
@@ -970,6 +897,7 @@ Status createCollection(OperationContext* opCtx,
     if (!swCollectionOptions.isOK()) {
         return swCollectionOptions.getStatus();
     }
+
     return createCollection(opCtx, nss, swCollectionOptions.getValue(), idIndex);
 }
 
@@ -982,6 +910,7 @@ Status createCollection(OperationContext* opCtx, const CreateCommand& cmd) {
         options =
             translateOptionsIfClusterByDefault(cmd.getNamespace(), std::move(options), idIndex);
     }
+
     return createCollection(opCtx, cmd.getNamespace(), options, idIndex);
 }
 
@@ -1044,73 +973,31 @@ Status createCollectionForApplyOps(
     auto& collectionOptions = swCollectionOptions.getValue();
     collectionOptions.uuid = ui ? ui : collectionOptions.uuid;
 
-    return createCollection(
+    return createCollectionHelper(
         opCtx, newCollectionName, collectionOptions, idIndex, catalogIdentifier);
 }
 
+
 Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
-                        const CollectionOptions& options,
+                        const CollectionOptions& optionsArg,
                         const boost::optional<BSONObj>& idIndex,
                         const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
-    auto status = userAllowedCreateNS(opCtx, ns);
-    if (!status.isOK()) {
-        return status;
+    const auto createViewlessTimeseriesColl = optionsArg.timeseries &&
+        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    auto options = optionsArg;
+    if (createViewlessTimeseriesColl) {
+        auto status = _setBucketingParametersAndAddClusteredIndex(options);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
-    uassert(ErrorCodes::CommandNotSupported,
-            "'recordIdsReplicated' option may not be run without featureFlagRecordIdsReplicated "
-            "enabled",
-            !options.recordIdsReplicated ||
-                gFeatureFlagRecordIdsReplicated.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
-    if (options.isView()) {
-        // system.profile will have new document inserts due to profiling. Inserts aren't supported
-        // on views.
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot create system.profile as a view",
-                !ns.isSystemDotProfile());
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot create a view in a multi-document "
-                                 "transaction.",
-                !opCtx->inMultiDocumentTransaction());
-        uassert(ErrorCodes::Error(6026500),
-                "The 'clusteredIndex' option is not supported with views",
-                !options.clusteredIndex);
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot create view with collection specific catalog "
-                "identifiers",
-                !catalogIdentifier.has_value());
-        return _createView(opCtx, ns, options);
-    } else if (options.timeseries && opCtx->writesAreReplicated()) {
-        // system.profile must be a simple collection since new document insertions directly work
-        // against the usual collection API. See introspect.cpp for more details.
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot create system.profile as a timeseries collection",
-                !ns.isSystemDotProfile());
-        // This helper is designed for user-created time-series collections on primaries. If a
-        // time-series buckets collection is created explicitly or during replication, treat this as
-        // a normal collection creation.
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream()
-                    << "Cannot create a time-series collection in a multi-document transaction.",
-                !opCtx->inMultiDocumentTransaction());
-        return _createTimeseries(opCtx, ns, options, idIndex, catalogIdentifier);
-    } else {
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot create system collection " << ns.toStringForErrorMsg()
-                              << " within a transaction.",
-                !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
-        return _createCollection(opCtx,
-                                 ns,
-                                 options,
-                                 idIndex,
-                                 /*virtualCollectionOptions=*/boost::none,
-                                 catalogIdentifier);
-    }
+    return createCollectionHelper(opCtx, ns, options, idIndex, catalogIdentifier);
 }
+
 
 Status createVirtualCollection(OperationContext* opCtx,
                                const NamespaceString& ns,
