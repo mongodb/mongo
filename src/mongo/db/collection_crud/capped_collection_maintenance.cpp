@@ -47,13 +47,11 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -65,36 +63,7 @@ namespace mongo {
 namespace collection_internal {
 namespace {
 
-class CappedDeleteSideTxn {
-public:
-    CappedDeleteSideTxn(OperationContext* opCtx, const CollectionPtr& collection) : _opCtx(opCtx) {
-        ClientLock lk(opCtx->getClient());
-        _originalRecoveryUnit = shard_role_details::releaseRecoveryUnit(_opCtx, lk);
-        invariant(_originalRecoveryUnit);
-        _originalRecoveryUnitState = shard_role_details::setRecoveryUnit(
-            _opCtx,
-            _opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
-            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
-            lk);
-    }
-
-    ~CappedDeleteSideTxn() {
-        ClientLock lk(_opCtx->getClient());
-        shard_role_details::setRecoveryUnit(
-            _opCtx, std::move(_originalRecoveryUnit), _originalRecoveryUnitState, lk);
-    }
-
-private:
-    OperationContext* const _opCtx;
-    std::unique_ptr<RecoveryUnit> _originalRecoveryUnit;
-    WriteUnitOfWork::RecoveryUnitState _originalRecoveryUnitState;
-};
-
 struct CappedCollectionState {
-    // For capped deletes performed on collections where 'needsCappedLock' is false, the mutex below
-    // protects 'cappedFirstRecord'. Otherwise, when 'needsCappedLock' is true, the exclusive
-    // metadata resource protects 'cappedFirstRecord'.
-    stdx::mutex cappedFirstRecordMutex;
     RecordId cappedFirstRecord;
 };
 
@@ -140,28 +109,14 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
     const auto& nss = collection->ns();
     auto& ccs = cappedCollectionState(*collection->getSharedDecorations());
 
-    stdx::unique_lock<stdx::mutex> cappedFirstRecordMutex(ccs.cappedFirstRecordMutex,
-                                                          stdx::defer_lock);
-
-    if (collection->needsCappedLock()) {
-        // As capped deletes can be part of a larger WriteUnitOfWork, we need a way to protect
-        // 'cappedFirstRecord' until the outermost WriteUnitOfWork commits or aborts. Locking the
-        // metadata resource exclusively on the collection gives us that guarantee as it uses
-        // two-phase locking semantics.
-        invariant(shard_role_details::getLocker(opCtx)->getLockMode(
-                      ResourceId(RESOURCE_METADATA, nss)) == MODE_X);
-    } else {
-        // Capped deletes not performed under the capped lock need the 'cappedFirstRecordMutex'
-        // mutex.
-        cappedFirstRecordMutex.lock();
-    }
-
-    boost::optional<CappedDeleteSideTxn> cappedDeleteSideTxn;
-    if (!collection->needsCappedLock()) {
-        // Any capped deletes not performed under the capped lock need to commit the innermost
-        // WriteUnitOfWork while 'cappedFirstRecordMutex' is locked.
-        cappedDeleteSideTxn.emplace(opCtx, collection);
-    }
+    // The capped metadata lock serializes writes to ensure only one one writer is actively deleting
+    // a document at at time. As capped deletes can be part of a larger WriteUnitOfWork, this also
+    // protect 'cappedFirstRecord' until the outermost WriteUnitOfWork commits or aborts. Locking
+    // the metadata resource exclusively on the collection gives us that guarantee as it uses
+    // two-phase locking semantics and the lock is held in the onCommit handler.
+    invariant(collection->needsCappedLock());
+    invariant(shard_role_details::getLocker(opCtx)->getLockMode(
+                  ResourceId(RESOURCE_METADATA, nss)) == MODE_X);
 
     const long long currentDataSize = collection->dataSize(opCtx);
     const long long currentNumRecords = collection->numRecords(opCtx);
@@ -178,7 +133,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
     long long sizeSaved = 0;
     long long docsRemoved = 0;
 
-    WriteUnitOfWork wuow(opCtx);
+    invariant(shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork());
 
     boost::optional<Record> record;
     auto cursor = collection->getCursor(opCtx, /*forward=*/true);
@@ -249,25 +204,13 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         serviceOpCounters(opCtx).gotDelete();
     }
 
-    if (cappedDeleteSideTxn) {
-        // Save the RecordId of the next record to be deleted, if it exists.
-        if (!record) {
-            ccs.cappedFirstRecord = RecordId();
-        } else {
-            ccs.cappedFirstRecord = std::move(record->id);
-        }
-    } else {
-        // Update the next record to be deleted. The next record must exist as we're using the same
-        // snapshot the insert was performed on and we can't delete newly inserted records.
-        invariant(record);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&ccs, recordId = std::move(record->id)](OperationContext*,
-                                                     boost::optional<Timestamp>) {
-                ccs.cappedFirstRecord = std::move(recordId);
-            });
-    }
-
-    wuow.commit();
+    // Update the next record to be deleted. The next record must exist as we're using the same
+    // snapshot the insert was performed on and we can't delete newly inserted records.
+    invariant(record);
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [&ccs, recordId = std::move(record->id)](OperationContext*, boost::optional<Timestamp>) {
+            ccs.cappedFirstRecord = std::move(recordId);
+        });
 }
 
 }  // namespace collection_internal
