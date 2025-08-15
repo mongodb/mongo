@@ -251,4 +251,39 @@ void RecipientStateMachineExternalStateImpl::ensureReshardingStashCollectionsEmp
     }
 }
 
+std::unique_ptr<ReshardingDataReplicationInterface>
+RecipientStateMachineExternalStateImpl::makeDataReplication(
+    OperationContext* opCtx,
+    ReshardingMetrics* metrics,
+    ReshardingApplierMetricsMap* applierMetrics,
+    const CommonReshardingMetadata& metadata,
+    const std::vector<DonorShardFetchTimestamp>& donorShards,
+    std::size_t oplogBatchTaskCount,
+    Timestamp cloneTimestamp,
+    bool cloningDone,
+    bool storeOplogFetcherProgress,
+    bool relaxed) {
+
+    // We refresh the routing information for the source collection to ensure the
+    // ReshardingOplogApplier is making its decisions according to the chunk distribution after the
+    // sharding metadata was frozen.
+    refreshCatalogCache(opCtx, metadata.getSourceNss());
+
+    auto sourceChunkMgr =
+        getTrackedCollectionRoutingInfo(opCtx, metadata.getSourceNss()).getChunkManager();
+
+    return ReshardingDataReplication::make(opCtx,
+                                           metrics,
+                                           applierMetrics,
+                                           oplogBatchTaskCount,
+                                           metadata,
+                                           donorShards,
+                                           cloneTimestamp,
+                                           cloningDone,
+                                           myShardId(opCtx->getServiceContext()),
+                                           std::move(sourceChunkMgr),
+                                           storeOplogFetcherProgress,
+                                           relaxed);
+}
+
 }  // namespace mongo

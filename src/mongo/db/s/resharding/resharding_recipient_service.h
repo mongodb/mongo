@@ -142,7 +142,6 @@ public:
         const ReshardingRecipientService* recipientService,
         const ReshardingRecipientDocument& recipientDoc,
         std::unique_ptr<RecipientStateMachineExternalState> externalState,
-        ReshardingDataReplicationFactory dataReplicationFactory,
         ServiceContext* serviceContext);
 
     ~RecipientStateMachine() override = default;
@@ -270,6 +269,8 @@ private:
         int64_t _bytesCopied = 0;
     };
 
+    using ShardApplierProgress = std::map<ShardId, ReshardingOplogApplierProgress>;
+
     /**
      * The work inside this function must be run regardless of any work on _scopedExecutor ever
      * running.
@@ -349,9 +350,6 @@ private:
     // Removes the local recipient document from disk.
     void _removeRecipientDocument(bool aborted, const CancelableOperationContextFactory& factory);
 
-    std::unique_ptr<ReshardingDataReplicationInterface> _makeDataReplication(
-        OperationContext* opCtx, bool cloningDone);
-
     void _ensureDataReplicationStarted(
         OperationContext* opCtx,
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -377,6 +375,11 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken);
     void _restoreMetrics(const CancelableOperationContextFactory& factory);
+
+    void _initializeShardApplierMetrics(
+        const boost::optional<ShardApplierProgress>& existingProgress);
+
+    void _initializeDataReplication();
 
     void _updateContextMetrics(OperationContext* opCtx);
 
@@ -437,7 +440,6 @@ private:
     boost::optional<resharding::RetryingCancelableOperationContextFactory>
         _retryingCancelableOpCtxFactory;
 
-    const ReshardingDataReplicationFactory _dataReplicationFactory;
     SharedSemiFuture<void> _dataReplicationQuiesced;
 
     SharedPromise<void> _changeStreamsMonitorStarted;

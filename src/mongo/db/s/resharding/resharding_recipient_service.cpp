@@ -295,7 +295,6 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::
         this,
         ReshardingRecipientDocument::parse(IDLParserContext{"RecipientStateMachine"}, initialState),
         std::make_unique<RecipientStateMachineExternalStateImpl>(),
-        ReshardingDataReplication::make,
         _serviceContext);
 }
 
@@ -303,7 +302,6 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
     const ReshardingRecipientService* recipientService,
     const ReshardingRecipientDocument& recipientDoc,
     std::unique_ptr<RecipientStateMachineExternalState> externalState,
-    ReshardingDataReplicationFactory dataReplicationFactory,
     ServiceContext* serviceContext)
     : repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine>(),
       _recipientService{recipientService},
@@ -323,7 +321,6 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _startConfigTxnCloneAt{recipientDoc.getStartConfigTxnCloneTime()},
       _markKilledExecutor{resharding::makeThreadPoolForMarkKilledExecutor(
           "RecipientStateMachineCancelableOpCtxPool")},
-      _dataReplicationFactory{std::move(dataReplicationFactory)},
       _critSecReason(BSON("command"
                           << "resharding_recipient"
                           << "collection"
@@ -940,62 +937,29 @@ void ReshardingRecipientService::RecipientStateMachine::
     _transitionState(RecipientStateEnum::kCloning, factory);
 }
 
-std::unique_ptr<ReshardingDataReplicationInterface>
-ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(OperationContext* opCtx,
-                                                                        bool cloningDone) {
-    invariant(_cloneTimestamp);
-
-    // We refresh the routing information for the source collection to ensure the
-    // ReshardingOplogApplier is making its decisions according to the chunk distribution after the
-    // sharding metadata was frozen.
-    _externalState->refreshCatalogCache(opCtx, _metadata.getSourceNss());
-
-    auto myShardId = _externalState->myShardId(opCtx->getServiceContext());
-
-    auto sourceChunkMgr =
-        _externalState->getTrackedCollectionRoutingInfo(opCtx, _metadata.getSourceNss())
-            .getChunkManager();
-
-    // The metrics map can already be pre-populated if it was recovered from disk.
-    if (_applierMetricsMap.empty()) {
-        for (const auto& donor : _donorShards) {
-            _applierMetricsMap.emplace(donor.getShardId(),
-                                       std::make_unique<ReshardingOplogApplierMetrics>(
-                                           donor.getShardId(), _metrics.get(), boost::none));
-        }
-    } else {
-        invariant(_applierMetricsMap.size() == _donorShards.size(),
-                  str::stream() << "applier metrics map size: " << _applierMetricsMap.size()
-                                << " != donor shards count: " << _donorShards.size());
-    }
-
-    auto oplogBatchTaskCount = _oplogBatchTaskCount.value_or(
-        static_cast<std::size_t>(resharding::gReshardingOplogBatchTaskCount.load()));
-    bool relaxed = _relaxed.value_or(false);
-
-    return _dataReplicationFactory(opCtx,
-                                   _metrics.get(),
-                                   &_applierMetricsMap,
-                                   oplogBatchTaskCount,
-                                   _metadata,
-                                   _donorShards,
-                                   *_cloneTimestamp,
-                                   cloningDone,
-                                   std::move(myShardId),
-                                   std::move(sourceChunkMgr),
-                                   _storeOplogFetcherProgress,
-                                   relaxed);
-}
-
 void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationStarted(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& abortToken,
     const CancelableOperationContextFactory& factory) {
-    const bool cloningDone = _recipientCtx.getState() > RecipientStateEnum::kCloning;
+    const bool cloningDone = _recipientCtx.getState() > RecipientStateEnum::kBuildingIndex;
 
     if (!_dataReplication) {
-        auto dataReplication = _makeDataReplication(opCtx, cloningDone);
+        invariant(_cloneTimestamp);
+        _initializeShardApplierMetrics(boost::none);
+        auto oplogBatchTaskCount = _oplogBatchTaskCount.value_or(
+            static_cast<std::size_t>(resharding::gReshardingOplogBatchTaskCount.load()));
+        auto dataReplication = _externalState->makeDataReplication(opCtx,
+                                                                   _metrics.get(),
+                                                                   &_applierMetricsMap,
+                                                                   _metadata,
+                                                                   _donorShards,
+                                                                   oplogBatchTaskCount,
+                                                                   *_cloneTimestamp,
+                                                                   cloningDone,
+                                                                   _storeOplogFetcherProgress,
+                                                                   _relaxed.value_or(false));
+
         const auto txnCloneTime = _startConfigTxnCloneAt;
         invariant(txnCloneTime);
         _dataReplicationQuiesced =
@@ -1144,6 +1108,11 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
     const CancelableOperationContextFactory& factory) {
     if (_recipientCtx.getState() > RecipientStateEnum::kBuildingIndex) {
         return ExecutorFuture(**executor);
+    }
+
+    if (!_skipCloningAndApplying) {
+        auto opCtx = factory.makeOperationContext(&cc());
+        _ensureDataReplicationStarted(opCtx.get(), executor, abortToken, factory);
     }
 
     {
@@ -1861,8 +1830,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
     reshardingOpCtxKilledWhileRestoringMetrics.execute(
         [&opCtx](const BSONObj& data) { opCtx->markKilled(); });
 
-    std::vector<std::pair<ShardId, boost::optional<ReshardingOplogApplierProgress>>>
-        progressDocList;
+    ShardApplierProgress shardApplierProgress;
     for (const auto& donor : _donorShards) {
         auto setOrAdd = [](auto& opt, auto add) {
             opt = opt.value_or(0) + add;
@@ -1913,7 +1881,6 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
         }
 
         {
-            boost::optional<ReshardingOplogApplierProgress> applierProgressDoc;
             const auto applierProgressColl =
                 acquireCollection(opCtx.get(),
                                   CollectionAcquisitionRequest(
@@ -1932,39 +1899,54 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
                     result);
 
                 if (!result.isEmpty()) {
-                    applierProgressDoc = ReshardingOplogApplierProgress::parse(
-                        IDLParserContext("resharding-recipient-service-applier-progress-doc"),
-                        result);
+                    auto [it, success] = shardApplierProgress.emplace(
+                        donor.getShardId(),
+                        ReshardingOplogApplierProgress::parse(
+                            IDLParserContext("resharding-recipient-service-applier-progress-doc"),
+                            result));
+                    tassert(10795500, "Duplicate shardIds across donor shards", success);
                     setOrAdd(externalMetrics.oplogEntriesApplied,
-                             applierProgressDoc->getNumEntriesApplied());
+                             it->second.getNumEntriesApplied());
                 }
             }
-
-            progressDocList.emplace_back(donor.getShardId(), applierProgressDoc);
         }
     }
 
-    // Restore stats here where interrupts will never occur, this is to ensure we will only update
-    // the metrics only once.
-    for (const auto& shardIdDocPair : progressDocList) {
-        const auto& shardId = shardIdDocPair.first;
-        const auto& progressDoc = shardIdDocPair.second;
-
-        if (!progressDoc) {
-            _applierMetricsMap.emplace(shardId,
-                                       std::make_unique<ReshardingOplogApplierMetrics>(
-                                           shardId, _metrics.get(), boost::none));
-            continue;
-        }
-
-        externalMetrics.accumulateFrom(*progressDoc);
-
-        auto applierMetrics =
-            std::make_unique<ReshardingOplogApplierMetrics>(shardId, _metrics.get(), progressDoc);
-        _applierMetricsMap.emplace(shardId, std::move(applierMetrics));
+    // Restore stats here where interrupts will never occur, this is to ensure we will update the
+    // metrics only once.
+    for (const auto& [_, progress] : shardApplierProgress) {
+        externalMetrics.accumulateFrom(progress);
     }
+    _initializeShardApplierMetrics(shardApplierProgress);
 
     _metrics->restoreExternallyTrackedRecipientFields(externalMetrics);
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_initializeShardApplierMetrics(
+    const boost::optional<ShardApplierProgress>& existingProgress) {
+    if (!_applierMetricsMap.empty()) {
+        invariant(_applierMetricsMap.size() == _donorShards.size(),
+                  str::stream() << "applier metrics map size: " << _applierMetricsMap.size()
+                                << " != donor shards count: " << _donorShards.size());
+        return;
+    }
+
+    for (const auto& donor : _donorShards) {
+        const auto& shardId = donor.getShardId();
+        const auto& progress = [&]() -> boost::optional<ReshardingOplogApplierProgress> {
+            if (!existingProgress) {
+                return boost::none;
+            }
+            auto it = existingProgress->find(shardId);
+            if (it == existingProgress->end()) {
+                return boost::none;
+            }
+            return it->second;
+        }();
+        _applierMetricsMap.emplace(
+            shardId,
+            std::make_unique<ReshardingOplogApplierMetrics>(shardId, _metrics.get(), progress));
+    }
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(

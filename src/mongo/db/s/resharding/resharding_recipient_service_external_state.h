@@ -127,6 +127,18 @@ public:
     void ensureTempReshardingCollectionExistsWithIndexes(OperationContext* opCtx,
                                                          const CommonReshardingMetadata& metadata,
                                                          Timestamp cloneTimestamp);
+
+    virtual std::unique_ptr<ReshardingDataReplicationInterface> makeDataReplication(
+        OperationContext* opCtx,
+        ReshardingMetrics* metrics,
+        ReshardingApplierMetricsMap* applierMetrics,
+        const CommonReshardingMetadata& metadata,
+        const std::vector<DonorShardFetchTimestamp>& donorShards,
+        std::size_t oplogBatchTaskCount,
+        Timestamp cloneTimestamp,
+        bool cloningDone,
+        bool storeOplogFetcherProgress,
+        bool relaxed) = 0;
 };
 
 class RecipientStateMachineExternalStateImpl
@@ -175,6 +187,18 @@ public:
 
     void clearFilteringMetadataOnTempReshardingCollection(
         OperationContext* opCtx, const NamespaceString& tempReshardingNss) override;
+
+    std::unique_ptr<ReshardingDataReplicationInterface> makeDataReplication(
+        OperationContext* opCtx,
+        ReshardingMetrics* metrics,
+        ReshardingApplierMetricsMap* applierMetrics,
+        const CommonReshardingMetadata& metadata,
+        const std::vector<DonorShardFetchTimestamp>& donorShards,
+        std::size_t oplogBatchTaskCount,
+        Timestamp cloneTimestamp,
+        bool cloningDone,
+        bool storeOplogFetcherProgress,
+        bool relaxed) override;
 
     void ensureReshardingStashCollectionsEmpty(
         OperationContext* opCtx,

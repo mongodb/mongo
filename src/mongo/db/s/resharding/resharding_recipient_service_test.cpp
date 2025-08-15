@@ -122,13 +122,66 @@ const long approxDocumentsToCopy = 100;
 const BSONObj sourceCollectionOptions = BSONObj();
 BSONObj tempReshardingCollectionOptions = BSONObj();
 
-Atomic<bool> shouldTriggerError{false};
-void maybeThrowErrorForTest() {
-    if (shouldTriggerError.load()) {
-        uasserted(ErrorCodes::InternalError,
-                  str::stream() << "Simulating an unrecoverable error for testing");
-    }
+template <typename DocumentType>
+DocumentType getPersistedStateDocument(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       boost::optional<UUID> reshardingUUID) {
+    DBDirectClient client(opCtx);
+    auto query = reshardingUUID ? BSON(DocumentType::kReshardingUUIDFieldName << *reshardingUUID)
+                                : BSONObj{};
+    auto doc = client.findOne(nss, query);
+    return DocumentType::parse(
+        IDLParserContext("reshardingRecipientServiceTest::getPersistedStateDocument"), doc);
 }
+
+ReshardingRecipientDocument getPersistedRecipientDocument(
+    OperationContext* opCtx, boost::optional<UUID> reshardingUUID = boost::none) {
+    return getPersistedStateDocument<ReshardingRecipientDocument>(
+        opCtx, NamespaceString::kRecipientReshardingOperationsNamespace, reshardingUUID);
+}
+
+ReshardingCoordinatorDocument getPersistedCoordinatorDocument(
+    OperationContext* opCtx, boost::optional<UUID> reshardingUUID = boost::none) {
+    return getPersistedStateDocument<ReshardingCoordinatorDocument>(
+        opCtx, NamespaceString::kConfigReshardingOperationsNamespace, reshardingUUID);
+}
+
+RecipientStateEnum getRecipientPhaseOnDisk(OperationContext* opCtx) {
+    return getPersistedRecipientDocument(opCtx).getMutableState().getState();
+}
+
+class DataReplicationForTest : public ReshardingDataReplicationInterface {
+public:
+    DataReplicationForTest() {
+        if (failToCreateReshardingDataReplicationForTest.shouldFail()) {
+            uasserted(ErrorCodes::InternalError, "Failed to create DataReplicationForTest");
+        }
+    }
+    SemiFuture<void> runUntilStrictlyConsistent(
+        std::shared_ptr<executor::TaskExecutor> executor,
+        std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+        CancellationToken cancelToken,
+        CancelableOperationContextFactory opCtxFactory,
+        const mongo::Date_t& startConfigTxnCloneTime) override {
+        return makeReadyFutureWith([] {}).semi();
+    };
+
+    void startOplogApplication() override {};
+
+    void prepareForCriticalSection() override {};
+
+    SharedSemiFuture<void> awaitCloningDone() override {
+        return makeReadyFutureWith([] {}).share();
+    };
+
+    SharedSemiFuture<void> awaitStrictlyConsistent() override {
+        return makeReadyFutureWith([] {}).share();
+    };
+
+    void shutdown() override {}
+
+    void join() override {}
+};
 
 class ExternalStateForTestImpl {
 public:
@@ -138,6 +191,7 @@ public:
         kGetCollectionOptions,
         kGetCollectionIndexes,
         kEnsureReshardingStashCollectionsEmpty,
+        kMakeDataReplication,
     };
 
     ShardId myShardId(ServiceContext* serviceContext) const {
@@ -261,11 +315,46 @@ public:
         }
     }
 
+    std::unique_ptr<ReshardingDataReplicationInterface> makeDataReplication(
+        OperationContext* opCtx,
+        ReshardingMetrics* metrics,
+        ReshardingApplierMetricsMap* applierMetrics,
+        const CommonReshardingMetadata& metadata,
+        const std::vector<DonorShardFetchTimestamp>& donorShards,
+        std::size_t oplogBatchTaskCount,
+        Timestamp cloneTimestamp,
+        bool cloningDone,
+        bool storeOplogFetcherProgress,
+        bool relaxed) {
+        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kMakeDataReplication);
+        setDataReplicationStarted();
+        return std::make_unique<DataReplicationForTest>();
+    }
+
     void throwUnrecoverableErrorIn(RecipientStateEnum phase, ExternalFunction func) {
         _errorFunction = std::make_tuple(phase, func);
     }
 
+    void notifyNewInstanceStarted() {
+        stdx::lock_guard guard(_instanceStateMutex);
+        _instanceSpecificState = std::make_unique<InstanceSpecificState>();
+    }
+
+    bool setDataReplicationStarted() {
+        stdx::lock_guard guard(_instanceStateMutex);
+        return _instanceSpecificState->dataReplicationRunning = true;
+    }
+
+    bool isDataReplicationRunning() {
+        stdx::lock_guard guard(_instanceStateMutex);
+        return _instanceSpecificState->dataReplicationRunning;
+    }
+
 private:
+    struct InstanceSpecificState {
+        bool dataReplicationRunning = false;
+    };
+
     const StringData _currentShardKey = "oldKey";
 
     const NamespaceString _sourceNss =
@@ -276,21 +365,15 @@ private:
 
     boost::optional<std::tuple<RecipientStateEnum, ExternalFunction>> _errorFunction = boost::none;
 
-    RecipientStateEnum _getCurrentPhaseOnDisk(OperationContext* opCtx) {
-        DBDirectClient client(opCtx);
-
-        auto doc =
-            client.findOne(NamespaceString::kRecipientReshardingOperationsNamespace, BSONObj{});
-        auto mutableState = doc.getObjectField("mutableState");
-        return RecipientState_parse(IDLParserContext{"reshardingRecipientServiceTest"},
-                                    mutableState.getStringField("state"));
-    }
+    stdx::mutex _instanceStateMutex;
+    std::unique_ptr<InstanceSpecificState> _instanceSpecificState =
+        std::make_unique<InstanceSpecificState>();
 
     void _maybeThrowErrorForFunction(OperationContext* opCtx, ExternalFunction func) {
         if (_errorFunction) {
             auto [expectedPhase, expectedFunction] = *_errorFunction;
 
-            if (_getCurrentPhaseOnDisk(opCtx) == expectedPhase && func == expectedFunction) {
+            if (getRecipientPhaseOnDisk(opCtx) == expectedPhase && func == expectedFunction) {
                 uasserted(ErrorCodes::InternalError, "Simulating unrecoverable error for testing");
             }
         }
@@ -370,41 +453,31 @@ public:
         _impl->ensureReshardingStashCollectionsEmpty(opCtx, sourceUUID, donorShards);
     }
 
+    std::unique_ptr<ReshardingDataReplicationInterface> makeDataReplication(
+        OperationContext* opCtx,
+        ReshardingMetrics* metrics,
+        ReshardingApplierMetricsMap* applierMetrics,
+        const CommonReshardingMetadata& metadata,
+        const std::vector<DonorShardFetchTimestamp>& donorShards,
+        std::size_t oplogBatchTaskCount,
+        Timestamp cloneTimestamp,
+        bool cloningDone,
+        bool storeOplogFetcherProgress,
+        bool relaxed) override {
+        return _impl->makeDataReplication(opCtx,
+                                          metrics,
+                                          applierMetrics,
+                                          metadata,
+                                          donorShards,
+                                          oplogBatchTaskCount,
+                                          cloneTimestamp,
+                                          cloningDone,
+                                          storeOplogFetcherProgress,
+                                          relaxed);
+    }
+
 private:
     std::shared_ptr<ExternalStateForTestImpl> _impl;
-};
-
-class DataReplicationForTest : public ReshardingDataReplicationInterface {
-public:
-    DataReplicationForTest() {
-        if (failToCreateReshardingDataReplicationForTest.shouldFail()) {
-            uasserted(ErrorCodes::InternalError, "Failed to create DataReplicationForTest");
-        }
-    }
-    SemiFuture<void> runUntilStrictlyConsistent(
-        std::shared_ptr<executor::TaskExecutor> executor,
-        std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
-        CancellationToken cancelToken,
-        CancelableOperationContextFactory opCtxFactory,
-        const mongo::Date_t& startConfigTxnCloneTime) override {
-        return makeReadyFutureWith([] {}).semi();
-    };
-
-    void startOplogApplication() override {};
-
-    void prepareForCriticalSection() override {};
-
-    SharedSemiFuture<void> awaitCloningDone() override {
-        return makeReadyFutureWith([] {}).share();
-    };
-
-    SharedSemiFuture<void> awaitStrictlyConsistent() override {
-        return makeReadyFutureWith([] {}).share();
-    };
-
-    void shutdown() override {}
-
-    void join() override {}
 };
 
 class ReshardingRecipientServiceForTest : public ReshardingRecipientService {
@@ -417,12 +490,12 @@ public:
 
     std::shared_ptr<repl::PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) override {
+        _externalStateImpl->notifyNewInstanceStarted();
         return std::make_shared<RecipientStateMachine>(
             this,
             ReshardingRecipientDocument::parse(
                 IDLParserContext{"ReshardingRecipientServiceForTest"}, initialState),
             std::make_unique<ExternalStateForTest>(_externalStateImpl),
-            [](auto...) { return std::make_unique<DataReplicationForTest>(); },
             _serviceContext);
     }
 
@@ -450,6 +523,14 @@ struct TestOptions {
         return bob.obj();
     }
 };
+
+bool shouldDataReplicationBeRunningIn(const TestOptions& testOptions, RecipientStateEnum phase) {
+    if (testOptions.skipCloningAndApplying) {
+        return false;
+    }
+    return phase == RecipientStateEnum::kCloning || phase == RecipientStateEnum::kBuildingIndex ||
+        phase == RecipientStateEnum::kApplying;
+}
 
 std::vector<TestOptions> makeBasicTestOptions() {
     std::vector<TestOptions> testOptions;
@@ -803,34 +884,6 @@ public:
             MODE_IS);
         ASSERT_TRUE(recipientColl.exists());
         ASSERT_TRUE(recipientColl.getCollectionPtr()->isEmpty(opCtx));
-    }
-
-    template <typename DocumentType>
-    DocumentType getPersistedStateDocument(OperationContext* opCtx,
-                                           const NamespaceString& nss,
-                                           UUID reshardingUUID) {
-        boost::optional<DocumentType> persistedDoc;
-        PersistentTaskStore<DocumentType> store(nss);
-        store.forEach(opCtx,
-                      BSON(DocumentType::kReshardingUUIDFieldName << reshardingUUID),
-                      [&](const auto& doc) {
-                          persistedDoc.emplace(doc);
-                          return false;
-                      });
-        ASSERT(persistedDoc);
-        return persistedDoc.get();
-    }
-
-    ReshardingRecipientDocument getPersistedRecipientDocument(OperationContext* opCtx,
-                                                              UUID reshardingUUID) {
-        return getPersistedStateDocument<ReshardingRecipientDocument>(
-            opCtx, NamespaceString::kRecipientReshardingOperationsNamespace, reshardingUUID);
-    }
-
-    ReshardingCoordinatorDocument getPersistedCoordinatorDocument(OperationContext* opCtx,
-                                                                  UUID reshardingUUID) {
-        return getPersistedStateDocument<ReshardingCoordinatorDocument>(
-            opCtx, NamespaceString::kConfigReshardingOperationsNamespace, reshardingUUID);
     }
 
 protected:
@@ -1516,10 +1569,15 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
             ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
                       ErrorCodes::InterruptedDueToReplStateChange);
 
-            prevState = state;
-
             recipient.reset();
             stepUp(opCtx.get());
+
+            if (shouldDataReplicationBeRunningIn(testOptions, prevState)) {
+                stateTransitionsGuard.wait(state);
+                ASSERT_TRUE(externalState()->isDataReplicationRunning());
+            }
+
+            prevState = state;
         }
 
         // Finally complete the operation and ensure its success.
@@ -2649,8 +2707,7 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringCloning) {
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
-        runUnrecoverableErrorTest(
-            testOptions, RecipientStateEnum::kCloning, kGetTrackedCollectionRoutingInfo);
+        runUnrecoverableErrorTest(testOptions, RecipientStateEnum::kCloning, kMakeDataReplication);
     }
 }
 
