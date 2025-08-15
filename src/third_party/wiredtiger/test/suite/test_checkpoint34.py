@@ -43,7 +43,7 @@ class test_checkpoint34(wttest.WiredTigerTestCase):
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]
 
-    conn_config = "checkpoint=(precise=true)"
+    conn_config = "precise_checkpoint=true"
 
     scenarios = make_scenarios(format_values)
 

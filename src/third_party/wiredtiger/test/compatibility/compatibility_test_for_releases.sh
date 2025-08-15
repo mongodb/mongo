@@ -739,36 +739,24 @@ gittags['mongodb-4.2']="mongodb-4.2"
 #gittags['mongodb-5.0']="ce1d1e58ba35166710552e3aaa1c426ddba513fd"
 #gittags['mongodb-4.4']="ec742d6807b943cd6f2baf1a55853d296eb5b5c6"
 
-# This array is used to configure the release branches we'd like to use for testing the importing
-# of files created in previous versions of WiredTiger. Go all the way back to mongodb-4.2 since
-# that's the first release where we don't support live import.
-import_release_branches=(develop mongodb-8.0 mongodb-7.0 mongodb-6.0 mongodb-5.0 mongodb-4.4 mongodb-4.2)
+# The version list is defined in the "meta/versions.sh" shell script
+# The variable name is the uppercased variable name
 
-# Branches in below 2 arrays should be put in newer-to-older order.
-#
-# An overlap (last element of the 1st array & first element of the 2nd array)
-# is expected to avoid missing the edge testing coverage.
-#
-# The 2 arrays should be adjusted over time when newer branches are created,
-# or older branches are EOL.
-newer_release_branches=(develop mongodb-8.0 mongodb-7.0 mongodb-6.0 mongodb-5.0 mongodb-4.4)
-older_release_branches=(mongodb-4.4 mongodb-4.2)
+# Use relative folder to locate the meta file
 
-# This array is used to generate compatible configuration files between releases, because
-# upgrade/downgrade test runs each build's format test program on the second build's
-# configuration file.
-compatible_upgrade_downgrade_release_branches=(mongodb-4.4 mongodb-4.2)
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+VERSIONS_FILE="$SCRIPT_DIR/meta/versions.sh"
+source "$VERSIONS_FILE"
 
-# This array is used to configure the release branches we'd like to run patch version
-# upgrade/downgrade test.
-patch_version_upgrade_downgrade_release_branches=(mongodb-8.0 mongodb-7.0 mongodb-6.0 mongodb-4.4)
+# The meaning of the names of each version list can be found in the version list file.
 
-# This array is used to configure the release branches we'd like to run test checkpoint
-# upgrade/downgrade test.
-test_checkpoint_release_branches=(develop mongodb-8.0 mongodb-7.0 mongodb-6.0 mongodb-4.4)
-
-# This array is used to configure the release branches we'd like to run upgrade to latest test.
-upgrade_to_latest_upgrade_downgrade_release_branches=(mongodb-8.0 mongodb-7.0 mongodb-6.0 mongodb-5.0 mongodb-4.4)
+import_release_branches=($IMPORT_RELEASE_BRANCHES)
+newer_release_branches=($NEWER_RELEASE_BRANCHES)
+older_release_branches=($OLDER_RELEASE_BRANCHES)
+compatible_upgrade_downgrade_release_branches=($COMPATIBLE_UPGRADE_DOWNGRADE_RELEASE_BRANCHES)
+patch_version_upgrade_downgrade_release_branches=($PATCH_VERSION_UPGRADE_DOWNGRADE_RELEASE_BRANCHES)
+test_checkpoint_release_branches=($TEST_CHECKPOINT_RELEASE_BRANCHES)
+upgrade_to_latest_upgrade_downgrade_release_branches=($UPGRADE_TO_LATEST_UPGRADE_DOWNGRADE_RELEASE_BRANCHES)
 
 declare -A scopes
 scopes[import]="import files from previous versions"

@@ -78,8 +78,7 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
 
     WT_CLEAR(get_args);
     get_args.lsn = lsn;
-    if (block_meta != NULL)
-        WT_CLEAR(*block_meta);
+    WT_ASSERT(session, block_meta != NULL);
 
     __wt_verbose(session, WT_VERB_READ,
       "page_id %" PRIu64 ", flags %" PRIx64 ", lsn %" PRIu64 ", base_lsn %" PRIu64 ", size %" PRIu32
@@ -184,7 +183,7 @@ reread:
                     goto corrupt;
                 }
 
-                if (result == last && block_meta != NULL) {
+                if (result == last) {
                     WT_ASSERT(session, get_args.lsn > 0);
                     WT_ASSERT(session,
                       (get_args.delta_count > 0) ==
@@ -200,8 +199,9 @@ reread:
                     block_meta->backlink_lsn = get_args.backlink_lsn;
                     block_meta->base_lsn = get_args.base_lsn;
                     block_meta->disagg_lsn = get_args.lsn;
-                    block_meta->delta_count =
-                      get_args.delta_count == 0 ? *results_count - 1 : get_args.delta_count;
+                    block_meta->delta_count = get_args.delta_count == 0 ?
+                      (uint8_t)(*results_count - 1) :
+                      (uint8_t)get_args.delta_count;
                     block_meta->checksum = checksum;
                     block_meta->encryption = get_args.encryption;
                     if (block_meta->delta_count > 0)

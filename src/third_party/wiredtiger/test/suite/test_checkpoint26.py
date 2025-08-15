@@ -38,8 +38,8 @@ import wttest
 # evict pages.
 class test_checkpoint26(wttest.WiredTigerTestCase):
     ckpt_precision = [
-        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
-        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+        ('fuzzy', dict(ckpt_config='precise_checkpoint=false')),
+        ('precise', dict(ckpt_config='precise_checkpoint=true')),
     ]
 
     scenarios = make_scenarios(ckpt_precision)
@@ -53,7 +53,7 @@ class test_checkpoint26(wttest.WiredTigerTestCase):
 
     def test_checkpoint_evict_page(self):
         # Avoid checkpoint error with precise checkpoint
-        if self.ckpt_config == 'checkpoint=(precise=true)':
+        if self.ckpt_config == 'precise_checkpoint=true':
             self.conn.set_timestamp('stable_timestamp=1')
 
         self.session.create(self.uri, 'key_format=i,value_format=S')

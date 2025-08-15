@@ -31,6 +31,8 @@ import argparse, inspect, os, pickle, shutil, subprocess, sys, tempfile, unittes
 # Import the common compatibility test functionality
 sys.path.insert(1, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
 import compatibility_common
+from compatibility_version import WTVersion
+from typing import List
 
 # Now we can import our test/py_utility and third-party dependencies
 import abstract_test_case, testtools, test_result, test_util, wtscenario
@@ -54,12 +56,12 @@ class CompatibilityTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         build_config = self.build_config if hasattr(self, 'build_config') else None
         return compatibility_common.branch_build_path(branch, build_config)
 
-    def run_method_on_branch(self, branch, method):
+    def run_method_on_branch(self, branch:WTVersion, method):
         '''
         Run a method on a branch.
         '''
         cwd = os.getcwd()
-        branch_path = self.branch_build_path(branch)
+        branch_path = self.branch_build_path(branch.name)
         build_python_path = os.path.join(branch_path, 'lang', 'python')
         this_script_dir = os.path.abspath(os.path.dirname(__file__))
 
@@ -200,20 +202,19 @@ def run_tests(suites):
         print("[pid:{}]: ERROR: running test: {}".format(os.getpid(), e))
         raise e
 
-def make_branch_scenarios(older, newer):
+def make_branch_scenarios(older:List[WTVersion], newer:List[WTVersion]):
     '''
     Create scenarios with the specified older and newer branches.
     '''
     older_branches = []
     for branch in older:
-        older_branches.append(('older=%s' % branch, { 'older_branch': branch }))
+        older_branches.append(('older=%s' % branch.name, { 'older_branch': branch }))
     newer_branches = []
     for branch in newer:
-        newer_branches.append(('newer=%s' % branch, { 'newer_branch': branch }))
+        newer_branches.append(('newer=%s' % branch.name, { 'newer_branch': branch }))
 
     return list(filter(
-        lambda scenario: compatibility_common.is_branch_order_asc(scenario[1]['older_branch'],
-                                                                  scenario[1]['newer_branch']),
+        lambda scenario: scenario[1]['older_branch'] < scenario[1]['newer_branch'],
         wtscenario.make_scenarios(older_branches, newer_branches)))
 
 def add_branch_pair_scenarios(suite):
@@ -222,20 +223,30 @@ def add_branch_pair_scenarios(suite):
     '''
     for test in testtools.iterate_tests(suite):
         # Get the older and newer branches, allowing tests to specify their own.
-        older = getattr(test, 'older', compatibility_common.BRANCHES)
-        newer = getattr(test, 'newer', compatibility_common.BRANCHES)
-        if type(older) is not list:
-            older = [older]
-        if type(newer) is not list:
-            newer = [newer]
+        def extract_versions(t, key:str):
+            versions = getattr(t, key, None)
+            if versions:
+                if type(versions) is not list:
+                    versions = [versions]
+                # need to build the version object from the string list
+                return [WTVersion(version) for version in versions]
+            else:
+                return compatibility_common.BRANCHES.SUITE_RELEASE_BRANCHES
+        older = extract_versions(test, 'older')
+        newer = extract_versions(test, 'newer')
 
         # Validate that the test is using only supported branches. Otherwise they may not be ready.
-        unsupported_branches = list(filter(lambda b: b not in compatibility_common.BRANCHES,
-                                           older + list(set(newer) - set(older))))
+        # support means branch name appeared in the branch list
+        unsupported_branches = list([
+            branch
+            for branch in set([*older, *newer])
+            if branch not in compatibility_common.BRANCHES.SUITE_RELEASE_BRANCHES
+        ])
+
         if len(unsupported_branches) > 0:
             unsupported_branches.sort()
             raise Exception('Test \'%s\' specifies unsupported branches: %s'
-                            % (test, ', '.join(unsupported_branches)))
+                            % (test, ', '.join([branch.name for branch in unsupported_branches])))
 
         # Make the scenarios from the older and newer branches.
         branch_scenarios = make_branch_scenarios(older, newer)
@@ -279,9 +290,9 @@ def prepare_tests(suites):
                 all_build_configs.append(config)
 
     # Check out and build all relevant branches.
-    for branch in compatibility_common.BRANCHES:
+    for branch in compatibility_common.BRANCHES.SUITE_RELEASE_BRANCHES:
         for config in all_build_configs:
-            compatibility_common.prepare_branch(branch, config)
+            compatibility_common.prepare_branch(branch.name, config)
 
     # Add branch arguments to the tests' scenarios.
     add_branch_pair_scenarios(suites)

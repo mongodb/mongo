@@ -37,8 +37,8 @@ from wtscenario import make_scenarios
 
 class test_checkpoint05(wttest.WiredTigerTestCase):
     ckpt_precision = [
-        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
-        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+        ('fuzzy', dict(ckpt_config='precise_checkpoint=false')),
+        ('precise', dict(ckpt_config='precise_checkpoint=true')),
     ]
 
     scenarios = make_scenarios(ckpt_precision)
@@ -60,7 +60,7 @@ class test_checkpoint05(wttest.WiredTigerTestCase):
     def test_checkpoints_during_backup(self):
         self.uri = 'table:ckpt05'
         # Avoid checkpoint error with precise checkpoint
-        if self.ckpt_config == 'checkpoint=(precise=true)':
+        if self.ckpt_config == 'precise_checkpoint=true':
             self.conn.set_timestamp('stable_timestamp=1')
         self.session.create(self.uri, 'key_format=i,value_format=i')
 

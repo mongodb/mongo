@@ -262,11 +262,24 @@ struct __wt_page_block_meta {
 
     uint64_t backlink_lsn;
     uint64_t base_lsn;
-    uint32_t delta_count;
 
     uint32_t checksum;
 
     WT_PAGE_LOG_ENCRYPTION encryption;
+
+    uint8_t delta_count;
+};
+
+/*
+ * WT_PAGE_DISAGG_INFO --
+ *  Page information associated with disaggregated storage.
+ */
+struct __wt_page_disagg_info {
+    uint64_t old_rec_lsn_max; /* The LSN associated with the page's before the most recent
+                                 reconciliation */
+    uint64_t rec_lsn_max;     /* The LSN associated with the page's most recent reconciliation */
+
+    WT_PAGE_BLOCK_META block_meta;
 };
 
 /*
@@ -287,7 +300,7 @@ struct __wt_multi {
      * memory.
      */
     void *disk_image;
-    WT_PAGE_BLOCK_META block_meta; /* the metadata for the disk image */
+    WT_PAGE_BLOCK_META *block_meta; /* the metadata for the disk image */
 
     /*
      * List of unresolved updates. Updates are either a row-store insert or update list, or
@@ -835,10 +848,7 @@ struct __wt_page {
     uint64_t cache_create_gen; /* Page create timestamp */
     uint64_t evict_pass_gen;   /* Eviction pass generation */
 
-    uint64_t old_rec_lsn_max; /* The LSN associated with the page's before the most recent
-                                 reconciliation */
-    uint64_t rec_lsn_max;     /* The LSN associated with the page's most recent reconciliation */
-    WT_PAGE_BLOCK_META block_meta;
+    WT_PAGE_DISAGG_INFO *disagg_info;
 
 #ifdef HAVE_DIAGNOSTIC
 #define WT_SPLIT_SAVE_STATE_MAX 3

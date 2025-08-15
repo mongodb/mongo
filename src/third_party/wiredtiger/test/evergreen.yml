@@ -3806,7 +3806,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -C cache_size=1000MB,checkpoint=(precise=true)
+          run_test_checkpoint_args: -x -C cache_size=1000MB,precise_checkpoint=true
 
   - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s1
     tags: ["data-validation-stress-test"]
@@ -3815,7 +3815,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 1 -C cache_size=1000MB,checkpoint=(precise=true)
+          run_test_checkpoint_args: -x -s 1 -C cache_size=1000MB,precise_checkpoint=true
 
   - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s2
     tags: ["data-validation-stress-test"]
@@ -3824,7 +3824,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 2 -C cache_size=1000MB,checkpoint=(precise=true)
+          run_test_checkpoint_args: -x -s 2 -C cache_size=1000MB,precise_checkpoint=true
 
   - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s3
     tags: ["data-validation-stress-test"]
@@ -3833,7 +3833,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 3 -C cache_size=1000MB,checkpoint=(precise=true)
+          run_test_checkpoint_args: -x -s 3 -C cache_size=1000MB,precise_checkpoint=true
 
   - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s4
     tags: ["data-validation-stress-test"]
@@ -3842,7 +3842,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 4 -C cache_size=1000MB,checkpoint=(precise=true)
+          run_test_checkpoint_args: -x -s 4 -C cache_size=1000MB,precise_checkpoint=true
 
   - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s5
     tags: ["data-validation-stress-test"]
@@ -3851,7 +3851,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 5 -C cache_size=1000MB,checkpoint=(precise=true)
+          run_test_checkpoint_args: -x -s 5 -C cache_size=1000MB,precise_checkpoint=true
 
   - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s6
     tags: ["data-validation-stress-test"]
@@ -3860,7 +3860,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 6 -C cache_size=1000MB,checkpoint=(precise=true)
+          run_test_checkpoint_args: -x -s 6 -C cache_size=1000MB,precise_checkpoint=true
 
   - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s7
     tags: ["data-validation-stress-test"]
@@ -3869,7 +3869,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 7 -C cache_size=1000MB,checkpoint=(precise=true)
+          run_test_checkpoint_args: -x -s 7 -C cache_size=1000MB,precise_checkpoint=true
 
   - name: format-failure-configs-test
     depends_on:
@@ -3963,7 +3963,7 @@ tasks:
       - func: "checkpoint stress test"
         vars:
           timestamp_config: -x
-          wt_config: cache_size=1000M,checkpoint=(precise=true)
+          wt_config: cache_size=1000M,precise_checkpoint=true
           no_of_procs: 10 # Number of processes to run in the background
           tiered: 0       # Don't enable tiered storage
           times: 1        # Number of times to run the loop
@@ -3981,7 +3981,7 @@ tasks:
       - func: "checkpoint stress test"
         vars:
           timestamp_config: -x
-          wt_config: cache_size=1000M,checkpoint=(precise=true)
+          wt_config: cache_size=1000M,precise_checkpoint=true
           no_of_procs: 5  # Number of processes to run in the background
           tiered: 1       # Enable tiered storage
           times: 1        # Number of times to run the loop

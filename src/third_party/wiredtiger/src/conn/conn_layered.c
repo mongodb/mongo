@@ -1629,6 +1629,9 @@ __layered_update_gc_ingest_tables_prune_timestamps(WT_SESSION_IMPL *session)
 
             /*
              * For each checkpoint, see of the handle is in use. If not, it is safe to gc.
+             * FIXME-WT-15192: `ckpt_inuse` and `last_ckpt` could be obtained from different tables
+             * and that's not correct to compare checkpoint orders from different tables since they
+             * are unrelated.
              */
             while (ckpt_inuse < last_ckpt) {
                 WT_ERR(__wt_snprintf(uri_at_checkpoint, uri_alloc, "%s/%s.%" PRId64,

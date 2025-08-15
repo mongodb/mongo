@@ -680,9 +680,9 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     if (F_ISSET(session, WT_SESSION_IMPORT))
         btree->modified = true;
 
+    /* FIXME-WT-15192: Consider setting `prune_timestamp` to `last_checkpoint_timestamp` */
     if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
-        WT_ACQUIRE_READ(
-          btree->prune_timestamp, conn->disaggregated_storage.last_checkpoint_timestamp);
+        btree->prune_timestamp = WT_TS_NONE;
 
     return (0);
 }
@@ -774,7 +774,8 @@ __wti_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
     WT_ERR(__wti_page_inmem(session, NULL, dsk.data,
       WT_DATA_IN_ITEM(&dsk) ? WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page, NULL));
     dsk.mem = NULL;
-    page->block_meta = block_meta;
+    if (page->disagg_info != NULL)
+        page->disagg_info->block_meta = block_meta;
 
     /* Finish initializing the root, root reference links. */
     __wt_root_ref_init(session, &btree->root, page, btree->type != BTREE_ROW);

@@ -35,7 +35,6 @@ from wtbackup import backup_base
 # Test that live_restore->fs_size can returns a valid size when the file only exists in the source
 # directory.
 # Note: The block_size statistic corresponds to underlying file size.
-@wttest.skip_for_hook("tiered", "using multiple WT homes")
 class test_live_restore03(backup_base):
     nrows = 100
 

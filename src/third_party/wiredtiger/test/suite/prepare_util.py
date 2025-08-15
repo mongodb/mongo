@@ -28,7 +28,7 @@
 import wttest
 
 class test_prepare_preserve_prepare_base(wttest.WiredTigerTestCase):
-    conn_config = 'checkpoint=(precise=true),preserve_prepared=true,statistics=(all)'
+    conn_config = 'precise_checkpoint=true,preserve_prepared=true,statistics=(all)'
 
     def get_stats(self, stats, uri):
         """Get the current values of multiple statistics."""

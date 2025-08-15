@@ -55,7 +55,7 @@ class test_timestamp27_preserve_prepared_off(wttest.WiredTigerTestCase):
             '/rollback timestamp is set when the preserve_prepared config is off/')
 
 class test_timestamp27_preserve_prepared_on(wttest.WiredTigerTestCase):
-    conn_config = "checkpoint=(precise=true),preserve_prepared=true"
+    conn_config = "precise_checkpoint=true,preserve_prepared=true"
 
     types = [
         ('fix', dict(key_format='r', value_format='8t')),

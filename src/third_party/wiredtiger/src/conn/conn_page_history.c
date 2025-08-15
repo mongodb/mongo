@@ -341,13 +341,13 @@ __wt_conn_page_history_track_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
     (void)__wt_atomic_add64(&page_history->global_evict_count, 1);
 
     /* So far this works only for disaggregated storage, as we don't have page IDs without it. */
-    if (!F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED)) {
+    if (page->disagg_info == NULL) {
         (void)__wt_atomic_add64(&page_history->global_evict_count_local, 1);
         return (0);
     }
 
-    page_id = page->block_meta.page_id;
-    if (page_id == 0) {
+    page_id = page->disagg_info->block_meta.page_id;
+    if (page_id == WT_BLOCK_INVALID_PAGE_ID) {
         (void)__wt_atomic_add64(&page_history->global_evict_count_no_page_id, 1);
         return (0);
     }
@@ -393,13 +393,13 @@ __wt_conn_page_history_track_read(WT_SESSION_IMPL *session, WT_PAGE *page)
     current_global_read_count = __wt_atomic_add64(&page_history->global_read_count, 1);
 
     /* So far this works only for disaggregated storage, as we don't have page IDs without it. */
-    if (!F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED)) {
+    if (page->disagg_info == NULL) {
         (void)__wt_atomic_add64(&page_history->global_read_count_local, 1);
         return (0);
     }
 
-    page_id = page->block_meta.page_id;
-    if (page_id == 0) /* This should not happen. */
+    page_id = page->disagg_info->block_meta.page_id;
+    if (page_id == WT_BLOCK_INVALID_PAGE_ID) /* This should not happen. */
         return (0);
 
     item = NULL;

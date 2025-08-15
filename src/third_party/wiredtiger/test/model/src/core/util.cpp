@@ -484,7 +484,7 @@ wt_disagg_config_string()
     std::string extension = wt_extension_path("page_log/palm/libwiredtiger_palm.so");
 
     std::ostringstream config;
-    config << "checkpoint=(precise=true),";
+    config << "precise_checkpoint=true,";
     config << "extensions=[" << extension << "],";
     /* config << "extensions=[" << extension << "=(config=\"(verbose=1)\")" << "],"; */
     config << "disaggregated=(page_log=palm,role=follower)";

@@ -2123,14 +2123,9 @@ struct __wt_connection {
      * use a minimum of the log file size.  A database can configure both log_size and wait to set
      * an upper bound for checkpoints; setting this value above 0 configures periodic checkpoints.,
      * an integer between \c 0 and \c 2GB; default \c 0.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;precise,
-     * Only write data with timestamps that are smaller or equal to the stable timestamp to the
-     * checkpoint.  Rollback to stable after restart is a no-op if enabled.  However\, it leads to
-     * extra cache pressure.  The user must have set the stable timestamp.  It is not compatible
-     * with use_timestamp=false config., a boolean flag; default \c false.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each checkpoint; setting this
-     * value above 0 configures periodic checkpoints., an integer between \c 0 and \c 100000;
-     * default \c 0.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait,
+     * seconds to wait between each checkpoint; setting this value above 0 configures periodic
+     * checkpoints., an integer between \c 0 and \c 100000; default \c 0.}
      * @config{ ),,}
      * @config{checkpoint_cleanup = (, periodically checkpoint cleanup the database., a set of
      * related configuration options defined as follows.}
@@ -2959,14 +2954,9 @@ struct __wt_connection {
  * minimum of the log file size.  A database can configure both log_size and wait to set an upper
  * bound for checkpoints; setting this value above 0 configures periodic checkpoints., an integer
  * between \c 0 and \c 2GB; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;precise, Only write data
- * with timestamps that are smaller or equal to the stable timestamp to the checkpoint.  Rollback to
- * stable after restart is a no-op if enabled.  However\, it leads to extra cache pressure.  The
- * user must have set the stable timestamp.  It is not compatible with use_timestamp=false config.,
- * a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between
- * each checkpoint; setting this value above 0 configures periodic checkpoints., an integer between
- * \c 0 and \c 100000; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait
+ * between each checkpoint; setting this value above 0 configures periodic checkpoints., an integer
+ * between \c 0 and \c 100000; default \c 0.}
  * @config{ ),,}
  * @config{checkpoint_cleanup = (, periodically checkpoint cleanup the database., a set of related
  * configuration options defined as follows.}
@@ -3316,6 +3306,10 @@ struct __wt_connection {
  * @config{page_delta = (, configure page delta settings for this connection., a set of related
  * configuration options defined as follows.}
  * @config{ ),,}
+ * @config{precise_checkpoint, Only write data with timestamps that are smaller or equal to the
+ * stable timestamp to the checkpoint.  Rollback to stable after restart is a no-op if enabled.
+ * However\, it leads to extra cache pressure.  The user must have set the stable timestamp.  It is
+ * not compatible with use_timestamp=false config., a boolean flag; default \c false.}
  * @config{prefetch = (, Enable automatic detection of scans by applications\, and attempt to
  * pre-fetch future content into the cache., a set of related configuration options defined as
  * follows.}

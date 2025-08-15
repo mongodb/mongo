@@ -31,7 +31,6 @@ from wtscenario import make_scenarios
 
 # test_live_restore07.py
 # Test that restoring from an empty database fails.
-@wttest.skip_for_hook("tiered", "using multiple WT homes")
 class test_live_restore07(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),

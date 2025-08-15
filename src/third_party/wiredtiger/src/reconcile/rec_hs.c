@@ -602,9 +602,12 @@ __rec_hs_pack_key(WT_SESSION_IMPL *session, WT_BTREE *btree, WTI_RECONCILE *r, W
   WT_ROW *rip, WT_ITEM *key)
 {
     WT_DECL_RET;
+    WT_PAGE *page;
     uint8_t *p;
 
-    switch (r->page->type) {
+    page = r->page;
+
+    switch (page->type) {
     case WT_PAGE_COL_FIX:
     case WT_PAGE_COL_VAR:
         p = key->mem;
@@ -613,8 +616,7 @@ __rec_hs_pack_key(WT_SESSION_IMPL *session, WT_BTREE *btree, WTI_RECONCILE *r, W
         break;
     case WT_PAGE_ROW_LEAF:
         if (ins == NULL) {
-            WT_WITH_BTREE(
-              session, btree, ret = __wt_row_leaf_key(session, r->page, rip, key, false));
+            WT_WITH_BTREE(session, btree, ret = __wt_row_leaf_key(session, page, rip, key, false));
             WT_RET(ret);
         } else {
             key->data = WT_INSERT_KEY(ins);
@@ -622,7 +624,7 @@ __rec_hs_pack_key(WT_SESSION_IMPL *session, WT_BTREE *btree, WTI_RECONCILE *r, W
         }
         break;
     default:
-        WT_RET(__wt_illegal_value(session, r->page->type));
+        WT_RET(__wt_illegal_value(session, page->type));
     }
 
     return (ret);

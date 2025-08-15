@@ -79,7 +79,6 @@ test_import04.py
 test_import07.py
 test_import08.py
 test_import10.py
-test_live_restore04.py # RTS message
 test_log03.py
 test_log04.py
 test_metadata_cursor01.py

@@ -35,7 +35,7 @@ from wtscenario import make_scenarios
 class test_prepare30(wttest.WiredTigerTestCase):
 
     conn_config_values = [
-        ('preserve_prepared_on', dict(expected_error=True, conn_config='checkpoint=(precise=true),preserve_prepared=true')),
+        ('preserve_prepared_on', dict(expected_error=True, conn_config='precise_checkpoint=true,preserve_prepared=true')),
     ]
 
     scenarios = make_scenarios(conn_config_values)

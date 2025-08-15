@@ -38,7 +38,7 @@ from wtscenario import make_scenarios
 class test_layered26(wttest.WiredTigerTestCase, DisaggConfigMixin):
     nitems = 5000
 
-    conn_base_config = 'checkpoint=(precise=true),disaggregated=(page_log=palm),'
+    conn_base_config = 'precise_checkpoint=true,disaggregated=(page_log=palm),'
     conn_config = conn_base_config + 'disaggregated=(role="follower")'
 
     session_create_config = 'key_format=S,value_format=S,'

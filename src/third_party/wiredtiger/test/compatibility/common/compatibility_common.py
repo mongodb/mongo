@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, re, sys
-from compatibility_config import *
+from compatibility_config import BRANCHES, BRANCHES_DIR
 
 # Remember the top-level test directory and the top-level project directory.
 TEST_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
@@ -44,35 +44,6 @@ test_util.setup_3rdparty_paths()
 
 # The default build directory
 DEFAULT_BUILD_DIR = 'build.compatibility'
-
-def is_branch_supported(branch):
-    '''
-    Check whether the branch is supported by the compatibility test.
-    '''
-    return branch == 'this' or branch == 'develop' or branch.startswith('mongodb-')
-
-def is_branch_order_asc(a, b):
-    '''
-    Compare two branches for whether the two branches are in ascending order with respect their
-    version numbers; i.e., whether branch "b" is newer than branch "a".
-    '''
-    if not is_branch_supported(a):
-        raise Exception('Unsupported branch "%s"' % a)
-    if not is_branch_supported(b):
-        raise Exception('Unsupported branch "%s"' % b)
-    if a == b:
-        return False
-
-    # Assume that 'this' branch is newer than 'develop'.
-    if a == 'this':
-        return False
-    if b == 'this':
-        return True
-    if a == 'develop':
-        return False
-    if b == 'develop':
-        return True
-    return b > a
 
 def branch_path(branch):
     '''

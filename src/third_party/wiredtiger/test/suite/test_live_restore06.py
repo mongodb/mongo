@@ -34,7 +34,6 @@ from wtbackup import backup_base
 
 # test_live_restore06.py
 # Ensure WiredTiger cleans all 'nbits=-1' strings from file metadata during backups.
-@wttest.skip_for_hook("tiered", "using multiple WT homes")
 class test_live_restore06(backup_base):
 
     def get_stat(self, statistic):

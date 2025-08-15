@@ -77,7 +77,7 @@ extern "C" {
 
 #define TESTUTIL_ENV_CONFIG_DISAGG          \
     ",disaggregated=(role=%s,page_log=%s)," \
-    "checkpoint=(precise=true)"
+    "precise_checkpoint=true"
 #define TESTUTIL_ENV_CONFIG_DISAGG_EXT                                         \
     "\"%s/ext/page_log/%s/libwiredtiger_%s.so\"=("                             \
     "config=\"(delay_ms=%" PRIu64 ",error_ms=%" PRIu64 ",force_delay=%" PRIu64 \

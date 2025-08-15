@@ -292,19 +292,20 @@ class DisaggHookCreator(wthooks.WiredTigerHookCreator):
     # the test name (or scenario name) skip the test.
     def should_skip(self, test) -> (bool, str):
         skip_categories = [
+            ("disagg",               "Disagg tests already turn on the proper stuff"),
             ("inmem",                "In memory tests don't make sense with disagg storage"),
+            ("layered",              "Layered tests already turn on the proper stuff"),
+            ("live_restore",         "Live restore is not supported with disagg storage"),
             ("lsm",                  "LSM is not supported with tiering"),
             ("modify_smoke_recover", "Copying WT dir doesn't copy the PALM directory"),
             ("rollback_to_stable",   "Rollback to stable is not needed at startup"),
             ("test_backup",          "Can't backup a disagg table"),
             ("test_compact",         "Can't compact a disagg table"),
-            ("test_cursor_bound",    "Can't use cursor bounds with a disagg table"),
-            ("test_salvage",         "Salvage tests directly name files ending in '.wt'"),
             ("test_config_json",     "Disagg hook's create function can't handle a json config string"),
             ("test_cursor_big",      "Cursor caching verified with stats"),
+            ("test_cursor_bound",    "Can't use cursor bounds with a disagg table"),
+            ("test_salvage",         "Salvage tests directly name files ending in '.wt'"),
             ("tiered",               "Tiered tests do not apply to disagg"),
-            ("disagg",               "Disagg tests already turn on the proper stuff"),
-            ("layered",               "Layered tests already turn on the proper stuff"),
         ]
 
         for (skip_string, skip_reason) in skip_categories:

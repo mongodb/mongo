@@ -337,6 +337,8 @@ struct __wt_page_deleted;
 typedef struct __wt_page_deleted WT_PAGE_DELETED;
 struct __wt_page_delta_config;
 typedef struct __wt_page_delta_config WT_PAGE_DELTA_CONFIG;
+struct __wt_page_disagg_info;
+typedef struct __wt_page_disagg_info WT_PAGE_DISAGG_INFO;
 struct __wt_page_header;
 typedef struct __wt_page_header WT_PAGE_HEADER;
 struct __wt_page_history;

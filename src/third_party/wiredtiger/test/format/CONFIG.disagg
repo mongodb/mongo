@@ -3,7 +3,7 @@
 ############################################
 # A configuration for disaggregated storage.
 backup=0
-checkpoint.precise=1
+precise_checkpoint=1
 disagg.page_log=palm
 disagg.enabled=1
 disagg.layered=1

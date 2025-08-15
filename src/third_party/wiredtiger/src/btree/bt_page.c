@@ -532,7 +532,8 @@ __wti_page_reconstruct_deltas(
                 /* The split code works with WT_MULTI structures, build one for the disk image. */
                 memset(&multi, 0, sizeof(multi));
                 multi.disk_image = mod->mod_disk_image;
-                multi.block_meta = ref->page->block_meta;
+                WT_RET(__wt_calloc_one(session, &multi.block_meta));
+                *multi.block_meta = ref->page->disagg_info->block_meta;
 
                 /*
                  * Store the disk image to a temporary pointer in case we fail to rewrite the page
@@ -541,6 +542,7 @@ __wti_page_reconstruct_deltas(
                 tmp = mod->mod_disk_image;
                 mod->mod_disk_image = NULL;
                 ret = __wt_split_rewrite(session, ref, &multi, false);
+                __wt_free(session, multi.block_meta);
                 if (ret != 0) {
                     mod->mod_disk_image = tmp;
                     WT_STAT_CONN_DSRC_INCR(session, cache_read_flatten_leaf_delta_fail);
@@ -588,9 +590,6 @@ __wt_page_block_meta_assign(WT_SESSION_IMPL *session, WT_PAGE_BLOCK_META *meta)
     btree = S2BT(session);
 
     WT_CLEAR(*meta);
-    if (!F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-        return;
-
     /*
      * Allocate an interim page ID. If the page is actually being loaded from disk, it's ok to waste
      * some IDs for now.
@@ -599,9 +598,9 @@ __wt_page_block_meta_assign(WT_SESSION_IMPL *session, WT_PAGE_BLOCK_META *meta)
     WT_ASSERT(session, page_id >= WT_BLOCK_MIN_PAGE_ID);
 
     meta->page_id = page_id;
-    meta->disagg_lsn = 0;
-    meta->backlink_lsn = 0;
-    meta->base_lsn = 0;
+    meta->disagg_lsn = WT_DISAGG_LSN_NONE;
+    meta->backlink_lsn = WT_DISAGG_LSN_NONE;
+    meta->base_lsn = WT_DISAGG_LSN_NONE;
 
     /*
      * 0 means there is no delta written for this page yet. We always write a full page for a new
@@ -654,7 +653,14 @@ __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint32_t alloc_entries, 
         return (__wt_illegal_value(session, type));
     }
 
-    WT_RET(__wt_calloc(session, 1, size, &page));
+    /* Allocate the structure that holds the disaggregated information for the page. */
+    if (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED)) {
+        size += sizeof(WT_PAGE_DISAGG_INFO);
+        WT_RET(__wt_calloc(session, 1, size, &page));
+        page->disagg_info =
+          (WT_PAGE_DISAGG_INFO *)((uint8_t *)page + size - sizeof(WT_PAGE_DISAGG_INFO));
+    } else
+        WT_RET(__wt_calloc(session, 1, size, &page));
 
     page->type = type;
     __wt_evict_page_init(page);
@@ -685,12 +691,7 @@ __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint32_t alloc_entries, 
                 }
             if (0) {
 err:
-                WT_INTL_INDEX_GET_SAFE(page, pindex);
-                if (pindex != NULL) {
-                    for (i = 0; i < pindex->entries; ++i)
-                        __wt_free(session, pindex->index[i]);
-                    __wt_free(session, pindex);
-                }
+                __wt_page_out(session, &page);
                 return (ret);
             }
         }
@@ -706,9 +707,6 @@ err:
     default:
         return (__wt_illegal_value(session, type));
     }
-
-    /* A new page doesn't have a page id. */
-    page->block_meta.page_id = WT_BLOCK_INVALID_PAGE_ID;
 
     /* Increment the cache statistics. */
     __wt_cache_page_inmem_incr(session, page, size, false);

@@ -39,7 +39,7 @@ from wtscenario import make_scenarios
 class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
     uri = "layered:test_layered45"
     conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),transaction_sync=(enabled,method=fsync),' \
-                     + 'page_delta=(delta_pct=50),disaggregated=(page_log=palm),checkpoint=(precise=true),preserve_prepared=true,'
+                     + 'page_delta=(delta_pct=50),disaggregated=(page_log=palm),precise_checkpoint=true,preserve_prepared=true,'
     #conn_config = conn_base_config + 'disaggregated=(role="leader")'
     disagg_storages = gen_disagg_storages('test_layered45', disagg_only = True)
 

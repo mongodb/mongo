@@ -37,7 +37,7 @@ WT_TS_MAX = 2**64-1
 
 class test_prepare36(test_prepare_preserve_prepare_base):
 
-    conn_config = 'checkpoint=(precise=true),preserve_prepared=true,statistics=(all)'
+    conn_config = 'precise_checkpoint=true,preserve_prepared=true,statistics=(all)'
     uri = 'table:test_prepare36'
 
 

@@ -51,8 +51,8 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
     ]
 
     ckpt_precision = [
-        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
-        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+        ('fuzzy', dict(ckpt_config='precise_checkpoint=false')),
+        ('precise', dict(ckpt_config='precise_checkpoint=true')),
     ]
 
     scenarios = make_scenarios(format_values, size_values, ckpt_precision)
@@ -64,7 +64,7 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
     @wttest.skip_for_hook("disagg", "disagg hook does not handle multithreaded tests correctly")
     def test_checkpoint02(self):
         # Avoid checkpoint error with precise checkpoint
-        if self.ckpt_config == 'checkpoint=(precise=true)':
+        if self.ckpt_config == 'precise_checkpoint=true':
             self.conn.set_timestamp('stable_timestamp=1')
 
         done = threading.Event()

@@ -34,7 +34,6 @@ from wtbackup import backup_base
 
 # test_live_restore08.py
 # Test bulk cursor usage with live restore.
-@wttest.skip_for_hook("tiered", "using multiple WT homes")
 class test_live_restore08(backup_base):
     nrows = 10000
 

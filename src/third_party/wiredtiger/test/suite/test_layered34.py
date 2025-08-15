@@ -37,7 +37,7 @@ from wtscenario import make_scenarios
 class test_layered34(wttest.WiredTigerTestCase, DisaggConfigMixin):
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'checkpoint=(precise=true),disaggregated=(page_log=palm,' \
+                     + 'precise_checkpoint=true,disaggregated=(page_log=palm,' \
                      + 'lose_all_my_data=true),'
     conn_config = conn_base_config + 'disaggregated=(role="follower")'
 

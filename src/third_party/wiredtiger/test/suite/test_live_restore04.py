@@ -34,7 +34,6 @@ from wtbackup import backup_base
 
 # test_live_restore04.py
 # Test using the wt utility with live restore.
-@wttest.skip_for_hook("tiered", "using multiple WT homes")
 class test_live_restore04(backup_base):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),

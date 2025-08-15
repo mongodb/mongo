@@ -789,7 +789,7 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
          * Ideally we would not gate precise checkpoints on disagg also being enabled.
          */
         if (g.disagg_storage_config && GV(CHECKPOINT_PRECISE))
-            CONFIG_APPEND(p, ",checkpoint=(precise=true)");
+            CONFIG_APPEND(p, ",precise_checkpoint=true");
 
 #if WIREDTIGER_VERSION_MAJOR >= 10
         if (GV(OPS_VERIFY) && verify_metadata)

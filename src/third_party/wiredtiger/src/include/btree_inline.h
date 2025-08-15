@@ -1645,8 +1645,8 @@ __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref, bool page_replacement
 
     WT_ERR(__wt_btree_block_free(session, addr.addr, addr.size, page_replacement));
 
-    if (!page_replacement && ref->page != NULL)
-        ref->page->block_meta.page_id = WT_BLOCK_INVALID_PAGE_ID;
+    if (!page_replacement && ref->page != NULL && ref->page->disagg_info != NULL)
+        ref->page->disagg_info->block_meta.page_id = WT_BLOCK_INVALID_PAGE_ID;
 
     /* Clear the address (so we don't free it twice). */
     __wt_ref_addr_free(session, ref);
@@ -1924,9 +1924,6 @@ __wt_page_materialization_check(WT_SESSION_IMPL *session, uint64_t rec_lsn_max)
     WT_DISAGGREGATED_STORAGE *disagg;
     uint64_t last_materialized_lsn;
 
-    if (!F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED))
-        return (true);
-
     /*
      * Pages that haven't been written back can be evicted. This will lead to them being reconciled
      * and retained, not actually evicted.
@@ -1979,7 +1976,9 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * frontier is satisfied.
      */
     if (mod == NULL) {
-        if (__wt_page_materialization_check(session, page->rec_lsn_max))
+        if (page->disagg_info == NULL)
+            return (true);
+        else if (__wt_page_materialization_check(session, page->disagg_info->rec_lsn_max))
             return (true);
         else {
             WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_materialization);
@@ -2036,7 +2035,8 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * Clean pages that are in front of the materialization check should not proceed to eviction.
      * They would not go through reconciliation, but just be discarded which isn't OK.
      */
-    if (!modified && !__wt_page_materialization_check(session, page->rec_lsn_max)) {
+    if (!modified && page->disagg_info != NULL &&
+      !__wt_page_materialization_check(session, page->disagg_info->rec_lsn_max)) {
         WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_materialization);
         return (false);
     }
@@ -2055,7 +2055,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * Don't evict dirty internal pages for disaggregated storage. They cannot be recreated
      * in-memory and it will not reduce cache usage.
      */
-    if (modified && F_ISSET(btree, WT_BTREE_DISAGGREGATED) && F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
+    if (modified && page->disagg_info != NULL && F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
         WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_disagg_dirty_internal_page);
         return (false);
     }

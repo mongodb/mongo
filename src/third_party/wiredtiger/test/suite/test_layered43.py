@@ -42,7 +42,7 @@ class test_layered43(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'checkpoint=(precise=true),disaggregated=(page_log=palm),' \
+                     + 'precise_checkpoint=true,disaggregated=(page_log=palm),' \
                      + 'block_cache=(enabled=true,type="dram",size=256MB),'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
