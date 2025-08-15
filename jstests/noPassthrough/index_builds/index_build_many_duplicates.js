@@ -45,7 +45,7 @@ assert(serverStatus.hasOwnProperty('indexBulkBuilder'),
 const section = serverStatus.indexBulkBuilder;
 print("Index build stats", tojson(section));
 
-const numSpills = section.bytesSpilledUncompressed;
+const numSpills = section.spilledRanges;
 assert.gt(numSpills, 0, tojson(section));
 
 // Ensure the uncompressed memory usage per spill does not exceed the limit.
