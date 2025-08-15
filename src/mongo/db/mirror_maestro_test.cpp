@@ -100,7 +100,7 @@ public:
 
         if (initMaestro()) {
             MirrorMaestro::init(service);
-            setExecutor_forTest(getServiceContext(), _executor);
+            setMirroringTaskExecutor_forTest(getServiceContext(), _executor);
         }
     }
 
@@ -193,8 +193,7 @@ protected:
             return config;
         }
 
-        auto serviceContext = getServiceContext();
-        auto cache = getCachedHelloResponse_forTest(serviceContext);
+        auto cache = _getCachedHelloResponse();
         ClockSource::StopWatch stopwatch;
         auto timeout = Milliseconds(1000);
 
@@ -207,13 +206,19 @@ protected:
             // be updated immediately. If either of these situations happen, we wait to get a new
             // cached HelloResponse in a timed-loop.
             sleepmillis(10);
-            cache = getCachedHelloResponse_forTest(serviceContext);
+            cache = _getCachedHelloResponse();
         }
 
         return config;
     }
 
 private:
+    std::shared_ptr<const repl::HelloResponse> _getCachedHelloResponse() const {
+        auto swCache = getCachedHelloResponse_forTest(getServiceContext());
+        ASSERT(swCache.isOK());
+        return swCache.getValue();
+    }
+
     std::shared_ptr<executor::NetworkInterfaceMock> _net;
 };
 
@@ -391,6 +396,12 @@ public:
         "samplingRate" << 0.0 << "targetedMirroring"
                        << BSON("samplingRate" << 0.1 << "maxTimeMS" << 500 << "tag" << kEastTag));
 
+    std::vector<HostAndPort> getCachedHosts() const {
+        auto swHosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+        ASSERT(swHosts.isOK());
+        return swHosts.getValue();
+    }
+
 private:
     FailPointEnableBlock _skipRegisteringMirroredReadsTopologyObserverCallback{
         "skipRegisteringMirroredReadsTopologyObserverCallback"};
@@ -400,7 +411,8 @@ private:
 
 TEST_F(TargetedMirrorMaestroTest, BasicInitializationEmptyHostsCache) {
     // Verify hosts cache is initially empty
-    auto hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    auto hosts = getCachedHosts();
+
     ASSERT(hosts.empty());
 }
 
@@ -423,7 +435,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateCachedHostsOnUpdatedTag) {
         getServiceContext(), config, false /* tagChanged */);
 
     // Verify hosts were cached
-    auto hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    auto hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 1);
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 
@@ -438,7 +450,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateCachedHostsOnUpdatedTag) {
         getServiceContext(), config, true /* tagChanged */);
 
     // Verify hosts were updated
-    hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 1);
     ASSERT_EQ((hosts)[0].toString(), kHost2);
 }
@@ -457,7 +469,7 @@ TEST_F(TargetedMirrorMaestroTest, AssertCachedHostsUpdatedOnServerParameterChang
         getServiceContext(), config, false /* tagChanged */);
 
     // Verify hosts were cached
-    auto hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    auto hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 1);
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 
@@ -471,7 +483,7 @@ TEST_F(TargetedMirrorMaestroTest, AssertCachedHostsUpdatedOnServerParameterChang
         ServerParameterControllerForTest("mirrorReads", updatedServerParam);
 
     // Verify hosts were updated
-    hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 1);
     ASSERT_EQ((hosts)[0].toString(), kHost2);
 }
@@ -488,7 +500,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateCachedHostsOnTopologyVersionChange) {
         getServiceContext(), config, false /* tagChanged */);
 
     // Verify hosts were cached
-    auto hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    auto hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 1);
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 
@@ -500,7 +512,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateCachedHostsOnTopologyVersionChange) {
         getServiceContext(), config, false /* tagChanged */);
 
     // Verify hosts were updated
-    hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 2);
     ASSERT_EQ((hosts)[0].toString(), kHost1);
     ASSERT_EQ((hosts)[1].toString(), kHost2);
@@ -518,7 +530,7 @@ TEST_F(TargetedMirrorMaestroTest, NoUpdateToCachedHostsIfTopologyVersionUnchange
         getServiceContext(), config, false /* tagChanged */);
 
     // Verify hosts were cached
-    auto hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    auto hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 1);
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 
@@ -531,7 +543,7 @@ TEST_F(TargetedMirrorMaestroTest, NoUpdateToCachedHostsIfTopologyVersionUnchange
         getServiceContext(), config, false /* tagChanged */);
 
     // Verify hosts were not updated
-    hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 1);
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 }
@@ -548,7 +560,7 @@ DEATH_TEST_F(TargetedMirrorMaestroTest, InvariantOnDecreasedConfigVersionForSame
         getServiceContext(), config, false /* tagChanged */);
 
     // Verify hosts were cached
-    auto hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    auto hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 1);
     ASSERT_EQ(((hosts)[0]).toString(), kHost1);
 
@@ -572,7 +584,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateHostsOnNewTermEvenIfLowerConfigVersion) 
         getServiceContext(), config, false /* tagChanged */);
 
     // Verify hosts were cached
-    auto hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    auto hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 1);
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 
@@ -586,7 +598,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateHostsOnNewTermEvenIfLowerConfigVersion) 
         getServiceContext(), config, false /* tagChanged */);
 
     // Verify hosts were updated
-    hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 2);
     ASSERT_EQ((hosts)[0].toString(), kHost1);
     ASSERT_EQ((hosts)[1].toString(), kHost2);
@@ -608,7 +620,7 @@ TEST_F(TargetedMirrorMaestroTest, AssertExpectedHostsTargeted) {
         getServiceContext(), config, false /* tagChanged */);
 
     // Verify hosts were cached
-    auto hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
+    auto hosts = getCachedHosts();
     ASSERT_EQ(hosts.size(), 1);
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 
@@ -639,13 +651,13 @@ TEST_F(TargetedMirrorMaestroTest, UninitializedConfigDefersHostCompute) {
 
     // Attempt to update cached hosts and assert host size.
     updateCachedHostsForTargetedMirroring_forTest(service, config, false /* tagChanged */);
-    ASSERT_EQ(0, getCachedHostsForTargetedMirroring_forTest(service).size());
+    ASSERT_EQ(0, getCachedHosts().size());
 
     // Update the config to be initialized.
     setAndVerifyConfig(2 /* version */, 1 /* term */, kTwoHostsEW, 2);
 
     // Host list should be computed upon getting.
-    auto hosts = getCachedHostsForTargetedMirroring_forTest(service);
+    auto hosts = getCachedHosts();
     ASSERT_EQ(1, hosts.size());
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 }
@@ -657,7 +669,9 @@ public:
     }
 };
 
-TEST_F(NoInitMirrorTest, UninitMirrorMaestroDoesNotTargetHosts) {
+// Test that setting the mirrorReads parameter before initialization will update the cached hosts
+// after initialization.
+TEST_F(NoInitMirrorTest, SetParamBeforeInit) {
     setAndVerifyConfig(2 /* version */, 1 /* term */, kTwoHostsEW, 2);
 
     auto param = BSON("samplingRate"
@@ -665,8 +679,9 @@ TEST_F(NoInitMirrorTest, UninitMirrorMaestroDoesNotTargetHosts) {
                       << BSON("samplingRate" << 1.0 << "maxTimeMS" << 500 << "tag" << kEastTag));
     ServerParameterControllerForTest controller("mirrorReads", param);
 
-    // Uninitialized MirrorMaestro should have 0 hosts that are targeted.
-    ASSERT_EQ(0, getCachedHostsForTargetedMirroring_forTest(getServiceContext()).size());
+    // Initializing MirrorMaestro will update the cached hosts according to the param we set above.
+    MirrorMaestro::init(getServiceContext());
+    ASSERT_EQ(1, getCachedHosts().size());
 }
 
 }  // namespace

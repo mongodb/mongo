@@ -161,12 +161,12 @@ public:
     /**
      * Returns the cached HelloResponse in the TopologyVersionObserver.
      */
-    std::shared_ptr<const repl::HelloResponse> getCachedHelloResponse();
+    StatusWith<std::shared_ptr<const repl::HelloResponse>> getCachedHelloResponse();
 
     /**
      * Returns the list of hosts to send mirrored reads to for targeted mirroring.
      */
-    std::vector<HostAndPort> getCachedHostsForTargetedMirroring();
+    StatusWith<std::vector<HostAndPort>> getCachedHostsForTargetedMirroring();
 
     /**
      * Update the list of hosts to target for targeted mirroring. The list of hosts will be updated
@@ -176,14 +176,20 @@ public:
     void updateCachedHostsForTargetedMirroring(const repl::ReplSetConfig& replSetConfig,
                                                bool tagChanged);
 
-    void overrideExecutor_forTest(std::shared_ptr<executor::TaskExecutor> executor);
-
-    auto getExecutor() const {
-        return _executor;
-    }
-
     auto isInitialized() const {
         return _isInitialized.load();
+    }
+
+    void overrideExecutor_forTest(std::shared_ptr<executor::TaskExecutor> executor) {
+        invariant(isInitialized());
+        _executor = std::move(executor);
+    }
+
+    StatusWith<std::shared_ptr<executor::TaskExecutor>> getExecutor_forTest() const {
+        if (MONGO_unlikely(!isInitialized())) {
+            return Status(ErrorCodes::NotYetInitialized, "MirrorMaestro is not yet initialized");
+        }
+        return _executor;
     }
 
     /**
@@ -313,8 +319,8 @@ private:
     friend std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(
         ServiceContext* serviceContext);
 
-    friend void setExecutor_forTest(ServiceContext* serviceContext,
-                                    std::shared_ptr<executor::TaskExecutor> executor);
+    friend void setMirroringTaskExecutor_forTest(ServiceContext* serviceContext,
+                                                 std::shared_ptr<executor::TaskExecutor> executor);
 
     /**
      * Returns the replica set tag that should be used to target mirrored reads.
@@ -552,6 +558,8 @@ Status setMirrorReadsParameter(const BSONObj& param) try {
     auto service = getGlobalServiceContext();
     auto& impl = getMirrorMaestroImpl(service);
     if (!impl.isInitialized()) {
+        // It's okay to early return since MirrorMaestroImpl initialization will call
+        // updateMirroringOptions with the new value we just set.
         return Status::OK();
     }
     impl.updateMirroringOptions(serverParam->_data.get());
@@ -663,17 +671,24 @@ void MirrorMaestroImpl::updateMirroringOptions(MirroredReadsParameters params) {
     }
 }
 
-std::shared_ptr<const repl::HelloResponse> MirrorMaestroImpl::getCachedHelloResponse() {
+StatusWith<std::shared_ptr<const repl::HelloResponse>> MirrorMaestroImpl::getCachedHelloResponse() {
+    if (MONGO_unlikely(!isInitialized())) {
+        return Status(ErrorCodes::NotYetInitialized, "MirrorMaestro is not yet initialized");
+    }
     return _topologyVersionObserver.getCached();
 }
 
-std::vector<HostAndPort> MirrorMaestroImpl::getCachedHostsForTargetedMirroring() {
+StatusWith<std::vector<HostAndPort>> MirrorMaestroImpl::getCachedHostsForTargetedMirroring() {
+    if (MONGO_unlikely(!isInitialized())) {
+        return Status(ErrorCodes::NotYetInitialized, "MirrorMaestro is not yet initialized");
+    }
+
     if (MONGO_unlikely(_cachedHostsForTargetedMirroring.consumeDeferHostCompute())) {
         auto config = _topologyVersionObserver.getReplSetConfig();
 
         // If the config is still uninitialized, early return.
         if (_maybeDeferHostCompute(config)) {
-            return {};
+            return std::vector<HostAndPort>();
         }
 
         const auto& targetedParams = _paramsSnapshot->getTargetedMirroring();
@@ -750,7 +765,9 @@ void MirrorMaestroImpl::tryMirror(const std::shared_ptr<CommandInvocation>& invo
     auto mirrorCount =
         std::ceil(_paramsSnapshot->getSamplingRate() * hostsForGeneralMirroring.size());
 
-    auto hostsForTargetedMirroring = getCachedHostsForTargetedMirroring();
+    auto swHosts = getCachedHostsForTargetedMirroring();
+    invariant(swHosts);
+    const auto& hostsForTargetedMirroring = swHosts.getValue();
 
     // If there are no hosts to target, and general mirroring is disabled, there is no work to do.
     if (hostsForTargetedMirroring.empty() && !mirrorMode.generalEnabled) {
@@ -993,10 +1010,6 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) {
     _isInitialized.store(true);
 }
 
-void MirrorMaestroImpl::overrideExecutor_forTest(std::shared_ptr<executor::TaskExecutor> executor) {
-    _executor = std::move(executor);
-}
-
 void MirrorMaestroImpl::shutdown() {
     LOGV2_DEBUG(31454, 2, "Shutting down MirrorMaestro");
 
@@ -1025,19 +1038,13 @@ void MirrorMaestroImpl::shutdown() {
     _initGuard.liveness = Liveness::kShutdown;
 }
 
-std::shared_ptr<executor::TaskExecutor> getMirroringTaskExecutor_forTest(
-    ServiceContext* serviceContext) {
-    auto& impl = getMirrorMaestroImpl(serviceContext);
-    return impl.getExecutor();
-}
-
-std::shared_ptr<const repl::HelloResponse> getCachedHelloResponse_forTest(
+StatusWith<std::shared_ptr<const repl::HelloResponse>> getCachedHelloResponse_forTest(
     ServiceContext* serviceContext) {
     auto& impl = getMirrorMaestroImpl(serviceContext);
     return impl.getCachedHelloResponse();
 }
 
-std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(
+StatusWith<std::vector<HostAndPort>> getCachedHostsForTargetedMirroring_forTest(
     ServiceContext* serviceContext) {
     auto& impl = getMirrorMaestroImpl(serviceContext);
     return impl.getCachedHostsForTargetedMirroring();
@@ -1050,8 +1057,14 @@ void updateCachedHostsForTargetedMirroring_forTest(ServiceContext* serviceContex
     impl.updateCachedHostsForTargetedMirroring(replSetConfig, tagChanged);
 }
 
-void setExecutor_forTest(ServiceContext* serviceContext,
-                         std::shared_ptr<executor::TaskExecutor> executor) {
+StatusWith<std::shared_ptr<executor::TaskExecutor>> getMirroringTaskExecutor_forTest(
+    ServiceContext* serviceContext) {
+    auto& impl = getMirrorMaestroImpl(serviceContext);
+    return impl.getExecutor_forTest();
+}
+
+void setMirroringTaskExecutor_forTest(ServiceContext* serviceContext,
+                                      std::shared_ptr<executor::TaskExecutor> executor) {
     auto& impl = getMirrorMaestroImpl(serviceContext);
     impl.overrideExecutor_forTest(executor);
 }

@@ -89,21 +89,17 @@ public:
  */
 
 /**
- * Gets the executor associated with the MirrorMaestro.
- */
-std::shared_ptr<executor::TaskExecutor> getMirroringTaskExecutor_forTest(
-    ServiceContext* serviceContext);
-
-/**
  * Returns the cached HelloResponse that will be used for general mirrored reads.
  */
-std::shared_ptr<const repl::HelloResponse> getCachedHelloResponse_forTest(
+StatusWith<std::shared_ptr<const repl::HelloResponse>> getCachedHelloResponse_forTest(
     ServiceContext* serviceContext);
 
 /**
- * Returns the list of hosts that will be used for targeted mirrored reads.
+ * Returns the list of hosts that will be used for targeted mirrored reads. Returns a
+ * NotYetInitialized status if the MirrorMaestro isn't initialized.
  */
-std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(ServiceContext* serviceContext);
+StatusWith<std::vector<HostAndPort>> getCachedHostsForTargetedMirroring_forTest(
+    ServiceContext* serviceContext);
 
 /**
  * Updates the list of hosts that will be used by targeted mirrored reads.
@@ -115,7 +111,19 @@ void updateCachedHostsForTargetedMirroring_forTest(ServiceContext* serviceContex
                                                    const repl::ReplSetConfig& replSetConfig,
                                                    bool tagChanged);
 
-void setExecutor_forTest(ServiceContext* serviceContext,
-                         std::shared_ptr<executor::TaskExecutor> executor);
+/**
+ * Gets the executor associated with the MirrorMaestro. Returns a NotYetInitialized status if the
+ * MirrorMaestro isn't initialized.
+ */
+StatusWith<std::shared_ptr<executor::TaskExecutor>> getMirroringTaskExecutor_forTest(
+    ServiceContext* serviceContext);
+
+/**
+ * Sets the executor associated with the MirrorMaestro.
+ *
+ * Note: This may only be called after initializing the MirrorMaestro.
+ */
+void setMirroringTaskExecutor_forTest(ServiceContext* serviceContext,
+                                      std::shared_ptr<executor::TaskExecutor> executor);
 
 }  // namespace mongo

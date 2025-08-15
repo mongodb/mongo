@@ -46,7 +46,14 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto exec = getMirroringTaskExecutor_forTest(opCtx->getServiceContext());
+        auto swExec = getMirroringTaskExecutor_forTest(opCtx->getServiceContext());
+        if (!swExec.isOK()) {
+            result.append("code", swExec.getStatus().code());
+            result.append("codeName", ErrorCodes::errorString(swExec.getStatus().code()));
+            result.append("errmsg", swExec.getStatus().reason());
+            return false;
+        }
+        auto exec = swExec.getValue();
 
         // TODO SERVER-100677: Unify global connection stats collection.
         executor::ConnectionPoolStats stats{};
@@ -85,9 +92,17 @@ public:
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
-             BSONObjBuilder&) override {
+             BSONObjBuilder& result) override {
         auto hps = cmdObj["hostAndPort"].Array();
-        auto exec = getMirroringTaskExecutor_forTest(opCtx->getServiceContext());
+        auto swExec = getMirroringTaskExecutor_forTest(opCtx->getServiceContext());
+        if (!swExec.isOK()) {
+            result.append("code", swExec.getStatus().code());
+            result.append("codeName", ErrorCodes::errorString(swExec.getStatus().code()));
+            result.append("errmsg", swExec.getStatus().reason());
+            return false;
+        }
+        auto exec = swExec.getValue();
+
         for (auto&& hp : hps) {
             exec->dropConnections(
                 HostAndPort(hp.String()),
