@@ -29,8 +29,10 @@
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_test_optimizations.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -67,16 +69,33 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceUniqueForThisTestMappingFn(
 /**
  * Use default mapper for all unregistered document sources.
  * The default is to return static_cast<Stage*>(documentSourcePtr);
+ *
+ * TODO SERVER-108165 Remove this once all the stages have been mapped.
  */
 TEST(DocumentSourceToStageRegistryTest, DefaultMapper) {
-    auto fakeDS =
-        make_intrusive<DocumentSourceTestOptimizations>(make_intrusive<ExpressionContextForTest>());
+    auto fakeDS = DocumentSourceLimit::create(make_intrusive<ExpressionContextForTest>(), 10LL);
     mappingFnCallCount = 0;
 
     auto fakeStage = buildStage(fakeDS);
 
-    ASSERT_EQ(fakeDS.get(), dynamic_cast<DocumentSourceTestOptimizations*>(fakeStage.get()));
+    ASSERT_EQ(fakeDS.get(), dynamic_cast<DocumentSourceLimit*>(fakeStage.get()));
     ASSERT_EQ(mappingFnCallCount, 0);
+}
+
+/**
+ * Test that for the DocumentSources that do not have a registered mapping function, we hit the
+ * tassert in the mapping function.
+ */
+DEATH_TEST(DocumentSourceToStageRegistryTest,
+           NonexistentMapper,
+           "Missing 'DocumentSource' to 'agg::Stage' mapping function") {
+    const auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+    // Create a DocumentSources that do not have a registered mapping function.
+    const boost::intrusive_ptr<DocumentSource> ds =
+        make_intrusive<DocumentSourceTestOptimizations>(expCtx);
+
+    ASSERT_THROWS_CODE(buildStage(ds), DBException, 10395401);
 }
 
 REGISTER_AGG_STAGE_MAPPING(uniqueForThisTest,

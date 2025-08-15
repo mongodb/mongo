@@ -30,17 +30,17 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_test_optimizations.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::test {
 
-
+// TODO SERVER-108165 Consider if this test if still needed after all splits.
 TEST(PipelineBuilderTest, OneStagePipeline) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    auto dsFake = make_intrusive<DocumentSourceTestOptimizations>(expCtx);
+    auto dsFake = DocumentSourceLimit::create(expCtx, 10LL);
     std::list<boost::intrusive_ptr<DocumentSource>> sources{dsFake};
     auto pipeline = Pipeline::create(std::move(sources), expCtx);
 
@@ -51,7 +51,6 @@ TEST(PipelineBuilderTest, OneStagePipeline) {
     // The next assertion is only true for trivial (same object instance) mapping of not-yet
     // refactored document sources during SPM-4106. After all stages are refactored, we must use
     // more specific assertions.
-    ASSERT_EQ(dsFake.get(),
-              dynamic_cast<DocumentSourceTestOptimizations*>(pl->getStages().back().get()));
+    ASSERT_EQ(dsFake.get(), dynamic_cast<DocumentSourceLimit*>(pl->getStages().back().get()));
 }
 }  // namespace mongo::test

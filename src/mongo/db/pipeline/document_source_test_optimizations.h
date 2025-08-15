@@ -30,19 +30,17 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
 
 namespace mongo {
 /**
  * A dummy class for other tests to inherit from to customize the behavior of any of the virtual
  * methods from DocumentSource without having to implement all of them.
  */
-class DocumentSourceTestOptimizations : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceTestOptimizations : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalTestOptimizations"_sd;
     DocumentSourceTestOptimizations(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(DocumentSourceTestOptimizations::kStageName, expCtx),
-          exec::agg::Stage(DocumentSourceTestOptimizations::kStageName, expCtx) {}
+        : DocumentSource(DocumentSourceTestOptimizations::kStageName, expCtx) {}
     ~DocumentSourceTestOptimizations() override = default;
     const char* getSourceName() const override {
         return DocumentSourceTestOptimizations::kStageName.data();
@@ -74,10 +72,6 @@ public:
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
-
-    GetNextResult doGetNext() final {
-        return GetNextResult::makeEOF();
-    }
 
 private:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
