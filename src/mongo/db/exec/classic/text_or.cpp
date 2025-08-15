@@ -446,8 +446,7 @@ void TextOrStage::initSorter() {
         SortOptions{}
             .FileStats(_sorterStats.get())
             .MaxMemoryUsageBytes(kMaxMemoryUsageForSorter)
-            .TempDir(expCtx()->getTempDir())
-            .ExtSortAllowed(),
+            .TempDir(expCtx()->getTempDir()),
         [](const RecordId& lhs, const RecordId& rhs) { return lhs.compare(rhs); });
 }
 
