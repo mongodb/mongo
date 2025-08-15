@@ -196,7 +196,6 @@ assert.commandFailedWithCode(
             }
         }
     }]),
-    // TODO SERVER-104725 Change this to the error code from LiteParsedPipeline::validate().
     10170100);
 
 assert.commandFailedWithCode(
@@ -220,5 +219,4 @@ assert.commandFailedWithCode(
             }
         }
     }]),
-    // TODO SERVER-104725 Change this to the error code from LiteParsedPipeline::validate().
     10473003);
