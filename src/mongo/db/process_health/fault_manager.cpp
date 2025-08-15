@@ -379,8 +379,9 @@ boost::optional<FaultState> FaultManager::handleTransientFault(const OptionalMes
 }
 
 boost::optional<FaultState> FaultManager::handleActiveFault(const OptionalMessageType& message) {
-    invariant(_fault);
-    LOGV2_FATAL(5936509, "Halting Process due to ongoing fault", "fault"_attr = *_fault);
+    auto fault = getFault();
+    invariant(fault);
+    LOGV2_FATAL(5936509, "Halting Process due to ongoing fault", "fault"_attr = *fault);
     return boost::none;
 }
 
@@ -395,22 +396,24 @@ void FaultManager::logMessageReceived(FaultState state, const HealthCheckStatus&
 }
 
 void FaultManager::logCurrentState(FaultState, FaultState newState, const OptionalMessageType&) {
-    {
+    std::shared_ptr<Fault> fault = [this]() -> auto {
         stdx::lock_guard<stdx::mutex> lk(_stateMutex);
         _lastTransitionTime = _svcCtx->getFastClockSource()->now();
-    }
-    if (_fault) {
+        return _fault;
+    }();
+
+    if (fault) {
         LOGV2(5939703,
               "Fault manager changed state ",
               "state"_attr = (str::stream() << newState),
-              "fault"_attr = *_fault);
+              "fault"_attr = *fault);
     } else {
         LOGV2(5936503, "Fault manager changed state ", "state"_attr = (str::stream() << newState));
     }
 }
 
 void FaultManager::setTransientFaultDeadline(FaultState, FaultState, const OptionalMessageType&) {
-    if (_fault->hasCriticalFacet(getConfig()) && !_transientFaultDeadline) {
+    if (auto fault = getFault(); fault->hasCriticalFacet(getConfig()) && !_transientFaultDeadline) {
         _transientFaultDeadline = std::make_unique<TransientFaultDeadline>(
             this, _taskExecutor, _config->getActiveFaultDuration());
     }
