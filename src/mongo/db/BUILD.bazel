@@ -4487,7 +4487,7 @@ mongo_cc_fuzzer_test(
         "op_msg_fuzzer_shard.cpp",
     ],
     deps = [
-        "op_msg_fuzzer_shard_fixture",
+        "op_msg_fuzzer_fixture",
         "server_base",
     ],
 )
@@ -4498,7 +4498,7 @@ mongo_cc_fuzzer_test(
         "op_msg_fuzzer_router.cpp",
     ],
     deps = [
-        "op_msg_fuzzer_router_fixture",
+        "op_msg_fuzzer_fixture",
         "server_base",
     ],
 )

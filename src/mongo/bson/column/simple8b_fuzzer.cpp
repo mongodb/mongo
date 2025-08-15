@@ -35,8 +35,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-static constexpr int128_t add(int128_t lhs, int128_t rhs) {
-    return static_cast<int128_t>(static_cast<uint128_t>(lhs) + static_cast<uint128_t>(rhs));
+static constexpr mongo::int128_t add(mongo::int128_t lhs, mongo::int128_t rhs) {
+    return static_cast<mongo::int128_t>(static_cast<mongo::uint128_t>(lhs) +
+                                        static_cast<mongo::uint128_t>(rhs));
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
