@@ -88,11 +88,8 @@ WiredTigerSession::~WiredTigerSession() {
 }
 
 namespace {
-void _openCursor(WT_SESSION* session,
-                 const std::string& uri,
-                 const char* config,
-                 WT_CURSOR** cursorOut) {
-    int ret = session->open_cursor(session, uri.c_str(), nullptr, config, cursorOut);
+void _openCursor(WT_SESSION* session, StringData uri, const char* config, WT_CURSOR** cursorOut) {
+    int ret = session->open_cursor(session, uri.data(), nullptr, config, cursorOut);
     if (ret == 0) {
         return;
     }
@@ -137,7 +134,7 @@ WT_CURSOR* WiredTigerSession::getCachedCursor(uint64_t id, const std::string& co
     return nullptr;
 }
 
-WT_CURSOR* WiredTigerSession::getNewCursor(const std::string& uri, const char* config) {
+WT_CURSOR* WiredTigerSession::getNewCursor(StringData uri, const char* config) {
     WT_CURSOR* cursor = nullptr;
     _openCursor(_session, uri, config, &cursor);
     _cursorsOut++;

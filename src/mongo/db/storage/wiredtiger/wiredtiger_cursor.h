@@ -61,7 +61,7 @@ public:
      *
      * If 'random' is true, every next calls will yield records in a random order.
      */
-    WiredTigerCursor(Params params, const std::string& uri, WiredTigerSession& session);
+    WiredTigerCursor(Params params, StringData uri, WiredTigerSession& session);
 
     // Prevent duplication of the logical owned-ness of the cursors via move or copy.
     WiredTigerCursor(WiredTigerCursor&&) = delete;

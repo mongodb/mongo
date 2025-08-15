@@ -169,12 +169,12 @@ public:
      * This will never return a cursor from the cursor cache, and these cursors should *never* be
      * released into the cache by calling releaseCursor(). Use closeCursor() instead.
      */
-    WT_CURSOR* getNewCursor(const std::string& uri, const char* config);
+    WT_CURSOR* getNewCursor(StringData uri, const char* config);
 
     /**
      * Wrapper for getNewCursor() without a config string.
      */
-    WT_CURSOR* getNewCursor(const std::string& uri) {
+    WT_CURSOR* getNewCursor(StringData uri) {
         return getNewCursor(uri, nullptr);
     }
 

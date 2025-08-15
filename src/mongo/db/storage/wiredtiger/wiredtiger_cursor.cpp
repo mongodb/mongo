@@ -50,9 +50,7 @@ namespace {
 static constexpr StringData kOverwriteFalse = "overwrite=false"_sd;
 }  // namespace
 
-WiredTigerCursor::WiredTigerCursor(Params params,
-                                   const std::string& uri,
-                                   WiredTigerSession& session)
+WiredTigerCursor::WiredTigerCursor(Params params, StringData uri, WiredTigerSession& session)
     : _tableID(params.tableID), _session(session) {
     // Passing nullptr is significantly faster for WiredTiger than passing an empty string.
     const char* configStr = nullptr;
