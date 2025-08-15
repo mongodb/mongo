@@ -2587,8 +2587,8 @@ functions:
         - "src/evergreen/run_python_script.sh"
         - "buildscripts/fast_archive.py"
         - "-f=mongo-coredumps.json"
-        - "-p=./**.core"
-        - "-p=./**.mdmp" # Windows: minidumps
+        - "-p=./*.core"
+        - "-p=./*.mdmp" # Windows: minidumps
         - "-n=Core Dump"
 
   "archive mongo coredumps": &archive_mongo_coredumps

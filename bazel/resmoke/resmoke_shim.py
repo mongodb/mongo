@@ -1,12 +1,17 @@
 import os
 import pathlib
+import signal
 import sys
 from functools import cache
+
+import psutil
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 from buildscripts.bazel_local_resources import acquire_local_resource
 from buildscripts.resmokelib import cli
+from buildscripts.resmokelib.hang_analyzer.process import signal_python
+from buildscripts.resmokelib.logging.loggers import new_resmoke_logger
 
 
 @cache
@@ -43,6 +48,36 @@ def add_evergreen_build_info(args):
     add_volatile_arg(args, "--versionId=", "version_id")
     add_volatile_arg(args, "--requester=", "requester")
 
+class ResmokeShimContext:
+    def __init__(self):
+        self.links = []
+        
+    def __enter__(self):
+        # Bazel will send SIGTERM on a test timeout. If all processes haven't terminated
+        # after –-local_termination_grace_seconds (default 15s), Bazel will SIGKILL them instead.
+        signal.signal(signal.SIGTERM, self._handle_interrupt)
+
+        # Symlink source directories because resmoke uses relative paths profusely.
+        base_dir = os.path.join(os.environ.get("TEST_SRCDIR"), "_main")
+        working_dir = os.getcwd()
+        for entry in os.scandir(base_dir):
+            link = os.path.join(working_dir, entry.name)
+            self.links.append(link)
+            os.symlink(entry.path, link)
+        return self
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        for link in self.links:
+            os.unlink(link)
+
+    def _handle_interrupt(self, signum, frame):
+        # Attempt a clean shutdown, producing python stacktraces and generating core dumps for
+        # any still running process. It is likely that most programs will have terminated before
+        # core dumps can be produced, since Bazel sends SIGTERM to all processes, not just this one.
+        # TODO: SERVER-109274
+        pid = os.getpid()
+        p = psutil.Process(pid)
+        signal_python(new_resmoke_logger(), p.name, pid)
 
 if __name__ == "__main__":
     sys.argv[0] = (
@@ -66,6 +101,7 @@ if __name__ == "__main__":
         resmoke_args.append(f"--dbpathPrefix={os.path.join(undeclared_output_dir,'data')}")
         resmoke_args.append(f"--taskWorkDir={undeclared_output_dir}")
         resmoke_args.append(f"--reportFile={os.path.join(undeclared_output_dir,'report.json')}")
+        os.chdir(undeclared_output_dir)
 
     if os.environ.get("TEST_SHARD_INDEX") and os.environ.get("TEST_TOTAL_SHARDS"):
         shard_count = os.environ.get("TEST_TOTAL_SHARDS")
@@ -90,7 +126,7 @@ if __name__ == "__main__":
     ):
         resmoke_args.append("--historicTestRuntimes=bazel/resmoke/test_runtimes.json")
 
-
-    cli.main(resmoke_args)
+    with ResmokeShimContext() as ctx:
+        cli.main(resmoke_args)
 
     lock.release()
