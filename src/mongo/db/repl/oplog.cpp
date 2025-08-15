@@ -1197,8 +1197,8 @@ void writeChangeStreamPreImage(OperationContext* opCtx,
     ChangeStreamPreImage preImageDocument{
         std::move(preImageId), oplogEntry.getWallClockTimeForPreImage(), preImage};
 
-    invariant(oplogEntry.getTid() == boost::none);
-    ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(opCtx, preImageDocument);
+    ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(
+        opCtx, oplogEntry.getTid(), preImageDocument);
 }
 }  // namespace
 

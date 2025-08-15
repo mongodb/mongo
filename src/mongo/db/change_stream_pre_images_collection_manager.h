@@ -32,12 +32,18 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/change_stream_pre_images_truncate_manager.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 #include "mongo/db/client.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/background.h"
+#include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -118,14 +124,24 @@ public:
     static ChangeStreamPreImagesCollectionManager& get(OperationContext* opCtx);
 
     /**
-     * Creates the pre-images collection, clustered by the primary key '_id'.
+     * Creates the pre-images collection, clustered by the primary key '_id'. The collection is
+     * created for the specific tenant if the 'tenantId' is specified.
      */
-    void createPreImagesCollection(OperationContext* opCtx);
+    void createPreImagesCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
 
     /**
-     * Inserts the document into the pre-images collection.
+     * Drops the pre-images collection. The collection is dropped for the specific tenant if
+     * the 'tenantId' is specified.
      */
-    void insertPreImage(OperationContext* opCtx, const ChangeStreamPreImage& preImage);
+    void dropPreImagesCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
+
+    /**
+     * Inserts the document into the pre-images collection. The document is inserted into the
+     * tenant's pre-images collection if the 'tenantId' is specified.
+     */
+    void insertPreImage(OperationContext* opCtx,
+                        boost::optional<TenantId> tenantId,
+                        const ChangeStreamPreImage& preImage);
 
     /**
      * Scans the system pre-images collection and deletes the expired pre-images from it.
@@ -171,21 +187,25 @@ private:
      */
 
     /**
-     * Removes expired pre-images through truncation.
+     * Removes expired pre-images with truncate. Suitable for both serverless and single tenant
+     * environments. 'tenantId' is boost::none in a single tenant environment.
      *
-     * Lazily initializes truncate markers if they don't already exist, then utilizes the truncate
-     * markers to remove expired pre-images from the collection.
+     * If 'tenantId' is not yet registered with the '_truncateManager', performs lazy registration
+     * and initialisation of the tenant's corresponding truncate markers before removing expired
+     * pre-images.
      *
      * Returns the number of pre-image documents removed.
      */
-    size_t _deleteExpiredPreImagesWithTruncate(OperationContext* opCtx);
+    size_t _deleteExpiredPreImagesWithTruncate(OperationContext* opCtx,
+                                               boost::optional<TenantId> tenantId);
 
     PurgingJobStats _purgingJobStats;
 
     AtomicWord<int64_t> _docsInserted;
 
     /**
-     * Manages truncate markers.
+     * Manages truncate markers and truncation across tenants. Treats a single tenant environment
+     * the same as a multi-tenant environment, but with only one tenant of TenantId boost::none.
      */
     PreImagesTruncateManager _truncateManager;
 };

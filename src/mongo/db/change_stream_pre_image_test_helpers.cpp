@@ -50,15 +50,16 @@ void appendPreImageRecordIdAndTS(const RecordId& rid,
 }  // namespace
 namespace change_stream_pre_image_test_helper {
 
-void createPreImagesCollection(OperationContext* opCtx) {
-    ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx);
+void createPreImagesCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+    ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx, tenantId);
 }
 
 void insertDirectlyToPreImagesCollection(OperationContext* opCtx,
+                                         boost::optional<TenantId> tenantId,
                                          const ChangeStreamPreImage& preImage) {
     const auto preImagesAcq = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString::kChangeStreamPreImagesNamespace,
+        CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(tenantId),
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
@@ -206,11 +207,9 @@ int64_t bytes(const ChangeStreamPreImage& preImage) {
 
 CollectionAcquisition acquirePreImagesCollectionForRead(OperationContext* opCtx,
                                                         boost::optional<TenantId> tenantId) {
-    // TODO SERVER-109191: Remove tenantId parameter.
-    invariant(tenantId == boost::none);
     return acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString::kChangeStreamPreImagesNamespace,
+        CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(tenantId),
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kRead),

@@ -692,11 +692,11 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
         }
     });
 
+    // Create the pre-images collection if it doesn't exist yet in the non-serverless environment.
     if (!change_stream_serverless_helpers::isChangeCollectionsModeActive(
             VersionContext::getDecoration(opCtx))) {
-        // Create the pre-images collection if it doesn't exist yet. Pre-images are not supported in
-        // serverless environments.
-        ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx);
+        ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(
+            opCtx, boost::none /* tenantId */);
     }
 
     // Ensure that 'queryShapeRepresentativeQueries' collection exists only:

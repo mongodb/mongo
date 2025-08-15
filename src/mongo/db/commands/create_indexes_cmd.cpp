@@ -877,9 +877,8 @@ public:
 
         CreateIndexesReply typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::Error(8293400),
-                    str::stream()
-                        << "Cannot create index on special internal config collection "
-                        << NamespaceString::kChangeStreamPreImagesNamespace.toStringForErrorMsg(),
+                    str::stream() << "Cannot create index on special internal config collection "
+                                  << NamespaceString::kPreImagesCollectionName,
                     !ns().isChangeStreamPreImagesCollection());
 
             const auto& cmd = [&] {

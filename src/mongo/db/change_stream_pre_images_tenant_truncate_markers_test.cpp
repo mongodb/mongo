@@ -46,9 +46,9 @@ class PreImageMarkerInitializationTest : public CatalogTestFixture,
 
 TEST_F(PreImageMarkerInitializationTest, SampleEmptyCollection) {
     auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
+    createPreImagesCollection(opCtx, kTenantId);
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, boost::none);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
     const auto lastRecordsMap =
         pre_image_marker_initialization_internal::sampleLastRecordPerNsUUID(opCtx, preImagesRAII);
     ASSERT_EQ(0, lastRecordsMap.size());
@@ -56,13 +56,13 @@ TEST_F(PreImageMarkerInitializationTest, SampleEmptyCollection) {
 
 TEST_F(PreImageMarkerInitializationTest, SampleLastRecordSingleNsUUID) {
     auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
+    createPreImagesCollection(opCtx, kTenantId);
 
     // Pre-image inserts aren't guaranteed to be serialized. Simulate inserting a more recent
     // pre-image before a slightly older one.
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage3);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
+    insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImage1);
+    insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImage3);
+    insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImage2);
 
     const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
     const auto lastRecordsMap =
@@ -78,13 +78,13 @@ TEST_F(PreImageMarkerInitializationTest, SampleLastRecordSingleNsUUID) {
 
 TEST_F(PreImageMarkerInitializationTest, SampleLastRecordMultipleNsUUIDs) {
     auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
+    createPreImagesCollection(opCtx, kTenantId);
 
     // 2 pre-images for 'kNsUUID', 2 pre-images for 'kNsUUIDOther'.
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImageOtherMin);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImageOther);
+    insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImage1);
+    insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImage2);
+    insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImageOtherMin);
+    insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImageOther);
 
     const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
     const auto lastRecordsMap =
@@ -108,7 +108,7 @@ TEST_F(PreImageMarkerInitializationTest, SampleLastRecordMultipleNsUUIDs) {
 
 TEST_F(PreImageMarkerInitializationTest, PreImageSamplesFromEmptyCollection) {
     auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
+    createPreImagesCollection(opCtx, kTenantId);
 
     const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
 
@@ -126,7 +126,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesFromEmptyCollection) {
 // Tests there is at least 1 sample per nsUUID, even if less samples are requested.
 TEST_F(PreImageMarkerInitializationTest, PreImageSamplesAlwaysContainLastRecordPerNsUUID) {
     auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
+    createPreImagesCollection(opCtx, kTenantId);
 
     auto assert1SampleForNsUUID =
         [](const UUID& nsUUID,
@@ -147,7 +147,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesAlwaysContainLastRecordP
     {
         // Test Case: 1 pre-image for 'kNsUUID' in the pre-images collection with 0 samples
         // requested yields 1 sample.
-        insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
+        insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImage1);
         auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
         const auto samples = pre_image_marker_initialization_internal::collectPreImageSamples(
             opCtx, preImagesRAII, 0);
@@ -157,7 +157,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesAlwaysContainLastRecordP
     {
         // Test Case: 2 pre-images for 'kNsUUID' in the pre-images collection with 0 samples
         // requested yields 1 sample.
-        insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
+        insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImage2);
         auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
         const auto samples = pre_image_marker_initialization_internal::collectPreImageSamples(
             opCtx, preImagesRAII, 0);
@@ -167,7 +167,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesAlwaysContainLastRecordP
     {
         // Test Case: 2 pre-images for 'kNsUUID', 1 for 'kNsOtherUUID' in the pre-images collection
         // with 0 samples requested yields 1 sample per nsUUID.
-        insertDirectlyToPreImagesCollection(opCtx, kPreImageOther);
+        insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImageOther);
         auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
         const auto samples = pre_image_marker_initialization_internal::collectPreImageSamples(
             opCtx, preImagesRAII, 0);
@@ -180,14 +180,14 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesAlwaysContainLastRecordP
 // non-empty collection.
 TEST_F(PreImageMarkerInitializationTest, PreImageSamplesRepeatSamples) {
     auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
+    createPreImagesCollection(opCtx, kTenantId);
 
     const Timestamp baseTimestamp = Timestamp(1, 1);
     const Date_t baseDate = dateFromISOString("2024-01-01T00:00:01.000Z").getValue();
 
     const auto kNsUUID = UUID::gen();
     const auto preImage = makePreImage(kNsUUID, baseTimestamp, baseDate);
-    insertDirectlyToPreImagesCollection(opCtx, preImage);
+    insertDirectlyToPreImagesCollection(opCtx, kTenantId, preImage);
 
     const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
 
@@ -205,7 +205,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesRepeatSamples) {
 
 TEST_F(PreImageMarkerInitializationTest, PopulateMapWithEmptyCollection) {
     auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
+    createPreImagesCollection(opCtx, kTenantId);
     const auto minBytesPerMarker = gPreImagesCollectionTruncateMarkersMinBytes;
 
     {
@@ -258,8 +258,8 @@ TEST_F(PreImageMarkerInitializationTest, PopulateMapWithEmptyCollection) {
 
 TEST_F(PreImageMarkerInitializationTest, PopulateMapWithSinglePreImage) {
     auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
+    createPreImagesCollection(opCtx, kTenantId);
+    insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImage1);
     auto assertPreImageIsTracked =
         [](const UUID& expectedUUID,
            const ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>&

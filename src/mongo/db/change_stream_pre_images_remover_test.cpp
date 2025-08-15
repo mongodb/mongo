@@ -32,11 +32,19 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/db/change_stream_options_gen.h"
+#include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_pre_image_test_helpers.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/change_streams_cluster_parameter_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
@@ -59,10 +67,14 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -74,10 +86,13 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <deque>
 #include <iterator>
 #include <limits>
 #include <memory>
 #include <string>
+#include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -162,10 +177,11 @@ protected:
 
     // Populates the pre-images collection with 'numRecords'. Generates pre-images with Timestamps 1
     // millisecond apart starting at 'startOperationTime'.
-    void prePopulatePreImagesCollection(const NamespaceString& nss,
+    void prePopulatePreImagesCollection(boost::optional<TenantId> tenantId,
+                                        const NamespaceString& nss,
                                         int64_t numRecords,
                                         Date_t startOperationTime) {
-        auto preImagesCollectionNss = NamespaceString::kChangeStreamPreImagesNamespace;
+        auto preImagesCollectionNss = NamespaceString::makePreImageCollectionNSS(tenantId);
         auto opCtx = operationContext();
         auto nsUUID = CollectionCatalog::get(opCtx)
                           ->lookupCollectionByNamespace(operationContext(), nss)
@@ -197,8 +213,8 @@ protected:
     };
 
     // Inserts a pre-image into the pre-images collection. The pre-image inserted has a 'ts' of
-    // 'preImageTS', and an 'operationTime' of either (1) 'preImageOperationTime', when
-    // explicitly specified, or (2) a 'Date_t' derived from the 'preImageTS'.
+    // 'preImageTS', and an 'operationTime' of either (1) 'preImageOperationTime', when explicitly
+    // specified, or (2) a 'Date_t' derived from the 'preImageTS'.
     void insertPreImage(NamespaceString nss,
                         Timestamp preImageTS,
                         boost::optional<Date_t> preImageOperationTime = boost::none) {
@@ -207,7 +223,7 @@ protected:
         auto& manager = ChangeStreamPreImagesCollectionManager::get(getServiceContext());
         WriteUnitOfWork wuow(opCtx);
         auto image = generatePreImage(uuid, preImageTS, preImageOperationTime);
-        manager.insertPreImage(opCtx, image);
+        manager.insertPreImage(opCtx, boost::none, image);
         wuow.commit();
     }
 
@@ -235,6 +251,18 @@ protected:
         invariantStatusOK(optionsManager.setOptions(opCtx, options));
     }
 
+    void setExpirationTime(const TenantId& tenantId, Seconds seconds) {
+        auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+        auto* changeStreamsParam =
+            clusterParameters
+                ->get<ClusterParameterWithStorage<ChangeStreamsClusterParameterStorage>>(
+                    "changeStreams");
+
+        auto oldSettings = changeStreamsParam->getValue(tenantId);
+        oldSettings.setExpireAfterSeconds(seconds.count());
+        changeStreamsParam->setValue(oldSettings, tenantId).ignore();
+    }
+
     void setUp() override {
         CatalogTestFixture::setUp();
         ChangeStreamOptionsManager::create(getServiceContext());
@@ -247,7 +275,7 @@ protected:
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
         auto& manager = ChangeStreamPreImagesCollectionManager::get(getServiceContext());
-        manager.createPreImagesCollection(operationContext());
+        manager.createPreImagesCollection(operationContext(), boost::none);
 
         invariantStatusOK(storageInterface()->createCollection(
             operationContext(), kPreImageEnabledCollection, CollectionOptions{}));
@@ -268,6 +296,11 @@ protected:
         // Verify the Timestamp is set accordingly.
         ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime().opTime.getTimestamp(),
                   targetTimestamp);
+    }
+
+    // A 'boost::none' tenantId implies a single tenant environment.
+    boost::optional<TenantId> nullTenantId() {
+        return boost::none;
     }
 };
 
@@ -381,7 +414,8 @@ TEST_F(PreImagesRemoverTest, EnsureAllDocsEventualyTruncatedFromPrePopulatedColl
     auto clock = clockSource();
     auto startOperationTime = clock->now();
     auto numRecords = 1000;
-    prePopulatePreImagesCollection(kPreImageEnabledCollection, numRecords, startOperationTime);
+    prePopulatePreImagesCollection(
+        nullTenantId(), kPreImageEnabledCollection, numRecords, startOperationTime);
 
     // Advance the clock to align with the most recent pre-image inserted.
     clock->advance(Milliseconds{numRecords});
@@ -413,8 +447,10 @@ TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurable) {
     auto clock = clockSource();
     auto startOperationTime = clock->now();
     auto numRecordsBeforeAllDurableTimestamp = 1000;
-    prePopulatePreImagesCollection(
-        kPreImageEnabledCollection, numRecordsBeforeAllDurableTimestamp, startOperationTime);
+    prePopulatePreImagesCollection(nullTenantId(),
+                                   kPreImageEnabledCollection,
+                                   numRecordsBeforeAllDurableTimestamp,
+                                   startOperationTime);
 
     // Advance the clock to align with the most recent pre-image inserted.
     clock->advance(Milliseconds{numRecordsBeforeAllDurableTimestamp});

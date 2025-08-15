@@ -83,11 +83,13 @@ bool isChangeCollectionsModeActive(const VersionContext& vCtx) {
 bool isChangeStreamEnabled(OperationContext* opCtx, const TenantId& tenantId) {
     auto catalog = CollectionCatalog::get(opCtx);
 
-    // A change stream in the serverless is declared as enabled if the change collection exists for
-    // the provided tenant. The pre-images collection is not supported on serverless.
+    // A change stream in the serverless is declared as enabled if both the change collection and
+    // the pre-images collection exist for the provided tenant.
     return isChangeCollectionsModeActive(VersionContext::getDecoration(opCtx)) &&
         static_cast<bool>(catalog->lookupCollectionByNamespace(
-            opCtx, NamespaceString::makeChangeCollectionNSS(tenantId)));
+            opCtx, NamespaceString::makeChangeCollectionNSS(tenantId))) &&
+        static_cast<bool>(catalog->lookupCollectionByNamespace(
+            opCtx, NamespaceString::makePreImageCollectionNSS(tenantId)));
 }
 
 bool canInitializeServices() {

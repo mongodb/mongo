@@ -49,7 +49,8 @@ namespace mongo {
 namespace {
 
 void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* result) {
-    const auto& preImagesCollectionNamespace = NamespaceString::kChangeStreamPreImagesNamespace;
+    const auto preImagesCollectionNamespace =
+        NamespaceString::makePreImageCollectionNSS(boost::none /** tenantId */);
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);
     auto preImagesColl = catalog->lookupCollectionByNamespace(opCtx, preImagesCollectionNamespace);
