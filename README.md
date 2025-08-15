@@ -1,6 +1,6 @@
 # ![Logo](docs/leaf.svg) MongoDB README
 
-Welcome to MongoDB!
+Welcome to MongoDB 8.2!
 
 ## Components
 
