@@ -16,7 +16,6 @@ const paramList = [
     {name: "internalQueryForceIntersectionPlans", value: true},
     {name: "internalQueryPlannerEnableIndexIntersection", value: false},
     {name: "internalQueryPlannerEnableHashIntersection", value: true},
-    {name: "internalQueryPlannerEnableSortIndexIntersection", value: true},
     {name: "internalQueryPlannerEnableIndexPruning", value: true},
     {name: "internalQueryCacheEvictionRatio", value: 11.0},
     {name: "internalQueryCacheWorksGrowthCoefficient", value: 3.0},

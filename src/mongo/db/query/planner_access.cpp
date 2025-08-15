@@ -1765,7 +1765,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
                 break;
             }
         }
-        if (allSortedByDiskLoc && internalQueryPlannerEnableSortIndexIntersection.load()) {
+        if (allSortedByDiskLoc) {
             auto asn = std::make_unique<AndSortedNode>();
             asn->addChildren(std::move(ixscanNodes));
             andResult = std::move(asn);
@@ -1788,12 +1788,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
                 }
             }
         } else {
-            // sort-based and hash-based index intersection are both disabled.
-            // Bail out by returning NULL.
+            // We can't use sort-based intersection, and hash-based intersection is disabled.
+            // Clean up the index scans and bail out by returning NULL.
             LOGV2_DEBUG(20947,
                         5,
-                        "Can't build index intersection solution: AND_HASH is disabled and "
-                        "AND_SORTED is either not possible or disabled");
+                        "Can't build index intersection solution: AND_SORTED is not possible and "
+                        "AND_HASH is disabled");
             return nullptr;
         }
     }

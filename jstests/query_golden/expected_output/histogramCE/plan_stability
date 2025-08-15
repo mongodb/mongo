@@ -64,7 +64,7 @@
     "keys" :    218,
     "docs" :    218,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :    218},
 
 {">>>pipeline": [{"$match":{"$and":[{"d_noidx":{"$lt":5}},{"$or":[{"$and":[{"a_noidx":{"$lt":2}},{"d_noidx":{"$exists":true}},{"a_idx":{"$all":[6,4,6]}},{"c_compound":{"$ne":13}}]},{"a_compound":{"$elemMatch":{"$nin":[14,3]}}}]},{"d_idx":{"$lt":7}}],"a_compound":{"$gt":10}}},{"$limit":165},{"$skip":33}],
@@ -84,7 +84,7 @@
     "keys" :    198,
     "docs" :    198,
     "sorts":      0,
-    "plans":     11,
+    "plans":     13,
     "rows" :    144},
 
 {">>>pipeline": [{"$match":{"$and":[{"c_compound":{"$ne":18}},{"$or":[{"a_compound":{"$elemMatch":{"$exists":true,"$nin":[3,4]}}},{"c_compound":{"$ne":10}},{"a_compound":{"$elemMatch":{"$exists":true,"$nin":[3,20]}}},{"k_compound":{"$exists":false}},{"a_idx":{"$lt":15}}]}],"a_compound":{"$lte":4}}},{"$sort":{"a_idx":-1}},{"$limit":237},{"$skip":14}],
@@ -98,7 +98,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :  98433},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[10,14,3,20]}},{"d_compound":{"$eq":2}}],"a_compound":{"$ne":15}}}],
@@ -130,7 +130,7 @@
     "keys" :     88,
     "docs" :     88,
     "sorts":      0,
-    "plans":     11,
+    "plans":     15,
     "rows" :     44},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[8,16]}},{"a_idx":{"$gt":20}}],"i_noidx":{"$gte":20},"k_compound":{"$ne":9}}},{"$limit":9}],
@@ -144,11 +144,11 @@
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[8,6,5]}},{"z_compound":{"$exists":false}}],"c_compound":{"$lt":5}}},{"$limit":197}],
     "error": "encountered interval which is unestimatable: [MinKey, 8.0)"},
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$all":[10,10,12,19]}},{"k_compound":{"$lt":15}},{"k_compound":{"$eq":8}}],"a_idx":{"$in":[13,9,12]}}},{"$sort":{"d_idx":-1}}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[12.0, 12.0]"]}}},{"stage":"IXSCAN","indexName":"k_compound_1_a_compound_1","indexBounds":{"k_compound":["[-inf, 15.0)"],"a_compound":["[MinKey, MaxKey]"]}}]}}},
-    "keys" :   5790,
-    "docs" :   2500,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"AND_SORTED","inputStages":[{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[10.0, 10.0]"]}},{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[12.0, 12.0]"]}},{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[19.0, 19.0]"]}}]}},{"stage":"IXSCAN","indexName":"k_compound_1","indexBounds":{"k_compound":["[-inf, 15.0)"]}}]}}},
+    "keys" :   3507,
+    "docs" :   1500,
     "sorts":   2011,
-    "plans":     10,
+    "plans":     12,
     "rows" :    300},
 
 {">>>pipeline": [{"$match":{"$and":[{"h_idx":{"$exists":true}},{"$or":[{"a_compound":{"$all":[4,17]}},{"$and":[{"h_idx":{"$in":[7,4]}},{"i_compound":{"$lte":9}},{"h_noidx":{"$gte":8}},{"c_noidx":{"$ne":1}},{"a_idx":{"$all":[7,17,8,14]}},{"h_idx":{"$nin":[13,7]}}]}]},{"$or":[{"a_idx":{"$all":[7,7,11,2]}},{"k_compound":{"$eq":17}}]}],"a_compound":{"$in":[6,20,4]}}},{"$limit":54},{"$project":{"_id":0,"a_idx":1}}],
@@ -156,7 +156,7 @@
     "keys" :   1013,
     "docs" :   1010,
     "sorts":      0,
-    "plans":     19,
+    "plans":     22,
     "rows" :      6},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$ne":9}},{"a_compound":{"$all":[8,19,8,18]}}],"k_compound":{"$in":[16,8,8]}}},{"$limit":167}],
@@ -184,7 +184,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     12,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[18,17]}},{"z_compound":{"$gte":4}}],"a_compound":{"$nin":[10,13,17]},"c_compound":{"$exists":true}}}],
@@ -198,7 +198,7 @@
     "keys" :    124,
     "docs" :    124,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :    124},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$all":[12,10,20]}},{"a_compound":{"$exists":true}}],"a_idx":{"$nin":[19,14]},"k_compound":{"$nin":[15,15,15]}}},{"$project":{"a_noidx":1}}],
@@ -208,7 +208,7 @@
     "keys" :    240,
     "docs" :    240,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :    240},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[19,20]}},{"k_compound":{"$exists":false}}],"i_idx":{"$gte":11}}},{"$sort":{"a_idx":1,"i_idx":1}},{"$skip":16},{"$project":{"_id":0,"h_noidx":1,"k_compound":1}}],
@@ -226,7 +226,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      7,
+    "plans":      9,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"h_noidx":{"$gt":6}},{"a_compound":{"$all":[5,11,6,14]}}],"a_compound":{"$lt":2}}}],
@@ -242,7 +242,7 @@
     "keys" :    214,
     "docs" :    214,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :    214},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$all":[1,7]}},{"z_compound":{"$eq":1}}],"c_compound":{"$lte":17}}},{"$sort":{"c_idx":1}},{"$limit":253},{"$project":{"_id":0,"a_idx":1,"h_idx":1}}],
@@ -250,7 +250,7 @@
     "keys" :  10257,
     "docs" :  10257,
     "sorts":  25108,
-    "plans":      9,
+    "plans":     10,
     "rows" :    253},
 
 {">>>pipeline": [{"$match":{"$or":[{"k_compound":{"$in":[11,7]}},{"a_idx":{"$ne":9}},{"a_compound":{"$all":[5,16,20,8]}}],"a_compound":{"$elemMatch":{"$nin":[3,16]}},"a_noidx":{"$nin":[14,11,17]},"k_idx":{"$nin":[7,15]}}},{"$sort":{"a_idx":1,"c_idx":1}},{"$limit":41},{"$project":{"_id":0,"h_compound":1}}],
@@ -258,11 +258,11 @@
 {">>>pipeline": [{"$match":{"$nor":[{"i_noidx":{"$gt":4}},{"a_compound":{"$gt":16}},{"a_compound":{"$all":[12,20,11]}}],"d_idx":{"$ne":1}}},{"$sort":{"h_idx":-1}},{"$limit":218}],
     "error": "encountered interval which is unestimatable: [MinKey, 12.0)"},
 {">>>pipeline": [{"$match":{"$and":[{"$or":[{"i_idx":{"$eq":19}},{"c_compound":{"$gt":8}},{"a_compound":{"$all":[4,16,8,17,19]}},{"a_compound":{"$all":[19,12]}}]},{"$or":[{"z_idx":{"$eq":8}},{"i_compound":{"$in":[19,18,9,7]}},{"a_compound":{"$exists":true}},{"a_idx":{"$in":[19,20,18]}},{"a_compound":{"$all":[10,2,11]}}]}]}},{"$project":{"_id":0,"a_compound":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[12.0, 12.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[16.0, 16.0]"]}}},{"stage":"IXSCAN","indexName":"i_idx_1","indexBounds":{"i_idx":["[19.0, 19.0]"]}},{"stage":"IXSCAN","indexName":"c_compound_1_d_compound_1","indexBounds":{"c_compound":["(8.0, inf]"],"d_compound":["[MinKey, MaxKey]"]}}]}}},
-    "keys" :   2001,
-    "docs" :   2001,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"AND_SORTED","inputStages":[{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[19.0, 19.0]"]}},{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[12.0, 12.0]"]}}]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[16.0, 16.0]"]}}},{"stage":"IXSCAN","indexName":"i_idx_1","indexBounds":{"i_idx":["[19.0, 19.0]"]}},{"stage":"IXSCAN","indexName":"c_compound_1_d_compound_1","indexBounds":{"c_compound":["(8.0, inf]"],"d_compound":["[MinKey, MaxKey]"]}}]}}},
+    "keys" :   3001,
+    "docs" :   1001,
     "sorts":      0,
-    "plans":     16,
+    "plans":     18,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[15,9,3,8,17]}},{"d_noidx":{"$gt":15}}],"$or":[{"a_idx":{"$all":[3,4,2]}},{"a_compound":{"$lt":16}}]}},{"$sort":{"d_idx":-1}},{"$limit":162},{"$project":{"_id":0,"a_compound":1,"a_noidx":1,"d_noidx":1,"k_noidx":1}}],
@@ -270,7 +270,7 @@
     "keys" :    162,
     "docs" :    162,
     "sorts":      0,
-    "plans":      7,
+    "plans":      9,
     "rows" :    162},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$gte":2}},{"a_idx":{"$nin":[19,5,11]}},{"a_idx":{"$all":[4,6]}},{"a_idx":{"$all":[20,16]}}],"c_idx":{"$nin":[12,6,11,11]}}}],
@@ -300,7 +300,7 @@
     "keys" :   2009,
     "docs" :   2007,
     "sorts":  10322,
-    "plans":     10,
+    "plans":     12,
     "rows" :     63},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[11,9,1]}},{"$or":[{"i_compound":{"$exists":true}},{"a_compound":{"$all":[15,8,8]}}]},{"$or":[{"d_idx":{"$exists":false}},{"a_idx":{"$exists":false}}]},{"a_idx":{"$all":[15,9,16,13,1,11]}}],"i_compound":{"$lt":16}}},{"$sort":{"i_idx":-1}},{"$project":{"a_idx":1}}],
@@ -310,7 +310,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :  99920},
 
 {">>>pipeline": [{"$match":{"$or":[{"d_compound":{"$lte":14}},{"z_compound":{"$lt":20}},{"$and":[{"a_compound":{"$all":[18,10,7]}},{"a_compound":{"$all":[15,12,3]}}]}],"a_idx":{"$elemMatch":{"$lte":11,"$nin":[16,8,12]}},"a_noidx":{"$all":[3,19,9]}}},{"$sort":{"h_idx":-1,"i_idx":1}},{"$limit":36},{"$project":{"_id":0,"a_idx":1,"a_noidx":1}}],
@@ -334,7 +334,7 @@
     "keys" :    110,
     "docs" :    110,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :    110},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$in":[1,20]}},{"a_compound":{"$all":[2,19,4]}},{"a_compound":{"$elemMatch":{"$gt":19}}}],"a_idx":{"$exists":true}}},{"$limit":19}],
@@ -342,15 +342,15 @@
     "keys" :     20,
     "docs" :     20,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :     19},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[16,10,15]}},{"a_compound":{"$all":[20,16,5,6]}},{"h_idx":{"$gt":8}}],"a_compound":{"$gt":3}}},{"$project":{"a_compound":1,"d_noidx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[16.0, 16.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[20.0, 20.0]"]}}},{"stage":"IXSCAN","indexName":"h_idx_1","indexBounds":{"h_idx":["(8.0, inf]"]}}]}}},
-    "keys" :  93000,
-    "docs" :  93000,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"AND_SORTED","inputStages":[{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[16.0, 16.0]"]}},{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[10.0, 10.0]"]}},{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[15.0, 15.0]"]}}]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[16.0, 16.0]"]}}},{"stage":"IXSCAN","indexName":"h_idx_1","indexBounds":{"h_idx":["(8.0, inf]"]}}]}}},
+    "keys" :  94007,
+    "docs" :  92000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :  91000},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$lte":9},"d_compound":{"$in":[4,4,2,9]},"d_idx":{"$lt":16}}},{"$sort":{"a_idx":-1}},{"$project":{"_id":0,"a_noidx":1,"c_idx":1,"i_compound":1}}],
@@ -368,7 +368,7 @@
     "keys" : 111081,
     "docs" : 101000,
     "sorts": 1251293,
-    "plans":      7,
+    "plans":      9,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$and":[{"i_compound":{"$exists":true}},{"a_idx":{"$elemMatch":{"$in":[18,9,17]}}}],"$or":[{"$and":[{"z_idx":{"$gt":7}},{"a_idx":{"$eq":2}},{"a_idx":{"$all":[7,18]}},{"a_compound":{"$all":[14,9,14]}}]},{"i_idx":{"$lt":19}},{"a_compound":{"$all":[15,3]}},{"a_compound":{"$all":[7,4]}},{"z_idx":{"$exists":true}}]}},{"$limit":157},{"$project":{"_id":0,"c_compound":1}}],
@@ -376,7 +376,7 @@
     "keys" :    157,
     "docs" :    157,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :    157},
 
 {">>>pipeline": [{"$match":{"$and":[{"h_idx":{"$exists":true}},{"i_compound":{"$eq":5}},{"$nor":[{"a_compound":{"$all":[17,10,20,15]}},{"a_compound":{"$nin":[5,9]}},{"a_idx":{"$gte":8}}]}],"h_noidx":{"$exists":true}}},{"$limit":48},{"$project":{"_id":0,"a_compound":1,"h_noidx":1}}],
@@ -392,7 +392,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts": 1251293,
-    "plans":     11,
+    "plans":     12,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[10,3,13,19]}},{"h_idx":{"$in":[12,12]}}],"i_idx":{"$in":[6,19]}}},{"$project":{"a_compound":1,"z_compound":1}}],
@@ -402,7 +402,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":   2096,
-    "plans":     13,
+    "plans":     16,
     "rows" :    169},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[13,19,7]}},{"a_idx":{"$in":[12,20]}}],"a_compound":{"$elemMatch":{"$exists":true}},"k_compound":{"$exists":true}}},{"$limit":122},{"$project":{"_id":0,"a_noidx":1,"i_noidx":1}}],
@@ -414,7 +414,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":   7908,
-    "plans":     10,
+    "plans":     11,
     "rows" :   1000},
 
 {">>>pipeline": [{"$match":{"$or":[{"$or":[{"a_compound":{"$lte":18}},{"a_idx":{"$all":[1,5,13,19]}}]},{"$and":[{"h_noidx":{"$eq":2}},{"i_noidx":{"$lt":16}},{"a_compound":{"$gt":11}}]}],"a_idx":{"$in":[15,3,14]},"i_compound":{"$gt":18}}},{"$sort":{"a_idx":1}},{"$limit":232}],
@@ -422,7 +422,7 @@
     "keys" :  27788,
     "docs" :  27443,
     "sorts": 176866,
-    "plans":     12,
+    "plans":     14,
     "rows" :    232},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$all":[2,18]}},{"a_compound":{"$all":[15,14,8,14]}},{"$or":[{"h_idx":{"$nin":[1,13]}},{"$and":[{"k_compound":{"$exists":true}},{"z_noidx":{"$exists":false}}]},{"a_compound":{"$all":[14,3]}}]}],"a_compound":{"$gt":4}}},{"$limit":228}],
@@ -430,7 +430,7 @@
     "keys" :    232,
     "docs" :    232,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :    228},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$gt":14}},{"i_compound":{"$lte":17}}],"a_compound":{"$eq":6},"k_compound":{"$ne":5}}},{"$sort":{"h_idx":1,"i_idx":1}}],
@@ -456,7 +456,7 @@
     "keys" :     59,
     "docs" :     59,
     "sorts":      0,
-    "plans":     13,
+    "plans":     16,
     "rows" :     19},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[10,7]}},{"a_compound":{"$nin":[12,3,6]}}],"k_idx":{"$eq":14}}},{"$sort":{"a_idx":1,"z_idx":-1}}],
@@ -486,7 +486,7 @@
     "keys" :    303,
     "docs" :    300,
     "sorts":   1340,
-    "plans":     10,
+    "plans":     12,
     "rows" :     32},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$exists":false}},{"$and":[{"a_compound":{"$all":[10,8,3]}},{"k_compound":{"$ne":13}}]}],"a_idx":{"$all":[2,3]}}},{"$limit":187},{"$project":{"a_idx":1}}],
@@ -496,7 +496,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     12,
     "rows" :     90},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$elemMatch":{"$gt":1}}},{"$or":[{"a_idx":{"$all":[16,11,2,1]}},{"a_compound":{"$exists":true}}]}],"a_noidx":{"$nin":[1,18]}}},{"$sort":{"d_idx":-1}},{"$limit":113}],
@@ -506,7 +506,7 @@
     "keys" :  10081,
     "docs" :  10081,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :   3145},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[9,11]}},{"a_idx":{"$elemMatch":{"$exists":true}}},{"$and":[{"a_compound":{"$lt":17}},{"a_noidx":{"$all":[15,4]}},{"h_noidx":{"$exists":false}}]}],"a_compound":{"$in":[2,11]},"a_idx":{"$elemMatch":{"$gte":20}}}},{"$sort":{"d_idx":1,"k_idx":1}},{"$limit":181},{"$project":{"_id":0,"a_idx":1,"k_compound":1}}],
@@ -514,7 +514,7 @@
     "keys" :  39798,
     "docs" :  39470,
     "sorts": 244605,
-    "plans":     10,
+    "plans":     12,
     "rows" :    181},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$nin":[7,7,6]},"c_compound":{"$nin":[18,13,18]}}},{"$sort":{"h_idx":1}}],
@@ -544,7 +544,7 @@
     "keys" :  13528,
     "docs" :  13528,
     "sorts": 130739,
-    "plans":     11,
+    "plans":     13,
     "rows" :  12528},
 
 {">>>pipeline": [{"$match":{"$and":[{"c_compound":{"$in":[1,6]}},{"k_compound":{"$ne":10}}],"$nor":[{"i_noidx":{"$lt":12}},{"$or":[{"k_idx":{"$in":[16,11]}},{"a_compound":{"$eq":1}},{"a_compound":{"$in":[10,9]}},{"a_compound":{"$all":[20,15,8]}}]}]}},{"$project":{"a_idx":1,"z_noidx":1}}],
@@ -556,7 +556,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":   6063,
-    "plans":      9,
+    "plans":     12,
     "rows" :    158},
 
 {">>>pipeline": [{"$match":{"$and":[{"i_compound":{"$nin":[8,18,13]}},{"a_compound":{"$exists":true}},{"$or":[{"z_noidx":{"$gt":1}},{"a_noidx":{"$elemMatch":{"$exists":true,"$in":[20,20],"$nin":[2,10]}}},{"a_compound":{"$exists":true}}]},{"$nor":[{"z_noidx":{"$gte":9}},{"a_compound":{"$all":[8,16,12,3,17]}},{"a_compound":{"$in":[5,15,12]}}]}]}},{"$sort":{"d_idx":1,"z_idx":1}},{"$limit":86}],
@@ -574,7 +574,7 @@
     "keys" :  10873,
     "docs" :  10873,
     "sorts":  36436,
-    "plans":     13,
+    "plans":     15,
     "rows" :   3928},
 
 {">>>pipeline": [{"$match":{"$and":[{"$or":[{"a_idx":{"$elemMatch":{"$gte":9,"$ne":1}}},{"k_compound":{"$in":[8,13,11,17]}}]},{"z_compound":{"$nin":[20,18,19]}},{"$or":[{"c_idx":{"$eq":16}},{"a_compound":{"$elemMatch":{"$exists":true,"$gt":7,"$nin":[19,13,17]}}},{"a_compound":{"$all":[19,12]}},{"h_idx":{"$lt":2}}]}],"$or":[{"c_compound":{"$nin":[15,7]}},{"a_noidx":{"$exists":true}}]}},{"$sort":{"z_idx":-1}},{"$limit":132}],
@@ -592,7 +592,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts": 622575,
-    "plans":      9,
+    "plans":     11,
     "rows" :    186},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_noidx":{"$exists":false}},{"k_compound":{"$lte":1}},{"a_compound":{"$all":[14,10,20,12,20]}}],"a_compound":{"$all":[9,19,19]},"h_compound":{"$gt":16}}},{"$sort":{"i_idx":-1}},{"$project":{"_id":0,"a_noidx":1,"h_noidx":1,"z_idx":1}}],
@@ -610,7 +610,7 @@
     "keys" :    209,
     "docs" :    209,
     "sorts":      0,
-    "plans":      7,
+    "plans":     11,
     "rows" :    209},
 
 {">>>pipeline": [{"$match":{"$nor":[{"d_idx":{"$eq":8}},{"a_idx":{"$eq":2}}],"a_compound":{"$nin":[1,1,10]},"d_compound":{"$lte":4}}},{"$limit":146},{"$project":{"_id":0,"a_idx":1,"i_compound":1}}],
@@ -622,7 +622,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts": 1251293,
-    "plans":      7,
+    "plans":      9,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$or":[{"k_compound":{"$gt":15}},{"a_compound":{"$ne":8}},{"a_idx":{"$all":[17,17,8]}}]}},{"$sort":{"h_idx":-1}},{"$limit":242},{"$project":{"_id":0,"c_idx":1}}],
@@ -630,7 +630,7 @@
     "keys" :    242,
     "docs" :    242,
     "sorts":      0,
-    "plans":      8,
+    "plans":     11,
     "rows" :    242},
 
 {">>>pipeline": [{"$match":{"$and":[{"$nor":[{"$and":[{"a_idx":{"$elemMatch":{"$exists":false}}},{"c_compound":{"$nin":[7,5]}}]},{"c_compound":{"$in":[19,14]}}]},{"$or":[{"a_idx":{"$all":[14,5,5]}},{"a_idx":{"$exists":true}},{"c_compound":{"$in":[16,16]}}]},{"c_noidx":{"$exists":true}}],"$nor":[{"c_compound":{"$eq":5}},{"h_compound":{"$lt":2}},{"$and":[{"a_noidx":{"$lt":19}},{"a_compound":{"$elemMatch":{"$exists":false,"$in":[14,16]}}}]},{"i_compound":{"$lt":2}}],"$or":[{"i_idx":{"$exists":false}},{"a_compound":{"$all":[12,8,14]}},{"a_idx":{"$elemMatch":{"$eq":9}}},{"z_compound":{"$nin":[12,20,19,11,3]}}]}}],
@@ -666,7 +666,7 @@
     "keys" :   1004,
     "docs" :   1004,
     "sorts":      0,
-    "plans":      9,
+    "plans":     12,
     "rows" :   1000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"i_noidx":{"$in":[7,16]}},{"a_compound":{"$all":[4,3,6,15]}}],"a_compound":{"$elemMatch":{"$lt":15}}}},{"$skip":17},{"$project":{"_id":0,"a_noidx":1}}],
@@ -678,7 +678,7 @@
     "keys" :    195,
     "docs" :    195,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :    195},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_idx":{"$in":[4,17,8]}},{"$nor":[{"a_compound":{"$all":[16,5,18,3]}},{"d_idx":{"$exists":false}}]}],"a_idx":{"$nin":[18,2,9]}}},{"$limit":144},{"$project":{"_id":0,"a_noidx":1,"d_compound":1}}],
@@ -720,7 +720,7 @@
     "keys" :     12,
     "docs" :     12,
     "sorts":     37,
-    "plans":     11,
+    "plans":     12,
     "rows" :     11},
 
 {">>>pipeline": [{"$match":{"$and":[{"i_noidx":{"$in":[4,4,14]}},{"$or":[{"a_compound":{"$lt":17}},{"c_compound":{"$gte":13}}]},{"a_compound":{"$elemMatch":{"$in":[20,18,4,12]}}}]}},{"$sort":{"d_idx":-1}}],
@@ -746,7 +746,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :     73},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$nin":[15,5]}},{"z_compound":{"$gt":3}},{"$or":[{"i_compound":{"$nin":[12,6,16,19,13,10]}},{"a_compound":{"$elemMatch":{"$eq":17,"$exists":true}}}]},{"a_compound":{"$lte":15}}],"a_idx":{"$nin":[5,7]}}},{"$sort":{"c_idx":1}},{"$project":{"_id":0,"a_compound":1,"a_noidx":1,"z_idx":1}}],
@@ -762,7 +762,7 @@
     "keys" : 169836,
     "docs" :  99978,
     "sorts": 1250995,
-    "plans":      8,
+    "plans":     11,
     "rows" :  99978},
 
 {">>>pipeline": [{"$match":{"$or":[{"c_idx":{"$in":[16,1,8,12]}},{"$or":[{"h_idx":{"$exists":false}},{"a_idx":{"$all":[16,18]}},{"a_compound":{"$exists":true}}]}],"a_idx":{"$gt":11}}},{"$sort":{"z_idx":-1}},{"$limit":15},{"$project":{"_id":0,"a_idx":1,"i_idx":1}}],
@@ -770,7 +770,7 @@
     "keys" : 277000,
     "docs" :  99988,
     "sorts": 370761,
-    "plans":      6,
+    "plans":      8,
     "rows" :     15},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[9,12]}},{"a_compound":{"$exists":false}}],"k_compound":{"$exists":true}}},{"$sort":{"c_idx":1,"z_idx":-1}},{"$limit":51}],
@@ -782,7 +782,7 @@
     "keys" :  96004,
     "docs" :  96000,
     "sorts": 373476,
-    "plans":     14,
+    "plans":     16,
     "rows" :     18},
 
 {">>>pipeline": [{"$match":{"$and":[{"k_compound":{"$nin":[1,3]}},{"$or":[{"a_compound":{"$exists":true}},{"a_compound":{"$all":[13,3]}}]},{"a_compound":{"$elemMatch":{"$in":[4,1,16,11]}}},{"a_idx":{"$elemMatch":{"$exists":true,"$nin":[9,9,14,12,13]}}}],"$nor":[{"i_noidx":{"$eq":1}},{"d_compound":{"$exists":false}}]}},{"$limit":106},{"$project":{"a_compound":1,"a_idx":1,"k_idx":1}}],
@@ -792,7 +792,7 @@
     "keys" :  10873,
     "docs" :  10873,
     "sorts":  17636,
-    "plans":      8,
+    "plans":      9,
     "rows" :     54},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[5,18,3]}},{"$or":[{"h_idx":{"$gte":15}},{"a_compound":{"$all":[16,10]}}]}],"i_idx":{"$nin":[4,13]}}},{"$sort":{"c_idx":-1}},{"$skip":3}],
@@ -800,7 +800,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :  84997},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[2,10,8,5]}},{"a_noidx":{"$eq":15}},{"k_compound":{"$in":[16,14]}},{"a_compound":{"$ne":9}}],"a_idx":{"$in":[12,9,10]}}},{"$limit":81}],
@@ -812,7 +812,7 @@
     "keys" :   4004,
     "docs" :   4000,
     "sorts":      0,
-    "plans":      7,
+    "plans":      9,
     "rows" :   4000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$in":[11,3]}},{"h_compound":{"$nin":[8,14,18]}},{"a_compound":{"$all":[18,17,1]}}],"z_compound":{"$exists":true}}},{"$limit":211},{"$project":{"a_compound":1,"a_noidx":1}}],
@@ -824,7 +824,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      8,
+    "plans":     10,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$gte":13},"a_idx":{"$gt":12},"k_compound":{"$lt":16}}},{"$limit":37}],
@@ -840,7 +840,7 @@
     "keys" :    144,
     "docs" :    144,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :    144},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$lte":2}},{"i_compound":{"$eq":20}},{"a_idx":{"$all":[14,17,17,1]}}],"a_idx":{"$gte":10}}},{"$project":{"_id":0,"a_compound":1}}],
@@ -848,7 +848,7 @@
     "keys" :  94299,
     "docs" :  80322,
     "sorts":      0,
-    "plans":      7,
+    "plans":      9,
     "rows" :  79314},
 
 {">>>pipeline": [{"$match":{"$nor":[{"d_idx":{"$eq":3}},{"$nor":[{"z_compound":{"$nin":[9,20,5,6]}},{"d_compound":{"$gte":5}},{"a_idx":{"$all":[4,12]}},{"c_compound":{"$exists":true}}]}],"a_compound":{"$all":[4,4,9]},"z_noidx":{"$gte":4}}},{"$limit":186},{"$project":{"_id":0,"a_noidx":1}}],
@@ -856,7 +856,7 @@
     "keys" :   2223,
     "docs" :   2223,
     "sorts":      0,
-    "plans":     12,
+    "plans":     16,
     "rows" :    186},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[14,17,18,12]}},{"a_idx":{"$nin":[17,12]}},{"c_compound":{"$lt":2}}]}},{"$sort":{"z_idx":1}},{"$project":{"_id":0,"a_compound":1,"a_noidx":1,"h_noidx":1}}],
@@ -864,7 +864,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$nin":[12,1]}},{"a_compound":{"$in":[8,1]}}],"$or":[{"z_compound":{"$gt":12}},{"a_idx":{"$all":[11,1,7]}},{"a_compound":{"$nin":[9,1,13]}}]}},{"$limit":98},{"$project":{"a_idx":1,"c_compound":1}}],
@@ -874,7 +874,7 @@
     "keys" : 199941,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[16,1,9]}},{"d_compound":{"$exists":false}}],"a_compound":{"$exists":true},"a_idx":{"$elemMatch":{"$ne":9}},"a_noidx":{"$elemMatch":{"$in":[11,6],"$lt":7}}}},{"$sort":{"c_idx":-1}},{"$limit":49}],
@@ -886,7 +886,7 @@
     "keys" :    202,
     "docs" :    200,
     "sorts":    320,
-    "plans":     12,
+    "plans":     13,
     "rows" :     59},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[8,20,3,5]}},{"a_idx":{"$exists":false}},{"a_idx":{"$nin":[1,14,20]}}],"h_compound":{"$exists":true}}},{"$sort":{"z_idx":1}},{"$limit":117}],
@@ -920,7 +920,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :  99924},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"a_idx":{"$all":[2,5]}},{"i_noidx":{"$exists":false}},{"z_compound":{"$in":[10,12]}},{"a_idx":{"$nin":[11,20]}}]},{"i_compound":{"$nin":[3,6]}}],"a_compound":{"$gte":2}}},{"$sort":{"c_idx":-1}},{"$skip":18},{"$project":{"_id":0,"a_compound":1}}],
@@ -930,7 +930,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts": 487120,
-    "plans":      9,
+    "plans":     11,
     "rows" :     48},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$nin":[14,16]}},{"z_compound":{"$lte":18}},{"$or":[{"c_idx":{"$exists":false}},{"a_compound":{"$gt":16}}]}],"i_compound":{"$nin":[5,6,7]}}},{"$sort":{"h_idx":-1}},{"$skip":65}],
@@ -942,7 +942,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      5,
+    "plans":      7,
     "rows" :  89982},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_idx":{"$gt":12}},{"$or":[{"k_compound":{"$ne":15}},{"d_idx":{"$ne":12}},{"a_compound":{"$all":[12,15]}}]},{"a_compound":{"$in":[16,13,2,14]}}]}}],
@@ -950,7 +950,7 @@
     "keys" :  41795,
     "docs" :  40809,
     "sorts":      0,
-    "plans":     10,
+    "plans":     12,
     "rows" :  40803},
 
 {">>>pipeline": [{"$match":{"$or":[{"h_compound":{"$gte":17}},{"$and":[{"z_compound":{"$gt":13}},{"z_noidx":{"$exists":true}},{"k_idx":{"$exists":true}}]},{"d_compound":{"$nin":[6,7,16,19]}}],"a_compound":{"$gte":15}}},{"$sort":{"z_idx":-1}},{"$limit":9},{"$project":{"_id":0,"a_compound":1}}],
@@ -966,7 +966,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":   1334,
-    "plans":      7,
+    "plans":      8,
     "rows" :     22},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$in":[14,18,12,10]}},{"$and":[{"c_compound":{"$gt":12}},{"z_noidx":{"$exists":true}},{"a_noidx":{"$exists":false}}]},{"a_compound":{"$all":[20,7]}},{"a_compound":{"$gt":5}}],"a_idx":{"$gt":5}}},{"$skip":42},{"$project":{"_id":0,"z_noidx":1}}],
@@ -984,7 +984,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :  99913},
 
 {">>>pipeline": [{"$match":{"$and":[{"$or":[{"a_compound":{"$all":[12,1,6]}},{"a_idx":{"$elemMatch":{"$exists":true,"$in":[1,1],"$ne":1,"$nin":[16,5]}}},{"h_idx":{"$in":[11,3,11]}},{"a_idx":{"$elemMatch":{"$in":[8,20]}}},{"a_idx":{"$exists":false}},{"z_idx":{"$in":[7,10]}}]},{"$or":[{"$or":[{"$and":[{"d_idx":{"$lte":5}},{"c_compound":{"$gte":20}},{"d_noidx":{"$in":[18,12,5,19]}}]},{"a_compound":{"$all":[11,9,11]}},{"k_compound":{"$exists":true}},{"d_compound":{"$in":[14,2,11]}}]},{"$and":[{"a_noidx":{"$elemMatch":{"$exists":true,"$gt":1,"$in":[2,12],"$lt":19}}},{"a_noidx":{"$elemMatch":{"$lte":4}}},{"a_idx":{"$exists":true}}]}]}]}},{"$sort":{"k_idx":-1,"z_idx":1}},{"$limit":203}],
@@ -994,7 +994,7 @@
     "keys" :  92000,
     "docs" :  92000,
     "sorts":      0,
-    "plans":      7,
+    "plans":      8,
     "rows" :  92000},
 
 {">>>pipeline": [{"$match":{"$or":[{"i_compound":{"$gt":8}},{"a_idx":{"$all":[1,13,2,7]}}]}},{"$sort":{"d_idx":1}}],
@@ -1002,7 +1002,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :  99991},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_noidx":{"$gt":18}},{"$nor":[{"c_compound":{"$nin":[16,4,14,2,12]}},{"i_compound":{"$in":[2,14,11]}},{"k_compound":{"$in":[8,7]}}]}],"d_compound":{"$gte":3}}},{"$limit":28}],
@@ -1014,7 +1014,7 @@
     "keys" :  99901,
     "docs" :  99900,
     "sorts":      0,
-    "plans":      8,
+    "plans":     11,
     "rows" :  99900},
 
 {">>>pipeline": [{"$match":{"$nor":[{"k_compound":{"$gte":15}},{"a_compound":{"$all":[11,5,7,12]}}],"a_compound":{"$elemMatch":{"$exists":true,"$in":[11,6,15]}},"d_idx":{"$exists":true}}},{"$sort":{"c_idx":-1,"d_idx":-1,"z_idx":-1}},{"$project":{"_id":0,"z_idx":1}}],
@@ -1026,7 +1026,7 @@
     "keys" : 101000,
     "docs" : 100998,
     "sorts":      0,
-    "plans":      6,
+    "plans":      7,
     "rows" :  19800},
 
 {">>>pipeline": [{"$match":{"$nor":[{"i_compound":{"$exists":false}},{"a_compound":{"$all":[14,17,15]}}],"d_compound":{"$in":[14,12,9,8,5]}}},{"$sort":{"h_idx":1}},{"$limit":229},{"$skip":21}],
@@ -1048,7 +1048,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      6,
+    "plans":     11,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[13,7,15]}},{"k_compound":{"$ne":6}}],"a_idx":{"$lte":14}}},{"$limit":243},{"$project":{"_id":0,"a_compound":1}}],
@@ -1056,7 +1056,7 @@
     "keys" :   1243,
     "docs" :   1243,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :    243},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[11,17,8,7,12]}},{"a_noidx":{"$eq":13}}],"a_idx":{"$in":[14,11,4,19]},"k_idx":{"$exists":true}}},{"$project":{"_id":0,"a_compound":1}}],
@@ -1074,7 +1074,7 @@
     "keys" :   7904,
     "docs" :   7903,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :   7903},
 
 {">>>pipeline": [{"$match":{"$nor":[{"$nor":[{"a_compound":{"$lt":8}},{"a_idx":{"$all":[5,2,19,4]}}]},{"d_idx":{"$eq":11}}],"h_compound":{"$gte":20}}},{"$sort":{"a_idx":1}},{"$limit":236}],
@@ -1082,7 +1082,7 @@
     "keys" :    296,
     "docs" :    296,
     "sorts":      0,
-    "plans":     11,
+    "plans":     13,
     "rows" :    236},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[19,11,4]}},{"a_compound":{"$exists":false}}],"k_noidx":{"$gte":8}}},{"$sort":{"a_idx":-1,"k_idx":-1}},{"$limit":255},{"$skip":44}],
@@ -1104,7 +1104,7 @@
     "keys" : 300105,
     "docs" : 100992,
     "sorts": 1251184,
-    "plans":     10,
+    "plans":     11,
     "rows" :  99992},
 
 {">>>pipeline": [{"$match":{"$or":[{"c_compound":{"$exists":true}},{"a_compound":{"$in":[9,5,2,5]}},{"k_idx":{"$gt":10}},{"d_idx":{"$exists":false}}],"a_noidx":{"$gt":18},"z_compound":{"$in":[17,20,1]}}},{"$sort":{"c_idx":1,"h_idx":1}},{"$limit":162}],
@@ -1142,7 +1142,7 @@
     "keys" :    139,
     "docs" :    139,
     "sorts":      0,
-    "plans":      8,
+    "plans":     11,
     "rows" :    139},
 
 {">>>pipeline": [{"$match":{"$or":[{"i_compound":{"$gte":4}},{"a_compound":{"$all":[17,5]}},{"a_compound":{"$all":[8,8]}}]}},{"$sort":{"z_idx":1}},{"$project":{"a_idx":1}}],
@@ -1150,7 +1150,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :  99996},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$ne":16}},{"$nor":[{"a_idx":{"$exists":false}},{"a_idx":{"$lt":2}},{"k_idx":{"$eq":14}},{"a_compound":{"$all":[17,12,8]}}]}],"a_idx":{"$exists":true},"c_compound":{"$nin":[11,7,18,17]}}},{"$sort":{"z_idx":1}},{"$project":{"d_compound":1}}],
@@ -1160,7 +1160,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      8,
+    "plans":     10,
     "rows" :  50129},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$elemMatch":{"$gt":14}}},{"k_idx":{"$exists":false}},{"a_idx":{"$all":[18,12,6]}},{"z_idx":{"$eq":3}},{"a_compound":{"$all":[15,11,7,4]}}],"a_compound":{"$in":[15,11]}}},{"$sort":{"d_idx":1}},{"$limit":28}],
@@ -1168,7 +1168,7 @@
     "keys" :   2006,
     "docs" :   2004,
     "sorts":   8677,
-    "plans":     11,
+    "plans":     12,
     "rows" :     28},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_noidx":{"$lte":10}},{"$and":[{"c_compound":{"$lte":7}},{"z_compound":{"$nin":[19,9]}}]}]}},{"$sort":{"h_idx":-1}}],
@@ -1190,7 +1190,7 @@
     "keys" : 179917,
     "docs" :  99995,
     "sorts": 612366,
-    "plans":      9,
+    "plans":     12,
     "rows" :    168},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"a_idx":{"$all":[8,16,9,19,8,6]}},{"$or":[{"a_compound":{"$all":[10,17,1,16]}},{"a_noidx":{"$nin":[20,6]}},{"a_noidx":{"$all":[3,9]}},{"a_compound":{"$all":[10,2,20]}},{"a_idx":{"$ne":9}}]}]},{"i_compound":{"$nin":[1,8,10]}}],"a_compound":{"$elemMatch":{"$exists":true,"$gt":8}}}},{"$skip":76}],
@@ -1200,7 +1200,7 @@
     "keys" :    152,
     "docs" :    152,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :    152},
 
 {">>>pipeline": [{"$match":{"$nor":[{"$or":[{"a_compound":{"$all":[17,16,19,20]}},{"z_idx":{"$exists":false}}]},{"z_idx":{"$exists":false}},{"z_compound":{"$exists":false}}],"a_compound":{"$nin":[14,16]}}},{"$sort":{"a_idx":-1,"k_idx":-1}}],
@@ -1214,15 +1214,15 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":   6425,
-    "plans":     11,
+    "plans":     14,
     "rows" :    227},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$all":[19,15]}},{"a_compound":{"$lt":3}}],"z_noidx":{"$in":[2,2,1]}}},{"$sort":{"d_idx":-1}},{"$limit":40}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[19.0, 19.0]"]}}},{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[-inf, 3.0)"]}}]}}},
-    "keys" :  94298,
-    "docs" :  80322,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"AND_SORTED","inputStages":[{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[19.0, 19.0]"]}},{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[15.0, 15.0]"]}}]}},{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[-inf, 3.0)"]}}]}}},
+    "keys" :  95298,
+    "docs" :  79322,
     "sorts": 329975,
-    "plans":      5,
+    "plans":      7,
     "rows" :     40},
 
 {">>>pipeline": [{"$match":{"$or":[{"c_compound":{"$exists":true}},{"a_compound":{"$elemMatch":{"$nin":[10,13]}}},{"$and":[{"z_noidx":{"$nin":[7,10,4]}},{"i_compound":{"$in":[6,5,17]}}]},{"h_idx":{"$in":[3,6,7]}},{"z_idx":{"$in":[13,1]}}],"a_compound":{"$elemMatch":{"$exists":true}}}},{"$project":{"_id":0,"a_noidx":1,"c_noidx":1,"d_idx":1}}],
@@ -1234,7 +1234,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :  98949},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$exists":false}},{"z_compound":{"$exists":true}},{"a_compound":{"$lte":15}}],"a_compound":{"$elemMatch":{"$in":[2,14,3]}}}},{"$sort":{"a_idx":-1,"d_idx":-1,"k_idx":-1}},{"$limit":237}],
@@ -1248,7 +1248,7 @@
     "keys" :     12,
     "docs" :     12,
     "sorts":      1,
-    "plans":      6,
+    "plans":     11,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$elemMatch":{"$ne":14}}},{"a_compound":{"$all":[8,14]}}],"a_compound":{"$elemMatch":{"$exists":true}},"a_noidx":{"$in":[5,12]},"d_idx":{"$lt":14}}},{"$limit":27}],
@@ -1258,7 +1258,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :  99985},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"a_compound":{"$exists":false}},{"a_idx":{"$exists":false}}]},{"d_compound":{"$lte":18}}],"k_compound":{"$nin":[9,11,15]}}},{"$sort":{"d_idx":1,"z_idx":-1}}],
@@ -1278,7 +1278,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      6,
+    "plans":     11,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$nin":[16,12,19]}},{"a_compound":{"$nin":[1,4,2,6]}}],"$nor":[{"$and":[{"a_compound":{"$all":[5,10]}},{"i_compound":{"$in":[9,17,2,14]}}]},{"i_noidx":{"$in":[6,2,5]}},{"h_noidx":{"$exists":false}}],"a_idx":{"$elemMatch":{"$exists":true}}}}],
@@ -1292,7 +1292,7 @@
     "keys" : 101000,
     "docs" : 101000,
     "sorts":  17202,
-    "plans":     10,
+    "plans":     11,
     "rows" :   2000},
 
 {">>>pipeline": [{"$match":{"$and":[{"$or":[{"a_compound":{"$all":[1,6]}},{"a_idx":{"$all":[14,9,3]}}]},{"k_compound":{"$lte":18}}]}},{"$project":{"i_compound":1,"z_compound":1}}],
@@ -1300,7 +1300,7 @@
     "keys" :   1900,
     "docs" :   1900,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :     84},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$lte":4}},{"a_compound":{"$elemMatch":{"$exists":true}}},{"$or":[{"k_compound":{"$exists":true}},{"$or":[{"a_idx":{"$lte":19}},{"c_idx":{"$nin":[16,11,4,10]}},{"a_idx":{"$all":[2,8,16]}}]}]},{"a_idx":{"$all":[6,12,8]}}],"a_noidx":{"$elemMatch":{"$ne":7}},"k_compound":{"$lte":14}}},{"$sort":{"c_idx":1}},{"$limit":184},{"$project":{"_id":0,"c_compound":1}}],
@@ -1318,7 +1318,7 @@
     "keys" :      4,
     "docs" :      2,
     "sorts":      0,
-    "plans":     10,
+    "plans":     12,
     "rows" :      2},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$elemMatch":{"$exists":true}}},{"a_compound":{"$lte":8}},{"a_idx":{"$all":[12,8]}}],"a_compound":{"$elemMatch":{"$lt":5,"$lte":20,"$ne":5}}}},{"$skip":48},{"$project":{"_id":0,"a_idx":1,"a_noidx":1,"h_idx":1,"i_idx":1}}],
@@ -1330,7 +1330,7 @@
     "keys" :    208,
     "docs" :    208,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :    155},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_noidx":{"$exists":false}},{"a_compound":{"$all":[9,16,15,18]}}],"i_compound":{"$exists":true}}},{"$sort":{"a_idx":-1,"h_idx":-1}},{"$limit":103}],
@@ -1340,7 +1340,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts": 1251293,
-    "plans":     10,
+    "plans":     12,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"c_idx":{"$in":[9,6,2]}},{"$nor":[{"a_compound":{"$in":[20,6]}},{"a_compound":{"$in":[10,8]}}]},{"a_idx":{"$eq":20}},{"a_noidx":{"$elemMatch":{"$exists":false}}}],"a_compound":{"$elemMatch":{"$in":[14,3,14,18]}},"a_idx":{"$elemMatch":{"$nin":[8,7,20]}}}}],
@@ -1356,7 +1356,7 @@
     "keys" :  12528,
     "docs" :  12528,
     "sorts":  31615,
-    "plans":     11,
+    "plans":     15,
     "rows" :   3456},
 
 {">>>pipeline": [{"$match":{"$or":[{"$or":[{"k_idx":{"$exists":false}},{"a_idx":{"$all":[16,13]}},{"c_compound":{"$ne":4}}]},{"a_idx":{"$in":[18,7,8]}}],"a_compound":{"$in":[11,5,9]}}}],
@@ -1364,7 +1364,7 @@
     "keys" :  23548,
     "docs" :  23255,
     "sorts":      0,
-    "plans":      6,
+    "plans":      8,
     "rows" :  23255},
 
 {">>>pipeline": [{"$match":{"$and":[{"k_idx":{"$lte":2}},{"a_idx":{"$lte":12}},{"$or":[{"a_idx":{"$all":[20,12,1]}},{"i_compound":{"$nin":[19,15]}}]},{"$or":[{"a_compound":{"$elemMatch":{"$exists":true,"$nin":[5,14]}}},{"a_compound":{"$exists":false}},{"i_idx":{"$eq":3}}]}],"$or":[{"$nor":[{"k_idx":{"$gt":20}},{"d_noidx":{"$gte":12}},{"h_noidx":{"$exists":false}}]},{"a_idx":{"$nin":[4,11,18,1]}}],"c_compound":{"$nin":[9,12]}}},{"$project":{"z_compound":1}}],
@@ -1378,7 +1378,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     11,
+    "plans":     13,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_idx":{"$lt":17}},{"$nor":[{"a_idx":{"$in":[18,5,20,11]}},{"z_compound":{"$exists":false}},{"a_idx":{"$exists":false}}]}],"$or":[{"a_compound":{"$all":[17,3]}},{"$and":[{"a_noidx":{"$elemMatch":{"$in":[15,20]}}},{"z_idx":{"$exists":true}},{"i_noidx":{"$exists":false}}]},{"a_compound":{"$exists":true}}]}},{"$limit":19}],
@@ -1388,7 +1388,7 @@
     "keys" :    325,
     "docs" :    325,
     "sorts":      0,
-    "plans":     10,
+    "plans":     13,
     "rows" :    222},
 
 {">>>pipeline": [{"$match":{"$and":[{"k_compound":{"$exists":true}},{"a_compound":{"$lt":17}},{"$nor":[{"a_noidx":{"$nin":[7,16]}},{"a_compound":{"$all":[9,12]}}]}]}},{"$project":{"a_noidx":1}}],
@@ -1418,7 +1418,7 @@
     "keys" :      4,
     "docs" :      2,
     "sorts":      0,
-    "plans":      6,
+    "plans":     11,
     "rows" :      2},
 
 {">>>pipeline": [{"$match":{"$nor":[{"z_idx":{"$gt":20}},{"a_compound":{"$all":[3,8,11,10]}}],"a_idx":{"$in":[13,6]}}},{"$limit":81},{"$project":{"a_compound":1,"a_noidx":1}}],
@@ -1436,7 +1436,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":    838,
-    "plans":     11,
+    "plans":     16,
     "rows" :     51},
 
 {">>>pipeline": [{"$match":{"$nor":[{"c_noidx":{"$exists":false}},{"a_compound":{"$all":[8,18,10,3]}}],"a_compound":{"$elemMatch":{"$nin":[9,7,7]}}}},{"$sort":{"z_idx":1}}],
@@ -1458,17 +1458,17 @@
     "keys" :  44506,
     "docs" :  44506,
     "sorts": 234843,
-    "plans":      5,
+    "plans":      6,
     "rows" :     72},
 
 {">>>pipeline": [{"$match":{"$nor":[{"h_idx":{"$lte":13}},{"a_compound":{"$all":[11,12,18,4]}},{"a_compound":{"$exists":false}}],"a_idx":{"$lte":6}}},{"$skip":70}],
     "error": "encountered interval which is unestimatable: [MinKey, 11.0)"},
 {">>>pipeline": [{"$match":{"$and":[{"$and":[{"a_noidx":{"$lt":6}},{"k_compound":{"$exists":true}}]},{"a_compound":{"$exists":true}},{"a_compound":{"$lte":20}}],"$or":[{"$and":[{"$nor":[{"a_noidx":{"$all":[8,20,3]}},{"i_idx":{"$lt":15}}]},{"a_noidx":{"$exists":true}},{"a_idx":{"$elemMatch":{"$exists":true,"$gt":20,"$in":[12,1]}}},{"$or":[{"z_idx":{"$gte":14}},{"a_noidx":{"$in":[17,1]}},{"k_idx":{"$ne":7}},{"c_compound":{"$gt":2}},{"c_idx":{"$ne":16}}]},{"k_noidx":{"$nin":[6,5,2]}}]},{"$or":[{"a_idx":{"$all":[14,18,10]}},{"i_compound":{"$gte":3}}]}]}},{"$project":{"_id":0,"a_noidx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":[]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[14.0, 14.0]"]}}},{"stage":"IXSCAN","indexName":"i_compound_1","indexBounds":{"i_compound":["[3.0, inf]"]}}]}}},
-    "keys" : 100997,
-    "docs" : 100997,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":[]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"AND_SORTED","inputStages":[{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[14.0, 14.0]"]}},{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[18.0, 18.0]"]}},{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[10.0, 10.0]"]}}]}},{"stage":"IXSCAN","indexName":"i_compound_1_z_compound_1","indexBounds":{"i_compound":["[3.0, inf]"],"z_compound":["[MinKey, MaxKey]"]}}]}}},
+    "keys" : 101997,
+    "docs" :  99997,
     "sorts":      0,
-    "plans":     14,
+    "plans":     16,
     "rows" :  99445},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$elemMatch":{"$gt":3}}},{"a_idx":{"$all":[6,4,13]}},{"a_idx":{"$all":[7,8]}}],"a_compound":{"$elemMatch":{"$nin":[7,12]}}}},{"$sort":{"a_idx":-1}},{"$limit":231},{"$project":{"_id":0,"a_compound":1,"a_noidx":1,"d_idx":1}}],
@@ -1480,7 +1480,7 @@
     "keys" : 101000,
     "docs" : 101000,
     "sorts": 303998,
-    "plans":     17,
+    "plans":     19,
     "rows" :  27123},
 
 {">>>pipeline": [{"$match":{"$and":[{"$or":[{"a_compound":{"$all":[19,17,8,1]}},{"i_compound":{"$ne":11}}]},{"i_noidx":{"$eq":16}}],"z_noidx":{"$in":[3,16]}}},{"$sort":{"k_idx":-1}},{"$limit":252},{"$project":{"a_noidx":1,"c_noidx":1}}],
@@ -1488,7 +1488,7 @@
     "keys" : 101000,
     "docs" : 100999,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :      0},
 
 {">>>pipeline": [{"$match":{"$nor":[{"h_idx":{"$in":[13,4,11,2]}},{"i_noidx":{"$in":[20,2,6,9]}},{"a_compound":{"$all":[9,1]}},{"a_idx":{"$elemMatch":{"$exists":false,"$in":[19,20]}}}],"k_compound":{"$lt":5}}},{"$sort":{"i_idx":-1}}],
@@ -1518,7 +1518,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      7,
+    "plans":      9,
     "rows" :  99994},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_noidx":{"$nin":[15,15]}},{"a_idx":{"$in":[1,14]}},{"a_noidx":{"$nin":[6,5]}},{"$nor":[{"a_compound":{"$all":[8,11,16]}},{"a_compound":{"$in":[11,16]}},{"k_compound":{"$in":[8,17,3,4]}}]}]}},{"$limit":178}],
@@ -1542,7 +1542,7 @@
     "keys" :    394,
     "docs" :    394,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :    159},
 
 {">>>pipeline": [{"$match":{"$nor":[{"c_compound":{"$in":[20,18]}},{"a_compound":{"$all":[11,18,1]}},{"k_compound":{"$exists":false}}],"h_idx":{"$nin":[4,20,14]}}},{"$project":{"k_compound":1}}],
@@ -1576,7 +1576,7 @@
     "keys" :    452,
     "docs" :    452,
     "sorts":      0,
-    "plans":     14,
+    "plans":     15,
     "rows" :    105},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$elemMatch":{"$nin":[11,9]}}},{"a_compound":{"$lte":15}},{"a_compound":{"$all":[8,20]}}],"a_compound":{"$elemMatch":{"$in":[16,14,15]}}}}],
@@ -1586,7 +1586,7 @@
     "keys" :    402,
     "docs" :    400,
     "sorts":   2797,
-    "plans":     11,
+    "plans":     12,
     "rows" :    400},
 
 {">>>pipeline": [{"$match":{"$nor":[{"z_noidx":{"$in":[3,18,17]}},{"d_idx":{"$gt":5}},{"a_compound":{"$exists":false}},{"a_compound":{"$all":[13,20,5]}},{"d_compound":{"$exists":false}}],"k_compound":{"$nin":[8,13]}}},{"$project":{"_id":0,"a_noidx":1,"d_noidx":1,"k_compound":1}}],
@@ -1606,7 +1606,7 @@
     "keys" :    100,
     "docs" :    100,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :     89},
 
 {">>>pipeline": [{"$match":{"$and":[{"$or":[{"a_compound":{"$all":[20,1,3]}},{"c_idx":{"$nin":[3,16]}},{"k_idx":{"$nin":[17,8]}}]},{"a_compound":{"$elemMatch":{"$gt":16}}}]}}],
@@ -1614,7 +1614,7 @@
     "keys" : 272000,
     "docs" :  99983,
     "sorts":      0,
-    "plans":      8,
+    "plans":      9,
     "rows" :  99983},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$elemMatch":{"$exists":true}}},{"c_compound":{"$nin":[3,3,12]}},{"d_compound":{"$ne":7}},{"a_idx":{"$all":[5,16]}}],"a_idx":{"$nin":[11,11,20]},"k_compound":{"$ne":17}}}],
@@ -1650,7 +1650,7 @@
     "keys" :    236,
     "docs" :    236,
     "sorts":      0,
-    "plans":      5,
+    "plans":     10,
     "rows" :    236},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_idx":{"$eq":15}},{"a_compound":{"$nin":[1,14,18]}},{"a_compound":{"$all":[18,15,10]}}],"a_noidx":{"$exists":true}}},{"$project":{"_id":0,"a_idx":1}}],
@@ -1664,7 +1664,7 @@
     "keys" :  30000,
     "docs" :  30000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :  30000},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$elemMatch":{"$in":[9,3,12,14]}}},{"a_idx":{"$all":[15,1,7]}}],"a_compound":{"$in":[11,16]}}}],
@@ -1672,7 +1672,7 @@
     "keys" :   2006,
     "docs" :   2004,
     "sorts":      0,
-    "plans":      8,
+    "plans":     10,
     "rows" :    349},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$exists":true}},{"$and":[{"a_compound":{"$all":[4,14,20]}},{"a_idx":{"$all":[18,17]}},{"a_compound":{"$nin":[13,17,12]}}]}],"z_compound":{"$exists":true}}},{"$limit":95},{"$project":{"_id":0,"a_idx":1,"a_noidx":1}}],
@@ -1688,7 +1688,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      5,
+    "plans":      7,
     "rows" :  99000},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[1,9]}},{"a_idx":{"$all":[18,15]}},{"a_idx":{"$gte":12}}],"d_idx":{"$in":[15,9]}}},{"$sort":{"a_idx":-1,"i_idx":-1}},{"$limit":195}],
@@ -1696,7 +1696,7 @@
     "keys" :  10000,
     "docs" :  10000,
     "sorts":  62724,
-    "plans":      5,
+    "plans":     10,
     "rows" :    195},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[4,1,15,5]}},{"$or":[{"a_noidx":{"$in":[18,13]}},{"a_idx":{"$elemMatch":{"$gt":18}}}]}],"h_noidx":{"$exists":true}}},{"$limit":49},{"$project":{"h_noidx":1,"z_idx":1}}],
@@ -1706,7 +1706,7 @@
     "keys" :   8000,
     "docs" :   8000,
     "sorts":      0,
-    "plans":      8,
+    "plans":     10,
     "rows" :   8000},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"a_compound":{"$exists":true}},{"i_idx":{"$exists":true}}]},{"$and":[{"a_compound":{"$exists":false}},{"z_idx":{"$eq":16}}]},{"k_compound":{"$lte":4}}],"h_noidx":{"$gte":13},"k_compound":{"$nin":[17,7,7]}}},{"$project":{"a_noidx":1}}],
@@ -1718,7 +1718,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     11,
+    "plans":     13,
     "rows" :  99948},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$all":[5,2]}},{"a_compound":{"$all":[9,10]}}],"a_compound":{"$gt":3}}},{"$sort":{"h_idx":-1}}],
@@ -1726,7 +1726,7 @@
     "keys" :  13535,
     "docs" :  16992,
     "sorts":  31625,
-    "plans":      9,
+    "plans":     12,
     "rows" :   3457},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[9,15,13]}},{"i_compound":{"$lte":12}}],"h_compound":{"$nin":[15,20,14]}}}],
@@ -1750,7 +1750,7 @@
     "keys" :     13,
     "docs" :     13,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :     11},
 
 {">>>pipeline": [{"$match":{"$nor":[{"c_noidx":{"$in":[7,17,9,4]}},{"a_noidx":{"$exists":false}}],"$or":[{"$nor":[{"z_compound":{"$in":[3,12]}},{"a_idx":{"$elemMatch":{"$exists":true,"$gt":20}}}]},{"$nor":[{"i_noidx":{"$gt":9}},{"c_idx":{"$exists":false}}]},{"a_compound":{"$gte":16}},{"$nor":[{"h_idx":{"$in":[20,7]}},{"a_compound":{"$exists":true}}]},{"$and":[{"a_idx":{"$all":[7,4,16,13,3]}},{"$nor":[{"a_idx":{"$elemMatch":{"$exists":false}}},{"a_noidx":{"$elemMatch":{"$gt":3,"$in":[9,2]}}}]}]}],"a_compound":{"$elemMatch":{"$exists":true}}}},{"$sort":{"d_idx":1}},{"$limit":44}],
@@ -1778,7 +1778,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts": 937686,
-    "plans":      7,
+    "plans":     12,
     "rows" :  76571},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$eq":12}},{"d_compound":{"$lte":14}}],"h_compound":{"$lte":5},"h_idx":{"$exists":true}}},{"$sort":{"i_idx":1}}],
@@ -1794,7 +1794,7 @@
     "keys" :  37662,
     "docs" :  35582,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :  35582},
 
 {">>>pipeline": [{"$match":{"$nor":[{"k_compound":{"$exists":false}},{"k_compound":{"$gt":13}},{"a_compound":{"$all":[13,1,18,6,14]}},{"a_idx":{"$elemMatch":{"$exists":false,"$in":[4,14]}}}],"a_idx":{"$all":[2,8]},"a_noidx":{"$exists":true}}},{"$limit":248}],
@@ -1864,7 +1864,7 @@
     "keys" :  14531,
     "docs" :  14479,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :  14370},
 
 {">>>pipeline": [{"$match":{"$nor":[{"i_idx":{"$gte":10}},{"a_compound":{"$all":[7,11,19,18,12]}}],"a_compound":{"$elemMatch":{"$lt":2,"$lte":3}}}},{"$sort":{"a_idx":1}},{"$limit":147}],
@@ -1878,7 +1878,7 @@
     "keys" :    148,
     "docs" :    148,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :    122},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_noidx":{"$exists":false}},{"a_compound":{"$exists":false}},{"d_noidx":{"$nin":[11,6,1]}}],"$or":[{"z_compound":{"$ne":13}},{"a_compound":{"$elemMatch":{"$exists":false,"$in":[18,12],"$lt":6}}},{"a_compound":{"$nin":[15,19,12]}},{"$and":[{"h_compound":{"$exists":false}},{"a_compound":{"$all":[10,1]}}]}],"a_compound":{"$gte":10}}},{"$limit":238}],
@@ -1894,7 +1894,7 @@
     "keys" :  18095,
     "docs" :  35184,
     "sorts":  28719,
-    "plans":     14,
+    "plans":     16,
     "rows" :     17},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_idx":{"$elemMatch":{"$exists":true}}},{"a_compound":{"$exists":true}}],"c_compound":{"$ne":3}}},{"$sort":{"h_idx":-1}},{"$limit":78}],
@@ -1934,7 +1934,7 @@
     "keys" :   2000,
     "docs" :   3000,
     "sorts":      0,
-    "plans":     20,
+    "plans":     21,
     "rows" :    326},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_idx":{"$in":[17,10]}},{"$and":[{"d_compound":{"$exists":true}},{"$or":[{"a_idx":{"$eq":7}},{"c_idx":{"$nin":[7,3]}},{"k_idx":{"$exists":false}}]},{"k_idx":{"$exists":true}}]}],"$or":[{"$or":[{"i_compound":{"$gte":5}},{"a_idx":{"$all":[19,6,8]}}]},{"z_compound":{"$in":[6,10,16]}},{"a_compound":{"$all":[8,19,3]}}],"a_noidx":{"$gt":13}}},{"$sort":{"c_idx":-1}}],
@@ -1942,7 +1942,7 @@
     "keys" :   2009,
     "docs" :   2006,
     "sorts":  17250,
-    "plans":     12,
+    "plans":     15,
     "rows" :   2005},
 
 {">>>pipeline": [{"$match":{"$nor":[{"i_idx":{"$exists":false}},{"$nor":[{"a_compound":{"$all":[20,3,20,16]}},{"k_compound":{"$gte":6}}]},{"k_idx":{"$exists":false}},{"z_noidx":{"$gt":9}}],"a_noidx":{"$exists":true},"z_compound":{"$exists":true}}},{"$project":{"i_noidx":1}}],
@@ -1950,7 +1950,7 @@
     "keys" : 100400,
     "docs" : 100400,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :  99389},
 
 {">>>pipeline": [{"$match":{"a_idx":{"$gt":9},"z_compound":{"$lte":12}}},{"$sort":{"z_idx":-1}}],
@@ -1978,7 +1978,7 @@
     "keys" :  30624,
     "docs" :  28548,
     "sorts": 312259,
-    "plans":     11,
+    "plans":     14,
     "rows" :  27799},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$in":[19,12,15]}},{"a_compound":{"$all":[6,20]}},{"a_compound":{"$exists":false}}],"a_compound":{"$all":[2,12]},"z_idx":{"$nin":[4,6,13]}}}],
@@ -1988,7 +1988,7 @@
     "keys" :      8,
     "docs" :      4,
     "sorts":     10,
-    "plans":     10,
+    "plans":     13,
     "rows" :      4},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$gte":2},"a_idx":{"$lte":7}}},{"$sort":{"z_idx":-1}},{"$limit":126},{"$project":{"k_noidx":1}}],
@@ -2018,7 +2018,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     13,
+    "plans":     14,
     "rows" :  93996},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$lt":19},"c_compound":{"$nin":[8,12,2,9]}}},{"$sort":{"h_idx":-1}}],
@@ -2034,7 +2034,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     13,
+    "plans":     14,
     "rows" :  11013},
 
 {">>>pipeline": [{"$match":{"$nor":[{"k_compound":{"$nin":[3,9]}},{"d_compound":{"$gt":18}},{"a_compound":{"$all":[19,6,6]}}],"a_noidx":{"$elemMatch":{"$gte":6,"$lt":19}}}},{"$limit":55}],
@@ -2046,7 +2046,7 @@
     "keys" :  11021,
     "docs" :  11019,
     "sorts":      0,
-    "plans":      8,
+    "plans":     11,
     "rows" :  11016},
 
 {">>>pipeline": [{"$match":{"$or":[{"c_compound":{"$eq":11}},{"a_compound":{"$all":[9,18]}},{"a_compound":{"$nin":[10,5]}}],"a_compound":{"$gte":20}}},{"$sort":{"a_idx":1,"i_idx":-1}},{"$project":{"_id":0,"c_compound":1}}],
@@ -2062,7 +2062,7 @@
     "keys" :    174,
     "docs" :    174,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :    174},
 
 {">>>pipeline": [{"$match":{"$and":[{"$or":[{"a_idx":{"$nin":[5,11,15]}},{"a_compound":{"$all":[5,18,7]}},{"a_idx":{"$elemMatch":{"$in":[20,15,19]}}}]},{"$or":[{"z_compound":{"$in":[8,5,8]}},{"$or":[{"d_compound":{"$gte":9}},{"a_idx":{"$all":[16,12,6]}},{"a_idx":{"$elemMatch":{"$gte":14,"$nin":[12,9]}}},{"i_idx":{"$exists":true}},{"i_idx":{"$exists":false}}]}]},{"$or":[{"k_compound":{"$in":[2,16,8,7]}},{"k_compound":{"$lte":18}}]}]}}],
@@ -2094,7 +2094,7 @@
     "keys" :    202,
     "docs" :    202,
     "sorts":      0,
-    "plans":     14,
+    "plans":     17,
     "rows" :    190},
 
 {">>>pipeline": [{"$match":{"$or":[{"d_idx":{"$in":[3,5,15,7]}},{"i_compound":{"$exists":true}},{"a_idx":{"$all":[14,15,8]}}],"a_compound":{"$in":[13,13,16]},"a_idx":{"$in":[10,3]}}},{"$sort":{"c_idx":-1}},{"$limit":146},{"$project":{"_id":0,"a_compound":1}}],
@@ -2102,7 +2102,7 @@
     "keys" :   2002,
     "docs" :   2000,
     "sorts":   7007,
-    "plans":     12,
+    "plans":     14,
     "rows" :    146},
 
 {">>>pipeline": [{"$match":{"k_idx":{"$ne":5},"z_compound":{"$ne":15}}},{"$sort":{"c_idx":1}},{"$limit":77}],
@@ -2120,7 +2120,7 @@
     "keys" :   1200,
     "docs" :   1200,
     "sorts":   9708,
-    "plans":      9,
+    "plans":     10,
     "rows" :   1200},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_noidx":{"$lt":4}},{"$or":[{"c_noidx":{"$in":[9,11]}},{"a_compound":{"$all":[13,7,2,3]}}]},{"$or":[{"i_compound":{"$lt":4}},{"a_idx":{"$eq":7}},{"a_compound":{"$exists":false}}]}],"h_compound":{"$nin":[19,13,13]}}},{"$sort":{"i_idx":-1,"z_idx":1}},{"$limit":148}],
@@ -2140,7 +2140,7 @@
     "keys" :    249,
     "docs" :    249,
     "sorts":      0,
-    "plans":     11,
+    "plans":     13,
     "rows" :    249},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"a_noidx":{"$exists":true}},{"a_compound":{"$elemMatch":{"$nin":[7,6]}}}]},{"a_compound":{"$nin":[18,19]}}],"k_compound":{"$gte":6}}},{"$sort":{"i_idx":1}}],
@@ -2186,7 +2186,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":   7908,
-    "plans":     11,
+    "plans":     13,
     "rows" :   1000},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$elemMatch":{"$nin":[17,12,15,5]}}},{"a_compound":{"$lte":12}}],"$or":[{"a_compound":{"$all":[5,1,19,11,12]}},{"a_idx":{"$nin":[8,4]}},{"i_idx":{"$lte":19}},{"a_compound":{"$elemMatch":{"$gte":11,"$in":[6,12]}}}]}},{"$project":{"a_compound":1,"a_idx":1}}],
@@ -2228,7 +2228,7 @@
     "keys" :    152,
     "docs" :    152,
     "sorts":      0,
-    "plans":     10,
+    "plans":     13,
     "rows" :    152},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$nin":[3,20]}},{"i_compound":{"$exists":true}}],"a_compound":{"$elemMatch":{"$lte":1}}}},{"$sort":{"h_idx":-1,"z_idx":1}},{"$project":{"_id":0,"a_compound":1,"k_compound":1}}],
@@ -2260,7 +2260,7 @@
     "keys" :  10873,
     "docs" :  10873,
     "sorts":      0,
-    "plans":     12,
+    "plans":     14,
     "rows" :   3928},
 
 {">>>pipeline": [{"$match":{"$nor":[{"k_compound":{"$in":[4,12,15]}},{"a_compound":{"$all":[13,11,5,3]}}],"a_idx":{"$in":[16,18]},"d_idx":{"$gt":7},"z_idx":{"$in":[4,8]}}}],
@@ -2310,7 +2310,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      8,
+    "plans":     10,
     "rows" :      2},
 
 {">>>pipeline": [{"$match":{"$or":[{"d_compound":{"$nin":[8,7]}},{"a_idx":{"$all":[11,15,1]}},{"a_idx":{"$elemMatch":{"$exists":true}}},{"i_compound":{"$gte":9}}],"d_compound":{"$lte":9}}},{"$sort":{"i_idx":-1}},{"$limit":88}],
@@ -2318,7 +2318,7 @@
     "keys" :     88,
     "docs" :     88,
     "sorts":      0,
-    "plans":     11,
+    "plans":     13,
     "rows" :     88},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$elemMatch":{"$eq":8,"$exists":true}}},{"a_compound":{"$all":[7,1,16,10]}}],"z_compound":{"$exists":true}}},{"$sort":{"c_idx":1,"h_idx":-1}},{"$limit":11},{"$project":{"k_compound":1}}],
@@ -2328,7 +2328,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      7,
+    "plans":      9,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[1,7,14]}},{"i_idx":{"$lt":4}}],"a_idx":{"$elemMatch":{"$in":[6,10,14,1]}}}},{"$limit":221},{"$project":{"a_idx":1}}],
@@ -2348,7 +2348,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :  99700},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_idx":{"$in":[18,3,5]}},{"i_compound":{"$in":[13,15]}}],"$or":[{"$or":[{"a_compound":{"$all":[3,18,9]}},{"a_compound":{"$elemMatch":{"$exists":false,"$in":[8,14,8]}}},{"$nor":[{"k_compound":{"$nin":[4,2]}},{"a_noidx":{"$elemMatch":{"$eq":1,"$exists":true,"$nin":[2,2,6]}}}]}]},{"a_idx":{"$elemMatch":{"$exists":true}}},{"a_compound":{"$nin":[16,15]}}],"a_idx":{"$all":[1,12]}}},{"$project":{"a_compound":1,"a_noidx":1}}],
@@ -2358,7 +2358,7 @@
     "keys" :    100,
     "docs" :    100,
     "sorts":    561,
-    "plans":     13,
+    "plans":     14,
     "rows" :    100},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[19,9,2]}},{"a_idx":{"$nin":[3,18]}},{"a_compound":{"$gte":10}}],"h_idx":{"$ne":3}}},{"$sort":{"i_idx":1,"k_idx":1}},{"$limit":248},{"$project":{"_id":0,"z_noidx":1}}],
@@ -2376,7 +2376,7 @@
     "keys" :    131,
     "docs" :    124,
     "sorts":    722,
-    "plans":     12,
+    "plans":     15,
     "rows" :    124},
 
 {">>>pipeline": [{"$match":{"$nor":[{"$or":[{"k_idx":{"$in":[14,12]}},{"a_noidx":{"$nin":[18,8]}}]},{"a_noidx":{"$in":[19,1]}},{"a_compound":{"$all":[15,1,4]}}],"a_noidx":{"$gt":11},"i_compound":{"$nin":[15,11]},"k_noidx":{"$nin":[17,14]}}},{"$sort":{"d_idx":-1}},{"$limit":118}],
@@ -2408,7 +2408,7 @@
     "keys" :   4003,
     "docs" :   4000,
     "sorts":   6345,
-    "plans":     14,
+    "plans":     16,
     "rows" :    215},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$elemMatch":{"$exists":true}}},{"a_noidx":{"$exists":true}}],"$or":[{"a_idx":{"$all":[18,16,19]}},{"d_compound":{"$nin":[20,18]}}],"a_noidx":{"$elemMatch":{"$gt":15,"$nin":[10,5,2]}}}},{"$sort":{"a_idx":-1}},{"$limit":220}],
@@ -2460,7 +2460,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":   7908,
-    "plans":     10,
+    "plans":     13,
     "rows" :   1000},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$exists":true},"d_compound":{"$lt":7},"z_idx":{"$lt":13}}},{"$sort":{"k_idx":-1}}],
@@ -2500,7 +2500,7 @@
     "keys" :  89000,
     "docs" :  89000,
     "sorts": 508563,
-    "plans":      5,
+    "plans":      6,
     "rows" :    119},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$ne":20}},{"d_idx":{"$lt":8}},{"a_idx":{"$all":[18,18,12,6,1]}},{"a_compound":{"$elemMatch":{"$exists":true}}}],"a_compound":{"$elemMatch":{"$nin":[12,18,5]}},"a_idx":{"$in":[6,2]}}},{"$limit":4},{"$project":{"d_compound":1}}],
@@ -2530,7 +2530,7 @@
     "keys" :   2006,
     "docs" :   2004,
     "sorts":   7917,
-    "plans":     11,
+    "plans":     13,
     "rows" :   1001},
 
 {">>>pipeline": [{"$match":{"$or":[{"h_idx":{"$gte":8}},{"$and":[{"i_compound":{"$exists":true}},{"a_compound":{"$all":[2,9,19,3,20]}}]}],"a_compound":{"$lte":11},"z_idx":{"$exists":true}}}],
@@ -2552,7 +2552,7 @@
     "keys" :    268,
     "docs" :    268,
     "sorts":      0,
-    "plans":     10,
+    "plans":     13,
     "rows" :    235},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_noidx":{"$gt":6}},{"a_idx":{"$elemMatch":{"$exists":true,"$in":[18,10,17,20]}}},{"a_compound":{"$all":[6,3,19,12]}}],"a_compound":{"$elemMatch":{"$exists":true}},"c_noidx":{"$in":[16,1]},"i_noidx":{"$ne":10}}},{"$sort":{"k_idx":-1}},{"$limit":214}],
@@ -2606,15 +2606,15 @@
     "keys" :  98002,
     "docs" :  98000,
     "sorts":      0,
-    "plans":      8,
+    "plans":     11,
     "rows" :  97989},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$eq":1}},{"a_compound":{"$lt":8}},{"$and":[{"a_idx":{"$all":[15,13]}},{"i_noidx":{"$exists":false}}]}],"z_idx":{"$nin":[6,6,11]}}},{"$project":{"a_idx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[15.0, 15.0]"]}}},{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[-inf, 8.0)"]}}]}}},
-    "keys" : 170836,
-    "docs" : 100978,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"AND_SORTED","inputStages":[{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[15.0, 15.0]"]}},{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[13.0, 13.0]"]}}]}},{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[-inf, 8.0)"]}}]}}},
+    "keys" : 171836,
+    "docs" :  99978,
     "sorts":      0,
-    "plans":      8,
+    "plans":     11,
     "rows" :  99002},
 
 {">>>pipeline": [{"$match":{"$and":[{"k_compound":{"$gte":7}},{"h_compound":{"$exists":true}}],"a_compound":{"$nin":[1,4]}}},{"$sort":{"h_idx":-1}},{"$limit":110}],
@@ -2636,7 +2636,7 @@
     "keys" :    111,
     "docs" :    111,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :    111},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$nin":[16,20,16,1]},"i_compound":{"$exists":true},"i_noidx":{"$in":[16,8,3]}}},{"$project":{"a_idx":1,"k_idx":1}}],
@@ -2646,7 +2646,7 @@
     "keys" : 469919,
     "docs" : 100983,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :  99983},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$all":[6,13,7,2]}},{"d_compound":{"$nin":[13,2]}}],"a_idx":{"$elemMatch":{"$gte":19,"$ne":16}}}},{"$sort":{"z_idx":1}}],
@@ -2700,7 +2700,7 @@
     "keys" :    172,
     "docs" :    172,
     "sorts":      0,
-    "plans":     13,
+    "plans":     15,
     "rows" :    171},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$in":[13,19,1,16]}},{"c_compound":{"$lt":7}},{"a_compound":{"$elemMatch":{"$eq":7}}}],"h_compound":{"$eq":3}}},{"$sort":{"a_idx":1,"k_idx":1}}],
@@ -2720,7 +2720,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     11,
+    "plans":     13,
     "rows" :  98300},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$ne":9}},{"$nor":[{"a_compound":{"$in":[16,14]}},{"a_idx":{"$all":[16,1]}}]}],"k_idx":{"$in":[10,14]}}},{"$sort":{"h_idx":1,"k_idx":-1,"z_idx":-1}},{"$project":{"_id":0,"a_idx":1}}],
@@ -2766,7 +2766,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      1,
-    "plans":      9,
+    "plans":     10,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$lt":12}},{"a_compound":{"$in":[11,12,3,11]}}],"a_idx":{"$elemMatch":{"$exists":true,"$lte":17}}}}],
@@ -2784,7 +2784,7 @@
     "keys" :    177,
     "docs" :    177,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :    177},
 
 {">>>pipeline": [{"$match":{"$or":[{"d_compound":{"$exists":true}},{"k_compound":{"$nin":[19,18,20,19]}}],"a_compound":{"$eq":4},"k_compound":{"$nin":[3,13,17]}}}],
@@ -2802,7 +2802,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     13,
+    "plans":     14,
     "rows" :  99998},
 
 {">>>pipeline": [{"$match":{"$nor":[{"h_compound":{"$in":[4,14,13,16,7,9]}},{"a_compound":{"$all":[1,7,16,14,15]}}],"d_noidx":{"$exists":true}}},{"$sort":{"c_idx":1}}],
@@ -2812,7 +2812,7 @@
     "keys" :  25786,
     "docs" :  25786,
     "sorts":      0,
-    "plans":      5,
+    "plans":      6,
     "rows" :   4939},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$elemMatch":{"$exists":false}}},{"a_compound":{"$all":[3,20,12,13,1]}}],"a_compound":{"$exists":true}}},{"$project":{"_id":0,"a_idx":1}}],
@@ -2866,7 +2866,7 @@
     "keys" :  26289,
     "docs" :  25923,
     "sorts":  76837,
-    "plans":     11,
+    "plans":     12,
     "rows" :   7721},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$in":[16,9]}},{"$or":[{"a_compound":{"$elemMatch":{"$exists":false,"$lt":19}}},{"a_compound":{"$elemMatch":{"$exists":true,"$in":[14,9]}}}]},{"z_idx":{"$lt":20}},{"a_idx":{"$all":[5,8]}}],"h_idx":{"$gte":7}}}],
@@ -2886,7 +2886,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      5,
+    "plans":     13,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$elemMatch":{"$exists":false}}},{"h_compound":{"$in":[11,18,16]}},{"i_idx":{"$exists":true}},{"a_compound":{"$all":[10,1]}},{"a_compound":{"$eq":20}}],"a_compound":{"$gte":18}}},{"$project":{"a_compound":1,"k_compound":1}}],
@@ -2916,7 +2916,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      8,
+    "plans":     11,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$all":[13,17,6]}},{"a_compound":{"$elemMatch":{"$exists":true,"$lte":8}}}],"a_noidx":{"$eq":11}}},{"$sort":{"d_idx":1}},{"$limit":137},{"$project":{"_id":0,"a_noidx":1}}],
@@ -2924,7 +2924,7 @@
     "keys" :  11362,
     "docs" :  11362,
     "sorts":      0,
-    "plans":      7,
+    "plans":      9,
     "rows" :    137},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$elemMatch":{"$nin":[7,19]}},"d_noidx":{"$nin":[12,2,19,2]},"z_idx":{"$nin":[15,2]}}},{"$sort":{"i_idx":-1}}],
@@ -2934,7 +2934,7 @@
     "keys" : 159579,
     "docs" :  99892,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :  17094},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"z_idx":{"$nin":[16,18,2]}},{"k_idx":{"$nin":[7,6,2]}}]},{"a_idx":{"$gt":12}},{"a_compound":{"$nin":[8,1]}},{"i_idx":{"$gt":3}}],"a_compound":{"$exists":true},"a_noidx":{"$lte":16},"d_compound":{"$exists":true}}},{"$sort":{"k_idx":1}},{"$limit":225}],
@@ -2952,7 +2952,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :  97993},
 
 {">>>pipeline": [{"$match":{"$or":[{"h_compound":{"$exists":false}},{"a_compound":{"$all":[16,6,7]}},{"c_compound":{"$ne":13}}],"i_compound":{"$lte":1}}},{"$sort":{"a_idx":1,"i_idx":-1,"k_idx":1}},{"$limit":186}],
@@ -2960,7 +2960,7 @@
     "keys" :      2,
     "docs" :      2,
     "sorts":      3,
-    "plans":     10,
+    "plans":     11,
     "rows" :      2},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$nin":[13,9,10]}},{"$and":[{"z_idx":{"$lte":12}},{"a_compound":{"$lt":5}},{"c_compound":{"$gte":1}}]}]}},{"$sort":{"h_idx":1}}],
@@ -2970,7 +2970,7 @@
     "keys" : 458941,
     "docs" : 100000,
     "sorts": 517439,
-    "plans":      9,
+    "plans":     11,
     "rows" :     65},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$nin":[20,6]}},{"a_compound":{"$all":[14,11]}},{"a_idx":{"$all":[20,7,4]}}],"a_compound":{"$in":[19,1]}}},{"$project":{"a_compound":1,"a_noidx":1}}],
@@ -3000,7 +3000,7 @@
     "keys" :  74593,
     "docs" :  64577,
     "sorts":      0,
-    "plans":      8,
+    "plans":      9,
     "rows" :  64570},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_idx":{"$elemMatch":{"$lt":4,"$lte":8}}},{"a_compound":{"$all":[2,13,3]}}]}},{"$sort":{"z_idx":1}}],
@@ -3008,7 +3008,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":   2338,
-    "plans":      8,
+    "plans":      9,
     "rows" :    342},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$gte":1}},{"a_compound":{"$exists":true}}],"$or":[{"a_compound":{"$ne":13}},{"a_idx":{"$all":[4,5,19]}},{"$and":[{"h_compound":{"$exists":false}},{"d_noidx":{"$exists":false}}]}]}},{"$limit":57}],
@@ -3034,7 +3034,7 @@
     "keys" :    221,
     "docs" :    221,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :    220},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$exists":true}},{"d_compound":{"$exists":true}},{"a_idx":{"$lt":15}},{"k_idx":{"$lt":16}}],"a_compound":{"$elemMatch":{"$in":[9,13,20]}},"a_idx":{"$gt":1}}},{"$sort":{"a_idx":1}},{"$limit":95}],
@@ -3084,7 +3084,7 @@
     "keys" :    207,
     "docs" :    207,
     "sorts":      0,
-    "plans":      8,
+    "plans":     10,
     "rows" :    207},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$nin":[2,17,14,16,20]}},{"a_compound":{"$nin":[9,17,11,20,16,11,6,19]}}],"h_idx":{"$exists":true}}},{"$project":{"a_compound":1}}],
@@ -3118,7 +3118,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts": 1251022,
-    "plans":      7,
+    "plans":     10,
     "rows" :  99980},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$exists":true},"a_idx":{"$exists":true},"h_noidx":{"$in":[19,8,20]}}},{"$project":{"_id":0,"a_idx":1,"a_noidx":1}}],
@@ -3148,7 +3148,7 @@
     "keys" :  10013,
     "docs" :  10013,
     "sorts":      0,
-    "plans":     11,
+    "plans":     14,
     "rows" :   3759},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$exists":false}},{"a_noidx":{"$exists":false}}],"$or":[{"$and":[{"i_idx":{"$nin":[17,3]}},{"a_idx":{"$exists":false}},{"i_compound":{"$nin":[2,20,6,18]}},{"h_idx":{"$lte":1}},{"z_compound":{"$lt":15}},{"d_compound":{"$exists":false}},{"i_compound":{"$exists":false}}]},{"a_idx":{"$ne":14}}]}},{"$sort":{"k_idx":-1}}],
@@ -3170,7 +3170,7 @@
     "keys" :    202,
     "docs" :    200,
     "sorts":      0,
-    "plans":      7,
+    "plans":      8,
     "rows" :    200},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$elemMatch":{"$gte":12}},"a_idx":{"$gt":6}}},{"$sort":{"a_idx":-1}},{"$limit":40}],
@@ -3214,7 +3214,7 @@
     "keys" :   1004,
     "docs" :   1004,
     "sorts":      0,
-    "plans":      6,
+    "plans":      8,
     "rows" :   1004},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$exists":true},"a_idx":{"$exists":true},"h_noidx":{"$in":[11,10]}}},{"$sort":{"i_idx":-1,"k_idx":1}}],
@@ -3246,7 +3246,7 @@
     "keys" : 101000,
     "docs" : 101000,
     "sorts": 549959,
-    "plans":     11,
+    "plans":     12,
     "rows" :     90},
 
 {">>>pipeline": [{"$match":{"$or":[{"k_idx":{"$nin":[11,18]}},{"z_compound":{"$nin":[12,1]}},{"a_compound":{"$exists":false}},{"a_compound":{"$elemMatch":{"$exists":false}}}],"a_compound":{"$elemMatch":{"$gt":2}}}},{"$sort":{"k_idx":-1}}],
@@ -3274,7 +3274,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      5,
+    "plans":      6,
     "rows" :  99989},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[12,16]}},{"a_idx":{"$exists":true}},{"k_compound":{"$in":[13,17,2]}}],"k_compound":{"$in":[15,3,7,19]}}}],
@@ -3282,7 +3282,7 @@
     "keys" :    404,
     "docs" :    400,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :    400},
 
 {">>>pipeline": [{"$match":{"d_compound":{"$nin":[7,19,10]},"h_idx":{"$gte":8}}},{"$sort":{"a_idx":1}},{"$project":{"a_noidx":1}}],
@@ -3342,7 +3342,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      5,
+    "plans":      7,
     "rows" :   1000},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$elemMatch":{"$exists":true,"$gte":3}},"h_compound":{"$exists":true}}},{"$project":{"_id":0,"h_idx":1}}],
@@ -3366,7 +3366,7 @@
     "keys" :  18096,
     "docs" :  17094,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :  17089},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_idx":{"$elemMatch":{"$eq":20,"$in":[8,17,14,15,2],"$lte":19}}},{"a_compound":{"$all":[8,17,18]}}],"a_compound":{"$elemMatch":{"$lte":8}}}},{"$limit":32}],
@@ -3400,7 +3400,7 @@
     "keys" :    252,
     "docs" :    252,
     "sorts":      0,
-    "plans":      5,
+    "plans":      6,
     "rows" :    252},
 
 {">>>pipeline": [{"$match":{"$and":[{"c_idx":{"$exists":true}},{"$or":[{"a_compound":{"$gt":14}},{"z_compound":{"$lte":5}},{"a_idx":{"$eq":12}},{"a_idx":{"$elemMatch":{"$exists":true}}},{"a_idx":{"$lte":16}},{"d_compound":{"$exists":true}}]}],"z_noidx":{"$lt":12}}},{"$sort":{"a_idx":-1,"i_idx":1}}],
@@ -3450,7 +3450,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :  99992},
 
 {">>>pipeline": [{"$match":{"$nor":[{"$and":[{"a_compound":{"$exists":false}},{"a_compound":{"$lt":10}},{"h_compound":{"$exists":true}},{"h_idx":{"$gt":13}}]},{"a_idx":{"$in":[12,15]}}],"k_compound":{"$lte":13}}},{"$project":{"a_compound":1,"h_compound":1}}],
@@ -3494,7 +3494,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      8,
+    "plans":     10,
     "rows" :  98700},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$all":[17,14]}},{"c_compound":{"$nin":[4,5,13]}},{"c_idx":{"$nin":[19,6]}}],"a_compound":{"$all":[7,2,7]}}},{"$sort":{"a_idx":1}},{"$limit":131},{"$project":{"_id":0,"i_noidx":1}}],
@@ -3502,7 +3502,7 @@
     "keys" :  10257,
     "docs" :  10257,
     "sorts":  19206,
-    "plans":      9,
+    "plans":     12,
     "rows" :    131},
 
 {">>>pipeline": [{"$match":{"$nor":[{"i_compound":{"$in":[7,9]}},{"a_compound":{"$all":[7,14,16,9]}},{"d_compound":{"$nin":[15,3,17]}}],"a_noidx":{"$elemMatch":{"$exists":true}}}}],
@@ -3528,7 +3528,7 @@
     "keys" :  99200,
     "docs" :  99200,
     "sorts":      0,
-    "plans":      9,
+    "plans":     12,
     "rows" :  99120},
 
 {">>>pipeline": [{"$match":{"$nor":[{"k_idx":{"$exists":false}},{"a_compound":{"$gt":17}},{"$nor":[{"$and":[{"c_compound":{"$exists":true}},{"a_compound":{"$all":[15,14,11]}},{"a_idx":{"$nin":[18,13]}},{"a_idx":{"$nin":[14,9]}}]},{"a_idx":{"$lt":3}},{"d_compound":{"$nin":[12,19,16,19]}}]}],"a_compound":{"$eq":3}}},{"$sort":{"a_idx":-1}}],
@@ -3614,7 +3614,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :   1000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$lt":1}},{"a_compound":{"$all":[19,8]}}],"h_idx":{"$gte":19}}}],
@@ -3624,7 +3624,7 @@
     "keys" :  99001,
     "docs" :  99000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :  43514},
 
 {">>>pipeline": [{"$match":{"$nor":[{"k_compound":{"$in":[14,20]}},{"$and":[{"c_compound":{"$exists":true}},{"a_compound":{"$elemMatch":{"$nin":[7,13,14,18]}}},{"z_noidx":{"$in":[2,5,7]}}]}],"d_compound":{"$nin":[10,8]}}},{"$sort":{"h_idx":1}},{"$project":{"h_idx":1}}],
@@ -3636,7 +3636,7 @@
     "keys" :  98002,
     "docs" :  98000,
     "sorts":      0,
-    "plans":      4,
+    "plans":      5,
     "rows" :  94371},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[20,17,2]}},{"i_idx":{"$gte":9}}],"i_compound":{"$in":[14,1,11]}}}],
@@ -3644,7 +3644,7 @@
     "keys" :      6,
     "docs" :      3,
     "sorts":      0,
-    "plans":      8,
+    "plans":      9,
     "rows" :      2},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$elemMatch":{"$ne":15}},"z_compound":{"$in":[4,1]}}},{"$project":{"a_compound":1,"h_compound":1,"i_idx":1}}],
@@ -3656,7 +3656,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     13,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"a_noidx":{"$lte":17}},{"a_compound":{"$all":[13,16,18]}}]},{"a_compound":{"$exists":true}},{"$and":[{"d_idx":{"$in":[9,16,3,3]}},{"c_noidx":{"$exists":false}}]}],"d_noidx":{"$lte":6}}},{"$sort":{"i_idx":1}}],
@@ -3664,7 +3664,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :  70000},
 
 {">>>pipeline": [{"$match":{"$and":[{"k_compound":{"$in":[4,4]}},{"k_compound":{"$exists":true}}],"$or":[{"a_compound":{"$in":[3,16,9]}},{"d_compound":{"$in":[4,15,9]}},{"h_idx":{"$exists":false}}]}}],
@@ -3682,7 +3682,7 @@
     "keys" :    244,
     "docs" :    244,
     "sorts":      0,
-    "plans":      5,
+    "plans":      7,
     "rows" :    244},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_idx":{"$elemMatch":{"$exists":true}}},{"a_compound":{"$elemMatch":{"$gte":9,"$nin":[9,18,3]}}},{"k_idx":{"$gte":1}}],"i_idx":{"$ne":1}}}],
@@ -3692,7 +3692,7 @@
     "keys" :    233,
     "docs" :    233,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :    233},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$nin":[7,11,11]},"i_idx":{"$exists":true}}},{"$sort":{"a_idx":1}},{"$project":{"_id":0,"a_compound":1,"i_noidx":1}}],
@@ -3702,7 +3702,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     11,
+    "plans":     13,
     "rows" :  90000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"d_noidx":{"$gte":14}},{"a_compound":{"$in":[19,4]}}],"a_compound":{"$nin":[15,4]}}},{"$sort":{"d_idx":-1}},{"$project":{"k_idx":1}}],
@@ -3718,7 +3718,7 @@
     "keys" : 193945,
     "docs" : 101004,
     "sorts":   1260,
-    "plans":      9,
+    "plans":     11,
     "rows" :    200},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$in":[2,3]}},{"a_compound":{"$exists":true}}],"a_compound":{"$exists":true}}},{"$sort":{"d_idx":1}},{"$project":{"_id":0,"a_compound":1,"a_noidx":1}}],
@@ -3750,7 +3750,7 @@
     "keys" :     82,
     "docs" :     82,
     "sorts":      0,
-    "plans":     10,
+    "plans":     13,
     "rows" :     82},
 
 {">>>pipeline": [{"$match":{"$or":[{"c_compound":{"$in":[7,12,17]}},{"a_idx":{"$nin":[14,3]}},{"a_compound":{"$all":[1,7]}}],"i_noidx":{"$nin":[10,2]}}},{"$sort":{"d_idx":-1}},{"$project":{"_id":0,"c_noidx":1,"h_compound":1,"k_noidx":1}}],
@@ -3762,7 +3762,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     12,
     "rows" :  99448},
 
 {">>>pipeline": [{"$match":{"$and":[{"z_compound":{"$lt":12}},{"a_compound":{"$lte":11}}],"$or":[{"a_idx":{"$nin":[19,1,16,19]}},{"$or":[{"$or":[{"a_idx":{"$elemMatch":{"$gt":16,"$in":[1,1],"$nin":[17,16,15]}}},{"c_compound":{"$in":[9,8,18]}},{"a_compound":{"$all":[5,15,4]}},{"a_compound":{"$gt":18}}]},{"a_idx":{"$nin":[2,2,17]}}]}]}},{"$limit":89},{"$project":{"a_noidx":1,"d_noidx":1,"k_idx":1}}],
@@ -3828,7 +3828,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      8,
+    "plans":     13,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$or":[{"k_idx":{"$gt":17}},{"$and":[{"a_noidx":{"$in":[11,8,9]}},{"h_compound":{"$nin":[20,18,1,4]}}]}],"i_compound":{"$exists":true}}},{"$sort":{"h_idx":1,"i_idx":-1}},{"$limit":46},{"$project":{"_id":0,"a_idx":1}}],
@@ -3852,7 +3852,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :  90000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[15,17,4]}},{"c_idx":{"$in":[4,2]}}],"h_idx":{"$gt":10}}},{"$sort":{"h_idx":1}},{"$limit":137}],
@@ -3950,7 +3950,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      4,
+    "plans":      5,
     "rows" :  99900},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[16,10]}},{"h_idx":{"$exists":false}},{"a_compound":{"$elemMatch":{"$eq":19,"$lte":4}}}],"a_idx":{"$exists":true},"k_compound":{"$gte":18}}},{"$sort":{"d_idx":-1,"i_idx":1,"z_idx":-1}}],
@@ -4038,7 +4038,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      7,
+    "plans":     12,
     "rows" :  67493},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$lte":8},"i_compound":{"$exists":true},"k_compound":{"$in":[4,12,17,4]}}},{"$sort":{"c_idx":-1}}],
@@ -4068,7 +4068,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :  95417},
 
 {">>>pipeline": [{"$match":{"$or":[{"z_compound":{"$exists":true}},{"a_compound":{"$nin":[10,14,19]}}],"k_idx":{"$lte":13}}}],
@@ -4130,7 +4130,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     12,
     "rows" :   9999},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$exists":true}},{"k_compound":{"$nin":[6,13]}},{"c_compound":{"$in":[1,1,9]}}],"d_idx":{"$in":[11,1,9]}}},{"$project":{"a_idx":1,"a_noidx":1}}],
@@ -4250,7 +4250,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      8,
+    "plans":      9,
     "rows" :  99984},
 
 {">>>pipeline": [{"$match":{"$nor":[{"z_noidx":{"$in":[8,12,8]}},{"a_compound":{"$all":[17,4]}}],"a_idx":{"$exists":true}}},{"$sort":{"a_idx":-1}},{"$limit":165}],
@@ -4336,7 +4336,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :    200},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$elemMatch":{"$lt":18}},"a_noidx":{"$in":[17,13,16,6,8,3,3]}}},{"$sort":{"k_idx":-1}},{"$project":{"z_idx":1}}],
@@ -4394,7 +4394,7 @@
     "keys" :      1,
     "docs" :      1,
     "sorts":      0,
-    "plans":      6,
+    "plans":      7,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"i_compound":{"$nin":[18,17]},"z_compound":{"$nin":[2,2,11,17]}}},{"$skip":29}],
@@ -4410,7 +4410,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      3,
+    "plans":      4,
     "rows" :  99978},
 
 {">>>pipeline": [{"$match":{"c_compound":{"$nin":[8,19,18,4]},"z_compound":{"$lte":10}}},{"$limit":127},{"$skip":29}],
@@ -4434,7 +4434,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      5,
+    "plans":     10,
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$or":[{"$nor":[{"h_idx":{"$exists":true}},{"$or":[{"k_noidx":{"$nin":[19,14,9]}},{"i_noidx":{"$exists":false}}]},{"k_idx":{"$exists":false}},{"a_noidx":{"$lt":13}},{"i_noidx":{"$nin":[12,10]}}]},{"a_idx":{"$elemMatch":{"$gte":12}}}]}},{"$sort":{"a_idx":-1}},{"$limit":210},{"$skip":31}],
@@ -4460,7 +4460,7 @@
     "keys" :    309,
     "docs" :    309,
     "sorts":      0,
-    "plans":      8,
+    "plans":     10,
     "rows" :    186},
 
 {">>>pipeline": [{"$match":{"c_compound":{"$ne":15},"d_compound":{"$nin":[18,8,18,3,11]}}},{"$skip":22}],
@@ -4532,7 +4532,7 @@
     "keys" :      1,
     "docs" :      1,
     "sorts":      1,
-    "plans":      6,
+    "plans":      7,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"z_compound":{"$nin":[1,16]}}},{"$limit":58},{"$project":{"_id":0,"z_compound":1}}],
@@ -4598,7 +4598,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      9,
+    "plans":     10,
     "rows" :  99963},
 
 {">>>pipeline": [{"$match":{"$nor":[{"$and":[{"$and":[{"k_idx":{"$nin":[8,15,6]}},{"a_noidx":{"$elemMatch":{"$exists":false}}},{"a_noidx":{"$exists":true}},{"a_noidx":{"$elemMatch":{"$exists":true}}},{"a_compound":{"$elemMatch":{"$exists":true}}}]},{"a_idx":{"$all":[11,6,8]}}]},{"k_compound":{"$in":[13,2,9]}}],"a_compound":{"$all":[20,2,20]},"i_compound":{"$in":[17,20]}}},{"$project":{"_id":0,"i_idx":1}}],
@@ -4656,7 +4656,7 @@
     "keys" :    196,
     "docs" :    196,
     "sorts":      0,
-    "plans":      5,
+    "plans":      7,
     "rows" :    177},
 
 {">>>pipeline": [{"$match":{"i_compound":{"$lte":14}}},{"$limit":43},{"$skip":11}],
@@ -4782,7 +4782,7 @@
     "rows" :  20000}
 
 ],
-">>>totals": {"pipelines": 1044, "plans": 3329, "keys": 42174033, "docs": 22846113, "sorts": 30459170, "rows": 17747871, "errors":    601},
+">>>totals": {"pipelines": 1044, "plans": 3738, "keys": 42176757, "docs": 22840113, "sorts": 30459170, "rows": 17747871, "errors":    601},
 ">>>parameters": {"planRankerMode":"histogramCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"random","internalQuerySamplingBySequentialScan":false}}
 
 

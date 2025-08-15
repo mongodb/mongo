@@ -402,7 +402,6 @@ public:
         // Turn on the "force intersect" option.
         // This will be reverted by PlanRankingTestBase's destructor when the test completes.
         internalQueryForceIntersectionPlans.store(true);
-        internalQueryPlannerEnableSortIndexIntersection.store(true);
 
         // And run the same query again.
         findCommand = std::make_unique<FindCommandRequest>(nss);

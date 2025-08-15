@@ -68,7 +68,7 @@ function generateZipfianList(size, s) {
  * - '_idx' for indexed fields
  * - '_noidx' for non-indexed fields
  * - '_compound' for compound indexes, where the field is indexed separately
- *   but participates in a compound index with other fields as well.
+ *   bug participates in a compound index with other fields as well.
  */
 export function populateSimplePlanStabilityDataset(collName, collSize) {
     assert(collSize > 0, "Size must be a positive integer");

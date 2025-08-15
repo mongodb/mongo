@@ -68,7 +68,6 @@ void QueryPlannerTest::setUp() {
     opCtx = serviceContext.makeOperationContext();
     expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
     internalQueryPlannerEnableHashIntersection.store(true);
-    internalQueryPlannerEnableSortIndexIntersection.store(true);
     params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("_id" << 1));
 }

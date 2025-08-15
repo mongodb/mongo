@@ -221,15 +221,6 @@ server_parameters:
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
-    internalQueryPlannerEnableSortIndexIntersection:
-        description: "Do we use sort-based intersection for rooted $and queries?"
-        set_at: [startup, runtime]
-        cpp_varname: "internalQueryPlannerEnableSortIndexIntersection"
-        cpp_vartype: AtomicWord<bool>
-        default: false
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
-        redact: false
-
     internalQueryPlannerEnableIndexPruning:
         description: "Prunes unnecessary candidate plans so we trial less duplicate options."
         set_at: [startup, runtime]
