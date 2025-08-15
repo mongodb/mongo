@@ -191,3 +191,32 @@ class TestGetTestsForKind(unittest.TestCase):
         actual = shard1 + shard2
         actual.sort()
         self.assertEqual(actual, tests)
+
+    def test_runtime_sharding_no_history(self):
+        tests = ["1.js", "2.js", "3.js", "4.js"]
+        runtimes = []
+        shard_count = 2
+
+        strategy = EqualRuntime(runtimes=runtimes)
+        shard1 = strategy.get_tests_for_shard(tests, shard_count, 0)
+        shard2 = strategy.get_tests_for_shard(tests, shard_count, 1)
+
+        self.assertEqual(set(shard1), set(["1.js", "3.js"]))
+        self.assertEqual(set(shard2), set(["2.js", "4.js"]))
+
+    def test_runtime_sharding_partial_history(self):
+        tests = ["1.js", "2.js", "3.js", "4.js"]
+        runtimes = [
+            {
+                "test_name": "1.js",
+                "avg_duration_pass": 1,
+            },
+        ]
+        shard_count = 2
+
+        strategy = EqualRuntime(runtimes=runtimes)
+        shard1 = strategy.get_tests_for_shard(tests, shard_count, 0)
+        shard2 = strategy.get_tests_for_shard(tests, shard_count, 1)
+
+        self.assertEqual(set(shard1), set(["1.js", "3.js"]))
+        self.assertEqual(set(shard2), set(["2.js", "4.js"]))

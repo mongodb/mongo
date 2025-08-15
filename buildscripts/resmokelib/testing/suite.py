@@ -653,8 +653,8 @@ class EqualRuntime(ShardingStrategy):
             total_runtime += runtime
 
         # Distribute the rest of tests without history, treating them all equally.
-        avg_runtime = total_runtime / len(tests)
-        if avg_runtime:
+        if tests_with_runtime:
+            avg_runtime = total_runtime / len(tests_with_runtime)
             loggers.ROOT_EXECUTOR_LOGGER.info(
                 f"Using average test runtime of {avg_runtime:.1f}s for tests without historic runtime info."
             )

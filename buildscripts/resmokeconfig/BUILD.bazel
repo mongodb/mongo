@@ -16,17 +16,26 @@ filegroup(
 resmoke_suite_test(
     name = "core",
     srcs = [
-        "//jstests/core/js:all_javascript_files",
+        "//jstests/core:all_subpackage_javascript_files",
+        "//jstests/core_standalone:all_subpackage_javascript_files",
     ],
     config = ":suites/core.yml",
     data = [
         "//jstests/hooks:all_javascript_files",
         "//src/third_party/schemastore.org:schemas",
     ],
+    exclude_files = [
+        # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
+        # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
+        "//jstests/core/txns:all_subpackage_javascript_files",
+        # Query settings are not supported on standalone.
+        "//jstests/core/query/query_settings:all_subpackage_javascript_files",
+        # Queryable encryption is not supported on standalone.
+        "//jstests/core/query/queryable_encryption:all_subpackage_javascript_files",
+    ],
     resmoke_args = [
         "--storageEngineCacheSizeGB=1",
     ],
-    shard_count = 2,
     tags = [
         "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
     ],
