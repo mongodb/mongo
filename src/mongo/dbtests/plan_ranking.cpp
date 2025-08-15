@@ -34,7 +34,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -42,37 +41,26 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
-#include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
-#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/plan_ranking_utils.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
-#include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_lib.h"
-#include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <cstddef>
 #include <memory>
@@ -91,7 +79,9 @@ extern AtomicWord<bool> internalQueryForceIntersectionPlans;
 
 extern AtomicWord<bool> internalQueryPlannerEnableHashIntersection;
 
-namespace cbr = cost_based_ranker;
+extern AtomicWord<int> internalQueryMaxBlockingSortMemoryUsageBytes;
+
+extern AtomicWord<int> internalQueryPlanEvaluationMaxResults;
 
 namespace PlanRankingTests {
 
@@ -139,56 +129,7 @@ public:
      * Does NOT take ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
      */
     const QuerySolution* pickBestPlan(CanonicalQuery* cq) {
-        const auto collection = acquireCollection(
-            &_opCtx,
-            CollectionAcquisitionRequest(nss,
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
-                                         repl::ReadConcernArgs::get(&_opCtx),
-                                         AcquisitionPrerequisites::kRead),
-            MODE_IS);
-        MultipleCollectionAccessor collectionsAccessor(collection);
-        QueryPlannerParams plannerParams{
-            QueryPlannerParams::ArgsForSingleCollectionQuery{
-                .opCtx = &_opCtx,
-                .canonicalQuery = *cq,
-                .collections = collectionsAccessor,
-                .plannerOptions = QueryPlannerParams::DEFAULT,
-            },
-        };
-
-        // Plan.
-        auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);
-        ASSERT_OK(statusWithMultiPlanSolns.getStatus());
-        auto solutions = std::move(statusWithMultiPlanSolns.getValue());
-
-        ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
-
-        _mps = std::make_unique<MultiPlanStage>(_expCtx.get(),
-                                                collection,
-                                                cq,
-                                                plan_cache_util::ClassicPlanCacheWriter{
-                                                    opCtx(), collection, false /* executeInSbe */
-                                                });
-        std::unique_ptr<WorkingSet> ws(new WorkingSet());
-        // Put each solution from the planner into the 'MultiPlanStage'.
-        for (size_t i = 0; i < solutions.size(); ++i) {
-            auto&& root = stage_builder::buildClassicExecutableTree(
-                &_opCtx, collection, *cq, *solutions[i], ws.get());
-            _mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
-        }
-        // This is what sets a backup plan, should we test for it.
-        NoopYieldPolicy yieldPolicy(&_opCtx,
-                                    _opCtx.getServiceContext()->getFastClockSource(),
-                                    PlanYieldPolicy::YieldThroughAcquisitions{});
-        _mps->pickBestPlan(&yieldPolicy).transitional_ignore();
-        ASSERT(_mps->bestPlanChosen());
-
-        auto bestPlanIdx = _mps->bestPlanIdx();
-        ASSERT(bestPlanIdx.has_value());
-        ASSERT_LESS_THAN(*bestPlanIdx, solutions.size());
-
-        // And return a pointer to the best solution.
-        return static_cast<const MultiPlanStage*>(_mps.get())->bestSolution();
+        return plan_ranking_tests::pickBestPlan(cq, _opCtx, _expCtx, _mps, nss);
     }
 
     /**
@@ -199,45 +140,7 @@ public:
      * The plan object itself is owned by this->_bestCBRPlan
      */
     const QuerySolution* bestCBRPlan(CanonicalQuery* cq, size_t numDocs) {
-        const auto collection = acquireCollection(
-            &_opCtx,
-            CollectionAcquisitionRequest(nss,
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
-                                         repl::ReadConcernArgs::get(&_opCtx),
-                                         AcquisitionPrerequisites::kRead),
-            MODE_IS);
-        MultipleCollectionAccessor collectionsAccessor(collection);
-
-        auto collCard{cbr::CardinalityEstimate{cbr::CardinalityType{static_cast<double>(numDocs)},
-                                               cbr::EstimationSource::Metadata}};
-        std::unique_ptr<ce::SamplingEstimator> samplingEstimator =
-            std::make_unique<ce::SamplingEstimatorImpl>(
-                &_opCtx,
-                collectionsAccessor,
-                PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                static_cast<size_t>(N),
-                ce::SamplingEstimatorImpl::SamplingStyle::kRandom,
-                boost::none,
-                collCard);
-
-        QueryPlannerParams plannerParams{
-            QueryPlannerParams::ArgsForSingleCollectionQuery{
-                .opCtx = &_opCtx,
-                .canonicalQuery = *cq,
-                .collections = collectionsAccessor,
-                .plannerOptions = QueryPlannerParams::DEFAULT,
-                .planRankerMode = QueryPlanRankerModeEnum::kSamplingCE,
-            },
-        };
-        auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
-            *cq, plannerParams, samplingEstimator.get(), nullptr);
-        ASSERT(statusWithCBRSolns.isOK());
-        auto solutions = std::move(statusWithCBRSolns.getValue().solutions);
-        ASSERT(solutions.size() == 1);
-        const QuerySolution* result = solutions[0].get();
-        // The plan itself is owned by _bestCBRPlan
-        _bestCBRPlan.push_back(std::move(solutions[0]));
-        return result;
+        return plan_ranking_tests::bestCBRPlan(cq, numDocs, _opCtx, N, _bestCBRPlan, nss);
     }
 
     /**

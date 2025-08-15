@@ -34,6 +34,7 @@
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/ce/ce_test_utils.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
@@ -124,12 +125,16 @@ public:
     /**
      * Insert documents to the default collection.
      */
-    void insertDocuments(const NamespaceString& nss, std::vector<BSONObj> docs);
+    void insertDocuments(const NamespaceString& nss,
+                         std::vector<BSONObj> docs,
+                         int batchSize = 50000);
 
     /**
      * Create a vector of "num" copies of pre-defined document.
      */
     std::vector<BSONObj> createDocuments(int num);
+
+    void createIndex(const BSONObj& spec);
 
     /**
      * Generate a vector of BSONObj based on the input data.
@@ -171,6 +176,15 @@ public:
 };
 
 enum class SampleSizeDef { ErrorSetting1 = 1, ErrorSetting2 = 2, ErrorSetting5 = 3 };
+enum class IndexCombinationTestSettings { kNone = 0, kSingleFieldIdx = 1, kAllIdxes = 2 };
+
+struct PlanRankingExecutionStatistics {
+    std::vector<double> multiplannerExecTimes;
+    std::map<int, std::map<SampleSizeDef, std::vector<double>>> cbrExecTimes;
+    std::map<SampleSizeDef, std::vector<double>> bareCQEvalExecTimes;
+    std::map<SampleSizeDef, int> cbrSampleSizes;
+    std::vector<double> selectivities;
+};
 
 size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef);
 
@@ -196,6 +210,14 @@ public:
         bool printResults = true);
 };
 
+/**
+ * Compare the set of fields the input workload configuration requires with the provided data
+ * configuration. Returns true if all the fields required by the workload configuration appear in
+ * the data configuration.
+ */
+bool dataConfigurationCoversQueryWorkload(DataConfiguration& dataConfig,
+                                          WorkloadConfiguration& workloadConfig);
+
 void initializeSamplingEstimator(DataConfiguration& configuration,
                                  SamplingEstimatorTest& samplingEstimatorTest);
 
@@ -203,6 +225,34 @@ void initializeSamplingEstimator(DataConfiguration& configuration,
 void createCollAndInsertDocuments(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const std::vector<BSONObj>& docs);
+
+/**
+ * Given a MatchExpression and a vector of BSONObj, evaluate the MatchExpression against all the
+ * BSONObjs and return the number of matching documents.
+ * This function also takes an optional argument to limit the number of documents to evaluate, if it
+ * is set, the function will only evaluate the 'limit' first documents from the vector.
+ */
+int evaluateMatchExpressionAgainstDataWithLimit(std::unique_ptr<MatchExpression> expr,
+                                                const std::vector<BSONObj>& data,
+                                                boost::optional<size_t> limit = boost::none);
+
+/**
+ * Given a set of fields that are candidates to be used to build indexes on, create a variety of
+ * combinations of said fields defining single field and composite indexes. The second argument
+ * "IndexCombinationTestSetting" defines the variety of combinations to create. 'kNone' will not
+ * create any index, 'kSingleFieldIdx' will return only the single field indexes i.e., a vector of
+ * vectors containing one object, 'kAllIndexes' will create all *in-sequence* combinations of the
+ * set of given fields.
+ */
+std::vector<std::vector<std::string>> getIndexCombinations(
+    const std::vector<std::string>& candidateIndexFields, IndexCombinationTestSettings setting);
+
+std::string createIndexesAccordingToConfiguration(
+    SamplingEstimatorTest& planRankingTest,
+    std::vector<std::vector<std::string>>& indexCombinations);
+
+std::unique_ptr<CanonicalQuery> createCanonicalQueryFromMatchExpression(
+    SamplingEstimatorTest& planRankingTest, std::unique_ptr<MatchExpression> matchExpression);
 
 ErrorCalculationSummary runQueries(WorkloadConfiguration queryConfig,
                                    std::vector<BSONObj>& bsonData,

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -138,5 +138,33 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/stats:stats_histograms",
         "//src/mongo/db/query/compiler/stats:stats_test_utils",
         "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "plan_ranking_utils",
+    srcs = [
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:plan_ranking_utils.cpp",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:plan_ranking_utils.h",
+        "//src/mongo/dbtests:dbtests.h",
+    ],
+    deps = [
+        "//src/mongo/db/index_builds:multi_index_block",
+        "//src/mongo/db/query:query_planner_test_lib",
+        "//src/mongo/idl:server_parameter_test_util",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "plan_ranking_bm",
+    srcs = [
+        "plan_ranking_bm.cpp",
+    ],
+    tags = ["second_half_bm"],
+    deps = [
+        "plan_ranking_utils",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/compiler/ce:ce_test_utils",
+        "//src/mongo/db/query/compiler/ce/sampling:sampling_test_utils",
     ],
 )

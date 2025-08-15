@@ -422,11 +422,11 @@ void generateDataOneField(size_t ndv,
     std::mt19937_64 seedArray(42);
     std::mt19937_64 seedDataset(seedData);
 
-    stats::MixedDistributionDescriptor zipfian{{dataDistribution, 1.0}};
+    stats::MixedDistributionDescriptor distr{{dataDistribution, 1.0}};
     stats::TypeDistrVector td;
 
     populateTypeDistrVectorAccordingToInputConfig(
-        td, dataInterval, typeCombinationData, ndv, seedArray, zipfian, arrayTypeLength);
+        td, dataInterval, typeCombinationData, ndv, seedArray, distr, arrayTypeLength);
 
     stats::DatasetDescriptorNew desc{std::move(td), seedDataset};
     data = desc.genRandomDataset(size);

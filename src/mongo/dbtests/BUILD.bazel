@@ -195,6 +195,7 @@ mongo_cc_binary(
         "//src/mongo/db/query:query_request",
         "//src/mongo/db/query/client_cursor",
         "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:plan_ranking_utils",
         "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/repl:oplog_entry_test_helpers",

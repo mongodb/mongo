@@ -29,11 +29,29 @@
 
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::ce {
+
+bool dataConfigurationCoversQueryWorkload(DataConfiguration& dataConfig,
+                                          WorkloadConfiguration& workloadConfig) {
+    for (const auto& queryField : workloadConfig.queryConfig.queryFields) {
+        bool exists = false;
+        for (const auto& dataField : dataConfig.collectionFieldsConfiguration) {
+            if (queryField.fieldName == dataField.fieldName) {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) {
+            return false;
+        }
+    }
+    return true;
+}
 
 void initializeSamplingEstimator(DataConfiguration& configuration,
                                  SamplingEstimatorTest& samplingEstimatorTest) {
@@ -53,15 +71,30 @@ void initializeSamplingEstimator(DataConfiguration& configuration,
 }
 
 void SamplingEstimatorTest::insertDocuments(const NamespaceString& nss,
-                                            const std::vector<BSONObj> docs) {
+                                            const std::vector<BSONObj> docs,
+                                            int batchSize) {
     std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
 
     AutoGetCollection agc(operationContext(), nss, LockMode::MODE_IX);
     {
-        WriteUnitOfWork wuow{operationContext()};
-        ASSERT_OK(collection_internal::insertDocuments(
-            operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
-        wuow.commit();
+        size_t currentInsertion = 0;
+        while (currentInsertion < inserts.size()) {
+            WriteUnitOfWork wuow{operationContext()};
+
+            int insertionsBeforeCommit = 0;
+            while (true) {
+                ASSERT_OK(collection_internal::insertDocument(
+                    operationContext(), *agc, inserts[currentInsertion], nullptr /* opDebug */));
+                insertionsBeforeCommit++;
+                currentInsertion++;
+
+                if (insertionsBeforeCommit > batchSize || currentInsertion == inserts.size()) {
+                    insertionsBeforeCommit = 0;
+                    break;
+                }
+            }
+            wuow.commit();
+        }
     }
 }
 
@@ -74,6 +107,15 @@ std::vector<BSONObj> SamplingEstimatorTest::createDocuments(int num) {
         docs.push_back(obj);
     }
     return docs;
+}
+
+void SamplingEstimatorTest::createIndex(const BSONObj& spec) {
+    WriteUnitOfWork wuow(operationContext());
+    AutoGetCollection autoColl(operationContext(), _kTestNss, MODE_X);
+    CollectionWriter collection(operationContext(), _kTestNss);
+    IndexBuildsCoordinator::createIndexesOnEmptyCollection(
+        operationContext(), collection, {spec}, /*fromMigrate=*/false);
+    wuow.commit();
 }
 
 std::vector<BSONObj> SamplingEstimatorTest::createDocumentsFromSBEValue(
@@ -162,6 +204,110 @@ void createCollAndInsertDocuments(OperationContext* opCtx,
             opCtx, *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
         wuow.commit();
     }
+}
+
+int evaluateMatchExpressionAgainstDataWithLimit(const std::unique_ptr<MatchExpression> expr,
+                                                const std::vector<BSONObj>& data,
+                                                boost::optional<size_t> limit) {
+    size_t resultCnt = 0, cnt = 0;
+    try {
+        for (const auto& doc : data) {
+            if (exec::matcher::matchesBSON(expr.get(), doc, nullptr)) {
+                resultCnt++;
+            }
+            cnt++;
+            if (limit && cnt >= limit) {
+                break;
+            }
+        }
+    } catch (const DBException&) {
+        std::cout << "EVALUATION FAILED" << std::endl;
+    }
+
+    return resultCnt;
+}
+
+std::vector<std::vector<std::string>> getIndexCombinations(const std::vector<std::string>& vec,
+                                                           IndexCombinationTestSettings setting) {
+    switch (setting) {
+        case IndexCombinationTestSettings::kNone: {
+            return {};
+        }
+        case IndexCombinationTestSettings::kSingleFieldIdx: {
+            std::vector<std::vector<std::string>> result;
+            for (const auto& lala : vec) {
+                result.push_back({lala});
+            }
+            return result;
+        }
+        case IndexCombinationTestSettings::kAllIdxes: {
+            int n = vec.size();
+            int total = 1 << n;  // 2^n combinations
+
+            std::vector<std::vector<std::string>> result;
+
+            for (int mask = 0; mask < total; ++mask) {
+                std::vector<std::string> combination;
+                for (int i = 0; i < n; ++i) {
+                    if (mask & (1 << i)) {
+                        combination.push_back(vec[i]);
+                    }
+                }
+
+                if (combination.size() > 0) {
+                    result.push_back(combination);
+                }
+            }
+            return result;
+        }
+    }
+    return {};
+}
+
+std::string createIndexesAccordingToConfiguration(
+    SamplingEstimatorTest& planRankingTest,
+    std::vector<std::vector<std::string>>& indexCombinations) {
+
+    // Build any indexes.
+    std::stringstream indexCombinationString;
+    for (const auto& indexCombination : indexCombinations) {
+        BSONObjBuilder temp;
+        std::string indexName = "";
+        for (const auto& dataField : indexCombination) {
+            temp << dataField << 1;
+            if (indexName.length() > 0) {
+                indexName += "_";
+            }
+            indexName += dataField;
+        }
+        BSONObj indexSpec =
+            BSON("v" << 2 << "name" << indexName << "key" << temp.obj() << "unique" << false);
+
+        if (indexCombinationString.gcount() > 0) {
+            indexCombinationString << "-";
+        }
+        indexCombinationString << "(" << indexName << ")";
+
+        planRankingTest.createIndex(indexSpec);
+    }
+    return indexCombinationString.str();
+}
+
+std::unique_ptr<CanonicalQuery> createCanonicalQueryFromMatchExpression(
+    SamplingEstimatorTest& planRankingTest, std::unique_ptr<MatchExpression> matchExpression) {
+    auto findCommand = std::make_unique<FindCommandRequest>(planRankingTest._kTestNss);
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(planRankingTest.getOperationContext(), *findCommand)
+                      .build();
+
+    auto parsedFindCmd = ParsedFindCommand::withExistingFilter(
+        expCtx,
+        expCtx->getCollator() ? expCtx->getCollator()->clone() : nullptr,
+        std::move(matchExpression),
+        std::move(findCommand),
+        ProjectionPolicies::aggregateProjectionPolicies());
+    return std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = expCtx, .parsedFind = std::move(parsedFindCmd.getValue())});
 }
 
 ErrorCalculationSummary runQueries(WorkloadConfiguration queryConfig,
