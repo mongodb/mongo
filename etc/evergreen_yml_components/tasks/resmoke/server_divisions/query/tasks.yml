@@ -2610,6 +2610,64 @@ tasks:
         "assigned_to_jira_team_server_query_integration",
         "default",
         "extensions",
+        "incompatible_windows",
+        "incompatible_mac",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: extensions_single_node
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "extensions",
+        "incompatible_windows",
+        "incompatible_mac",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: extensions_single_shard
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "extensions",
+        "incompatible_windows",
+        "incompatible_mac",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: extensions_sharded_cluster
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "extensions",
+        "incompatible_windows",
+        "incompatible_mac",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: extensions_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "extensions",
+        "incompatible_windows",
+        "incompatible_mac",
       ]
     commands:
       - func: "do setup"
