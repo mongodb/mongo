@@ -51,6 +51,7 @@ class LibfuzzerHook(interface.Hook):
             "-merge=1",
             test.merged_corpus_directory,
             test.corpus_directory,
+            "-artifact-prefix=./out/fuzzer-",
         ]
         process = core.programs.make_process(self.logger, default_args, **test.program_options)
         process.start()
