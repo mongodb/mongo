@@ -390,6 +390,14 @@ std::vector<std::unique_ptr<MatchExpression>> createQueryMatchExpressionOnMultip
     std::vector<std::vector<std::pair<stats::SBEValue, stats::SBEValue>>> queryFieldsIntervals);
 
 /**
+ * A wrapper function invoking both generateMultiFieldIntervals and
+ * createQueryMatchExpressionOnMultipleFields returning directly MatchExpressions on multiple
+ * fields.
+ */
+std::vector<std::unique_ptr<MatchExpression>> generateMatchExpressionsBasedOnWorkloadConfig(
+    WorkloadConfiguration& workloadConfig);
+
+/**
  * Generates query intervals randomly according to testing configuration.
  * In case of point queries, this function still returns a pair containing the same value twice. In
  * this case, the consumer may disregard the second value.

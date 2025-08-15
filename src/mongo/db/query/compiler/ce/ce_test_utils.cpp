@@ -302,6 +302,14 @@ std::vector<std::unique_ptr<MatchExpression>> createQueryMatchExpressionOnMultip
     return allMatchExpressionQueries;
 }
 
+std::vector<std::unique_ptr<MatchExpression>> generateMatchExpressionsBasedOnWorkloadConfig(
+    WorkloadConfiguration& workloadConfig) {
+    // Generate queries.
+    std::vector<std::vector<std::pair<stats::SBEValue, stats::SBEValue>>> queryFieldsIntervals =
+        generateMultiFieldIntervals(workloadConfig);
+    return createQueryMatchExpressionOnMultipleFields(workloadConfig, queryFieldsIntervals);
+}
+
 size_t calculateCardinality(const MatchExpression* expr, std::vector<BSONObj> data) {
     size_t cnt = 0;
     for (const auto& doc : data) {

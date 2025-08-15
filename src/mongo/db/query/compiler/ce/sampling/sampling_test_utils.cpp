@@ -227,21 +227,21 @@ int evaluateMatchExpressionAgainstDataWithLimit(const std::unique_ptr<MatchExpre
     return resultCnt;
 }
 
-std::vector<std::vector<std::string>> getIndexCombinations(const std::vector<std::string>& vec,
-                                                           IndexCombinationTestSettings setting) {
+std::vector<std::vector<std::string>> getIndexCombinations(
+    const std::vector<std::string>& candidateIndexFields, IndexCombinationTestSettings setting) {
     switch (setting) {
         case IndexCombinationTestSettings::kNone: {
             return {};
         }
         case IndexCombinationTestSettings::kSingleFieldIdx: {
             std::vector<std::vector<std::string>> result;
-            for (const auto& lala : vec) {
+            for (const auto& lala : candidateIndexFields) {
                 result.push_back({lala});
             }
             return result;
         }
         case IndexCombinationTestSettings::kAllIdxes: {
-            int n = vec.size();
+            int n = candidateIndexFields.size();
             int total = 1 << n;  // 2^n combinations
 
             std::vector<std::vector<std::string>> result;
@@ -250,7 +250,7 @@ std::vector<std::vector<std::string>> getIndexCombinations(const std::vector<std
                 std::vector<std::string> combination;
                 for (int i = 0; i < n; ++i) {
                     if (mask & (1 << i)) {
-                        combination.push_back(vec[i]);
+                        combination.push_back(candidateIndexFields[i]);
                     }
                 }
 
