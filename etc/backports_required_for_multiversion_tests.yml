@@ -480,8 +480,6 @@ last-continuous:
       ticket: SERVER-82020
     - test_file: jstests/aggregation/expressions/reduce_overflow.js
       ticket: SERVER-102364
-    - test_file: jstests/sharding/validate_collection_shard_version.js
-      ticket: SERVER-87119
     - test_file: jstests/core/query/internal_apply_oplog_update.js
       ticket: SERVER-107211
     - test_file: jstests/replsets/v1_apply_ops_oplog_format.js
@@ -1023,8 +1021,6 @@ last-lts:
       ticket: SERVER-95570
     - test_file: jstests/aggregation/expressions/reduce_overflow.js
       ticket: SERVER-102364
-    - test_file: jstests/sharding/validate_collection_shard_version.js
-      ticket: SERVER-87119
     - test_file: jstests/core/query/internal_apply_oplog_update.js
       ticket: SERVER-107211
     - test_file: jstests/replsets/v1_apply_ops_oplog_format.js

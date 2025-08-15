@@ -49,7 +49,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_requests_sender.h"
@@ -101,112 +100,78 @@ public:
 
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
-             const BSONObj& providedCmdObj,
+             const BSONObj& cmdObj,
              BSONObjBuilder& output) override {
-        const NamespaceString nss(parseNs(dbName, providedCmdObj));
+        const NamespaceString nss(parseNs(dbName, cmdObj));
 
         sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
         return router.routeWithRoutingContext(
-            opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
-                // The CollectionRouter is not capable of implicitly translate the namespace
-                // to a timeseries buckets collection, which is required in this command.
-                // Hence, we'll use the CollectionRouter to handle StaleConfig errors but
-                // will ignore its RoutingContext. Instead, we'll use a
-                // CollectionRoutingInfoTargeter object to properly get the RoutingContext
-                // when the collection is timeseries.
-                // TODO (SPM-3830) Use the RoutingContext provided by the CollectionRouter
-                // once all timeseries collections become viewless.
-                unusedRoutingCtx.skipValidation();
+            opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                auto results = scatterGatherVersionedTargetByRoutingTable(
+                    opCtx,
+                    routingCtx,
+                    nss,
+                    applyReadWriteConcern(
+                        opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                    ReadPreferenceSetting::get(opCtx),
+                    Shard::RetryPolicy::kIdempotent,
+                    {} /*query*/,
+                    {} /*collation*/,
+                    boost::none /*letParameters*/,
+                    boost::none /*runtimeConstants*/);
 
-                // Clear the `result` BSON builder since this lambda function may be retried
-                // if the router cache is stale.
-                output.resetToEmpty();
+                Status firstFailedShardStatus = Status::OK();
+                bool isValid = true;
+                BSONObjBuilder rawResBuilder;
 
-                auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
-                auto routingInfo = targeter.getRoutingInfo();
-                auto cmdObj = [&]() {
-                    if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
-                        return timeseries::makeTimeseriesCommand(
-                            providedCmdObj,
-                            nss,
-                            getName(),
-                            CreateIndexesCommand::kIsTimeseriesNamespaceFieldName);
+                for (const auto& cmdResult : results) {
+                    const auto& shardId = cmdResult.shardId;
+
+                    const auto& swResponse = cmdResult.swResponse;
+                    if (!swResponse.isOK()) {
+                        rawResBuilder.append(shardId.toString(),
+                                             BSON("error" << swResponse.getStatus().toString()));
+                        if (firstFailedShardStatus.isOK())
+                            firstFailedShardStatus = swResponse.getStatus();
+                        continue;
                     }
-                    return providedCmdObj;
-                }();
 
-                return routing_context_utils::runAndValidate(
-                    targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
-                        auto results = scatterGatherVersionedTargetByRoutingTable(
-                            opCtx,
-                            routingCtx,
-                            targeter.getNS(),
-                            applyReadWriteConcern(
-                                opCtx,
-                                this,
-                                CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-                            ReadPreferenceSetting::get(opCtx),
-                            Shard::RetryPolicy::kIdempotent,
-                            {} /*query*/,
-                            {} /*collation*/,
-                            boost::none /*letParameters*/,
-                            boost::none /*runtimeConstants*/);
+                    const auto& response = swResponse.getValue();
+                    if (!response.isOK()) {
+                        rawResBuilder.append(shardId.toString(),
+                                             BSON("error" << response.status.toString()));
+                        if (firstFailedShardStatus.isOK())
+                            firstFailedShardStatus = response.status;
+                        continue;
+                    }
 
-                        Status firstFailedShardStatus = Status::OK();
-                        bool isValid = true;
-                        BSONObjBuilder rawResBuilder;
+                    rawResBuilder.append(shardId.toString(), response.data);
 
-                        for (const auto& cmdResult : results) {
-                            const auto& shardId = cmdResult.shardId;
+                    const auto status = getStatusFromCommandResult(response.data);
+                    if (!status.isOK()) {
+                        if (firstFailedShardStatus.isOK())
+                            firstFailedShardStatus = status;
+                        continue;
+                    }
 
-                            const auto& swResponse = cmdResult.swResponse;
-                            if (!swResponse.isOK()) {
-                                rawResBuilder.append(
-                                    shardId.toString(),
-                                    BSON("error" << swResponse.getStatus().toString()));
-                                if (firstFailedShardStatus.isOK())
-                                    firstFailedShardStatus = swResponse.getStatus();
-                                continue;
-                            }
+                    if (!response.data["valid"].trueValue()) {
+                        isValid = false;
+                    }
+                }
+                rawResBuilder.done();
 
-                            const auto& response = swResponse.getValue();
-                            if (!response.isOK()) {
-                                rawResBuilder.append(shardId.toString(),
-                                                     BSON("error" << response.status.toString()));
-                                if (firstFailedShardStatus.isOK())
-                                    firstFailedShardStatus = response.status;
-                                continue;
-                            }
+                if (firstFailedShardStatus.isOK()) {
+                    if (!routingCtx.getCollectionRoutingInfo(nss).isSharded()) {
+                        CommandHelpers::filterCommandReplyForPassthrough(
+                            results[0].swResponse.getValue().data, &output);
+                    } else {
+                        output.appendBool("valid", isValid);
+                    }
+                }
+                output.append("raw", rawResBuilder.obj());
 
-                            rawResBuilder.append(shardId.toString(), response.data);
-
-                            const auto status = getStatusFromCommandResult(response.data);
-                            if (!status.isOK()) {
-                                if (firstFailedShardStatus.isOK())
-                                    firstFailedShardStatus = status;
-                                continue;
-                            }
-
-                            if (!response.data["valid"].trueValue()) {
-                                isValid = false;
-                            }
-                        }
-                        rawResBuilder.done();
-
-                        if (firstFailedShardStatus.isOK()) {
-                            if (!routingCtx.getCollectionRoutingInfo(targeter.getNS())
-                                     .isSharded()) {
-                                CommandHelpers::filterCommandReplyForPassthrough(
-                                    results[0].swResponse.getValue().data, &output);
-                            } else {
-                                output.appendBool("valid", isValid);
-                            }
-                        }
-                        output.append("raw", rawResBuilder.obj());
-
-                        uassertStatusOK(firstFailedShardStatus);
-                        return true;
-                    });
+                uassertStatusOK(firstFailedShardStatus);
+                return true;
             });
     }
 };

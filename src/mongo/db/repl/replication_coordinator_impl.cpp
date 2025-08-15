@@ -67,7 +67,6 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
-#include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
 #include "mongo/db/repl/hello/hello_response.h"
@@ -3022,7 +3021,6 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* opCtx
                                                          const NamespaceString& ns,
                                                          bool secondaryOk) {
     invariant(opCtx->isLockFreeReadsOp() || shard_role_details::getLocker(opCtx)->isRSTLLocked() ||
-              canCollectionSkipRSTLLockAcquisition(ns) ||
               gFeatureFlagIntentRegistration.isEnabled());
     return checkCanServeReadsFor_UNSAFE(opCtx, ns, secondaryOk);
 }
