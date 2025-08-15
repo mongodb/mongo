@@ -33,6 +33,11 @@
 
 namespace sdk = mongo::extension::sdk;
 
+/**
+ * $testFoo is a no-op stage.
+ *
+ * The stage definition must be empty, like {$testFoo: {}}, or it will fail to parse.
+ */
 class TestFooLogicalStage : public sdk::LogicalAggregationStage {};
 
 class TestFooStageDescriptor : public sdk::AggregationStageDescriptor {
@@ -45,7 +50,8 @@ public:
     std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
         uassert(10624200,
                 "Failed to parse " + kStageName + ", expected object",
-                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
+                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj() &&
+                    stageBson.getField(kStageName).Obj().isEmpty());
 
         return std::make_unique<TestFooLogicalStage>();
     }

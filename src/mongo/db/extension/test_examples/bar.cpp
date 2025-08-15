@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-// TODO SERVER-109108: Remove this file.
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
@@ -35,6 +34,12 @@
 
 namespace sdk = mongo::extension::sdk;
 
+/**
+ * $testBar is a no-op stage.
+ *
+ * The stage definition must NOT be empty or it will fail to parse. The contents of the stage
+ * definition can be anything, as long as it is not an empty object.
+ */
 class TestBarLogicalStage : public sdk::LogicalAggregationStage {};
 
 class TestBarStageDescriptor : public sdk::AggregationStageDescriptor {
@@ -48,6 +53,10 @@ public:
         uassert(10845401,
                 "Failed to parse " + kStageName + ", expected object",
                 stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
+
+        uassert(10785800,
+                "Failed to parse " + kStageName + ", must have at least one field",
+                !stageBson.getField(kStageName).Obj().isEmpty());
 
         return std::make_unique<TestBarLogicalStage>();
     }

@@ -435,9 +435,6 @@ const skips = new Set([
     // TODO SERVER-108821: Remove $testFoo and $testBar from the skips list once extensions aren't
     // listed by $listMqlEntities.
     "$testFoo",
-    // TODO SERVER-109108: Remove $testBar when the bar extension no longer exists. $testBar can
-    // also be removed with the completion of SERVER-108821 but it's unknown which ticket will be
-    // completed first.
     "$testBar"
 ]);
 

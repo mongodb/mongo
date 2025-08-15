@@ -65,7 +65,6 @@ package(default_visibility = ["//visibility:public"])
         "malformed7",
         "malformed8",
         "foo",
-        # TODO SERVER-109108: Remove this entry when the bar extension is no longer needed.
         "bar",
         # TODO SERVER-109108: Remove this entry when the buzz extension is no longer needed.
         "buzz",

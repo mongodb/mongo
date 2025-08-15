@@ -53,7 +53,6 @@ class LoadExtensionsTest : public unittest::Test {
 protected:
     static inline const std::string kTestFooStageName = "$testFoo";
     static inline const std::string kTestFooLibExtensionPath = "libfoo_mongo_extension.so";
-    // TODO SERVER-109108: Remove this when we can use only libfoo_mongo_extension.so.
     static inline const std::string kTestBarLibExtensionPath = "libbar_mongo_extension.so";
     // TODO SERVER-109108: Remove this when we can use only libfoo_mongo_extension.so.
     static inline const std::string kTestBuzzLibExtensionPath = "libbuzz_mongo_extension.so";
