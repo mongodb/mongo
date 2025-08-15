@@ -1019,14 +1019,11 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
         return true;
     }
 
+    // Try as a module if it's a syntax error. We can't do much more introspection from here,
+    // since these can be indistinguishable from syntax errors either caused by not loading
+    // as a module, or generic syntax errors regardless of scripts/modules.
     const JSClass* syntaxError = js::ProtoKeyToClass(JSProto_SyntaxError);
-    if (!JS_InstanceOf(cx, obj, syntaxError, nullptr)) {
-        return false;
-    }
-
-    return report->errorNumber == JSMSG_IMPORT_DECL_AT_TOP_LEVEL ||
-        report->errorNumber == JSMSG_EXPORT_DECL_AT_TOP_LEVEL ||
-        report->errorNumber == JSMSG_AWAIT_OUTSIDE_ASYNC_OR_MODULE;
+    return JS_InstanceOf(cx, obj, syntaxError, nullptr);
 }
 
 bool MozJSImplScope::exec(StringData code,
