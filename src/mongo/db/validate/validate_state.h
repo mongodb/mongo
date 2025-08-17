@@ -38,6 +38,7 @@
 #include "mongo/db/local_catalog/database.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/local_catalog/throttle_cursor.h"
 #include "mongo/db/namespace_string.h"
@@ -61,6 +62,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
 namespace CollectionValidation {
 
 /**
@@ -93,7 +95,7 @@ public:
 
     const CollectionPtr& getCollection() const {
         invariant(_collection);
-        return _collection;
+        return _collection->getCollectionPtr();
     }
 
     const std::vector<std::string>& getIndexIdents() const {
@@ -169,17 +171,10 @@ private:
 
     NamespaceString _nss;
 
-    // Locks for foreground validation only.
-    boost::optional<AutoGetDb> _databaseLock;
-    boost::optional<CollectionNamespaceOrUUIDLock> _collectionLock;
 
-    // Hold a reference to the CollectionCatalog for a collection instance at a point-in-time to
-    // remain valid during the duration of background validation.
-    std::shared_ptr<const CollectionCatalog> _catalog;
-    CollectionPtr _collection;
-
-    // Always present after construction, but needs to be boost::optional due to the lack of default
-    // constructor
+    // These fields are initialized by initializeCollection(), they are nullopt before then because
+    // they don't have default constructors.
+    boost::optional<CollectionAcquisition> _collection;
     boost::optional<UUID> _uuid;
 
     // Stores the index idents that are going to be validated.
