@@ -14,7 +14,7 @@ buildvariants:
     expansions:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source
-        --enableEnterpriseTests=off
+        --modules=none
       push_path: osx
       push_bucket: downloads.mongodb.org
       push_bucket_new: cdn-origin-mongodb-server-community
@@ -64,7 +64,7 @@ buildvariants:
     expansions:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source
-        --enableEnterpriseTests=off
+        --modules=none
       push_path: osx
       push_bucket: downloads.mongodb.org
       push_bucket_new: cdn-origin-mongodb-server-community

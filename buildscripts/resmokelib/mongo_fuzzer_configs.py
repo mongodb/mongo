@@ -186,7 +186,7 @@ def generate_encryption_config(rng: random.Random):
     # encryption also required an enterprise binary.
     if (
         config.STORAGE_ENGINE != "wiredTiger"
-        or config.ENABLE_ENTERPRISE_TESTS != "on"
+        or "enterprise" not in config.MODULES
         or config.DISABLE_ENCRYPTION_FUZZING
     ):
         return ret

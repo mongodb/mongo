@@ -1,0 +1,9 @@
+testing:
+  fixture_dirs:
+    - buildscripts/tests/resmoke_end2end/fixtures
+  hook_dirs:
+    - buildscripts/tests/resmoke_end2end/hooks
+  suite_dirs:
+    - buildscripts/tests/resmoke_end2end/suites
+  jstest_dirs:
+    - buildscripts/tests/resmoke_end2end/testfiles
