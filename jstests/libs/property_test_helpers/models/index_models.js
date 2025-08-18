@@ -2,7 +2,7 @@
  * Fast-check models for indexes.
  * See property_test_helpers/README.md for more detail on the design.
  */
-import {fieldArb, scalarArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {fieldArb, getScalarArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {
     getPartialFilterPredicateArb
 } from "jstests/libs/property_test_helpers/models/match_models.js";
@@ -76,7 +76,7 @@ const emptyOptionsArb = fc.constant({});
 
 // Generates an index option for partial filters. Since predicate models by default have a list of
 // parameters at their leaves, we specify we want a single scalar at the leaves.
-const partialFilterOptionArb = getPartialFilterPredicateArb({leafArb: scalarArb}).map(pred => {
+const partialFilterOptionArb = getPartialFilterPredicateArb({leafArb: getScalarArb()}).map(pred => {
     return {partialFilterExpression: pred};
 });
 

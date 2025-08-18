@@ -83,7 +83,7 @@ function runWithKnobs(knobToVal, fn) {
     }
 }
 
-function queriesWithKnobsSetAreSameAsControlCollScan(getQuery, testHelpers, knobToVal) {
+function queriesWithKnobsSetAreSameAsControlCollScan(getQuery, testHelpers, {knobToVal}) {
     const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
 
     // Compute the control results all at once.
@@ -119,7 +119,7 @@ function getWorkloadModel(isTS, aggModel) {
             knobToVal: queryKnobsModel
         })
         .map(({collSpec, queries, knobToVal}) => {
-            return {collSpec, queries, extraParams: [knobToVal]};
+            return {collSpec, queries, extraParams: {knobToVal}};
         });
 }
 

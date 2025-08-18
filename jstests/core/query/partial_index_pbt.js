@@ -22,7 +22,7 @@
 import {
     createCacheCorrectnessProperty
 } from "jstests/libs/property_test_helpers/common_properties.js";
-import {getDocsModel} from "jstests/libs/property_test_helpers/models/document_models.js";
+import {getDatasetModel} from "jstests/libs/property_test_helpers/models/document_models.js";
 import {getIndexModel} from "jstests/libs/property_test_helpers/models/index_models.js";
 import {
     getPartialFilterPredicateArb
@@ -55,7 +55,7 @@ const workloadModel =
           // This filter will be used for the partial index filter, and to prefix queries with
           // {$match: filter} so that every query is eligible to use the partial indexes.
           partialFilterPredShape: getPartialFilterPredicateArb(),
-          docs: getDocsModel(false /* isTS */),
+          docs: getDatasetModel(),
           indexes: fc.array(getIndexModel({allowPartialIndexes: false, allowSparse: false}),
                             {minLength: 0, maxLength: 15, size: '+2'}),
           pipelines: fc.array(getAggPipelineModel(),

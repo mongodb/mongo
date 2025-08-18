@@ -16,47 +16,50 @@
  */
 import {
     dateArb,
-    intArb,
-    scalarArb
+    getScalarArb,
+    intArb
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
-const mFieldModel = fc.record({m1: scalarArb, m2: scalarArb});
-const arrayFieldElementArb = oneof(scalarArb, fc.array(scalarArb, {maxLength: 2}), mFieldModel);
-const arrayFieldModel = fc.array(arrayFieldElementArb, {maxLength: 5});
+export function getDocModel({allowUnicode, allowNullBytes} = {}) {
+    const scalarArb = getScalarArb({allowUnicode, allowNullBytes});
 
-const defaultDocModel = fc.record({
-    _id: intArb,
-    t: dateArb,
-    m: mFieldModel,
-    array: oneof(scalarArb, arrayFieldModel),
-    a: scalarArb,
-    b: scalarArb
-});
-// `defaultDocModel` and `timeseriesDocModel` may diverge later. By exporting two models, we make it
-// clear these models are separate so existing tests don't rely on behavior specific to `docModel`.
-const timeseriesDocModel = defaultDocModel;
+    const mFieldModel = fc.record({m1: scalarArb, m2: scalarArb});
+    const arrayFieldElementArb = oneof(scalarArb, fc.array(scalarArb, {maxLength: 2}), mFieldModel);
+    const arrayFieldModel = fc.array(arrayFieldElementArb, {maxLength: 5});
 
-// Maximum number of documents that our collection model can generate.
-const kMaxNumDocs = 250;
-
-// An array of [0...249] to label our documents with.
-const docIds = [];
-for (let i = 0; i < kMaxNumDocs; i++) {
-    docIds.push(i);
+    return fc.record({
+        _id: intArb,
+        t: dateArb,
+        m: mFieldModel,
+        array: oneof(scalarArb, arrayFieldModel),
+        a: scalarArb,
+        b: scalarArb
+    });
 }
-const uniqueIdsArb = fc.shuffledSubarray(docIds, {minLength: kMaxNumDocs, maxLength: kMaxNumDocs});
 
-export function getDocsModel(isTS) {
-    const docModel = isTS ? timeseriesDocModel : defaultDocModel;
+export function getDatasetModel({maxNumDocs = 250, docModel} = {}) {
+    if (!docModel) {
+        // If no document model is provided, assume the default.
+        docModel = getDocModel();
+    }
+
+    // An array of [0...maxNumDocs] to label our documents with.
+    const docIds = [];
+    for (let i = 0; i < maxNumDocs; i++) {
+        docIds.push(i);
+    }
+    const uniqueIdsArb =
+        fc.shuffledSubarray(docIds, {minLength: maxNumDocs, maxLength: maxNumDocs});
+
     // The size=+2 argument tells fc.array to generate array sizes closer to the max than the min.
     // This way the average number of documents produced is >100, which means our queries will be
     // less likely to produce empty results. The size argument does not affect minimization. On
     // failure, fast-check will still minimize down to 1 document if possible.
     // These docs are 'unlabeled' because we have not assigned them unique _ids yet.
     const unlabeledDocsModel =
-        fc.array(docModel, {minLength: 1, maxLength: kMaxNumDocs, size: '+2'});
+        fc.array(docModel, {minLength: 1, maxLength: maxNumDocs, size: '+2'});
     // Now label the docs with unique _ids.
     return fc.record({unlabeledDocs: unlabeledDocsModel, _ids: uniqueIdsArb})
         .map(({unlabeledDocs, _ids}) => {

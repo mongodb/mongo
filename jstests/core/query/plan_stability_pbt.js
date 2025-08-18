@@ -20,7 +20,7 @@
  * ]
  */
 
-import {getDifferentlyShapedQueries} from "jstests/libs/property_test_helpers/common_properties.js";
+import {createPlanStabilityProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
@@ -29,7 +29,6 @@ import {
 } from "jstests/libs/property_test_helpers/pbt_resolved_bugs.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
-import {getRejectedPlans, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 if (isSlowBuild(db)) {
     jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
@@ -41,45 +40,11 @@ const numQueriesPerRun = 50;
 
 const experimentColl = db.plan_stability_pbt;
 
-// Checks if the winning plan is the same between explains, and the same rejected plans exist.
-function sameWinningAndRejectedPlans(explain1, explain2) {
-    // When CBR non-deterministic sampling is enabled, this function should remove the cost and CE
-    // estimates from the plans, and assert that the same set of candidate plans are considered (no
-    // assertion on the winning plan).
-    const cmp = friendlyEqual;
-    return cmp(getWinningPlanFromExplain(explain1), getWinningPlanFromExplain(explain2)) &&
-        cmp(getRejectedPlans(explain1), getRejectedPlans(explain2));
-}
-
-function correctnessProperty(getQuery, testHelpers) {
-    const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
-
-    for (const query of queries) {
-        // Run explain on the query once to get the initial winning plan. Then we run explain ten
-        // more times to assert that the winning plan is the same each time.
-        const initialExplain = experimentColl.explain().aggregate(query);
-
-        for (let i = 0; i < 10; i++) {
-            const newExplain = experimentColl.explain().aggregate(query);
-            if (!sameWinningAndRejectedPlans(initialExplain, newExplain)) {
-                return {
-                    passed: false,
-                    message:
-                        'A query was found to have unstable plan selection across runs with the same documents and indexes.',
-                    initialExplain,
-                    newExplain
-                };
-            }
-        }
-    }
-    return {passed: true};
-};
-
 // TODO SERVER-106983, re-enable $match once planner is deterministic.
 const aggModel = getAggPipelineModel().filter(q => !JSON.stringify(q).includes('$match'));
 
 testProperty(
-    correctnessProperty,
+    createPlanStabilityProperty(experimentColl),
     {experimentColl},
     makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
     numRuns,
