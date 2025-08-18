@@ -31,6 +31,7 @@
 
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection_uuid_mismatch.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 
 
@@ -132,7 +133,7 @@ void CollectionPreConditions::checkAcquisitionAgainstPreConditions(
                 !acquisition.exists() || !acquisition.getCollectionPtr()->isTimeseriesCollection());
     } else {
         if (!acquisition.exists()) {
-            if (preConditions.isTimeseriesCollection()) {
+            if (preConditions.isTimeseriesCollection() && !isRawDataOperation(opCtx)) {
                 if (preConditions.isViewlessTimeseriesCollection()) {
                     uasserted(ErrorCodes::NamespaceNotFound,
                               str::stream()
