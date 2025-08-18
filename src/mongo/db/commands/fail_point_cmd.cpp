@@ -141,7 +141,7 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::FailedToParse,
-                    "Missing maxTimeMs",
+                    "Missing maxTimeMS",
                     request().getGenericArguments().getMaxTimeMS());
             const std::string failPointName = std::string{request().getCommandParameter()};
             FailPoint* failPoint = globalFailPointRegistry().find(failPointName);
