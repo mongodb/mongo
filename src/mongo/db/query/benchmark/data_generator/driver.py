@@ -31,9 +31,7 @@ import pathlib
 import shlex
 import typing
 
-import datagen.config
 import datagen.database_instance
-import datagen.util
 
 
 class CorrelatedGeneratorFactory:
@@ -57,7 +55,7 @@ class CorrelatedGeneratorFactory:
         # Faker and random do not allow the seed to be retrieved after instantiation,
         # so the spec files can not create uncorrelated Faker objects after the fact that
         # use the same seed. So, we instantiate a global uncorrelated Faker here.
-        datagen.util.set_uncorrelated_faker(faker.Faker(seed = seed))
+        datagen.util.set_uncorrelated_faker(faker.Faker(seed=seed))
 
     def make_generator(self) -> typing.Generator:
         """Generates the dictated objects as a generator."""
@@ -234,36 +232,26 @@ async def main():
 
         seed = None
 
-        # 2-3. Generate data and create indices.
-        if issubclass(spec, datagen.config.DataGeneratorProducer):
-            # 2a. CE data generator spec.
+        # 2. Create and insert the documents.
+        if args.size:
+            # Generate 1024 bits of randomness as the initial seed if one was not already provided.
             seed = args.seed if args.seed else f"{random.getrandbits(1024)}"
-            data_generator = spec.generator_function(seed)
-            generator = datagen.util.DataGenerator(database_instance, data_generator)
-            await generator.populate_collections()
-        else:
-            # 2b. Create and insert the documents.
-            if args.size:
-                # Generate 1024 bits of randomness as the initial seed if one was not already provided.
-                seed = args.seed if args.seed else f"{random.getrandbits(1024)}"
-                generator_factory = CorrelatedGeneratorFactory(spec, seed)
-                generator = generator_factory.make_generator()
-                await upstream(database_instance, collection_name, generator, args.size)
-                generator_factory.dump_metadata(collection_name, args.size, seed, metadata_path)
+            generator_factory = CorrelatedGeneratorFactory(spec, seed)
+            generator = generator_factory.make_generator()
+            await upstream(database_instance, collection_name, generator, args.size)
+            generator_factory.dump_metadata(collection_name, args.size, seed, metadata_path)
 
-            # 3b. Create indices after documents.
-            indices = args.indices if args.indices else ()
-            for index_set_name in indices:
-                if hasattr(module, index_set_name):
-                    index_set = getattr(module, index_set_name)
-                    indices = index_set() if callable(index_set) else index_set
-                    await database_instance.database.get_collection(collection_name).create_indexes(
-                        indices
-                    )
-                else:
-                    raise RuntimeError(
-                        f"Module {module} does not define index set {index_set_name}."
-                    )
+        # 3. Create indices after documents.
+        indices = args.indices if args.indices else ()
+        for index_set_name in indices:
+            if hasattr(module, index_set_name):
+                index_set = getattr(module, index_set_name)
+                indices = index_set() if callable(index_set) else index_set
+                await database_instance.database.get_collection(collection_name).create_indexes(
+                    indices
+                )
+            else:
+                raise RuntimeError(f"Module {module} does not define index set {index_set_name}.")
 
         # 4. Only record things if the dataset is somehow actually changed.
         if any((args.size, args.indices, args.drop, args.restore)):

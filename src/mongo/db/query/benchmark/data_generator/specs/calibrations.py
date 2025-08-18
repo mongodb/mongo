@@ -29,11 +29,12 @@
 Example collection spec to demonstrate various features of this data generator.
 
 Models a mixed spread of documents used to test CE calibrations.
+
+TODO(SERVER-106819): Make this example work once functions from CE calibrations have been integrated
+into the data generator.
 """
 
-import dataclasses
 import random
-import typing
 
 import datagen.config
 import datagen.random
@@ -313,8 +314,3 @@ def generate_calibrations(seed) -> datagen.config.DataGeneratorConfig:
         write_mode=datagen.config.WriteMode.REPLACE,
         collection_name_with_card=True,
     )
-
-
-@dataclasses.dataclass
-class Calibrations(datagen.config.DataGeneratorProducer):
-    generator_function: typing.Callable = generate_calibrations

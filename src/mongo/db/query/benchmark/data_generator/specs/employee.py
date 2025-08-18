@@ -141,8 +141,8 @@ class Employee:
         return Employee.compute_salary(fkr, title_level, team_value)
 
     @staticmethod
-    def make_start_date(fkr: faker.proxy.Faker, title: Title) -> datetime.date:
-        today = datetime.date.today()
+    def make_start_date(fkr: faker.proxy.Faker, title: Title) -> datetime.datetime:
+        today = datetime.datetime.today()
         ago = datetime.timedelta(
             days=fkr.random_int(title.level * 250, title.level * (title.level + 2) * 110)
         )
