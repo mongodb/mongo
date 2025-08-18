@@ -435,16 +435,13 @@ function fieldPresent(field, containingObj) {
  * out.
  */
 (function testQueryWithoutScoreDetailsMetadataProjectionWorksWhenRankFusionHasNoScoreDetails() {
-    const testQuery = [
-        {
-            $rankFusion: {
-                input: {pipelines: {search: [searchStage, {$limit: limit}]}},
-                combination: {weights: {search: 2}},
-                scoreDetails: false,
-            },
+    const testQuery = [{
+        $rankFusion: {
+            input: {pipelines: {search: [searchStage, {$limit: limit}]}},
+            combination: {weights: {search: 2}},
+            scoreDetails: false,
         },
-        {$project: {plot_embedding: 0}}
-    ];
+    }];
 
     assert.commandWorked(db.runCommand({aggregate: collName, pipeline: testQuery, cursor: {}}));
 })();
@@ -457,12 +454,14 @@ function fieldPresent(field, containingObj) {
     const testQuery = [
         {
             $rankFusion: {
-                input: {pipelines: {matchAndSort: [{$match: {title: "ape"}}, {$sort: {title: 1}}]}},
+                input: {
+                    pipelines: {matchAndSort: [{$match: {fullplot: "ape"}}, {$sort: {fullplot: 1}}]}
+                },
                 combination: {weights: {matchAndSort: 2}},
                 scoreDetails: true,
             },
         },
-        {$project: {plot_embedding: 0}}
+        {$project: {details: {$meta: "scoreDetails"}}}
     ];
     assert.commandWorked(db.runCommand({aggregate: collName, pipeline: testQuery, cursor: {}}));
     const results = coll.aggregate(testQuery).toArray();
