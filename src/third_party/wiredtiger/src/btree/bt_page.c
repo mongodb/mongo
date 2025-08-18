@@ -524,10 +524,13 @@ __wti_page_reconstruct_deltas(
         if (F_ISSET(&S2C(session)->page_delta, WT_FLATTEN_LEAF_PAGE_DELTA) &&
           !__wt_rec_in_progress(session)) {
             ret = __wt_reconcile(session, ref, false, WT_REC_REWRITE_DELTA);
-            if (ret == 0) {
-                mod = ref->page->modify;
-                WT_ASSERT(
-                  session, mod->mod_disk_image != NULL && mod->mod_replace.block_cookie == NULL);
+            mod = ref->page->modify;
+            /*
+             * We may generate an empty page if the keys all have a globally visible tombstone. Give
+             * up the rewrite in this case.
+             */
+            if (ret == 0 && mod->mod_disk_image != NULL) {
+                WT_ASSERT(session, mod->mod_replace.block_cookie == NULL);
 
                 /* The split code works with WT_MULTI structures, build one for the disk image. */
                 memset(&multi, 0, sizeof(multi));
@@ -550,7 +553,7 @@ __wti_page_reconstruct_deltas(
                 }
 
                 WT_STAT_CONN_DSRC_INCR(session, cache_read_flatten_leaf_delta);
-            } else {
+            } else if (ret != 0) {
                 WT_STAT_CONN_DSRC_INCR(session, cache_read_flatten_leaf_delta_fail);
                 WT_RET(ret);
             }

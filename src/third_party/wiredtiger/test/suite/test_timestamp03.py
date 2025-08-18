@@ -38,6 +38,7 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
+@wttest.skip_for_hook("disagg", "log tables are disabled in disagg so this test will fail")
 class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     table_ts_log     = 'ts03_ts_logged'
     table_ts_nolog   = 'ts03_ts_nologged'

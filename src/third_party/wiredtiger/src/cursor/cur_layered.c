@@ -149,7 +149,7 @@ __clayered_enter(WT_CURSOR_LAYERED *clayered, bool reset, bool update, bool iter
                     break;
             }
         }
-        WT_WITH_SCHEMA_LOCK(session, ret = __clayered_open_cursors(session, clayered, update));
+        ret = __clayered_open_cursors(session, clayered, update);
 
         /*
          * We only check the external state once. There will always be a race where the state
@@ -518,8 +518,6 @@ __clayered_open_cursors(WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, b
     c = &clayered->iface;
     conn = S2C(session);
     layered = (WT_LAYERED_TABLE *)session->dhandle;
-
-    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
 
     /*
      * Query operations need a full set of cursors. Overwrite cursors do queries in service of
