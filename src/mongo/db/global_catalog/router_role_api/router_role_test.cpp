@@ -157,13 +157,6 @@ public:
         auto targetService =
             operationContext()->getServiceContext()->getService(ClusterRole::RouterServer);
         operationContext()->getClient()->setService(targetService);
-
-        // Initialize the TransactionRouter state with state related to a previous txnNumber on this
-        // same sessionId. We'll later use a greater txnNumber in the test cases.
-        {
-            setupTransactionWithAtClusterTime(Timestamp(2, 0), 3);
-            actAsSubRouter();
-        }
     }
 
     void tearDown() override {
@@ -171,23 +164,19 @@ public:
         RouterRoleTest::tearDown();
     }
 
-    void actAsSubRouter() {
+    void actAsSubRouter(LogicalTime afterClusterTime = LogicalTime(Timestamp(3, 1))) {
         // Attach txn request fields for a request to shard0 so that the shard acts as a sub-router.
         TxnNumber txnNum{3};
         operationContext()->setTxnNumber(txnNum);
+        operationContext()->setActiveTransactionParticipant();
+        operationContext()->setInMultiDocumentTransaction();
         repl::ReadConcernArgs readConcernArgs;
         ASSERT_OK(readConcernArgs.initialize(
             BSON("insert" << "test" << repl::ReadConcernArgs::kReadConcernFieldName
-                          << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
-                                  << LogicalTime(Timestamp(3, 1)).asTimestamp()
-                                  << repl::ReadConcernArgs::kLevelFieldName << "snapshot"))));
+                          << BSON(repl::ReadConcernArgs::kAfterClusterTimeFieldName
+                                  << afterClusterTime.asTimestamp()
+                                  << repl::ReadConcernArgs::kLevelFieldName << "majority"))));
         repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
-
-        auto txnRouter = TransactionRouter::get(operationContext());
-        txnRouter.beginOrContinueTxn(
-            operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
-        txnRouter.attachTxnFieldsIfNeeded(
-            operationContext(), ShardId{"0"}, BSON("insert" << "test"));
     }
 
     void setupTransactionWithAtClusterTime(Timestamp clusterTime, int txnId) {
@@ -286,6 +275,22 @@ TEST_F(RouterRoleTest, DBPrimaryRouterRetryOnStaleDbVersionForNonSubRouterWithou
     ASSERT_EQ(tries, 2);
 }
 
+TEST_F(RouterRoleTestTxn, DBPrimaryRouterSetsPlacementConflictTimeIfSubRouter) {
+    auto clusterTime = Timestamp(1, 1);
+    actAsSubRouter(LogicalTime(clusterTime));
+
+    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    router.route(
+        operationContext(), "test", [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+            auto txnRouter = TransactionRouter::get(opCtx);
+            ASSERT(txnRouter);
+
+            auto placementConflictTime = txnRouter.getPlacementConflictTime();
+            ASSERT(placementConflictTime);
+            ASSERT_EQ(placementConflictTime->asTimestamp(), clusterTime);
+        });
+}
+
 TEST_F(RouterRoleTest, DBPrimaryRouterExceedsMaxRetryAttempts) {
     int maxTestRetries = 10;
 
@@ -366,6 +371,22 @@ TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryOnStaleConfigForNonSubRout
         ErrorCodes::StaleConfig);
 
     ASSERT_EQ(tries, 1);
+}
+
+TEST_F(RouterRoleTestTxn, CollectionRouterSetsPlacementConflictTimeIfSubRouter) {
+    auto clusterTime = Timestamp(1, 1);
+    actAsSubRouter(LogicalTime(clusterTime));
+
+    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    router.route(
+        operationContext(), "test", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            auto txnRouter = TransactionRouter::get(opCtx);
+            ASSERT(txnRouter);
+
+            auto placementConflictTime = txnRouter.getPlacementConflictTime();
+            ASSERT(placementConflictTime);
+            ASSERT_EQ(placementConflictTime->asTimestamp(), clusterTime);
+        });
 }
 
 TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigWithoutTxn) {
@@ -913,6 +934,24 @@ TEST_F(RouterRoleTest,
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::StaleConfig);
 
     ASSERT_EQ(tries, 1);
+}
+
+TEST_F(RouterRoleTestTxn, MultiCollectionRouterSetsPlacementConflictTimeIfSubRouter) {
+    auto clusterTime = Timestamp(1, 1);
+    actAsSubRouter(LogicalTime(clusterTime));
+
+    sharding::router::MultiCollectionRouter router(getServiceContext(), {_nss});
+    router.route(operationContext(),
+                 "test",
+                 [&](OperationContext* opCtx,
+                     stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap) {
+                     auto txnRouter = TransactionRouter::get(opCtx);
+                     ASSERT(txnRouter);
+
+                     auto placementConflictTime = txnRouter.getPlacementConflictTime();
+                     ASSERT(placementConflictTime);
+                     ASSERT_EQ(placementConflictTime->asTimestamp(), clusterTime);
+                 });
 }
 
 // TODO SERVER-102931: Integrate RouterAcquisitionSnapshot into the tests below.
