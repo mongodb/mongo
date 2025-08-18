@@ -41,3 +41,6 @@ filters:
   - "golden_test.py":
     approvers:
       - 10gen/query-optimization
+  - "evergreen_gen_streams*":
+    approvers:
+      - 10gen/streams-engine

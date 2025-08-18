@@ -96,6 +96,7 @@ scratch
 /mongoshim*
 /mongosniff*
 /mongotrafficreader*
+/bin
 
 # artifacts from db-contrib-tool
 /ksdecode*

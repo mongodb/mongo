@@ -56,6 +56,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmoke_tests_runtime_validate.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/powercycle* @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/golden_test.py @10gen/query-optimization @svc-auto-approve-bot
+/buildscripts/evergreen_gen_streams* @10gen/streams-engine @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/antithesis/OWNERS.yml
 /buildscripts/antithesis/ @10gen/devprod-correctness @svc-auto-approve-bot
@@ -329,6 +330,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/validate_compile_commands.py @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/packager_crypt_py_run.sh @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/perf-submission.sh @10gen/devprod-performance-analysis @svc-auto-approve-bot
+/evergreen/streams* @10gen/streams-engine @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/OWNERS.yml
 /jstests/README.md @10gen/devprod-correctness @svc-auto-approve-bot

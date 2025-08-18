@@ -521,6 +521,61 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
+      - name: streams_build_and_publish_gen
+
+  - name: enterprise-amazon2023-streams-arm64
+    display_name: "Amazon Linux 2023 enterprise build with streams arm64"
+    cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - amazon2023-arm64-latest-small
+    expansions:
+      test_flags: >-
+        --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
+        --additionalFeatureFlags=featureFlagStreams
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
+      push_name: linux
+      push_arch: aarch64-enterprise-amazon2023-streams
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --streams_release_build=True
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise-streams
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      compile_variant: enterprise-amazon2023-streams-arm64
+      large_distro_name: amazon2023-arm64-latest-large
+    tasks:
+      - name: compile_test_and_package_serial_TG
+        distros:
+          - amazon2023-arm64-latest-large
+      - name: run_unit_tests_TG
+        distros:
+          - amazon2023-arm64-latest-large
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - amazon2023-arm64-latest-large
+      - name: .release_critical !.requires_large_host !crypt_push
+      - name: .release_critical .requires_large_host !crypt_push
+        distros:
+          - amazon2023-arm64-latest-large
+      - name: streams_gen
+      - name: streams_kafka_gen
+      # TODO(SERVER-103985) - Enabling this is blocked on SRE support arm64 in the sre/gwproxy image (SRE-1481)
+      # - name: streams_kafka_gwproxy
+      - name: streams_kafka_benchmark
+      - name: streams_https
+      - name: streams_lambda
+      - name: streams_s3
+      - name: streams_build_and_publish_gen
+      # Only needed once to generate the streams manifest for both x86 and arm
+      - name: streams_publish_manifest_al2023_gen
 
   - name: enterprise-amazon2-streams
     display_name: "Amazon Linux 2 enterprise build with streams"
@@ -571,6 +626,7 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
+      - name: streams_build_and_publish_gen
 
   - name: enterprise-amazon2-streams-arm64
     display_name: "Amazon Linux 2 enterprise build with streams arm64"
@@ -622,6 +678,9 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
+      - name: streams_build_and_publish_gen
+      # Only needed once to generate the streams manifest for both x86 and arm
+      - name: streams_publish_manifest_gen
 
   - &enterprise-amazon2023-arm64-fuzzers-template
     <<: *enterprise-amazon2023-arm64-template

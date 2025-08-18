@@ -288,7 +288,7 @@ tasks:
 
   - <<: *gen_task_template
     name: streams_gen
-    tags: ["assigned_to_jira_team_streams", "default"]
+    tags: ["assigned_to_jira_team_streams", "default", "streams_release_test"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -296,7 +296,8 @@ tasks:
 
   - <<: *gen_task_template
     name: streams_kafka_gen
-    tags: ["assigned_to_jira_team_streams", "experimental"]
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -305,7 +306,8 @@ tasks:
 
   - <<: *task_template
     name: streams_kafka_gwproxy
-    tags: ["assigned_to_jira_team_streams", "experimental"]
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:
       - command: ec2.assume_role
         params:
@@ -315,31 +317,48 @@ tasks:
 
   - <<: *task_template
     name: streams_kafka_benchmark
-    tags: ["assigned_to_jira_team_streams", "experimental"]
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: streams_https
-    tags: ["assigned_to_jira_team_streams", "default"]
+    tags: ["assigned_to_jira_team_streams", "default", "streams_release_test"]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: streams_lambda
-    tags: ["assigned_to_jira_team_streams", "experimental"]
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: streams_s3
-    tags: ["assigned_to_jira_team_streams", "experimental"]
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:
       - func: "do setup"
       - func: "run tests"
+
+  - name: streams_build_and_publish_gen
+    tags: ["assigned_to_jira_team_streams", "auxiliary"]
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+      # Update with all gen tasks to depend on here and the display name in evergreen_gen_streams_build_and_publish_task.py
+      - name: streams_gen
+      - name: streams_kafka_gen
+    commands:
+      - func: "streams build and publish"
 
   # Experimental task running the jscore suite bazel target. To be removed with SERVER-103537.
   - name: bazel_jscore
