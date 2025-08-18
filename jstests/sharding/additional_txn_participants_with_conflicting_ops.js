@@ -62,10 +62,17 @@ const sessionDB = session.getDatabase(dbName);
     // Run a $lookup which will add shard1 as an additional participant. This should throw
     // because shard1 had an incoming migration. This $lookup can also throw
     // ShardCannotRefreshDueToLocksHeld if the shard acting as a router needs to refresh.
-    let err = assert.throwsWithCode(() => {
-        sessionDB.getCollection(localColl).aggregate(
-            [{$lookup: {from: foreignColl, localField: "x", foreignField: "_id", as: "result"}}]);
-    }, [ErrorCodes.MigrationConflict, ErrorCodes.ShardCannotRefreshDueToLocksHeld]);
+    let err = assert.throwsWithCode(
+        () => {
+            sessionDB.getCollection(localColl).aggregate([
+                {$lookup: {from: foreignColl, localField: "x", foreignField: "_id", as: "result"}}
+            ]);
+        },
+        [
+            ErrorCodes.StaleConfig,
+            ErrorCodes.MigrationConflict,
+            ErrorCodes.ShardCannotRefreshDueToLocksHeld
+        ]);
     assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
 
     session.abortTransaction();

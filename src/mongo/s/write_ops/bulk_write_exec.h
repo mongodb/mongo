@@ -307,7 +307,10 @@ public:
      * unordered writes that is all writes in the batch, and for ordered writes it is only the first
      * write (since we would stop after that failed and not attempt execution of further writes.)
      */
-    void noteChildBatchError(const TargetedWriteBatch& targetedBatch, const Status& status);
+    void noteChildBatchError(
+        const TargetedWriteBatch& targetedBatch,
+        const Status& status,
+        boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace);
 
     /**
      * Processes a local error encountered while trying to send a child batch to a shard. This could

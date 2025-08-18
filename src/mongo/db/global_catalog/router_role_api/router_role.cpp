@@ -96,6 +96,15 @@ void DBPrimaryRouter::_onException(OperationContext* opCtx, RoutingRetryInfo* re
                 si->getDb() == _dbName);
 
         catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
+    } else if (s == ErrorCodes::StaleConfig) {
+        // For some operations, like create, we need to check the ShardVersion to serialize with the
+        // critical section. Hence, the shard may throw a StaleConfig even when the router didn't
+        // attach a shardVersion. This StaleConfig must be handled by the shard itself, however the
+        // retryable attemps on the shard side are just 1, so that error may bubble up until here.
+        // TODO (SERVER-77402) Remove the StaleConfig retry for the DBPrimaryRouter once the
+        // ShardRole loop increases the retryable attempts.
+        auto si = s.extraInfo<StaleConfigInfo>();
+        tassert(10370601, "StaleConfig must have extraInfo", si);
     } else {
         uassertStatusOK(s);
     }
@@ -161,9 +170,6 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
         auto si = s.extraInfo<StaleConfigInfo>();
         tassert(6375904, "StaleConfig must have extraInfo", si);
 
-        if (!isNssInvolvedInRouting(si->getNss())) {
-            uassertStatusOK(s);
-        }
 
         const bool isShardStale = [&]() {
             if (!si->getVersionWanted()) {
@@ -186,7 +192,41 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
             uassertStatusOK(s);
         }
 
-        catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
+        const auto staleNs = si->getNss();
+
+        // When the shard is stale, the StaleConfig thrown by the shard should be handled by the
+        // shard itself. However, the num of retryable attemps on the shard side is just 1, so that
+        // error may bubble up until here if there is any concurrent metadata flush. In addition,
+        // the StaleConfig thrown by the shard may not be related to the targeted collection. For
+        // example, a lookup may throw a StaleConfig for the foreign collection.
+        // TODO (SERVER-77402) Only allow StaleConfig errors for the involved namespaces once the
+        // ShardRole loop increases the retryable attempts
+        if (!isShardStale) {
+            if (!isNssInvolvedInRouting(staleNs)) {
+                uassertStatusOK(s);
+            }
+        }
+
+        // Refresh the view namespace if the stale namespace is a buckets timeseries collection.
+        if (staleNs.isTimeseriesBucketsCollection()) {
+            // A timeseries might've been created, so we need to invalidate the original namespace
+            // version.
+            catalogCache->onStaleCollectionVersion(staleNs.getTimeseriesViewNamespace(),
+                                                   boost::none);
+        }
+
+        // Refresh the timeseries buckets nss when the command targets the buckets collection but
+        // the stale namespace is it's view.
+        std::for_each(
+            _targetedNamespaces.begin(), _targetedNamespaces.end(), [&](const auto& targetedNss) {
+                if (targetedNss.isTimeseriesBucketsCollection() &&
+                    targetedNss.getTimeseriesViewNamespace() == staleNs) {
+                    catalogCache->onStaleCollectionVersion(targetedNss, boost::none);
+                }
+            });
+
+        catalogCache->onStaleCollectionVersion(staleNs, si->getVersionWanted());
+
     } else if (s == ErrorCodes::StaleEpoch) {
         if (auto si = s.extraInfo<StaleEpochInfo>()) {
             if (!isNssInvolvedInRouting(si->getNss())) {
@@ -226,6 +266,11 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
             catalogCache->onStaleCollectionVersion(nss, boost::none);
             catalogCache->onStaleDatabaseVersion(nss.dbName(), boost::none);
         }
+    } else if (s == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
+        // The shard is stale but it was not allowed to retry from the ServiceEntryPoint. For
+        // instance, a getMore command can't be individually retried, therefore we must retry the
+        // entire operation from this point.
+
     } else {
         uassertStatusOK(s);
     }

@@ -78,7 +78,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
               // that represent the pre-refine chunks, but the collection has already been changed
               // to possess the post-refine chunk boundaries.
               (err.message.includes("shard key bounds") &&
-               err.message.includes("are not valid for shard key pattern"))));
+               err.message.includes("are not valid for shard key pattern")) ||
+              (err.message.includes("bound") &&
+               err.message.includes("is not valid for shard key pattern"))));
     };
 
     $config.states.refineCollectionShardKey = function refineCollectionShardKey(

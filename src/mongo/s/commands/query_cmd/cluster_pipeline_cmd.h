@@ -129,34 +129,21 @@ public:
             return true;
         }
 
-        void _runAggOnNamespace(OperationContext* opCtx,
-                                BSONObjBuilder* result,
-                                boost::optional<ExplainOptions::Verbosity> verbosity,
-                                const NamespaceString& executionNss) {
-            uassertStatusOK(ClusterAggregate::runAggregate(
-                opCtx,
-                ClusterAggregate::Namespaces{_aggregationRequest.getNamespace(), executionNss},
-                _aggregationRequest,
-                _liteParsedPipeline,
-                _privileges,
-                verbosity,
-                result));
-        }
-
         void _runAggCommand(OperationContext* opCtx,
                             BSONObjBuilder* result,
                             boost::optional<ExplainOptions::Verbosity> verbosity) {
             const auto& nss = _aggregationRequest.getNamespace();
 
             try {
-                _runAggOnNamespace(opCtx,
-                                   result,
-                                   verbosity,
-                                   isRawDataOperation(opCtx) &&
-                                           CollectionRoutingInfoTargeter{opCtx, nss}
-                                               .timeseriesNamespaceNeedsRewrite(nss)
-                                       ? nss.makeTimeseriesBucketsNamespace()
-                                       : nss);
+                uassertStatusOK(
+                    ClusterAggregate::runAggregate(opCtx,
+                                                   ClusterAggregate::Namespaces{nss, nss},
+                                                   _aggregationRequest,
+                                                   _liteParsedPipeline,
+                                                   _privileges,
+                                                   verbosity,
+                                                   result));
+
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 if (!isRawDataOperation(opCtx) ||
                     !ex->getNamespace().isTimeseriesBucketsCollection()) {
@@ -175,7 +162,15 @@ public:
                     // was for raw data, we want to run aggregate on the buckets namespace instead
                     // of as a view.
                     result->resetToEmpty();
-                    _runAggOnNamespace(opCtx, result, verbosity, ex->getNamespace());
+                    uassertStatusOK(ClusterAggregate::runAggregate(
+                        opCtx,
+                        ClusterAggregate::Namespaces{_aggregationRequest.getNamespace(),
+                                                     ex->getNamespace()},
+                        _aggregationRequest,
+                        _liteParsedPipeline,
+                        _privileges,
+                        verbosity,
+                        result));
                 }
             }
         }

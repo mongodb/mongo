@@ -429,10 +429,8 @@ private:
     // Exception handler for error codes that may trigger a retry. All methods will throw `status`
     // unless an attempt to retry is possible.
     void _checkRetryForTransaction(Status& status);
-    void _onNeedRetargetting(Status& status);
-    void _onStaleDbVersion(Status& status);
+    void _onStaleRoutingErrors(Status& status);
     void _onSnapshotError(Status& status);
-    void _onShardCannotRefreshDueToLocksHeldError(Status& status);
     void _onCannotImplicitlyCreateCollection(Status& status);
 
     ParseAndRunCommand* const _parc;
@@ -1040,42 +1038,6 @@ void ParseAndRunCommand::RunAndRetry::_checkRetryForTransaction(Status& status) 
     abortGuard.dismiss();
 }
 
-void ParseAndRunCommand::RunAndRetry::_onNeedRetargetting(Status& status) {
-    invariant(ErrorCodes::isA<ErrorCategory::NeedRetargettingError>(status));
-
-    auto staleInfo = status.extraInfo<StaleConfigInfo>();
-    if (!staleInfo)
-        iassert(status);
-
-    auto opCtx = _parc->_rec->getOpCtx();
-    const auto staleNs = staleInfo->getNss();
-    const auto& originalNs = _parc->_invocation->ns();
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    catalogCache->onStaleCollectionVersion(staleNs, staleInfo->getVersionWanted());
-
-    if ((staleNs.isTimeseriesBucketsCollection() || originalNs.isTimeseriesBucketsCollection()) &&
-        staleNs != originalNs) {
-        // A timeseries might've been created, so we need to invalidate the original namespace
-        // version.
-        Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(originalNs, boost::none);
-    }
-
-    _checkRetryForTransaction(status);
-}
-
-void ParseAndRunCommand::RunAndRetry::_onStaleDbVersion(Status& status) {
-    invariant(status.code() == ErrorCodes::StaleDbVersion);
-    auto opCtx = _parc->_rec->getOpCtx();
-
-    // Mark database entry in cache as stale.
-    auto extraInfo = status.extraInfo<StaleDbRoutingVersion>();
-    invariant(extraInfo);
-    Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(extraInfo->getDb(),
-                                                             extraInfo->getVersionWanted());
-
-    _checkRetryForTransaction(status);
-}
-
 void ParseAndRunCommand::RunAndRetry::_onSnapshotError(Status& status) {
     // Simple retry on any type of snapshot error.
     invariant(ErrorCodes::isA<ErrorCategory::SnapshotError>(status));
@@ -1092,9 +1054,17 @@ void ParseAndRunCommand::RunAndRetry::_onSnapshotError(Status& status) {
     }
 }
 
-void ParseAndRunCommand::RunAndRetry::_onShardCannotRefreshDueToLocksHeldError(Status& status) {
-    invariant(status.code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
+void ParseAndRunCommand::RunAndRetry::_onStaleRoutingErrors(Status& status) {
+    invariant(ErrorCodes::isA<ErrorCategory::NeedRetargettingError>(status) ||
+              status.code() == ErrorCodes::StaleDbVersion ||
+              status.code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
 
+    // These errors should be handled by either a `CollectionRouter` or a `DBPrimaryRouter` on a
+    // lower level unless we are in a txn.
+    auto opCtx = _parc->_rec->getOpCtx();
+    if (!TransactionRouter::get(opCtx)) {
+        iassert(status);
+    }
     _checkRetryForTransaction(status);
 }
 
@@ -1122,14 +1092,12 @@ void ParseAndRunCommand::RunAndRetry::run() {
         } catch (const DBException& ex) {
             auto status = ex.toStatus();
 
-            if (status.isA<ErrorCategory::NeedRetargettingError>()) {
-                _onNeedRetargetting(status);
-            } else if (status == ErrorCodes::StaleDbVersion) {
-                _onStaleDbVersion(status);
+            if (status.isA<ErrorCategory::NeedRetargettingError>() ||
+                status == ErrorCodes::StaleDbVersion ||
+                status == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
+                _onStaleRoutingErrors(status);
             } else if (status.isA<ErrorCategory::SnapshotError>()) {
                 _onSnapshotError(status);
-            } else if (status == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
-                _onShardCannotRefreshDueToLocksHeldError(status);
             } else if (status == ErrorCodes::CannotImplicitlyCreateCollection) {
                 _onCannotImplicitlyCreateCollection(status);
             } else if (status == ErrorCodes::TransactionParticipantFailedUnyield) {
