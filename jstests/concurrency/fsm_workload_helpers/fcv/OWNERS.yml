@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/server-fcv
+  - "handle_setFCV_errors.js":
+    approvers:
+      - 10gen/server-fcv

@@ -55,6 +55,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
@@ -168,6 +169,20 @@ public:
                        GenericFCV::kLastLTS /* target */,
                        GenericFCV::kLatest /* previous */
             );
+    }
+
+    void addTransitionsUpgradingToDowngrading() {
+        if (repl::feature_flags::gFeatureFlagUpgradingToDowngrading.isEnabled()) {
+            for (auto&& isFromConfigServer : {false, true}) {
+                _transitions[{GenericFCV::kUpgradingFromLastLTSToLatest,
+                              GenericFCV::kLastLTS,
+                              isFromConfigServer}] = GenericFCV::kDowngradingFromLatestToLastLTS;
+                _transitions[{GenericFCV::kUpgradingFromLastContinuousToLatest,
+                              GenericFCV::kLastContinuous,
+                              isFromConfigServer}] =
+                    GenericFCV::kDowngradingFromLatestToLastContinuous;
+            }
+        }
     }
 
     void addTransitionFromLatestToLastContinuous() {
@@ -408,13 +423,22 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     // We may have just stepped down, in which case we should not proceed.
     opCtx->checkForInterrupt();
 
+    bool isUpgradingOrDowngrading =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isUpgradingOrDowngrading(
+            fromVersion);
+    bool isUpgradingToDowngradingPath = (fromVersion == GenericFCV::kUpgradingFromLastLTSToLatest &&
+                                         newVersion == GenericFCV::kLastLTS) ||
+        (fromVersion == GenericFCV::kUpgradingFromLastContinuousToLatest &&
+         newVersion == GenericFCV::kLastContinuous);
+    bool isDowngradingToUpgradingPath =
+        fromVersion == GenericFCV::kDowngradingFromLatestToLastLTS &&
+        newVersion == GenericFCV::kLatest;
+
     // Only transition to fully upgraded or downgraded states when we have completed all required
-    // upgrade/downgrade behavior, unless it is the newly added downgrading to upgrading path.
-    auto transitioningVersion = setTargetVersion &&
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isUpgradingOrDowngrading(
-                fromVersion) &&
-            !(fromVersion == GenericFCV::kDowngradingFromLatestToLastLTS &&
-              newVersion == GenericFCV::kLatest)
+    // upgrade/downgrade behavior, unless it is the downgrading to upgrading path or the upgrading
+    // to downgrading path.
+    auto transitioningVersion = setTargetVersion && isUpgradingOrDowngrading &&
+            !isDowngradingToUpgradingPath && !isUpgradingToDowngradingPath
         ? fromVersion
         : fcvTransitions.getTransitionalVersion(fromVersion, newVersion, isFromConfigServer);
 
@@ -678,6 +702,18 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
 
 void FeatureCompatibilityVersion::addTransitionFromLatestToLastContinuous() {
     fcvTransitions.addTransitionFromLatestToLastContinuous();
+}
+
+void FeatureCompatibilityVersion::addTransitionsUpgradingToDowngrading() {
+    fcvTransitions.addTransitionsUpgradingToDowngrading();
+}
+
+void FeatureCompatibilityVersion::afterStartupActions(OperationContext* opCtx) {
+    fassertInitializedAfterStartup(opCtx);
+    if (!mongo::repl::disableTransitionFromLatestToLastContinuous) {
+        addTransitionFromLatestToLastContinuous();
+    }
+    addTransitionsUpgradingToDowngrading();
 }
 
 Lock::ExclusiveLock FeatureCompatibilityVersion::enterFCVChangeRegion(OperationContext* opCtx) {

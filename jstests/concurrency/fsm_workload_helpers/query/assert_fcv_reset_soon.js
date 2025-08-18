@@ -8,6 +8,9 @@ const kAcceptedSetFCVErrors = [
     // Cannot upgrade FCV if a previous FCV downgrade stopped in the middle of cleaning up
     // internal server metadata.
     7428200,
+    // Cannot downgrade FCV if a previous FCV upgrade stopped in the middle of cleaning up
+    // internal server metadata.
+    10778001,
     // Cannot downgrade FCV that requires a collMod command when index builds are concurrently
     // taking place.
     12587,

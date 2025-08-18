@@ -31,9 +31,8 @@ function transitionFailsDuringIsCleaningServerMetadata(
     const isOriginallyDowngradeTest = originalTransitionType === "downgrade";
     const targetFCV = isOriginallyDowngradeTest ? lastLTSFCV : latestFCV;
     const originalFCV = isOriginallyDowngradeTest ? latestFCV : lastLTSFCV;
-    // TODO(SERVER-107829): Remove the 5147403 (FCV transition not allowed) error code.
     const cannotTransitionDuringMetadataCleanupErrorCode =
-        isOriginallyDowngradeTest ? 7428200 : [10778001, 5147403];
+        isOriginallyDowngradeTest ? 7428200 : 10778001;
 
     let adminDB = conn.getDB("admin");
     assert.commandWorked(

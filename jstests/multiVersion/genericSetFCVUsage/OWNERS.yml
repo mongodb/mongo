@@ -30,9 +30,6 @@ filters:
   - "await_prepared_transactions_on_FCV_downgrade.js":
     approvers:
       - 10gen/server-fcv
-  - "can_upgrade_FCV_after_failed_downgrade.js":
-    approvers:
-      - 10gen/server-fcv
   - "cannot_downgrade_from_latest_to_last_continuous.js":
     approvers:
       - 10gen/server-fcv
@@ -100,3 +97,7 @@ filters:
   - "fcv_transition_fails_during_is_cleaning_server_metadata.js":
     approvers:
       - 10gen/server-fcv
+  - "can_transition_to_originalFCV_after_failed_upgrade_or_downgrade.js":
+    approvers:
+      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing

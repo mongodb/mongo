@@ -725,13 +725,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(startupOpCtx.get());
     }
 
-    // Ensure FCV document exists and is initialized in-memory. Fatally asserts if there is an
-    // error.
-    FeatureCompatibilityVersion::fassertInitializedAfterStartup(startupOpCtx.get());
-
-    if (!mongo::repl::disableTransitionFromLatestToLastContinuous) {
-        FeatureCompatibilityVersion::addTransitionFromLatestToLastContinuous();
-    }
+    FeatureCompatibilityVersion::afterStartupActions(startupOpCtx.get());
 
     if (gFlowControlEnabled.load()) {
         LOGV2(20536, "Flow Control is enabled on this deployment");

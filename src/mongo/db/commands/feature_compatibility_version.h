@@ -69,6 +69,18 @@ public:
     static void addTransitionFromLatestToLastContinuous();
 
     /**
+     * Adds transitions that allow users to downgrade back to the originalFCV after a failed
+     * upgrade.
+     */
+    static void addTransitionsUpgradingToDowngrading();
+
+    /**
+     * Performs actions that need to be done after startup, including asserting if FCV is not
+     * properly initialized and adding transitions for FCV states
+     */
+    static void afterStartupActions(OperationContext* opCtx);
+
+    /**
      * Returns the on-disk feature compatibility version document if it can be found.
      * If there was an error finding the document, returns the error reason.
      */
