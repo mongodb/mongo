@@ -34,6 +34,7 @@
 #include "mongo/stdx/mutex.h"
 
 #include <cstdint>
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <shared_mutex>
@@ -106,6 +107,30 @@ private:
 template <typename MutexType>
 concept ImplementsLockShared = requires(MutexType m) { m.lock_shared(); };
 
+#if defined(__linux__) && defined(__x86_64__)
+struct Timer {
+    MONGO_COMPILER_ALWAYS_INLINE auto getTime() const {
+        unsigned int lo, hi;
+        asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
+        return ((uint64_t)hi << 32) | lo;
+    }
+};
+#elif defined(__linux__) && defined(__aarch64__)
+struct Timer {
+    MONGO_COMPILER_ALWAYS_INLINE auto getTime() const {
+        uint64_t tsc;
+        asm volatile("mrs %0, cntvct_el0" : "=r"(tsc));
+        return tsc;
+    }
+};
+#else
+struct Timer {
+    MONGO_COMPILER_ALWAYS_INLINE auto getTime() const {
+        return std::clock();
+    }
+};
+#endif
+
 }  // namespace observable_mutex_details
 
 /**
@@ -171,38 +196,20 @@ private:
     using ObservationToken = observable_mutex_details::ObservationToken;
     using AtomicAcquisitionStats = observable_mutex_details::AcquisitionStats<Atomic<uint64_t>>;
 
-    // TODO SERVER-106769: Replace the following with the new low-overhead timer.
-    MONGO_COMPILER_ALWAYS_INLINE uint64_t _getCurrentCPUCycle() const {
-#if defined(__x86_64__)
-        unsigned int lo, hi;
-        __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
-        __asm__ __volatile__("lfence" ::: "memory");
-        return ((uint64_t)hi << 32) | lo;
-#elif defined(__aarch64__)
-        asm volatile("isb" : : : "memory");
-        uint64_t tsc;
-        asm volatile("mrs %0, cntvct_el0" : "=r"(tsc));
-        return tsc;
-#else
-        return 0;
-#endif
-    }
-
     MONGO_COMPILER_NOINLINE void _onContendedAcquisition(AtomicAcquisitionStats& stats,
                                                          const std::function<void()>& lock) {
+        // TODO SERVER-106769: Replace `Timer` with the new low-overhead timer.
+        observable_mutex_details::Timer timer;
         stats.contentions.fetchAndAddRelaxed(1);
-#ifndef _WIN32  // TODO SERVER-107856: Enable the waitCycles metric for Windows
-        const auto t1 = _getCurrentCPUCycle();
-#endif
+        const auto t1 = timer.getTime();
         try {
             lock();
         } catch (...) {
             stats.contentions.fetchAndSubtractRelaxed(1);
             throw;
         }
-#ifndef _WIN32
-        stats.waitCycles.fetchAndAddRelaxed(_getCurrentCPUCycle() - t1);
-#endif
+        const auto t2 = timer.getTime();
+        stats.waitCycles.fetchAndAddRelaxed(t2 - t1);
     }
 
     mutable MutexType _mutex;
