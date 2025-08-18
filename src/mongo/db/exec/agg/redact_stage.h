@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,23 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source_internal_replace_root.h"
+#pragma once
 
-namespace mongo {
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/redact_processor.h"
 
-ALLOCATE_DOCUMENT_SOURCE_ID(_internalReplaceRoot, DocumentSourceInternalReplaceRoot::id)
+#include <memory>
 
-const char* DocumentSourceInternalReplaceRoot::getSourceName() const {
-    return kStageNameInternal.data();
-}
+namespace mongo::exec::agg {
 
-DocumentSourceContainer::iterator DocumentSourceInternalReplaceRoot::doOptimizeAt(
-    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    invariant(*itr == this);
-    return itr;
-}
+class RedactStage final : public Stage {
+public:
+    RedactStage(StringData stageName,
+                const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                const std::shared_ptr<RedactProcessor>& redactProcessor);
 
-Value DocumentSourceInternalReplaceRoot::serialize(const SerializationOptions& opts) const {
-    return Value(Document{{getSourceName(), _newRoot->serialize()}});
-}
-}  // namespace mongo
+private:
+    GetNextResult doGetNext() final;
+    std::shared_ptr<RedactProcessor> _redactProcessor;
+};
+
+}  // namespace mongo::exec::agg

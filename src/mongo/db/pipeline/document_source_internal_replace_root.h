@@ -38,15 +38,13 @@ namespace mongo {
  * Represents a $replaceRoot pipeline stage that can be translated to SBE instead of executing as a
  * DocumentSourceSingleDocumentTransformation.
  */
-class DocumentSourceInternalReplaceRoot final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceInternalReplaceRoot final : public DocumentSource {
 public:
     static constexpr StringData kStageNameInternal = "$_internalReplaceRoot"_sd;
 
     DocumentSourceInternalReplaceRoot(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                       boost::intrusive_ptr<Expression> newRoot)
-        : DocumentSource(kStageNameInternal, pExpCtx),
-          exec::agg::Stage(kStageNameInternal, pExpCtx),
-          _newRoot(newRoot) {}
+        : DocumentSource(kStageNameInternal, pExpCtx), _newRoot(newRoot) {}
 
     const char* getSourceName() const final;
 
@@ -87,8 +85,6 @@ public:
     }
 
 private:
-    GetNextResult doGetNext() final;
-
     // The parsed "newRoot" argument to the $replaceRoot stage.
     boost::intrusive_ptr<Expression> _newRoot;
 };

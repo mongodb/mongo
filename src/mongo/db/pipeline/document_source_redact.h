@@ -36,14 +36,13 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/redact_processor.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/util/intrusive_counter.h"
 
+#include <memory>
 #include <set>
 
 #include <boost/none.hpp>
@@ -52,7 +51,7 @@
 
 namespace mongo {
 
-class DocumentSourceRedact final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceRedact final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$redact"_sd;
     const char* getSourceName() const final;
@@ -92,8 +91,8 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    RedactProcessor* getRedactProcessor() {
-        return _redactProcessor.get_ptr();
+    const std::shared_ptr<RedactProcessor>& getRedactProcessor() const {
+        return _redactProcessor;
     }
 
     boost::intrusive_ptr<Expression> getExpression() {
@@ -109,9 +108,7 @@ private:
                          const boost::intrusive_ptr<Expression>& previsit,
                          Variables::Id currentId);
 
-    GetNextResult doGetNext() final;
-
-    boost::optional<RedactProcessor> _redactProcessor;
+    std::shared_ptr<RedactProcessor> _redactProcessor;
 };
 
 }  // namespace mongo

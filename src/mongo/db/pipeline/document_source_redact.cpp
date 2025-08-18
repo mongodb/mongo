@@ -62,8 +62,7 @@ DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext
                                            const intrusive_ptr<Expression>& expression,
                                            Variables::Id currentId)
     : DocumentSource(kStageName, expCtx),
-      exec::agg::Stage(kStageName, expCtx),
-      _redactProcessor(boost::in_place(expCtx, expression, currentId)) {}
+      _redactProcessor(std::make_shared<RedactProcessor>(expCtx, expression, currentId)) {}
 
 REGISTER_DOCUMENT_SOURCE(redact,
                          LiteParsedDocumentSourceDefault::parse,
@@ -78,17 +77,6 @@ const char* DocumentSourceRedact::getSourceName() const {
 static const Value descendVal = Value("descend"_sd);
 static const Value pruneVal = Value("prune"_sd);
 static const Value keepVal = Value("keep"_sd);
-
-DocumentSource::GetNextResult DocumentSourceRedact::doGetNext() {
-    auto nextInput = pSource->getNext();
-    for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-        if (boost::optional<Document> result =
-                _redactProcessor->process(nextInput.releaseDocument())) {
-            return std::move(*result);
-        }
-    }
-    return nextInput;
-}
 
 DocumentSourceContainer::iterator DocumentSourceRedact::doOptimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
@@ -109,7 +97,7 @@ DocumentSourceContainer::iterator DocumentSourceRedact::doOptimizeAt(
             // create an infinite number of $matches.
             DocumentSourceContainer::iterator returnItr = std::next(itr);
 
-            container->insert(itr, DocumentSourceMatch::create(redactSafePortion, pExpCtx));
+            container->insert(itr, DocumentSourceMatch::create(redactSafePortion, getExpCtx()));
 
             return returnItr;
         }
