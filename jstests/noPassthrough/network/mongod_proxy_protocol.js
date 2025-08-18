@@ -45,7 +45,7 @@ function failInvalidProtocol(node, port, id, attrs, loadBalanced, count) {
     } catch (err) {
         assert(checkLog.checkContainsWithCountJson(node, id, attrs, count, undefined, true),
                `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} ${
-                   tojson(id)} times in the log`);
+                   tojson(count)} times in the log -- failed with this error: ${tojson(err)}`);
     }
 }
 
