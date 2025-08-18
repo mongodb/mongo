@@ -101,6 +101,7 @@
 #include "mongo/db/local_catalog/database_holder.h"
 #include "mongo/db/local_catalog/database_holder_impl.h"
 #include "mongo/db/local_catalog/db_raii.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/local_catalog/health_log.h"
 #include "mongo/db/local_catalog/health_log_interface.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
@@ -1379,6 +1380,10 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
         executor::makeNetworkInterface("ReplNetwork", nullptr, std::move(hookList)));
 }
 
+void setUpReplicaSetDDLHooks(ServiceContext* serviceContext) {
+    ReplicaSetDDLTracker::create(serviceContext);
+}
+
 void setUpReplication(ServiceContext* serviceContext) {
     repl::StorageInterface::set(serviceContext, std::make_unique<repl::StorageInterfaceImpl>());
     auto storageInterface = repl::StorageInterface::get(serviceContext);
@@ -1432,6 +1437,9 @@ void setUpReplication(ServiceContext* serviceContext) {
     // Register primary-only services here so that the services are started up when the replication
     // coordinator starts up.
     registerPrimaryOnlyServices(serviceContext);
+
+    // Register replica set DDL hooks.
+    setUpReplicaSetDDLHooks(serviceContext);
 }
 
 void setUpObservers(ServiceContext* serviceContext) {

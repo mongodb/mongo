@@ -167,3 +167,12 @@ mongo_cc_library(
         "//src/mongo/db/auth:authprivilege",
     ],
 )
+
+mongo_cc_library(
+    name = "replica_set_ddl_tracker",
+    srcs = ["replica_set_ddl_tracker.cpp"],
+    hdrs = ["replica_set_ddl_tracker.h"],
+    deps = [
+        "//src/mongo/db:service_context",
+    ],
+)

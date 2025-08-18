@@ -1313,6 +1313,7 @@ mongo_cc_library(
         "//src/mongo/db/local_catalog:index_key_validate",
         "//src/mongo/db/local_catalog:validate_db_metadata_command",
         "//src/mongo/db/local_catalog/ddl:rename_collection_idl",
+        "//src/mongo/db/local_catalog/ddl:replica_set_ddl_tracker",
         "//src/mongo/db/local_catalog/lock_manager",
         "//src/mongo/db/local_catalog/lock_manager:exception_util",
         "//src/mongo/db/local_catalog/lock_manager:lock_info_command",
