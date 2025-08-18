@@ -1394,8 +1394,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
 
     // While constructing the executor, some stages might have been lowered from the 'pipeline' into
     // the executor, so we need to recheck whether the executor's layer can still produce an empty
-    // document.
-    *shouldProduceEmptyDocs = pipeline->getDependencies(availableMetadata).hasNoRequirements();
+    // document. This will be the case when:
+    // - The rest of the pipeline has no dependencies AND
+    // - The expression context does not indicate a requirement to produce sortable output. If an
+    // upstream node sets 'needsSortedMerge' then this node is required to populate documents with
+    // their $sortKey and cannot use the "empty document" optimization.
+    *shouldProduceEmptyDocs = pipeline->getDependencies(availableMetadata).hasNoRequirements() &&
+        !expCtx->needsSortedMerge();
     if (executor.isOK()) {
         executor.getValue()->setReturnOwnedData(!*shouldProduceEmptyDocs);
     }

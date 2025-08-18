@@ -60,7 +60,7 @@ public:
     ExpressionContextBuilder& tmpDir(std::string);
     ExpressionContextBuilder& mayDbProfile(bool);
     ExpressionContextBuilder& fromRouter(bool);
-    ExpressionContextBuilder& needsMerge(bool);
+    ExpressionContextBuilder& mergeType(MergeType);
     ExpressionContextBuilder& inRouter(bool);
     ExpressionContextBuilder& forPerShardCursor(bool);
     ExpressionContextBuilder& allowDiskUse(bool);

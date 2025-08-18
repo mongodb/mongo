@@ -106,6 +106,20 @@ enum struct SbeCompatibility {
     noRequirements,
 };
 
+// Indicator to a pipeline how/if the consumer intends to merge its output.
+enum class MergeType {
+    // Consumer will not merge the output of this pipeline with another one. $group accumulators
+    // should produce full results and $sortKey does not need to be populated.
+    noMerge,
+    // Consumer will merge the output of this pipeline with another one in an order-insensitive way.
+    // $group accumulators should produce partial results but $sortKey does not need to be
+    // populated.
+    unsortedMerge,
+    // Consumer will merge the output of this pipeline with another one using merge sort. $group
+    // accumulator should produce partial results and $sortKey must be populated.
+    sortedMerge,
+};
+
 std::ostream& operator<<(std::ostream& os, SbeCompatibility sbeCompat);
 
 struct ResolvedNamespace {
@@ -556,12 +570,27 @@ public:
         _params.collUUID = std::move(uuid);
     }
 
+    // TODO SERVER-107416: Delete 'getNeedsMerge()' once all callers use 'needsUnsortedMerge()' or
+    // 'needsSortedMerge()'.
     bool getNeedsMerge() const {
-        return _params.needsMerge;
+        return _params.mergeType == MergeType::unsortedMerge ||
+            _params.mergeType == MergeType::sortedMerge;
     }
 
     void setNeedsMerge(bool needsMerge) {
-        _params.needsMerge = needsMerge;
+        _params.mergeType = needsMerge ? MergeType::sortedMerge : MergeType::noMerge;
+    }
+
+    bool needsUnsortedMerge() const {
+        return _params.mergeType == MergeType::unsortedMerge;
+    }
+
+    bool needsSortedMerge() const {
+        return _params.mergeType == MergeType::sortedMerge;
+    }
+
+    MergeType mergeType() const {
+        return _params.mergeType;
     }
 
     bool getInRouter() const {
@@ -1075,7 +1104,10 @@ protected:
         bool mayDbProfile = true;
         bool fromRouter = false;
         bool inRouter = false;
-        bool needsMerge = false;
+        // Indicates whether/what type of merge the current pipeline needs to support. For example,
+        // if this value is 'unsortedMerge', then group accumulators need to output partial results,
+        // so they can be combined by the merging pipeline.
+        MergeType mergeType = MergeType::noMerge;
         bool forPerShardCursor = false;
         bool allowDiskUse = false;
         bool bypassDocumentValidation = false;

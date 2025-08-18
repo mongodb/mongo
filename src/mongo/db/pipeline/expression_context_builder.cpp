@@ -112,8 +112,8 @@ ExpressionContextBuilder& ExpressionContextBuilder::fromRouter(bool fromRouter) 
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::needsMerge(bool needsMerge) {
-    params.needsMerge = needsMerge;
+ExpressionContextBuilder& ExpressionContextBuilder::mergeType(MergeType mergeType) {
+    params.mergeType = mergeType;
     return *this;
 }
 
@@ -467,7 +467,18 @@ ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     OperationContext* operationContext, const AggregateCommandRequest& request, bool useDisk) {
     opCtx(operationContext);
     fromRouter(aggregation_request_helper::getFromRouter(request));
-    needsMerge(request.getNeedsMerge());
+    if (!request.getNeedsMerge() && request.getNeedsSortedMerge()) {
+        tasserted(10372401,
+                  "Encountered malformed AggregationCommandRequest: needsMerge = false and "
+                  "needsSortedMerge = true are contradictory");
+    }
+    MergeType type{MergeType::noMerge};
+    if (request.getNeedsSortedMerge()) {
+        type = MergeType::sortedMerge;
+    } else if (request.getNeedsMerge()) {
+        type = MergeType::unsortedMerge;
+    }
+    mergeType(type);
     allowDiskUse(request.getAllowDiskUse().value_or(useDisk));
     bypassDocumentValidation(request.getBypassDocumentValidation().value_or(false));
     isMapReduceCommand(request.getIsMapReduceCommand());
@@ -542,7 +553,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
             .resolvedNamespace(other->getResolvedNamespaces())
             .mayDbProfile(other->getMayDbProfile())
             .fromRouter(other->getFromRouter())
-            .needsMerge(other->getNeedsMerge())
+            .mergeType(other->mergeType())
             .forPerShardCursor(other->getForPerShardCursor())
             .allowDiskUse(other->getAllowDiskUse())
             .bypassDocumentValidation(other->getBypassDocumentValidation())

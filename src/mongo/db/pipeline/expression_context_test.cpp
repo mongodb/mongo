@@ -40,6 +40,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -266,6 +267,78 @@ TEST_F(ExpressionContextTest, CopyWithInitializesViewWhenSpecified) {
     ASSERT_EQUALS(expCtxCopy->getView()->first, viewNss);
     ASSERT_EQUALS(expCtxCopy->getView()->second.size(), viewPipeline.size());
     ASSERT_BSONOBJ_EQ(expCtxCopy->getView()->second[0], viewPipeline[0]);
+}
+
+struct AddCmdTestCase {
+    OptionalBool needsMerge;
+    OptionalBool needsSortedMerge;
+
+    boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx) const {
+        AggregateCommandRequest request(NamespaceString{});
+        if (needsMerge.has_value()) {
+            request.setNeedsMerge(needsMerge);
+        }
+        if (needsSortedMerge.has_value()) {
+            request.setNeedsSortedMerge(needsSortedMerge);
+        }
+        return ExpressionContextBuilder{}.fromRequest(opCtx, request).build();
+    }
+};
+
+TEST_F(ExpressionContextTest, MergeType) {
+    auto opCtxHolder = makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    {
+        const auto expCtx =
+            AddCmdTestCase{.needsMerge = true, .needsSortedMerge = true}.makeExpCtx(opCtx);
+        ASSERT_TRUE(expCtx->getNeedsMerge());
+        ASSERT_FALSE(expCtx->needsUnsortedMerge());
+        ASSERT_TRUE(expCtx->needsSortedMerge());
+    }
+    {
+        const auto expCtx =
+            AddCmdTestCase{.needsMerge = true, .needsSortedMerge = false}.makeExpCtx(opCtx);
+        ASSERT_TRUE(expCtx->getNeedsMerge());
+        ASSERT_TRUE(expCtx->needsUnsortedMerge());
+        ASSERT_FALSE(expCtx->needsSortedMerge());
+    }
+    {
+        const auto expCtx = AddCmdTestCase{.needsMerge = true}.makeExpCtx(opCtx);
+        ASSERT_TRUE(expCtx->getNeedsMerge());
+        ASSERT_TRUE(expCtx->needsUnsortedMerge());
+        ASSERT_FALSE(expCtx->needsSortedMerge());
+    }
+    {
+        const auto expCtx = AddCmdTestCase{}.makeExpCtx(opCtx);
+        ASSERT_FALSE(expCtx->getNeedsMerge());
+        ASSERT_FALSE(expCtx->needsUnsortedMerge());
+        ASSERT_FALSE(expCtx->needsSortedMerge());
+    }
+    {
+        const auto expCtx =
+            AddCmdTestCase{.needsMerge = false, .needsSortedMerge = false}.makeExpCtx(opCtx);
+        ASSERT_FALSE(expCtx->getNeedsMerge());
+        ASSERT_FALSE(expCtx->needsUnsortedMerge());
+        ASSERT_FALSE(expCtx->needsSortedMerge());
+    }
+    {
+        const auto expCtx = AddCmdTestCase{.needsSortedMerge = false}.makeExpCtx(opCtx);
+        ASSERT_FALSE(expCtx->getNeedsMerge());
+        ASSERT_FALSE(expCtx->needsUnsortedMerge());
+        ASSERT_FALSE(expCtx->needsSortedMerge());
+    }
+}
+
+// This should tassert to detect this malformed AggregateCommandRequest.
+// The 'needsSortedMerge' bit implies 'needsMerge'.
+DEATH_TEST_F(ExpressionContextTest, IllegalNeedsMergeCombo, "10372401") {
+    auto opCtx = makeOperationContext();
+    AddCmdTestCase{.needsMerge = false, .needsSortedMerge = true}.makeExpCtx(opCtx.get());
+}
+
+DEATH_TEST_F(ExpressionContextTest, IllegalNeedsMergeComboNeedsMergeEmpty, "10372401") {
+    auto opCtx = makeOperationContext();
+    AddCmdTestCase{.needsSortedMerge = true}.makeExpCtx(opCtx.get());
 }
 
 }  // namespace

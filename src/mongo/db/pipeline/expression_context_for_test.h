@@ -177,7 +177,10 @@ public:
               .runtimeConstants = request.getLegacyRuntimeConstants(),
               .letParameters = request.getLet(),
               .fromRouter = aggregation_request_helper::getFromRouter(request),
-              .needsMerge = request.getNeedsMerge(),
+              .mergeType = request.getNeedsMerge()
+                  ? (request.getNeedsSortedMerge() ? MergeType::sortedMerge
+                                                   : MergeType::unsortedMerge)
+                  : MergeType::noMerge,
               .forPerShardCursor = request.getPassthroughToShard().has_value(),
               .allowDiskUse = request.getAllowDiskUse().value_or(false),
               .bypassDocumentValidation = request.getBypassDocumentValidation().value_or(false),

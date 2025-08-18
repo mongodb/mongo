@@ -257,6 +257,12 @@ commands:
                 description: "True if this request represents the shards part of a split pipeline, and should produce mergeable output."
                 type: optionalBool
                 stability: internal
+            needsSortedMerge:
+                description:
+                    "True if this request requires this node to produce documents with a $sortKey populated.
+                    Set by the router when the router will be merging sorted streams from the shards."
+                type: optionalBool
+                stability: internal
             fromMongos:
                 description: "True if this request originated from a mongoS."
                 type: optionalBool
