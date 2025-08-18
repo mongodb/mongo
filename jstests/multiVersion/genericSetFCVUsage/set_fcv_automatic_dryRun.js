@@ -107,12 +107,29 @@ function testFailureWithSkipDryRun(conn, shardConn, failPointName, expectedError
         skipDryRun: true,
         confirm: true,
     });
-
     assert.commandFailedWithCode(skipDryRunFailResult, expectedError);
+
     checkFCV(db, lastLTSFCV, lastLTSFCV);  // if dryRun is skipped and an error is raised, the FCV
                                            // remains in a transitional downgrading state.
 
+    // If the user runs an explicit dryRun at this point, an error will be thrown and their FCV
+    // stays in the transitional state
+    assert.commandFailedWithCode(db.runCommand({
+        setFeatureCompatibilityVersion: lastLTSFCV,
+        dryRun: true,
+        confirm: true,
+    }),
+                                 expectedError);
+    checkFCV(db, lastLTSFCV, lastLTSFCV);
+
     failpoint.off();
+
+    // If the user runs an explicit dryRun at this point, it will succeed but still keep the FCV in
+    // the transitional state
+    assert.commandWorked(
+        db.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, dryRun: true, confirm: true}));
+    checkFCV(db, lastLTSFCV, lastLTSFCV);
+
     jsTestLog("SkipDryRun tests completed successfully.");
 
     // Reset FCV to latestFCV for consistency across tests

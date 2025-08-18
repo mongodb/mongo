@@ -1007,6 +1007,7 @@ private:
                                             const FCV requestedVersion,
                                             const FCV originalVersion) {
 
+        invariant(!ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(originalVersion));
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
         if (MONGO_unlikely(failUpgradeValidationDueToIncompatibleFeature.shouldFail())) {
@@ -1289,6 +1290,7 @@ private:
                                               const FCV requestedVersion,
                                               const FCV originalVersion) {
 
+        invariant(!ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(originalVersion));
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
         if (MONGO_unlikely(failDowngradeValidationDueToIncompatibleFeature.shouldFail())) {
@@ -1956,15 +1958,20 @@ private:
                        const SetFeatureCompatibilityVersion& request,
                        FCV requestedVersion,
                        FCV actualVersion) {
+
+        // Derive the original version if the actual version is in a transitional state.
+        const FCV originalVersion = multiversion::isStandardFCV(actualVersion)
+            ? actualVersion
+            : multiversion::getTransitionFCVInfo(actualVersion).from;
         LOGV2(10710700,
               "Executing dry-run validation of setFeatureCompatibilityVersion command",
               "requestedVersion"_attr = requestedVersion,
               "actualVersion"_attr = actualVersion);
 
         if (requestedVersion > actualVersion) {
-            _userCollectionsUassertsForUpgrade(opCtx, requestedVersion, actualVersion);
+            _userCollectionsUassertsForUpgrade(opCtx, requestedVersion, originalVersion);
         } else if (requestedVersion < actualVersion) {
-            _userCollectionsUassertsForDowngrade(opCtx, requestedVersion, actualVersion);
+            _userCollectionsUassertsForDowngrade(opCtx, requestedVersion, originalVersion);
         }
 
         auto role = ShardingState::get(opCtx)->pollClusterRole();
