@@ -190,3 +190,8 @@ feature_flags:
         cpp_varname: gFeatureFlagMandatoryAuthzChecks
         default: false
         fcv_gated: false
+    featureFlagSupportOverloadRetryability:
+        description: "Feature flag to enable support overload retryability in server-based clients"
+        cpp_varname: gFeatureFlagSupportOverloadRetryability
+        default: false
+        fcv_gated: false
