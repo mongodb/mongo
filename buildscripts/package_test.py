@@ -540,6 +540,22 @@ def validate_top_level_directory(tar_name: str):
     if all(os_arch not in top_level_directory for os_arch in VALID_TAR_DIRECTORY_ARCHITECTURES):
         raise Exception(f"Found an unexpected os-arch pairing as the top level directory. Top level directory: {top_level_directory}")
 
+def validate_enterprise(sources_text, edition, binfile):
+    if edition != "enterprise" and edition != "atlas":
+        if "src/mongo/db/modules/enterprise" in sources_text:
+            raise Exception(f"Found enterprise code in {edition} binary {binfile}.")
+    else:
+        if "src/mongo/db/modules/enterprise" not in sources_text:
+            raise Exception(f"Failed to find enterprise code in {edition} binary {binfile}.")
+
+def validate_atlas(sources_text, edition, binfile):
+    if edition != "atlas":
+        if "/modules/atlas/" in sources_text:
+            raise Exception(f"Found atlas code in {edition} binary {binfile}.")
+    else:
+        if "/modules/enterprise/" not in sources_text:
+            raise Exception(f"Failed to find atlas code in {edition} binary {binfile}.")
+
 arches: Set[str] = set()
 oses: Set[str] = set()
 editions: Set[str] = set()
@@ -686,20 +702,6 @@ if args.command == "branch":
                 "Checking the source files used to build the binaries, use --skip-enterprise-check to skip this check."
             )
 
-            if args.edition != "enterprise":
-                exception_msg = "Found enterprise code in non-enterprise binary {binfile}."
-
-                def validate_binaries(sources_text):
-                    return "src/mongo/db/modules/enterprise" not in sources_text
-            else:
-                exception_msg = "Failed to find enterprise code in enterprise binary {binfile}."
-
-                def validate_binaries(sources_text):
-                    return "src/mongo/db/modules/enterprise" in sources_text
-                
-            def validate_atlas_binaries(sources_text):
-                    return "src/mongo/db/modules/atlas" not in sources_text
-
             os.makedirs("dist-test", exist_ok=True)
 
             tar = tarfile.open("mongo-binaries.tgz", "r:gz")
@@ -741,10 +743,9 @@ if args.command == "branch":
                 )
                 output_text = p.stdout + p.stderr
                 logging.info(output_text)
-                if not validate_binaries(output_text):
-                    raise Exception(exception_msg.format(binfile=binfile))
-                if not validate_atlas_binaries(output_text):
-                    raise Exception(f"Found atlas code in release binary {binfile}.")
+                
+                validate_enterprise(output_text, args.edition, binfile)
+                validate_atlas(output_text, args.edition, binfile)
 
                 if p.returncode != 0:
                     raise Exception("GDB process exited non-zero!")
