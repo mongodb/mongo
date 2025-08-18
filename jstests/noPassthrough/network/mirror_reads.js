@@ -18,6 +18,17 @@ const kCollName = "coll";
 // much time as possible to increment.
 const kLargeMaxTimeMS = 100000000;
 
+/* Verify that setting mirrorReads parameter on a standalone logs a warning. */
+{
+    const conn = MongoRunner.runMongod({setParameter: "mirrorReads={samplingRate: 0.0}"});
+    const message = "Setting the mirrorReads server parameter on a standalone has no effect.";
+    checkLog.containsWithCount(conn, message, 1);
+
+    conn.adminCommand({setParameter: 1, mirrorReads: {samplingRate: 0.5}});
+    checkLog.containsWithCount(conn, message, 2);
+    MongoRunner.stopMongod(conn);
+}
+
 /* Verify mirror reads behavior for various commands. */
 {
     const rst = new ReplSetTest({

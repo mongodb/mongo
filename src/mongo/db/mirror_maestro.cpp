@@ -541,12 +541,19 @@ auto& gMirroredReadsSection = *ServerStatusSectionBuilder<MirroredReadsSection>(
                                    std::string{MirrorMaestro::kServerStatusSectionName})
                                    .forShard();
 
+Atomic<bool> isMirrorReadsSet = false;
+void warnMirrorReadsSetOnStandalone() {
+    LOGV2_WARNING(10744100,
+                  "Setting the mirrorReads server parameter on a standalone has no effect.");
+}
+
 auto parseMirroredReadsParameters(const BSONObj& obj) {
     IDLParserContext ctx("mirrorReads");
     return MirroredReadsParameters::parse(ctx, obj);
 }
 
 Status setMirrorReadsParameter(const BSONObj& param) try {
+    isMirrorReadsSet.store(true);
     auto serverParam = ServerParameterSet::getNodeParameterSet()->get<MirroredReadsServerParameter>(
         kMirroredReadsParamName);
     serverParam->_data = parseMirroredReadsParameters(param);
@@ -558,8 +565,8 @@ Status setMirrorReadsParameter(const BSONObj& param) try {
     auto service = getGlobalServiceContext();
     auto& impl = getMirrorMaestroImpl(service);
     if (!impl.isInitialized()) {
-        // It's okay to early return since MirrorMaestroImpl initialization will call
-        // updateMirroringOptions with the new value we just set.
+        // If impl is not initialized and ServiceContext exists, then we must be on a standalone.
+        warnMirrorReadsSetOnStandalone();
         return Status::OK();
     }
     impl.updateMirroringOptions(serverParam->_data.get());
@@ -598,6 +605,9 @@ void MirrorMaestro::init(ServiceContext* serviceContext) {
     invariant(replCoord);
     if (!replCoord->getSettings().isReplSet()) {
         // We only need a maestro if we're in a replica set
+        if (isMirrorReadsSet.load()) {
+            warnMirrorReadsSetOnStandalone();
+        }
         return;
     }
 
