@@ -237,10 +237,11 @@ void OplogCapMaintainerThread::_run() {
                     AutoGetOplogFastPathOptions{.skipRSTLLock = true,
                                                 .explicitIntent =
                                                     rss::consensus::IntentRegistry::Intent::Read});
-                const auto& oplogCollection = oplogRead->getCollection();
-                rs = oplogCollection->getRecordStore();
-                if (rs) {
-                    return;
+                const auto& oplog = oplogRead->getCollection();
+
+                if (oplog) {
+                    rs = oplog->getRecordStore();
+                    break;
                 }
                 // Wait a bit to give the oplog a chance to be created.
                 MONGO_IDLE_THREAD_BLOCK;
