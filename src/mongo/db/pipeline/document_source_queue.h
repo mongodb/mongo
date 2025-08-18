@@ -34,7 +34,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
@@ -45,8 +44,6 @@
 #include <set>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -60,7 +57,7 @@ namespace mongo {
  * This stage can also be useful to adapt the usual pull-based model of a pipeline to more of a
  * push-based model by pushing documents to feed through the pipeline into this queue stage.
  */
-class DocumentSourceQueue : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceQueue : public DocumentSource {
 public:
     using DeferredQueue = DeferredFn<std::deque<GetNextResult>>;
 
@@ -160,9 +157,6 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 protected:
-    // Documents are always returned starting from the front.
-    GetNextResult doGetNext() override;
-
     DeferredQueue _queue;
 
     // An optional alias name is provided for cases like $documents where we want an error message
@@ -176,6 +170,9 @@ protected:
     // An optional 'StageConstraints' override useful for cases such as '$indexStats' where fine
     // grained over the constraints are needed.
     boost::optional<StageConstraints> _constraintsOverride = boost::none;
+
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceQueueToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
 };
 
 }  // namespace mongo

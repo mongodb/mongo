@@ -77,7 +77,6 @@ DocumentSourceQueue::DocumentSourceQueue(DocumentSourceQueue::DeferredQueue resu
                                          boost::optional<Value> serializeOverride,
                                          boost::optional<StageConstraints> constraintsOverride)
     : DocumentSource(kStageName /* pass the real stage name here for execution stats */, expCtx),
-      exec::agg::Stage(kStageName, expCtx),
       _queue(std::move(results)),
       _stageNameOverride(std::move(stageNameOverride)),
       _serializeOverride(std::move(serializeOverride)),
@@ -85,16 +84,6 @@ DocumentSourceQueue::DocumentSourceQueue(DocumentSourceQueue::DeferredQueue resu
 
 const char* DocumentSourceQueue::getSourceName() const {
     return _stageNameOverride.value_or(kStageName).data();
-}
-
-DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
-    if (_queue->empty()) {
-        return GetNextResult::makeEOF();
-    }
-
-    auto next = std::move(_queue->front());
-    _queue->pop_front();
-    return next;
 }
 
 Value DocumentSourceQueue::serialize(const SerializationOptions& opts) const {

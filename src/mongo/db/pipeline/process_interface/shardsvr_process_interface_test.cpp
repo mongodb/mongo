@@ -32,13 +32,12 @@
 #include "mongo/base/shim.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/queue_stage.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/index/index_constants.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
@@ -97,8 +96,8 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
     expCtx()->getOperationContext()->setWriteConcern(wco);
 
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
-    auto queue = DocumentSourceQueue::create(expCtx());
-    stage->setSource(queue.get());
+    auto queueStage = exec::agg::buildStage(DocumentSourceQueue::create(expCtx()));
+    stage->setSource(queueStage.get());
 
     auto future = launchAsync([&] { ASSERT_TRUE(stage->getNext().isEOF()); });
 

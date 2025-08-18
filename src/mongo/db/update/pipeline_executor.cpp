@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
+#include "mongo/db/exec/agg/queue_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/mutable_bson/element.h"
@@ -116,8 +117,9 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
 
 UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParams) const {
     const auto originalDoc = applyParams.element.getDocument().getObject();
-
-    DocumentSourceQueue* queueStage = static_cast<DocumentSourceQueue*>(_pipeline->peekFront());
+    auto* queueStage =
+        dynamic_cast<exec::agg::QueueStage*>(_execPipeline->getStages().front().get());
+    tassert(10817001, "expected the first stage in the pipeline to be a QueueStage", queueStage);
     queueStage->emplace_back(Document{originalDoc});
 
     const auto transformedDoc = _execPipeline->getNext()->toBson();

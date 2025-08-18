@@ -44,6 +44,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/queue_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -97,6 +98,11 @@ namespace {
 // Use this new name to register these tests under their own unit test suite.
 using ShardedUnionTest = ShardedAggTestFixture;
 
+boost::intrusive_ptr<exec::agg::Stage> makeQueueStage(
+    boost::intrusive_ptr<ExpressionContext> expCtx) {
+    return exec::agg::buildStage(DocumentSourceQueue::create(expCtx));
+}
+
 TEST_F(ShardedUnionTest, RetriesSubPipelineOnNetworkError) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
@@ -107,7 +113,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnNetworkError) {
     auto unionWith = exec::agg::buildStage(
         make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
-    auto queue = DocumentSourceQueue::create(expCtx());
+    auto queue = makeQueueStage(expCtx());
     unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, "unionResult"_sd}};
@@ -146,7 +152,7 @@ TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
     auto unionWith = exec::agg::buildStage(
         make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
-    auto queue = DocumentSourceQueue::create(expCtx());
+    auto queue = makeQueueStage(expCtx());
     unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
@@ -197,7 +203,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     auto unionWith = exec::agg::buildStage(
         make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
-    auto queue = DocumentSourceQueue::create(expCtx());
+    auto queue = makeQueueStage(expCtx());
     unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, "unionResult"_sd}};
@@ -281,7 +287,7 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     auto unionWith = exec::agg::buildStage(
         make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
-    auto queue = DocumentSourceQueue::create(expCtx());
+    auto queue = makeQueueStage(expCtx());
     unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
@@ -380,7 +386,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     auto unionWith = exec::agg::buildStage(
         make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
-    auto queue = DocumentSourceQueue::create(expCtx());
+    auto queue = makeQueueStage(expCtx());
     unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
@@ -459,7 +465,7 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
     auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx());
     auto unionWithStage = exec::agg::buildStage(unionWith);
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
-    auto queue = DocumentSourceQueue::create(expCtx());
+    auto queue = makeQueueStage(expCtx());
     unionWithStage->setSource(queue.get());
 
     NamespaceString expectedBackingNs(kTestAggregateNss);
@@ -556,7 +562,7 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
     auto unionWith = exec::agg::buildStage(
         make_intrusive<DocumentSourceUnionWith>(expCtx(), std::move(pipeline)));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
-    auto queue = DocumentSourceQueue::create(expCtx());
+    auto queue = makeQueueStage(expCtx());
     unionWith->setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 2}};
