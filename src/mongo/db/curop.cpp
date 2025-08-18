@@ -50,6 +50,7 @@
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/stats/timer_stats.h"
@@ -88,10 +89,78 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
-
 namespace {
-
 auto& oplogGetMoreStats = *MetricBuilder<TimerStats>("repl.network.oplogGetMoresProcessed");
+
+// Server operations are expected to regularly call OperationContext::checkForInterrupt() to see
+// whether they have been killed and should halt execution. These counters track how many interrupt
+// checks occur, over all operations, as well as information about overdue interrupt checks.
+
+// Total interrupt checks across all operations, regardless of sampling.
+auto& totalInterruptChecks = *MetricBuilder<Counter64>("operation.interrupt.totalChecks");
+
+// Counts how many operations participated in interrupt check tracking.
+auto& numSampledOps = *MetricBuilder<Counter64>("operation.interrupt.sampledOps");
+
+// Accumulates total number of interrupt checks across all sampled operations.
+auto& totalInterruptChecksFromSampledOps =
+    *MetricBuilder<Counter64>("operation.interrupt.checksFromSample");
+
+// Counts how many sampled operations had at least one overdue interrupt check.
+auto& opsWithOverdueInterruptCheck =
+    *MetricBuilder<Counter64>("operation.interrupt.overdueOpsFromSample");
+
+// Counts total number of overdue interrupt checks across all sampled operations.
+auto& overdueInterruptChecks =
+    *MetricBuilder<Counter64>("operation.interrupt.overdueChecksFromSample");
+
+// Computes total time overdue for interrupt checks across sampled operations.
+auto& overdueInterruptTotalTimeMillis =
+    *MetricBuilder<Counter64>("operation.interrupt.overdueInterruptTotalMillisFromSample");
+
+// Approximate max time any sampled operation was overdue for interrupt check.
+auto& overdueInterruptApproxMaxTimeMillis =
+    *MetricBuilder<Atomic64Metric>("operation.interrupt.overdueInterruptApproxMaxMillisFromSample");
+
+/*
+ * Helper for reporting stats on an operation that was sampled for interrupt check tracking.
+ */
+void reportCheckForInterruptSampledOperation(
+    int64_t numInterruptChecks, const OperationContext::OverdueInterruptCheckStats& stats) {
+    totalInterruptChecksFromSampledOps.increment(numInterruptChecks);
+    numSampledOps.increment();
+
+    if (stats.overdueInterruptChecks > 0) {
+        opsWithOverdueInterruptCheck.increment();
+
+        overdueInterruptChecks.increment(stats.overdueInterruptChecks);
+        overdueInterruptTotalTimeMillis.increment(
+            durationCount<Milliseconds>(stats.overdueAccumulator));
+
+        // Note that if we wanted the exact maximum, we would use a CAS loop, since it's possible a
+        // new maximum will be entered between the set() and get() here. The approximate maximum is
+        // good enough though.
+        overdueInterruptApproxMaxTimeMillis.set(
+            std::max(overdueInterruptApproxMaxTimeMillis.get(),
+                     static_cast<int64_t>(durationCount<Milliseconds>(stats.overdueMaxTime))));
+    }
+}
+
+/*
+ * Helper for reporting stats on checkForInterrupt(), for any operation.
+ */
+void reportCheckForInterruptStats(OperationContext* opCtx) {
+    const int64_t numInterruptChecks = opCtx->numInterruptChecks();
+    totalInterruptChecks.increment(numInterruptChecks);
+
+    if (auto* stats = opCtx->overdueInterruptCheckStats()) {
+        // We treat this as a "last interrupt check," though we don't actually check for
+        // interrupt since the operation is completing anyways.
+        opCtx->updateInterruptCheckCounters();
+
+        reportCheckForInterruptSampledOperation(numInterruptChecks, *stats);
+    }
+}
 
 BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
                                          const BSONObj& cmdObj,
@@ -116,6 +185,13 @@ void incrementQueueStats(TicketHolder* ticketHolder,
         Milliseconds(stats.maxAcquisitionDelinquencyMillis.loadRelaxed()));
 }
 }  // namespace
+
+Counter64& CurOp::totalInterruptChecks_forTest() {
+    return totalInterruptChecks;
+}
+Counter64& CurOp::opsWithOverdueInterruptCheck_forTest() {
+    return opsWithOverdueInterruptCheck;
+}
 
 /**
  * This type decorates a Client object with a stack of active CurOp objects.
@@ -347,8 +423,9 @@ void CurOp::setGenericCursor(WithLock, GenericCursor gc) {
 }
 
 CurOp::~CurOp() {
-    if (parent() != nullptr)
+    if (parent() != nullptr) {
         parent()->yielded(_numYields.load());
+    }
     invariant(!_stack || this == _stack->pop());
 }
 
@@ -541,7 +618,18 @@ TickSource::Tick CurOp::startTime() {
     // additional check that writes to '_start' never race.
     TickSource::Tick unassignedStart = 0;
     invariant(_start.compare_exchange_strong(unassignedStart, _tickSource->getTicks()));
-    return _start.load();
+
+    TickSource::Tick startTime = _start.load();
+
+    // For top level operations, we decide whether or not to sample this operation for interrupt
+    // tracking.
+    if (gFeatureFlagRecordDelinquentMetrics.isEnabled() && !parent() &&
+        opCtx()->getClient()->getPrng().nextCanonicalDouble() <
+            gOverdueInterruptCheckSamplingRate.loadRelaxed()) {
+        opCtx()->trackOverdueInterruptChecks(startTime);
+    }
+
+    return startTime;
 }
 
 void CurOp::done() {
@@ -656,6 +744,13 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
             incrementQueueStats(manager->getTicketHolder(LockMode::MODE_IX),
                                 admCtx.writeDelinquencyStats());
         }
+    }
+
+    // For the top-level operation which was chosen for sampling, update the server status
+    // counters. We don't want to double count overdue interrupt checks that come from child
+    // operations in the serverStatus counters.
+    if (!parent()) {
+        reportCheckForInterruptStats(opCtx);
     }
 
     // Do not log the slow query information if asked to omit it

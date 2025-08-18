@@ -30,11 +30,13 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/operation_context_options_gen.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
@@ -505,6 +507,159 @@ TEST_F(CurOpStatsTest, CheckAdmissionQueueStats) {
 
     ASSERT_BSONOBJ_EQ(currentQueue, expectedCurrentQueue);
     ASSERT_BSONOBJ_EQ_UNORDERED(queueStats, expectedQueueStats);
+}
+
+TEST(CurOpTest, DelinquentInterruptChecksNotDoubleCounted) {
+    RAIIServerParameterControllerForTest enableDelinquentTracking(
+        "featureFlagRecordDelinquentMetrics", true);
+    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
+                                                               1);
+
+    QueryTestServiceContext serviceContext;
+
+    auto& totalInterruptChecks = CurOp::totalInterruptChecks_forTest();
+    const auto interruptChecksAtStart = totalInterruptChecks.get();
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    curop->ensureStarted();
+
+    const Milliseconds interval{gOverdueInterruptCheckIntervalMillis.load()};
+
+    serviceContext.tickSource()->advance(interval * 2);
+    opCtx->checkForInterrupt();
+
+    // Now push another operation onto the curop stack.
+    {
+        CurOp subOp;
+        subOp.push(opCtx.get());
+
+        for (size_t i = 0; i < 10; ++i) {
+            serviceContext.tickSource()->advance(interval * 10);
+            opCtx->checkForInterrupt();
+        }
+
+        subOp.completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
+    }
+
+    curop->done();
+    curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
+
+    ASSERT_EQ(totalInterruptChecks.get() - interruptChecksAtStart, 11);
+}
+
+TEST(CurOpTest, OpWhichNeverChecksForInterruptBumpsDelinquentCounter) {
+    RAIIServerParameterControllerForTest enableDelinquentTracking(
+        "featureFlagRecordDelinquentMetrics", true);
+    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
+                                                               1);
+
+    QueryTestServiceContext serviceContext;
+
+    auto& opsWithOverdueInterruptCheck = CurOp::opsWithOverdueInterruptCheck_forTest();
+    const auto overdueOpsAtStart = opsWithOverdueInterruptCheck.get();
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    curop->setTickSource_forTest(serviceContext.tickSource());
+    curop->ensureStarted();
+
+    // OpCtx should be set up to track interrupts.
+    ASSERT(opCtx->overdueInterruptCheckStats());
+
+    // The operation never checks for interrupt. It should still be marked as overdue though.
+    const Milliseconds interval{gOverdueInterruptCheckIntervalMillis.load()};
+    serviceContext.tickSource()->advance(interval * 2);
+
+    curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
+    ASSERT_EQ(opCtx->overdueInterruptCheckStats()->overdueInterruptChecks, 1);
+
+    ASSERT_EQ(opsWithOverdueInterruptCheck.get() - overdueOpsAtStart, 1);
+}
+
+TEST(CurOpTest, InterruptChecksSamplingRespectsFeatureFlag) {
+    // When the feature flag is set to false, we should never sample an operation, even if the
+    // sampling rate is set to 1.0
+    RAIIServerParameterControllerForTest disableDelinquentTracking(
+        "featureFlagRecordDelinquentMetrics", false);
+    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
+                                                               1);
+
+    QueryTestServiceContext serviceContext;
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    curop->ensureStarted();
+    opCtx->checkForInterrupt();
+
+    // Simulate advancing the mock clock.
+    const Milliseconds interval{gOverdueInterruptCheckIntervalMillis.load()};
+    serviceContext.tickSource()->advance(interval * 5);
+
+    // Verify that delinquent stats are not recorded due to the feature flag being disabled.
+    ASSERT(!opCtx->overdueInterruptCheckStats());
+    ASSERT_EQ(opCtx->numInterruptChecks(), 1);
+}
+
+TEST(CurOpTest, InterruptCheckTrackingWithSamplingRateZero) {
+    RAIIServerParameterControllerForTest enableDelinquentTracking(
+        "featureFlagRecordDelinquentMetrics", true);
+    // When the sampling rate is 0, an operation should not track interrupts, but should
+    // otherwise behave normally.
+    RAIIServerParameterControllerForTest neverTrackInterrupts("overdueInterruptCheckSamplingRate",
+                                                              0);
+
+    QueryTestServiceContext serviceContext;
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    curop->ensureStarted();
+    opCtx->checkForInterrupt();
+
+    // Simulate advancing the mock clock.
+    const Milliseconds interval{gOverdueInterruptCheckIntervalMillis.load()};
+    serviceContext.tickSource()->advance(interval * 5);
+
+    // Verify that overdue interrupt check stats are not tracked due to sampling rate being 0.
+    ASSERT(!opCtx->overdueInterruptCheckStats());
+    ASSERT_EQ(opCtx->numInterruptChecks(), 1);
+}
+
+TEST(CurOpTest, InterruptCheckTrackingIsSampled) {
+    RAIIServerParameterControllerForTest enableDelinquentTracking(
+        "featureFlagRecordDelinquentMetrics", true);
+    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
+                                                               1.0 / 1000.0);
+
+    QueryTestServiceContext serviceContext;
+
+    size_t iters = 0;
+    size_t nSampled = 0;
+
+    do {
+        auto opCtx = serviceContext.makeOperationContext();
+        auto curop = CurOp::get(*opCtx);
+
+        curop->ensureStarted();
+        opCtx->checkForInterrupt();
+
+        if (opCtx->overdueInterruptCheckStats()) {
+            // Found an operation which was sampled.
+            nSampled++;
+            break;
+        }
+
+        ++iters;
+    } while (iters < 100'000);
+
+    // If this assertion fails, it means none of the CurOps we generated were selected
+    // for sampling. This should be statistically impossible (around 1 in 10^44) assuming
+    // 1 in 1000 ops gets randomly sampled, and indicates there's likely a problem
+    // with the sampling mechanism (or you are very unlucky).
+    ASSERT_GT(nSampled, 0);
 }
 
 }  // namespace

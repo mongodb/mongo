@@ -47,34 +47,46 @@ function assertDelinquentStats(metrics, count, msg, previousOperationMetrics) {
     }
 }
 
+function assertNoOverdueOps(operationMetrics, previousOperationMetrics) {
+    assert.eq(operationMetrics.sampledOps, previousOperationMetrics.sampledOps, operationMetrics);
+    assert.eq(operationMetrics.checksFromSample,
+              previousOperationMetrics.checksFromSample,
+              operationMetrics);
+    assert.eq(operationMetrics.overdueOpsFromSample,
+              previousOperationMetrics.overdueOpsFromSample,
+              operationMetrics);
+    assert.eq(operationMetrics.overdueChecksFromSample,
+              previousOperationMetrics.overdueChecksFromSample,
+              operationMetrics);
+    assert.eq(operationMetrics.overdueInterruptTotalMillisFromSample,
+              previousOperationMetrics.overdueInterruptTotalMillisFromSample,
+              operationMetrics);
+    assert.eq(operationMetrics.overdueInterruptApproxMaxMillisFromSample,
+              previousOperationMetrics.overdueInterruptApproxMaxMillisFromSample,
+              operationMetrics);
+}
+
 function assertOverdueOps(operationMetrics, previousOperationMetrics) {
-    if (previousOperationMetrics) {
-        function errorString() {
-            return "Operation metrics before overdue op: " + tojson(previousOperationMetrics) +
-                " Most recent operation metrics " + tojson(operationMetrics);
-        }
-        assert.gt(operationMetrics.totalInterruptChecks,
-                  previousOperationMetrics.totalInterruptChecks,
-                  errorString);
-        assert.gt(operationMetrics.overdueInterruptOps,
-                  previousOperationMetrics.overdueInterruptOps,
-                  errorString);
-        assert.gt(operationMetrics.overdueInterruptChecks,
-                  previousOperationMetrics.overdueInterruptChecks,
-                  errorString);
-        assert.gt(operationMetrics.overdueInterruptTotalMillis,
-                  previousOperationMetrics.overdueInterruptTotalMillis,
-                  errorString);
-        assert.gte(operationMetrics.overdueInterruptApproxMaxMillis,
-                   previousOperationMetrics.overdueInterruptApproxMaxMillis,
-                   errorString);
-    } else {
-        assert.gte(operationMetrics.totalInterruptChecks, 0, operationMetrics);
-        assert.eq(operationMetrics.overdueInterruptOps, 0, operationMetrics);
-        assert.eq(operationMetrics.overdueInterruptChecks, 0, operationMetrics);
-        assert.eq(operationMetrics.overdueInterruptTotalMillis, 0, operationMetrics);
-        assert.eq(operationMetrics.overdueInterruptApproxMaxMillis, 0, operationMetrics);
+    const interruptMetrics = operationMetrics.interrupt;
+    const previousInterruptMetrics = previousOperationMetrics.interrupt;
+
+    function errorString() {
+        return {metricsBefore: previousInterruptMetrics, metricsAfter: operationMetrics};
     }
+    assert.gt(
+        interruptMetrics.checksFromSample, previousInterruptMetrics.checksFromSample, errorString);
+    assert.gt(interruptMetrics.overdueOpsFromSample,
+              previousInterruptMetrics.overdueOpsFromSample,
+              errorString);
+    assert.gt(interruptMetrics.overdueChecksFromSample,
+              previousInterruptMetrics.overdueChecksFromSample,
+              errorString);
+    assert.gt(interruptMetrics.overdueInterruptTotalMillisFromSample,
+              previousInterruptMetrics.overdueInterruptTotalMillisFromSample,
+              errorString);
+    assert.gte(interruptMetrics.overdueInterruptApproxMaxMillisFromSample,
+               previousInterruptMetrics.overdueInterruptApproxMaxMillisFromSample,
+               errorString);
 }
 
 function testDelinquencyOnRouter(routerDb) {
@@ -95,7 +107,7 @@ function testDelinquencyOnRouter(routerDb) {
 
     assert.eq(routerDb.testColl.find().comment(findComment).itcount(), 4);
 
-    // Ensure that serverStatus indicates a find() was run.Add commentMore actions
+    // Ensure that serverStatus indicates a find() was run.
     {
         const serverStatus = routerDb.serverStatus();
         const findMetrics = serverStatus.metrics.commands["find"];
@@ -103,8 +115,7 @@ function testDelinquencyOnRouter(routerDb) {
     }
 
     const serverStatus = routerDb.serverStatus();
-    // TODO: SERVER-104007 Add back this assertion
-    // assertOverdueOps(serverStatus.metrics.operation, previousOperationMetrics);
+    assertOverdueOps(serverStatus.metrics.operation, previousOperationMetrics);
 
     failPoint.off();
 }
@@ -204,8 +215,8 @@ function testDelinquencyOnShard(routerDb, shardDb) {
 
     {
         const serverStatus = shardDb.serverStatus();
-        // TODO: SERVER-104007 Add back this assertion
-        // assertOverdueOps(serverStatus.metrics.operation, previousOperationMetrics);
+        assertOverdueOps(serverStatus.metrics.operation,
+                         previousOperationMetrics.metrics.operation);
     }
 
     failPoint.off();
@@ -283,12 +294,13 @@ function runTest(routerDb, shardDb) {
 
     // Run a ping() command that we don't expect to be overdue.Add commentMore actions
     {
+        const previousOperationMetrics = routerDb.serverStatus().metrics.operation;
+
         const pingResult = routerDb.getSiblingDB('admin').runCommand({ping: 1});
         assert.commandWorked(pingResult, "Ping command failed");
 
         const serverStatus = routerDb.serverStatus();
-        // TODO: SERVER-104007 Add back this assertion
-        // assertOverdueOps(serverStatus.metrics.operation, null);
+        assertNoOverdueOps(serverStatus.metrics.operation, previousOperationMetrics);
 
         // TODO SERVER-104009: Once we have per-command information, we can also make an assertion
         // about the ping command not being overdue.
@@ -313,7 +325,9 @@ const startupParameters = {
     featureFlagRecordDelinquentMetrics: true,
     delinquentAcquisitionIntervalMillis: delinquentIntervalMs,
     internalQueryStatsRateLimit: -1,
-    overdueInterruptCheckIntervalMillis: delinquentIntervalMs * 100,
+
+    overdueInterruptCheckIntervalMillis: delinquentIntervalMs,
+    overdueInterruptCheckSamplingRate: 1.0,  // For this test we sample 100% of the time.
 };
 
 {

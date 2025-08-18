@@ -141,6 +141,24 @@ class OperationContext final : public OperationContextBase,
     OperationContext& operator=(const OperationContext&) = delete;
 
 public:
+    /**
+     * Used for tracking information about checkForInterrupt() calls that are overdue. This is only
+     * used for a small sample of operations to avoid regressing performance.
+     *
+     * TODO: SERVER-105801 we should consider moving this information up to Interruptible.
+     */
+    struct OverdueInterruptCheckStats {
+        int64_t overdueInterruptChecks{0};
+
+        // Sum and max time an operation was overdue in checking for interrupts.
+        Milliseconds overdueAccumulator{0};
+        Milliseconds overdueMaxTime{0};
+
+        // We only collect interrupt check stats for a small fraction of operations. For this sample
+        // we can afford to read the TickSource each checkForInterrupt() call.
+        TickSource::Tick interruptCheckWindowStartTime;
+    };
+
     static constexpr auto kDefaultOperationContextTimeoutError = ErrorCodes::ExceededTimeLimit;
 
     /**
@@ -213,6 +231,16 @@ public:
      * Returns Status::OK() unless this operation is in a killed state.
      */
     Status checkForInterruptNoAssert() noexcept override;
+
+    /**
+     * Updates the counters for tracking overdue interrupts.
+     *
+     * This function may only be called when the operation has opted into tracking interrupts
+     * (check via overdueInterruptCheckStats()). For such operations, this should be called at the
+     * operation's completion to ensure that the time after the final checkForInterrupt() is
+     * accounted for.
+     */
+    void updateInterruptCheckCounters();
 
     /**
      * Returns the service context under which this operation context runs.
@@ -752,6 +780,28 @@ public:
         _killOpsExempt = true;
     }
 
+    /**
+     * Returns number of checkForInterrupts() done on this OperationContext.
+     */
+    int64_t numInterruptChecks() const {
+        return _numInterruptChecks;
+    }
+
+    /**
+     * Begins tracking time between interrupt checks using the given time as the operation start
+     * time. It is an error to call this when already tracking interrupt checks
+     * (overdueInterruptCheckStats() can be used to determine this).
+     */
+    void trackOverdueInterruptChecks(TickSource::Tick startTime);
+
+    /**
+     * Returns pointer to the struct containing interrupt check stats iff this OperationContext is
+     * tracking interrupts. Otherwise returns nullptr.
+     */
+    const OverdueInterruptCheckStats* overdueInterruptCheckStats() const {
+        return _overdueInterruptCheckStats.get();
+    }
+
     // The query sampling options for operations on this opCtx. 'optIn' makes the operations
     // eligible for query sampling regardless of whether the client is considered as internal by
     // the sampler. 'optOut' does the opposite.
@@ -799,6 +849,12 @@ public:
                     prevDeadlineState.deadline, prevDeadlineState.maxTime, prevDeadlineState.error);
                 _hasArtificialDeadline = prevDeadlineState.hasArtificialDeadline;
                 _markKilledIfDeadlineRequires();
+
+                // For purposes of tracking overdue interrupts, act as if the moment we left
+                // the ignore state was the last check for interrupt.
+                if (auto* stats = _overdueInterruptCheckStats.get()) {
+                    stats->interruptCheckWindowStartTime = tickSource().getTicks();
+                }
             });
             // Ignore interrupts until the callback completes.
             {
@@ -951,6 +1007,13 @@ private:
 
     // When the operation was marked as killed.
     AtomicWord<TickSource::Tick> _killTime{0};
+
+    // Tracks total number of interrupt checks.
+    int64_t _numInterruptChecks{0};
+
+    // State for tracking overdue interrupt checks. This is only allocated for a small sample of
+    // operations that are randomly selected.
+    std::unique_ptr<OverdueInterruptCheckStats> _overdueInterruptCheckStats;
 
     // Used to cancel all tokens obtained via getCancellationToken() when this OperationContext is
     // killed.

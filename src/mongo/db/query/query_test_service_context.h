@@ -44,7 +44,7 @@ namespace mongo {
 class QueryTestServiceContext {
 public:
     QueryTestServiceContext(std::unique_ptr<TickSourceMock<Nanoseconds>> tickSource =
-                                std::unique_ptr<TickSourceMock<Nanoseconds>>());
+                                std::make_unique<TickSourceMock<Nanoseconds>>());
     ~QueryTestServiceContext();
 
     ServiceContext* getServiceContext() const;
@@ -53,7 +53,12 @@ public:
 
     ServiceContext::UniqueOperationContext makeOperationContext();
 
+    TickSourceMock<Nanoseconds>* tickSource() {
+        return _tickSource;
+    }
+
 private:
+    TickSourceMock<Nanoseconds>* _tickSource;
     ServiceContext::UniqueServiceContext _serviceContext;
     ServiceContext::UniqueClient _client;
 };

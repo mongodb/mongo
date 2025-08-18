@@ -36,6 +36,7 @@
 #include "mongo/db/local_catalog/lock_manager/locker.h"
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/operation_key_manager.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
@@ -78,6 +79,10 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(checkForInterruptFail);
 
 const auto kNoWaiterThread = stdx::thread::id();
+
+Milliseconds interruptCheckPeriod() {
+    return Milliseconds{gOverdueInterruptCheckIntervalMillis.loadRelaxed()};
+}
 }  // namespace
 
 OperationContext::OperationContext(Client* client, OperationId opId)
@@ -214,6 +219,11 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() noexcept {
+    ++_numInterruptChecks;
+    if (_overdueInterruptCheckStats) {
+        updateInterruptCheckCounters();
+    }
+
     if (getClient()->getKilled() && !_isExecutingShutdown) {
         return Status(ErrorCodes::ClientMarkedKilled, "client has been killed");
     }
@@ -258,6 +268,32 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
     }
 
     return Status::OK();
+}
+
+void OperationContext::trackOverdueInterruptChecks(TickSource::Tick startTime) {
+    dassert(!_overdueInterruptCheckStats);
+    _overdueInterruptCheckStats = std::make_unique<OverdueInterruptCheckStats>();
+    _overdueInterruptCheckStats->interruptCheckWindowStartTime = startTime;
+}
+
+void OperationContext::updateInterruptCheckCounters() {
+    const TickSource::Tick now = tickSource().getTicks();
+    const TickSource::Tick prevStart =
+        std::exchange(_overdueInterruptCheckStats->interruptCheckWindowStartTime, now);
+
+    if (_ignoreInterrupts || isWaitingForConditionOrInterrupt()) {
+        // If we're ignoring interrupts or we're in an interruptible wait, we update the time of
+        // the last interrupt check, but we do not bump the overdue counters.
+        return;
+    }
+
+    if (auto overdue = tickSource().ticksTo<Milliseconds>(now - prevStart) - interruptCheckPeriod();
+        overdue > Milliseconds{0}) {
+        auto& stats = *_overdueInterruptCheckStats;
+        ++stats.overdueInterruptChecks;
+        stats.overdueAccumulator += overdue;
+        stats.overdueMaxTime = std::max(stats.overdueMaxTime, overdue);
+    }
 }
 
 void OperationContext::_schedulePeriodicClientConnectedCheck() {

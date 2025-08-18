@@ -141,6 +141,10 @@ public:
     static BSONObj truncateAndSerializeGenericCursor(GenericCursor cursor,
                                                      boost::optional<size_t> maxQuerySize);
 
+    // Convenience helpers for testing metrics that are tracked here.
+    static Counter64& totalInterruptChecks_forTest();
+    static Counter64& opsWithOverdueInterruptCheck_forTest();
+
     /**
      * Pushes this CurOp to the top of the given "opCtx"'s CurOp stack.
      */
@@ -892,5 +896,4 @@ private:
     AtomicWord<int64_t> _inUseTrackedMemoryBytes{0};
     AtomicWord<int64_t> _peakTrackedMemoryBytes{0};
 };
-
 }  // namespace mongo
