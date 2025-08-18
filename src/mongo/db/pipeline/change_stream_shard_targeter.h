@@ -69,7 +69,8 @@ public:
      *   collection/database allocation to shards is not available for the given change stream open
      *   cluster time.
      */
-    virtual ShardTargeterDecision initialize(Timestamp atClusterTime,
+    virtual ShardTargeterDecision initialize(OperationContext* opCtx,
+                                             Timestamp atClusterTime,
                                              ChangeStreamReaderContext& context) = 0;
 
     /**
@@ -95,7 +96,7 @@ public:
      *   unbounded and the change stream must be read in Normal mode.
      */
     virtual std::pair<ShardTargeterDecision, boost::optional<Timestamp>> startChangeStreamSegment(
-        Timestamp atClusterTime, ChangeStreamReaderContext& context) = 0;
+        OperationContext* opCtx, Timestamp atClusterTime, ChangeStreamReaderContext& context) = 0;
 
     /**
      * Processes and reacts to a control change event.
@@ -108,7 +109,8 @@ public:
      * - In Degraded mode requests to open and/or close cursors cannot be made - the set of tracked
      *   shards for a bounded change stream segment is fixed.
      */
-    virtual ShardTargeterDecision handleEvent(const Document& event,
+    virtual ShardTargeterDecision handleEvent(OperationContext* opCtx,
+                                              const Document& event,
                                               ChangeStreamReaderContext& context) = 0;
 };
 

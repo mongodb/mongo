@@ -53,6 +53,7 @@ mongo_cc_unit_test(
         "change_stream_shard_targeter_state_event_handler_mock.h",
         "collection_change_stream_db_absent_state_event_handler_test.cpp",
         "collection_change_stream_db_present_state_event_handler_test.cpp",
+        "collection_change_stream_shard_targeter_impl_test.cpp",
         "control_events_test.cpp",
         "data_to_shards_allocation_query_service_impl_test.cpp",
         "//src/mongo/db/pipeline:change_stream_reader_context_mock.h",

@@ -77,7 +77,7 @@ public:
     }
 
     HistoricalPlacementFetcherMock& fetcher() {
-        return dynamic_cast<HistoricalPlacementFetcherMock&>(_ctx->historicalPlacementFetcher());
+        return dynamic_cast<HistoricalPlacementFetcherMock&>(_ctx->getHistoricalPlacementFetcher());
     }
 
 private:

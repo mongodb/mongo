@@ -53,7 +53,7 @@ public:
     /**
      * Returns a reference to the HistoricalPlacementFetcher associated with this context.
      */
-    virtual HistoricalPlacementFetcher& historicalPlacementFetcher() const = 0;
+    virtual HistoricalPlacementFetcher& getHistoricalPlacementFetcher() const = 0;
 
     /**
      * Sets a new event handler to respond to ChangeStreamShardTargeter control events.

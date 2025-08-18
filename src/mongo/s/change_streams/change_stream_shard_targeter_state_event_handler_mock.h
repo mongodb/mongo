@@ -43,7 +43,7 @@ public:
         std::unique_ptr<HistoricalPlacementFetcherMock> fetcher)
         : _fetcher(std::move(fetcher)) {}
 
-    HistoricalPlacementFetcher& historicalPlacementFetcher() const override {
+    HistoricalPlacementFetcher& getHistoricalPlacementFetcher() const override {
         return *_fetcher;
     }
 
@@ -65,5 +65,44 @@ public:
 
 private:
     std::unique_ptr<HistoricalPlacementFetcherMock> _fetcher;
+};
+
+class ChangeStreamShardTargeterEventHandlerMock
+    : public ChangeStreamShardTargeterStateEventHandler {
+public:
+    struct Call {
+        bool degradedMode;
+        ControlEvent controlEvent;
+
+        bool operator==(const Call& other) const = default;
+    };
+
+    explicit ChangeStreamShardTargeterEventHandlerMock(ShardTargeterDecision normal,
+                                                       ShardTargeterDecision degraded)
+        : normalDecision(normal), degradedDecision(degraded) {}
+
+    ShardTargeterDecision handleEvent(OperationContext*,
+                                      const ControlEvent& e,
+                                      ChangeStreamShardTargeterStateEventHandlingContext&,
+                                      ChangeStreamReaderContext&) override {
+        calls.emplace_back(false, e);
+        ++normalCallCount;
+        return normalDecision;
+    }
+    ShardTargeterDecision handleEventInDegradedMode(
+        OperationContext*,
+        const ControlEvent& e,
+        ChangeStreamShardTargeterStateEventHandlingContext&,
+        ChangeStreamReaderContext&) override {
+        calls.emplace_back(true, e);
+        ++degradedCallCount;
+        return degradedDecision;
+    }
+
+    std::vector<Call> calls;
+    size_t normalCallCount = 0;
+    size_t degradedCallCount = 0;
+    ShardTargeterDecision normalDecision;
+    ShardTargeterDecision degradedDecision;
 };
 }  // namespace mongo

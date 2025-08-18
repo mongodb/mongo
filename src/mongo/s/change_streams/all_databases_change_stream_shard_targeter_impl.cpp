@@ -34,18 +34,18 @@
 namespace mongo {
 
 ShardTargeterDecision AllDatabasesChangeStreamShardTargeterImpl::initialize(
-    Timestamp atClusterTime, ChangeStreamReaderContext& context) {
+    OperationContext* opCtx, Timestamp atClusterTime, ChangeStreamReaderContext& context) {
     MONGO_UNIMPLEMENTED_TASSERT(10783906);
 }
 
 ShardTargeterDecision AllDatabasesChangeStreamShardTargeterImpl::handleEvent(
-    const Document& event, ChangeStreamReaderContext& context) {
+    OperationContext* opCtx, const Document& event, ChangeStreamReaderContext& context) {
     MONGO_UNIMPLEMENTED_TASSERT(10783907);
 }
 
 std::pair<ShardTargeterDecision, boost::optional<Timestamp>>
 AllDatabasesChangeStreamShardTargeterImpl::startChangeStreamSegment(
-    Timestamp atClusterTime, ChangeStreamReaderContext& context) {
+    OperationContext* opCtx, Timestamp atClusterTime, ChangeStreamReaderContext& context) {
     MONGO_UNIMPLEMENTED_TASSERT(10783908);
 }
 

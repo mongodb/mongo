@@ -101,7 +101,7 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
     Timestamp clusterTime,
     ChangeStreamShardTargeterStateEventHandlingContext& ctx,
     ChangeStreamReaderContext& readerCtx) {
-    auto placement = ctx.historicalPlacementFetcher().fetch(
+    auto placement = ctx.getHistoricalPlacementFetcher().fetch(
         opCtx, readerCtx.getChangeStream().getNamespace(), clusterTime);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         return ShardTargeterDecision::kSwitchToV1;

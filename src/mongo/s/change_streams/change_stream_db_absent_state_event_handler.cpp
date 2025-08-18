@@ -48,7 +48,7 @@ ShardTargeterDecision ChangeStreamShardTargeterDbAbsentStateEventHandler::handle
             std::holds_alternative<DatabaseCreatedControlEvent>(event));
     Timestamp clusterTime = std::get<DatabaseCreatedControlEvent>(event).clusterTime;
 
-    auto placement = ctx.historicalPlacementFetcher().fetch(
+    auto placement = ctx.getHistoricalPlacementFetcher().fetch(
         opCtx, readerCtx.getChangeStream().getNamespace(), clusterTime);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         return ShardTargeterDecision::kSwitchToV1;

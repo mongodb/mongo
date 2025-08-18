@@ -37,6 +37,7 @@
 #include "mongo/s/change_streams/collection_change_stream_shard_targeter_impl.h"
 #include "mongo/s/change_streams/control_events.h"
 #include "mongo/s/change_streams/database_change_stream_shard_targeter_impl.h"
+#include "mongo/s/change_streams/historical_placement_fetcher_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/namespace_string_util.h"
@@ -48,12 +49,16 @@ namespace mongo {
 std::unique_ptr<ChangeStreamShardTargeter> ChangeStreamReaderBuilderImpl::buildShardTargeter(
     OperationContext* opCtx, const ChangeStream& changeStream) {
     switch (changeStream.getChangeStreamType()) {
-        case ChangeStreamType::kCollection:
-            return std::make_unique<CollectionChangeStreamShardTargeterImpl>();
-        case ChangeStreamType::kDatabase:
+        case ChangeStreamType::kCollection: {
+            auto fetcher = std::make_unique<HistoricalPlacementFetcherImpl>();
+            return std::make_unique<CollectionChangeStreamShardTargeterImpl>(std::move(fetcher));
+        }
+        case ChangeStreamType::kDatabase: {
             return std::make_unique<DatabaseChangeStreamShardTargeterImpl>();
-        case ChangeStreamType::kAllDatabases:
+        }
+        case ChangeStreamType::kAllDatabases: {
             return std::make_unique<AllDatabasesChangeStreamShardTargeterImpl>();
+        }
     }
 
     MONGO_UNREACHABLE_TASSERT(10719000);

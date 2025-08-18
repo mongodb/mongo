@@ -29,24 +29,73 @@
 
 #include "mongo/s/change_streams/collection_change_stream_shard_targeter_impl.h"
 
+#include "mongo/db/pipeline/change_stream_read_mode.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/s/change_streams/collection_change_stream_db_absent_state_event_handler.h"
+#include "mongo/s/change_streams/collection_change_stream_db_present_state_event_handler.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 ShardTargeterDecision CollectionChangeStreamShardTargeterImpl::initialize(
-    Timestamp atClusterTime, ChangeStreamReaderContext& context) {
-    MONGO_UNIMPLEMENTED_TASSERT(10783900);
+    OperationContext* opCtx, Timestamp atClusterTime, ChangeStreamReaderContext& readerCtx) {
+    auto placement =
+        _fetcher->fetch(opCtx, readerCtx.getChangeStream().getNamespace(), atClusterTime);
+    if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
+        return ShardTargeterDecision::kSwitchToV1;
+    }
+    tassert(10720100,
+            "HistoricalPlacementStatus can not be in the future",
+            placement.getStatus() != HistoricalPlacementStatus::FutureClusterTime);
+
+    if (placement.getShards().empty()) {
+        readerCtx.openCursorOnConfigServer(atClusterTime);
+        setEventHandler(
+            std::make_unique<CollectionChangeStreamShardTargeterDbAbsentStateEventHandler>());
+    } else {
+        stdx::unordered_set<ShardId> activeShardSet(placement.getShards().begin(),
+                                                    placement.getShards().end());
+        readerCtx.openCursorsOnDataShards(atClusterTime, activeShardSet);
+        setEventHandler(
+            std::make_unique<CollectionChangeStreamShardTargeterDbPresentStateEventHandler>());
+    }
+
+    return ShardTargeterDecision::kContinue;
 }
 
 ShardTargeterDecision CollectionChangeStreamShardTargeterImpl::handleEvent(
-    const Document& event, ChangeStreamReaderContext& readerContext) {
-    MONGO_UNIMPLEMENTED_TASSERT(10783901);
+    OperationContext* opCtx, const Document& event, ChangeStreamReaderContext& readerContext) {
+    tassert(10720101,
+            "CollectionChangeStreamShardTargeterImpl::_eventHandler must be present for handling "
+            "control events",
+            _eventHandler);
+
+    auto controlEvent = parseControlEvent(event);
+    return readerContext.inDegradedMode()
+        ? _eventHandler->handleEventInDegradedMode(opCtx, controlEvent, *this, readerContext)
+        : _eventHandler->handleEvent(opCtx, controlEvent, *this, readerContext);
 }
 
 std::pair<ShardTargeterDecision, boost::optional<Timestamp>>
 CollectionChangeStreamShardTargeterImpl::startChangeStreamSegment(
-    Timestamp atClusterTime, ChangeStreamReaderContext& context) {
+    OperationContext* opCtx, Timestamp atClusterTime, ChangeStreamReaderContext& context) {
     MONGO_UNIMPLEMENTED_TASSERT(10783902);
+}
+
+HistoricalPlacementFetcher& CollectionChangeStreamShardTargeterImpl::getHistoricalPlacementFetcher()
+    const {
+    return *_fetcher;
+}
+
+ChangeStreamShardTargeterStateEventHandler*
+CollectionChangeStreamShardTargeterImpl::getEventHandler() const {
+    return _eventHandler.get();
+}
+
+void CollectionChangeStreamShardTargeterImpl::setEventHandler(
+    std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> eventHandler) {
+    _eventHandler = std::move(eventHandler);
 }
 
 }  // namespace mongo

@@ -114,7 +114,8 @@ DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
     ChangeStreamReaderContextMock context(changeStream);
 
     ChangeStreamShardTargeterMock mock;
-    ASSERT_THROWS_CODE(mock.initialize(Timestamp(42, 1), context), AssertionException, 10767900);
+    ASSERT_THROWS_CODE(
+        mock.initialize(getOpCtx(), Timestamp(42, 1), context), AssertionException, 10767900);
 }
 
 DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
@@ -131,7 +132,8 @@ DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
     ChangeStreamShardTargeterMock mock;
     mock.bufferResponses(responses);
 
-    ASSERT_THROWS_CODE(mock.initialize(Timestamp(42, 1), context), AssertionException, 10767901);
+    ASSERT_THROWS_CODE(
+        mock.initialize(getOpCtx(), Timestamp(42, 1), context), AssertionException, 10767901);
 }
 
 DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
@@ -150,7 +152,8 @@ DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
     ChangeStreamShardTargeterMock mock;
     mock.bufferResponses(responses);
 
-    ASSERT_THROWS_CODE(mock.initialize(Timestamp(42, 1), context), AssertionException, 10767902);
+    ASSERT_THROWS_CODE(
+        mock.initialize(getOpCtx(), Timestamp(42, 1), context), AssertionException, 10767902);
 }
 
 DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
@@ -170,7 +173,7 @@ DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
     mock.bufferResponses(responses);
 
     ASSERT_THROWS_CODE(
-        mock.handleEvent(Document{BSONObj()}, context), AssertionException, 10767903);
+        mock.handleEvent(getOpCtx(), Document{BSONObj()}, context), AssertionException, 10767903);
 }
 
 TEST_F(ChangeStreamShardTargeterTest, InitializeReturnsContinue) {
@@ -186,7 +189,7 @@ TEST_F(ChangeStreamShardTargeterTest, InitializeReturnsContinue) {
     ChangeStreamShardTargeterMock mock;
     mock.bufferResponses(responses);
 
-    auto shardTargeterDecision = mock.initialize(ts, context);
+    auto shardTargeterDecision = mock.initialize(getOpCtx(), ts, context);
     ASSERT_EQ(decision, shardTargeterDecision);
 }
 
@@ -203,7 +206,7 @@ TEST_F(ChangeStreamShardTargeterTest, InitializeReturnsSwitchToV1) {
     ChangeStreamShardTargeterMock mock;
     mock.bufferResponses(responses);
 
-    auto shardTargeterDecision = mock.initialize(ts, context);
+    auto shardTargeterDecision = mock.initialize(getOpCtx(), ts, context);
     ASSERT_EQ(decision, shardTargeterDecision);
 }
 
@@ -223,7 +226,7 @@ TEST_F(ChangeStreamShardTargeterTest, StartChangeStreamSegmentReturnsContinue) {
     ChangeStreamShardTargeterMock mock;
     mock.bufferResponses(responses);
 
-    auto shardTargeterDecision = mock.startChangeStreamSegment(ts, context);
+    auto shardTargeterDecision = mock.startChangeStreamSegment(getOpCtx(), ts, context);
     ASSERT_EQ(decision, shardTargeterDecision.first);
     ASSERT_TRUE(shardTargeterDecision.second.has_value());
     ASSERT_EQ(endTs, *shardTargeterDecision.second);
@@ -242,7 +245,7 @@ TEST_F(ChangeStreamShardTargeterTest, HandleEventReturnsContinue) {
     ChangeStreamShardTargeterMock mock;
     mock.bufferResponses(responses);
 
-    auto shardTargeterDecision = mock.handleEvent(Document{BSONObj()}, context);
+    auto shardTargeterDecision = mock.handleEvent(getOpCtx(), Document{BSONObj()}, context);
     ASSERT_EQ(decision, shardTargeterDecision);
 }
 
@@ -259,7 +262,7 @@ TEST_F(ChangeStreamShardTargeterTest, HandleEventReturnsSwitchToV1) {
     ChangeStreamShardTargeterMock mock;
     mock.bufferResponses(responses);
 
-    auto shardTargeterDecision = mock.handleEvent(Document{BSONObj()}, context);
+    auto shardTargeterDecision = mock.handleEvent(getOpCtx(), Document{BSONObj()}, context);
     ASSERT_EQ(decision, shardTargeterDecision);
 }
 

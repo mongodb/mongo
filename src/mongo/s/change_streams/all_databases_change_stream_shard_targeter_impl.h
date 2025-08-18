@@ -42,13 +42,17 @@ namespace mongo {
 
 class AllDatabasesChangeStreamShardTargeterImpl : public ChangeStreamShardTargeter {
 public:
-    ShardTargeterDecision initialize(Timestamp atClusterTime,
+    ShardTargeterDecision initialize(OperationContext* opCtx,
+                                     Timestamp atClusterTime,
                                      ChangeStreamReaderContext& context) override;
 
     std::pair<ShardTargeterDecision, boost::optional<Timestamp>> startChangeStreamSegment(
-        Timestamp atClusterTime, ChangeStreamReaderContext& context) override;
+        OperationContext* opCtx,
+        Timestamp atClusterTime,
+        ChangeStreamReaderContext& context) override;
 
-    ShardTargeterDecision handleEvent(const Document& event,
+    ShardTargeterDecision handleEvent(OperationContext* opCtx,
+                                      const Document& event,
                                       ChangeStreamReaderContext& context) override;
 };
 

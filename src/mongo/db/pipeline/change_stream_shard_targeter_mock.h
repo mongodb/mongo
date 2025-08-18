@@ -57,7 +57,8 @@ public:
         ReaderContextCallback callback;
     };
 
-    ShardTargeterDecision initialize(Timestamp atClusterTime,
+    ShardTargeterDecision initialize(OperationContext* opCtx,
+                                     Timestamp atClusterTime,
                                      ChangeStreamReaderContext& context) override {
         Response response = popResponse(atClusterTime);
 
@@ -70,7 +71,9 @@ public:
     }
 
     std::pair<ShardTargeterDecision, boost::optional<Timestamp>> startChangeStreamSegment(
-        Timestamp atClusterTime, ChangeStreamReaderContext& context) override {
+        OperationContext* opCtx,
+        Timestamp atClusterTime,
+        ChangeStreamReaderContext& context) override {
         Response response = popResponse(atClusterTime);
 
         // Execute callback so that ChangeStreamReaderContext can make any modifications.
@@ -81,7 +84,8 @@ public:
         return std::make_pair(response.decision, response.endTs);
     }
 
-    ShardTargeterDecision handleEvent(const Document& event,
+    ShardTargeterDecision handleEvent(OperationContext* opCtx,
+                                      const Document& event,
                                       ChangeStreamReaderContext& context) override {
         Response response = popResponse(Document{});
 
