@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/util/net/hostandport.h"
@@ -116,6 +117,15 @@ Status waitForWriteConcern(OperationContext* opCtx,
                            const repl::OpTime& replOpTime,
                            const WriteConcernOptions& writeConcern,
                            WriteConcernResult* result);
+
+/**
+ * Used to simulated WriteConcernTimeouts in tests. If the failWaitForWriteConcernIfTimeoutSet
+ * failpoint is enabled and the write concern has a timeout, it would return a WriteConcernTimeout
+ * error
+ */
+boost::optional<repl::ReplicationCoordinator::StatusAndDuration>
+_tryGetWCFailureFromFailPoint_ForTest(const repl::OpTime& replOpTime,
+                                      const WriteConcernOptions& writeConcern);
 
 
 }  // namespace mongo

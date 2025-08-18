@@ -40,7 +40,6 @@
 #include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -53,6 +52,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/timer.h"
@@ -84,10 +84,36 @@ auto& gleDefaultUnsatisfiable = *MetricBuilder<Counter64>{"getLastError.default.
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForWriteConcern);
+MONGO_FAIL_POINT_DEFINE(failWaitForWriteConcernIfTimeoutSet);
 
 bool commandSpecifiesWriteConcern(const GenericArguments& requestArgs) {
     return !!requestArgs.getWriteConcern();
 }
+
+boost::optional<repl::ReplicationCoordinator::StatusAndDuration>
+_tryGetWCFailureFromFailPoint_ForTest(const OpTime& replOpTime,
+                                      const WriteConcernOptions& writeConcern) {
+    bool shouldMockError = false;
+    failWaitForWriteConcernIfTimeoutSet.executeIf(
+        [&](const BSONObj& data) { shouldMockError = true; },
+        [&](const BSONObj& data) {
+            return writeConcern.wTimeout != WriteConcernOptions::kNoTimeout;
+        });
+
+    if (shouldMockError) {
+        LOGV2(10431701,
+              "Failing write concern wait due to failpoint",
+              "threadName"_attr = getThreadName(),
+              "replOpTime"_attr = replOpTime,
+              "writeConcern.isMajority()"_attr = writeConcern.isMajority(),
+              "writeConcern"_attr = writeConcern.toBSON());
+        auto mockStatus = Status(ErrorCodes::WriteConcernTimeout, "Mock write concern timeout");
+        return repl::ReplicationCoordinator::StatusAndDuration(mockStatus, Milliseconds(0));
+    } else {
+        return boost::none;
+    }
+}
+
 
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                                                     const GenericArguments& genericArgs,
@@ -381,9 +407,13 @@ Status waitForWriteConcern(OperationContext* opCtx,
         return Status::OK();
     }
 
-    // Replica set stepdowns and gle mode changes are thrown as errors
-    repl::ReplicationCoordinator::StatusAndDuration replStatus =
+    auto replStatus =
         replCoord->awaitReplication(opCtx, replOpTime, writeConcernWithPopulatedSyncMode);
+
+    if (auto mockStatusForTest = _tryGetWCFailureFromFailPoint_ForTest(replOpTime, writeConcern)) {
+        replStatus = *mockStatusForTest;
+    }
+
     if (replStatus.status == ErrorCodes::WriteConcernTimeout) {
         gleWtimeouts.increment();
         if (!writeConcern.getProvenance().isClientSupplied()) {

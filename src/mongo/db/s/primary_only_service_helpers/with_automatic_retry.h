@@ -57,6 +57,12 @@ const auto kDefaultRetryabilityPredicate = [](const Status& status) {
         status == ErrorCodes::ShardingStateNotInitialized;
 };
 
+const auto kRetryabilityPredicateIncludeWriteConcernTimeout = [](const Status& status) {
+    // Retry on write concern errors, which are not retriable errors, but may be retryable
+    // in the context of a primary-only service.
+    return kDefaultRetryabilityPredicate(status) || status == ErrorCodes::WriteConcernTimeout;
+};
+
 const auto kAlwaysRetryPredicate = [](const Status& status) {
     return true;
 };

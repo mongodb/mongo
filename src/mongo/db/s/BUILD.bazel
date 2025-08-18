@@ -1437,6 +1437,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/metrics:phase_duration_test.cpp",
         "//src/mongo/db/s/migration_blocking_operation:multi_update_coordinator_test.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:cancel_state_test.cpp",
+        "//src/mongo/db/s/primary_only_service_helpers:with_automatic_retry_test.cpp",
         "//src/mongo/db/vector_clock:vector_clock_shard_server_test.cpp",
     ],
     tags = [

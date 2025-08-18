@@ -464,85 +464,81 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
     const CancellationToken& stepdownToken,
     bool aborted) {
     return _retryingCancelableOpCtxFactory
-        ->withAutomaticRetry(
-            [this, executor, stepdownToken, aborted](const auto& factory) {
-                if (!aborted) {
-                    // If a failover occured after the donor transitioned to done locally, but
-                    // before it notified the coordinator, it will already be in state done here.
-                    // Otherwise, it must be in blocking-writes before transitioning to done.
-                    invariant(_donorCtx.getState() == DonorStateEnum::kBlockingWrites ||
-                              _donorCtx.getState() == DonorStateEnum::kDone);
+        ->withAutomaticRetry([this, executor, stepdownToken, aborted](const auto& factory) {
+            if (!aborted) {
+                // If a failover occured after the donor transitioned to done locally, but
+                // before it notified the coordinator, it will already be in state done here.
+                // Otherwise, it must be in blocking-writes before transitioning to done.
+                invariant(_donorCtx.getState() == DonorStateEnum::kBlockingWrites ||
+                          _donorCtx.getState() == DonorStateEnum::kDone);
 
-                    _dropOriginalCollectionThenTransitionToDone(factory);
-                } else if (_donorCtx.getState() != DonorStateEnum::kDone) {
-                    {
-                        // Unblock the RecoverRefreshThread as quickly as possible when aborting.
-                        stdx::lock_guard<stdx::mutex> lk(_mutex);
-                        ensureFulfilledPromise(lk,
-                                               _critSecWasAcquired,
-                                               {ErrorCodes::ReshardCollectionAborted, "aborted"});
-                        ensureFulfilledPromise(lk,
-                                               _critSecWasPromoted,
-                                               {ErrorCodes::ReshardCollectionAborted, "aborted"});
-                    }
-
-                    // If aborted, the donor must be allowed to transition to done from any
-                    // state.
-                    _transitionToDone(aborted, factory);
+                _dropOriginalCollectionThenTransitionToDone(factory);
+            } else if (_donorCtx.getState() != DonorStateEnum::kDone) {
+                {
+                    // Unblock the RecoverRefreshThread as quickly as possible when aborting.
+                    stdx::lock_guard<stdx::mutex> lk(_mutex);
+                    ensureFulfilledPromise(
+                        lk, _critSecWasAcquired, {ErrorCodes::ReshardCollectionAborted, "aborted"});
+                    ensureFulfilledPromise(
+                        lk, _critSecWasPromoted, {ErrorCodes::ReshardCollectionAborted, "aborted"});
                 }
 
-                {
-                    auto opCtx = factory.makeOperationContext(&cc());
+                // If aborted, the donor must be allowed to transition to done from any
+                // state.
+                _transitionToDone(aborted, factory);
+            }
 
-                    // Clear filtering metadata for the temp resharding namespace;
-                    // We force a refresh to make sure that the placement information is updated
-                    // in cache after abort decision before the donor state document is deleted.
-                    {
-                        const auto coll = acquireCollection(opCtx.get(),
-                                                            CollectionAcquisitionRequest::fromOpCtx(
-                                                                opCtx.get(),
+            {
+                auto opCtx = factory.makeOperationContext(&cc());
+
+                // Clear filtering metadata for the temp resharding namespace;
+                // We force a refresh to make sure that the placement information is updated
+                // in cache after abort decision before the donor state document is deleted.
+                {
+                    const auto coll = acquireCollection(
+                        opCtx.get(),
+                        CollectionAcquisitionRequest::fromOpCtx(opCtx.get(),
                                                                 _metadata.getTempReshardingNss(),
                                                                 AcquisitionPrerequisites::kWrite),
-                                                            MODE_IX);
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                            opCtx.get(), _metadata.getTempReshardingNss())
-                            ->clearFilteringMetadata(opCtx.get());
-                    }
-
-                    const auto onReleaseCriticalSectionAction =
-                        _externalState->getOnReleaseCriticalSectionCustomAction();
-                    ShardingRecoveryService::get(opCtx.get())
-                        ->releaseRecoverableCriticalSection(
-                            opCtx.get(),
-                            _metadata.getSourceNss(),
-                            _critSecReason,
-                            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                            *onReleaseCriticalSectionAction);
-
-                    _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
-                                        resharding::getCurrentTime());
-
-                    // We force a refresh to make sure that the placement information is updated
-                    // in cache after abort decision before the donor state document is deleted.
-                    std::initializer_list<NamespaceString> namespacesToRefresh{
-                        _metadata.getSourceNss(), _metadata.getTempReshardingNss()};
-                    for (const auto& nss : namespacesToRefresh) {
-                        _externalState->refreshCollectionPlacementInfo(opCtx.get(), nss);
-                        _externalState->waitForCollectionFlush(opCtx.get(), nss);
-                    }
+                        MODE_IX);
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                        opCtx.get(), _metadata.getTempReshardingNss())
+                        ->clearFilteringMetadata(opCtx.get());
                 }
 
-                auto opCtx = factory.makeOperationContext(&cc());
-                return _updateCoordinator(opCtx.get(), executor, factory)
-                    .then([this, aborted, stepdownToken, &factory] {
-                        {
-                            auto opCtx = factory.makeOperationContext(&cc());
-                            removeDonorDocFailpoint.pauseWhileSet(opCtx.get());
-                        }
-                        _removeDonorDocument(stepdownToken, aborted, factory);
-                    });
-            },
-            resharding::kRetryabilityPredicateIncludeWriteConcernTimeout)
+                const auto onReleaseCriticalSectionAction =
+                    _externalState->getOnReleaseCriticalSectionCustomAction();
+                ShardingRecoveryService::get(opCtx.get())
+                    ->releaseRecoverableCriticalSection(
+                        opCtx.get(),
+                        _metadata.getSourceNss(),
+                        _critSecReason,
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                        *onReleaseCriticalSectionAction);
+
+                _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
+                                    resharding::getCurrentTime());
+
+                // We force a refresh to make sure that the placement information is updated
+                // in cache after abort decision before the donor state document is deleted.
+                std::initializer_list<NamespaceString> namespacesToRefresh{
+                    _metadata.getSourceNss(), _metadata.getTempReshardingNss()};
+                for (const auto& nss : namespacesToRefresh) {
+                    _externalState->refreshCollectionPlacementInfo(opCtx.get(), nss);
+                    _externalState->waitForCollectionFlush(opCtx.get(), nss);
+                }
+            }
+
+            auto opCtx = factory.makeOperationContext(&cc());
+            return _updateCoordinator(opCtx.get(), executor, factory)
+                .then([this, aborted, stepdownToken, &factory] {
+                    {
+                        auto opCtx = factory.makeOperationContext(&cc());
+                        removeDonorDocFailpoint.pauseWhileSet(opCtx.get());
+                    }
+                    _removeDonorDocument(stepdownToken, aborted, factory);
+                });
+        })
         .onTransientError([](const Status& status) {
             LOGV2(5633600,
                   "Transient error while finishing resharding operation",
@@ -603,7 +599,10 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
     const CancellationToken& stepdownToken) noexcept {
     auto abortToken = _initAbortSource(stepdownToken);
     _markKilledExecutor->startup();
-    _retryingCancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
+    _retryingCancelableOpCtxFactory.emplace(
+        abortToken,
+        _markKilledExecutor,
+        resharding::kRetryabilityPredicateIncludeWriteConcernTimeout);
 
     return ExecutorFuture(**executor)
         .then([this, executor, abortToken] {
@@ -613,7 +612,10 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
             return _notifyCoordinatorAndAwaitDecision(executor, abortToken);
         })
         .onCompletion([this, executor, stepdownToken, abortToken](Status status) {
-            _retryingCancelableOpCtxFactory.emplace(stepdownToken, _markKilledExecutor);
+            _retryingCancelableOpCtxFactory.emplace(
+                stepdownToken,
+                _markKilledExecutor,
+                resharding::kRetryabilityPredicateIncludeWriteConcernTimeout);
             if (stepdownToken.isCanceled()) {
                 // Propagate any errors from the donor stepping down.
                 return ExecutorFuture<bool>(**executor, status);

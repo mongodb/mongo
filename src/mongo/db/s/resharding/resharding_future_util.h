@@ -46,18 +46,21 @@
 namespace mongo {
 namespace resharding {
 
-using primary_only_service_helpers::kDefaultRetryabilityPredicate;
+using primary_only_service_helpers::kRetryabilityPredicateIncludeWriteConcernTimeout;
 using primary_only_service_helpers::RetryabilityPredicate;
 using primary_only_service_helpers::RetryingCancelableOperationContextFactory;
-using primary_only_service_helpers::WithAutomaticRetry;
 
-const auto kRetryabilityPredicateIncludeWriteConcernTimeout = [](const Status& status) {
-    return kDefaultRetryabilityPredicate(status) || status == ErrorCodes::WriteConcernTimeout;
+const auto kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern = [](const Status& status) {
+    return kRetryabilityPredicateIncludeWriteConcernTimeout(status) ||
+        status == ErrorCodes::LockTimeout;
 };
 
-const auto kRetryabilityPredicateIncludeLockTimeout = [](const Status& status) {
-    return kDefaultRetryabilityPredicate(status) || status == ErrorCodes::LockTimeout;
-};
+template <typename BodyCallable>
+primary_only_service_helpers::WithAutomaticRetry<BodyCallable> WithAutomaticRetry(
+    BodyCallable&& body) {
+    return primary_only_service_helpers::WithAutomaticRetry<BodyCallable>(
+        std::move(body), kRetryabilityPredicateIncludeWriteConcernTimeout);
+}
 
 /**
  * Converts a vector of SharedSemiFutures into a vector of ExecutorFutures.
