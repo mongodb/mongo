@@ -242,7 +242,7 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
     BSONObjBuilder resultBuilder;
 
     // Make sure the oplog application mode is passed through via 'applyOps' correctly.
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     auto docToInsert0 = BSON("_id" << 0);
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, uuid, docToInsert0);
@@ -250,7 +250,7 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
     ASSERT_OK(applyOps(
         opCtx.get(), nss.dbName(), cmdObj, OplogApplication::Mode::kInitialSync, &resultBuilder));
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
+                  logs.countBSONContainingSubset(
                       BSON("attr" << BSON("oplogApplicationMode" << "InitialSync"))));
 
     auto docToInsert1 = BSON("_id" << 1);
@@ -259,10 +259,8 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
     ASSERT_OK(applyOps(
         opCtx.get(), nss.dbName(), cmdObj, OplogApplication::Mode::kSecondary, &resultBuilder));
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
+                  logs.countBSONContainingSubset(
                       BSON("attr" << BSON("oplogApplicationMode" << "Secondary"))));
-
-    stopCapturingLogMessages();
 }
 
 /**

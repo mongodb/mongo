@@ -2301,22 +2301,22 @@ TEST_F(OplogFetcherTest, OplogFetcherRetriesConnectionButFails) {
     // Shutdown the mock remote server before the OplogFetcher tries to connect.
     _mockServer->shutdown();
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     // Create an OplogFetcher with 1 retry attempt. This will also ensure that _runQuery was
     // scheduled before returning.
     auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
 
     oplogFetcher->join();
-    stopCapturingLogMessages();
+    logs.stop();
 
     // This is the error code for connection failures.
     ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState.getStatus());
 
     // We should see one retry
-    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(BSON("id" << 21274)));
+    ASSERT_EQUALS(1, logs.countBSONContainingSubset(BSON("id" << 21274)));
 
     // We should one failure to retry
-    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(BSON("id" << 21275)));
+    ASSERT_EQUALS(1, logs.countBSONContainingSubset(BSON("id" << 21275)));
 }
 
 TEST_F(OplogFetcherTest, OplogFetcherDoesNotRetryConnectionWhenSyncSourceChangeIsExpected) {
@@ -2331,20 +2331,20 @@ TEST_F(OplogFetcherTest, OplogFetcherDoesNotRetryConnectionWhenSyncSourceChangeI
     // Shutdown the mock remote server before the OplogFetcher tries to connect.
     _mockServer->shutdown();
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     // Create an OplogFetcher with 1 retry attempt. This will also ensure that _runQuery was
     // scheduled before returning.
     auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
 
     oplogFetcher->join();
-    stopCapturingLogMessages();
+    logs.stop();
 
     // This is the error code for connection failures.
     ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState.getStatus());
 
     // We should not see retry attempts.
-    ASSERT_EQUALS(0, countBSONFormatLogLinesIsSubset(BSON("id" << 21274)));
-    ASSERT_EQUALS(0, countBSONFormatLogLinesIsSubset(BSON("id" << 21275)));
+    ASSERT_EQUALS(0, logs.countBSONContainingSubset(BSON("id" << 21274)));
+    ASSERT_EQUALS(0, logs.countBSONContainingSubset(BSON("id" << 21275)));
 }
 
 TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownBeforeReconnect) {

@@ -447,17 +447,17 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceLogSlowServices) {
     ASSERT_EQ(0, slowService->numCallsOnStepUpComplete);
 
     // With the default sleep interval (no sleep) we don't log anything.
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQ(1, slowService->numCallsOnStepUpBegin);
     ASSERT_EQ(1, slowService->numCallsOnStepUpComplete);
     ASSERT_EQ(0,
-              countTextFormatLogLinesContaining(
+              logs.countTextContaining(
                   "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpBegin"));
     ASSERT_EQ(0,
-              countTextFormatLogLinesContaining(
+              logs.countTextContaining(
                   "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpComplete"));
 
     // Introduce delays at the minimum thresholds at which we will log for a single service.
@@ -467,30 +467,30 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceLogSlowServices) {
         Milliseconds(repl::slowServiceOnStepUpCompleteThresholdMS.load() + 1));
     slowService->setStepDownSleepDuration(
         Milliseconds(repl::slowServiceOnStepDownThresholdMS.load() + 1));
-    startCapturingLogMessages();
+    logs.start();
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepDown();
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQ(2, slowService->numCallsOnStepUpBegin);
     ASSERT_EQ(2, slowService->numCallsOnStepUpComplete);
-    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowSingleServiceStepUpBeginMsg));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowSingleServiceStepUpCompleteMsg));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowSingleServiceStepDownMsg));
+    ASSERT_EQ(1, logs.countTextContaining(slowSingleServiceStepUpBeginMsg));
+    ASSERT_EQ(1, logs.countTextContaining(slowSingleServiceStepUpCompleteMsg));
+    ASSERT_EQ(1, logs.countTextContaining(slowSingleServiceStepDownMsg));
 
     // Introduce a delay that should cause us to log for the total time across all services.
     slowService->setStepUpBeginSleepDuration(
         Milliseconds(repl::slowTotalOnStepUpBeginThresholdMS.load() + 1));
     slowService->setStepUpCompleteSleepDuration(
         Milliseconds(repl::slowTotalOnStepUpCompleteThresholdMS.load() + 1));
-    startCapturingLogMessages();
+    logs.start();
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQ(3, slowService->numCallsOnStepUpBegin);
     ASSERT_EQ(3, slowService->numCallsOnStepUpComplete);
-    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowTotalTimeStepUpBeginMsg));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining(slowTotalTimeStepUpCompleteMsg));
+    ASSERT_EQ(1, logs.countTextContaining(slowTotalTimeStepUpBeginMsg));
+    ASSERT_EQ(1, logs.countTextContaining(slowTotalTimeStepUpCompleteMsg));
 }
 
 }  // namespace

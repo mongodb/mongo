@@ -259,7 +259,7 @@ TEST_F(ReplCoordTest, NodeEntersArbiterStateWhenStartingUpWithValidLocalConfigWh
 }
 
 TEST_F(ReplCoordTest, NodeEntersRemovedStateWhenStartingUpWithALocalConfigWhichLacksItAsAMember) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     assertStartSuccess(BSON("_id" << "mySet"
                                   << "version" << 2 << "members"
                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -267,34 +267,34 @@ TEST_F(ReplCoordTest, NodeEntersRemovedStateWhenStartingUpWithALocalConfigWhichL
                                                 << BSON("_id" << 2 << "host"
                                                               << "node2:54321"))),
                        HostAndPort("node3", 12345));
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining("Locally stored replica set configuration does "
-                                                    "not have a valid entry for the current node"));
+                  logs.countTextContaining("Locally stored replica set configuration does "
+                                           "not have a valid entry for the current node"));
     ASSERT_EQUALS(MemberState::RS_REMOVED, getReplCoord()->getMemberState().s);
 }
 
 TEST_F(ReplCoordTest,
        NodeEntersRemovedStateWhenStartingUpWithALocalConfigContainingTheWrongSetName) {
     init("mySet");
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     assertStartSuccess(BSON("_id" << "notMySet"
                                   << "version" << 2 << "members"
                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                            << "node1:12345"))),
                        HostAndPort("node1", 12345));
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining("Local replica set configuration document set "
-                                                    "name differs from command line set name"));
+                  logs.countTextContaining("Local replica set configuration document set "
+                                           "name differs from command line set name"));
     ASSERT_EQUALS(MemberState::RS_REMOVED, getReplCoord()->getMemberState().s);
 }
 
 TEST_F(ReplCoordTest, NodeEntersStartupStateWhenStartingUpWithNoLocalConfig) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     start();
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(3, countTextFormatLogLinesContaining("Did not find local "));
+    logs.stop();
+    ASSERT_EQUALS(3, logs.countTextContaining("Did not find local "));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
@@ -5258,14 +5258,13 @@ TEST_F(ReplCoordTest, HelloInShutdown) {
 
 TEST_F(ReplCoordTest, LogAMessageWhenShutDownBeforeReplicationStartUpFinished) {
     init();
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     {
         auto opCtx = makeOperationContext();
         getReplCoord()->shutdown(opCtx.get(), nullptr /* shutdownTimeElapsedBuilder */);
     }
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining("shutdown() called before startup() finished"));
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("shutdown() called before startup() finished"));
 }
 
 TEST_F(ReplCoordTest, DoNotProcessSelfWhenUpdatePositionContainsInfoAboutSelf) {
@@ -7053,7 +7052,7 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     // Log all the election messages.
     auto replElectionAllSeverityGuard = unittest::MinimumLoggedSeverityGuard{
         logv2::LogComponent::kReplicationElection, logv2::LogSeverity::Debug(5)};
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     // heartbeatTimeoutSecs is made large so we can advance the clock without worrying about
     // additional heartbeats.
     assertStartSuccess(BSON("_id" << "mySet"
@@ -7068,14 +7067,14 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     // Setting mode to secondary should schedule the election timeout.
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Scheduled election timeout callback"));
-    ASSERT_EQ(0, countTextFormatLogLinesContaining("Rescheduled election timeout callback"));
-    ASSERT_EQ(0, countTextFormatLogLinesContaining("Canceling election timeout callback"));
+    ASSERT_EQ(1, logs.countTextContaining("Scheduled election timeout callback"));
+    ASSERT_EQ(0, logs.countTextContaining("Rescheduled election timeout callback"));
+    ASSERT_EQ(0, logs.countTextContaining("Canceling election timeout callback"));
 
     // Scheduling again should produce the "rescheduled", not the "scheduled", message .
     replCoord->cancelAndRescheduleElectionTimeout();
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Scheduled election timeout callback"));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduled election timeout callback"));
+    ASSERT_EQ(1, logs.countTextContaining("Scheduled election timeout callback"));
+    ASSERT_EQ(1, logs.countTextContaining("Rescheduled election timeout callback"));
 
     auto net = getNet();
     net->enterNetwork();
@@ -7103,8 +7102,8 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     net->exitNetwork();
 
     // The election should have scheduled (not rescheduled) another timeout.
-    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduled election timeout callback"));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduled election timeout callback"));
+    ASSERT_EQ(2, logs.countTextContaining("Scheduled election timeout callback"));
+    ASSERT_EQ(1, logs.countTextContaining("Rescheduled election timeout callback"));
 
     auto replElectionReducedSeverityGuard = unittest::MinimumLoggedSeverityGuard{
         logv2::LogComponent::kReplicationElection, logv2::LogSeverity::Debug(4)};
@@ -7115,8 +7114,8 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     replCoord->cancelAndRescheduleElectionTimeout();
 
     // We should not see this reschedule because it should be at log level 5.
-    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduled election timeout callback"));
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduled election timeout callback"));
+    ASSERT_EQ(2, logs.countTextContaining("Scheduled election timeout callback"));
+    ASSERT_EQ(1, logs.countTextContaining("Rescheduled election timeout callback"));
 
     net->enterNetwork();
     until = electionTimeoutWhen + Milliseconds(1001);
@@ -7124,11 +7123,11 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     net->exitNetwork();
     replCoord->cancelAndRescheduleElectionTimeout();
 
-    stopCapturingLogMessages();
+    logs.stop();
     // We should see this reschedule at level 4 because it has been over 1 sec since we logged
     // at level 4.
-    ASSERT_EQ(2, countTextFormatLogLinesContaining("Scheduled election timeout callback"));
-    ASSERT_EQ(2, countTextFormatLogLinesContaining("Rescheduled election timeout callback"));
+    ASSERT_EQ(2, logs.countTextContaining("Scheduled election timeout callback"));
+    ASSERT_EQ(2, logs.countTextContaining("Rescheduled election timeout callback"));
 }
 
 TEST_F(ReplCoordTest, ZeroCommittedSnapshotAfterClearingCommittedSnapshot) {
@@ -8504,7 +8503,7 @@ TEST_F(ReplCoordTest, IgnoreNonNullDurableOpTimeOrWallTimeForArbiterFromReplSetU
                        << UpdatePositionArgs::kDurableOpTimeFieldName << opTime2.asOpTime().toBSON()
                        << UpdatePositionArgs::kDurableWallTimeFieldName << wallTime2)))));
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_OK(repl->processReplSetUpdatePosition(updatePositionArgs));
 
     // Make sure node 2 is fully caught up but node 3 has null durable optime/walltime.
@@ -8526,10 +8525,10 @@ TEST_F(ReplCoordTest, IgnoreNonNullDurableOpTimeOrWallTimeForArbiterFromReplSetU
         }
         MONGO_UNREACHABLE;
     }
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQUALS(
         1,
-        countTextFormatLogLinesContaining(
+        logs.countTextContaining(
             "Received non-null durable optime/walltime for arbiter from replSetUpdatePosition"));
 }
 
@@ -8572,7 +8571,7 @@ TEST_F(ReplCoordTest, IgnoreNonNullDurableOpTimeOrWallTimeForArbiterFromHeartbea
     hbResp.setWrittenOpTimeAndWallTime({opTime2, wallTime2});
     hbResp.setDurableOpTimeAndWallTime({opTime2, wallTime2});
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     repl->handleHeartbeatResponse_forTest(
         hbResp.toBSON(), 1 /* targetIndex */, Milliseconds(5) /* ping */);
 
@@ -8595,9 +8594,9 @@ TEST_F(ReplCoordTest, IgnoreNonNullDurableOpTimeOrWallTimeForArbiterFromHeartbea
         MONGO_UNREACHABLE;
     }
 
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
+                  logs.countTextContaining(
                       "Received non-null durable optime/walltime for arbiter from heartbeat"));
 }
 

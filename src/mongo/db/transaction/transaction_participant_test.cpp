@@ -4679,15 +4679,15 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
 
     tickSource->advance(Microseconds(11 * 1000));
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     txnParticipant.commitUnpreparedTransaction(opCtx());
-    stopCapturingLogMessages();
+    logs.stop();
 
     const auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
 
     BSONObj expected = txnParticipant.getTransactionInfoForLogForTest(
         opCtx(), &lockerInfo.stats, true, apiParameters, readConcernArgs);
-    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(formatBSONForLogLine(expected)));
+    ASSERT_EQUALS(1, logs.countBSONContainingSubset(formatBSONForLogLine(expected)));
 }
 
 TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowCommit) {
@@ -4730,15 +4730,15 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowCommit) {
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
     const auto [prepareTimestamp, namespaces] = txnParticipant.prepareTransaction(opCtx(), {});
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
-    stopCapturingLogMessages();
+    logs.stop();
 
     const auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
 
     BSONObj expected = txnParticipant.getTransactionInfoForLogForTest(
         opCtx(), &lockerInfo.stats, true, apiParameters, readConcernArgs);
-    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(formatBSONForLogLine(expected)));
+    ASSERT_EQUALS(1, logs.countBSONContainingSubset(formatBSONForLogLine(expected)));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
@@ -4779,9 +4779,9 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
 
     tickSource->advance(Microseconds(11 * 1000));
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     txnParticipant.abortTransaction(opCtx());
-    stopCapturingLogMessages();
+    logs.stop();
 
     const auto expectedTransactionInfo =
         buildTransactionInfoBSON(opCtx(),
@@ -4794,8 +4794,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
                                  metricValue,
                                  false);
 
-    ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(formatBSONForLogLine(expectedTransactionInfo)));
+    ASSERT_EQUALS(1, logs.countBSONContainingSubset(formatBSONForLogLine(expectedTransactionInfo)));
 }
 
 TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
@@ -4840,9 +4839,9 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
 
     auto prepareOpTime = txnParticipant.getPrepareOpTime();
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     txnParticipant.abortTransaction(opCtx());
-    stopCapturingLogMessages();
+    logs.stop();
 
     const auto expectedTransactionInfo =
         buildTransactionInfoBSON(opCtx(),
@@ -4857,8 +4856,7 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
 
                                  false,
                                  prepareOpTime);
-    ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(formatBSONForLogLine(expectedTransactionInfo)));
+    ASSERT_EQUALS(1, logs.countBSONContainingSubset(formatBSONForLogLine(expectedTransactionInfo)));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterExceptionInPrepare) {
@@ -4901,13 +4899,13 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterExceptionInPrepare) {
 
     _opObserver->postTransactionPrepareThrowsException = true;
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     ASSERT_THROWS_CODE(txnParticipant.prepareTransaction(opCtx(), {}),
                        AssertionException,
                        ErrorCodes::OperationFailed);
     ASSERT_FALSE(_opObserver->transactionPrepared);
     ASSERT(txnParticipant.transactionIsAborted());
-    stopCapturingLogMessages();
+    logs.stop();
 
     const auto expectedTransactionInfo =
         buildTransactionInfoBSON(opCtx(),
@@ -4920,8 +4918,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterExceptionInPrepare) {
                                  metricValue,
                                  false);
 
-    ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(formatBSONForLogLine(expectedTransactionInfo)));
+    ASSERT_EQUALS(1, logs.countBSONContainingSubset(formatBSONForLogLine(expectedTransactionInfo)));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
@@ -4972,11 +4969,11 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
 
     tickSource->advance(Microseconds(11 * 1000));
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     txnParticipant.abortTransaction(opCtx());
-    stopCapturingLogMessages();
+    logs.stop();
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("transaction"));
+    ASSERT_EQUALS(1, logs.countTextContaining("transaction"));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoZeroSampleRate) {
@@ -5002,12 +4999,12 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoZeroSampleRate) {
 
     tickSource->advance(Microseconds(11 * 1000));
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     txnParticipant.commitUnpreparedTransaction(opCtx());
-    stopCapturingLogMessages();
+    logs.stop();
 
     // Test that the transaction is not logged.
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("transaction parameters"));
+    ASSERT_EQUALS(0, logs.countTextContaining("transaction parameters"));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityInfo) {
@@ -5034,12 +5031,12 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityInfo) {
 
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     txnParticipant.commitUnpreparedTransaction(opCtx());
-    stopCapturingLogMessages();
+    logs.stop();
 
     // Test that the transaction is not logged.
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("transaction parameters"));
+    ASSERT_EQUALS(0, logs.countTextContaining("transaction parameters"));
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityDebug) {
@@ -5066,12 +5063,12 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoVerbosityDebug) {
         serverGlobalParams.sampleRate.store(originalSampleRate);
     });
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     txnParticipant.commitUnpreparedTransaction(opCtx());
-    stopCapturingLogMessages();
+    logs.stop();
 
     // Test that the transaction is still logged.
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("transaction"));
+    ASSERT_EQUALS(1, logs.countTextContaining("transaction"));
 }
 
 TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {

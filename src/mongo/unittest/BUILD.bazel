@@ -21,6 +21,7 @@ mongo_cc_library(
         "stringify.cpp",
         "temp_dir.cpp",
         "unittest.cpp",
+        "log_capture.cpp",
 
         # Note: Only used here and for the corresponding test. consider moving.
         "//src/mongo/bson:unordered_fields_bsonobj_comparator.h",
@@ -37,6 +38,7 @@ mongo_cc_library(
         "framework.h",
         "golden_test.h",
         "join_thread.h",
+        "log_capture.h",
         "log_test.h",
         "matcher.h",
         "matcher_core.h",
@@ -179,6 +181,7 @@ mongo_cc_unit_test(
         "fixture_test.cpp",
         "golden_test_test.cpp",
         "inline_auto_update_test.cpp",
+        "log_capture_test.cpp",
         "temp_dir_test.cpp",
         "thread_assertion_monitor_test.cpp",
         "unittest_test.cpp",
