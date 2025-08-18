@@ -33,12 +33,10 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
@@ -56,7 +54,7 @@
 namespace mongo {
 
 /**
- * This stage is used internally for change stream notifications to artifically generate an
+ * This stage is used internally for change stream notifications to artificially generate an
  * "invalidate" entry for commands that should invalidate the change stream (e.g. collection drop
  * for a single-collection change stream). It is not intended to be created by the user.
  */
@@ -106,6 +104,10 @@ public:
     }
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage>
+    documentSourceChangeStreamCheckInvalidateToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     /**
      * Use the create static method to create a DocumentSourceChangeStreamCheckInvalidate.
      */
@@ -117,11 +119,7 @@ private:
                   _startAfterInvalidate->fromInvalidate == ResumeTokenData::kFromInvalidate);
     }
 
-    GetNextResult doGetNext() final;
-
     boost::optional<ResumeTokenData> _startAfterInvalidate;
-    boost::optional<Document> _queuedInvalidate;
-    boost::optional<ChangeStreamInvalidationInfo> _queuedException;
 };
 
 }  // namespace mongo

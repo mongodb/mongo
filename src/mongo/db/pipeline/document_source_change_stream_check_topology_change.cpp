@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/change_stream_topology_change_info.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -64,7 +63,6 @@ StageConstraints DocumentSourceChangeStreamCheckTopologyChange::constraints(
     return constraints;
 }
 
-
 boost::intrusive_ptr<DocumentSourceChangeStreamCheckTopologyChange>
 DocumentSourceChangeStreamCheckTopologyChange::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -72,29 +70,6 @@ DocumentSourceChangeStreamCheckTopologyChange::createFromBson(
             str::stream() << "the '" << kStageName << "' spec must be an object",
             elem.type() == BSONType::object && elem.Obj().isEmpty());
     return new DocumentSourceChangeStreamCheckTopologyChange(expCtx);
-}
-
-DocumentSource::GetNextResult DocumentSourceChangeStreamCheckTopologyChange::doGetNext() {
-    auto nextInput = pSource->getNext();
-
-    if (!nextInput.isAdvanced()) {
-        return nextInput;
-    }
-
-    auto eventDoc = nextInput.getDocument();
-
-    const StringData eventOpType =
-        eventDoc[DocumentSourceChangeStream::kOperationTypeField].getStringData();
-
-    // Throw the 'ChangeStreamTopologyChangeInfo' exception, wrapping the topology change event
-    // along with its metadata. This will bypass the remainder of the pipeline and will be passed
-    // directly up to mongoS.
-    if (eventOpType == DocumentSourceChangeStream::kNewShardDetectedOpType) {
-        uasserted(ChangeStreamTopologyChangeInfo(eventDoc.toBsonWithMetaData()),
-                  "Collection migrated to new shard");
-    }
-
-    return nextInput;
 }
 
 Value DocumentSourceChangeStreamCheckTopologyChange::doSerialize(

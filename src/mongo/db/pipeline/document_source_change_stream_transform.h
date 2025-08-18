@@ -38,12 +38,12 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 
+#include <memory>
 #include <set>
 
 #include <boost/none.hpp>
@@ -52,7 +52,7 @@
 
 namespace mongo {
 
-class DocumentSourceChangeStreamTransform : public DocumentSourceInternalChangeStreamStage {
+class DocumentSourceChangeStreamTransform final : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamTransform"_sd;
 
@@ -99,17 +99,19 @@ public:
         return id;
     }
 
-protected:
-    DocumentSource::GetNextResult doGetNext() override;
-
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamTransformToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     // This constructor is private, callers should use the 'create()' method above.
     DocumentSourceChangeStreamTransform(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         DocumentSourceChangeStreamSpec spec);
 
     DocumentSourceChangeStreamSpec _changeStreamSpec;
 
-    ChangeStreamEventTransformer _transformer;
+    // TODO SERVER-105521: Check if we can change from 'std::shared_ptr' to 'std::unique_ptr', and
+    // std::move the transformer to the Stage.
+    std::shared_ptr<ChangeStreamEventTransformer> _transformer;
 
     // Set to true if this transformation stage can be run on the collectionless namespace.
     bool _isIndependentOfAnyCollection;

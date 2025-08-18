@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/change_stream_transform_stage.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -300,7 +301,7 @@ std::vector<Document> ChangeStreamStageTest::getApplyOpsResults(
     // Create the stages and check that the documents produced matched those in the applyOps.
     auto execPipeline = makeExecPipeline(oplogEntry, spec);
     auto transform = execPipeline->getStages()[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     std::vector<Document> res;
     auto next = transform->getNext();

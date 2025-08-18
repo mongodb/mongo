@@ -29,11 +29,7 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
@@ -41,7 +37,6 @@
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/string_map.h"
 
 #include <utility>
 
@@ -109,7 +104,7 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
     : DocumentSourceInternalChangeStreamStage(DocumentSourceChangeStreamTransform::kStageName,
                                               expCtx),
       _changeStreamSpec(std::move(spec)),
-      _transformer(expCtx, _changeStreamSpec),
+      _transformer(std::make_shared<ChangeStreamEventTransformer>(expCtx, _changeStreamSpec)),
       _isIndependentOfAnyCollection(expCtx->getNamespaceString().isCollectionlessAggregateNS()) {
 
     // Extract the resume token or high-water-mark from the spec.
@@ -155,27 +150,13 @@ Value DocumentSourceChangeStreamTransform::serialize(const SerializationOptions&
 }
 
 DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTracker* deps) const {
-    deps->fields.merge(_transformer.getFieldNameDependencies());
+    deps->fields.merge(_transformer->getFieldNameDependencies());
     return DepsTracker::State::EXHAUSTIVE_ALL;
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceChangeStreamTransform::getModifiedPaths() const {
     // All paths are modified.
     return {DocumentSource::GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
-}
-
-DocumentSource::GetNextResult DocumentSourceChangeStreamTransform::doGetNext() {
-    uassert(50988,
-            "Illegal attempt to execute an internal change stream stage on router. A $changeStream "
-            "stage must be the first stage in a pipeline",
-            !pExpCtx->getInRouter());
-
-    auto input = pSource->getNext();
-    if (!input.isAdvanced()) {
-        return input;
-    }
-
-    return _transformer.applyTransformation(input.releaseDocument());
 }
 
 }  // namespace mongo

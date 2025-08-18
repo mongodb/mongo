@@ -85,72 +85,6 @@ DocumentSourceChangeStreamAddPreImage::createFromBson(
         expCtx, parsedSpec.getFullDocumentBeforeChange());
 }
 
-DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext() {
-    auto input = pSource->getNext();
-    if (!input.isAdvanced()) {
-        return input;
-    }
-
-    // If this is not an update, replace or delete, then just pass along the result.
-    const auto kOpTypeField = DocumentSourceChangeStream::kOperationTypeField;
-    const auto opType = input.getDocument()[kOpTypeField];
-    DocumentSourceChangeStream::checkValueType(opType, kOpTypeField, BSONType::string);
-    if (opType.getStringData() != DocumentSourceChangeStream::kUpdateOpType &&
-        opType.getStringData() != DocumentSourceChangeStream::kReplaceOpType &&
-        opType.getStringData() != DocumentSourceChangeStream::kDeleteOpType) {
-        return input;
-    }
-
-    auto preImageId = input.getDocument()[kPreImageIdFieldName];
-    tassert(6091900, "Pre-image id field is missing", !preImageId.missing());
-    tassert(5868900,
-            "Expected pre-image id field to be a document",
-            preImageId.getType() == BSONType::object);
-
-    // Obtain the pre-image document, if available, given the specified preImageId.
-    auto preImageDoc = lookupPreImage(pExpCtx, preImageId.getDocument());
-    uassert(
-        ErrorCodes::NoMatchingDocument,
-        str::stream() << "Change stream was configured to require a pre-image for all update, "
-                         "delete and replace events, but the pre-image was not found for event: "
-                      << makePreImageNotFoundErrorMsg(input.getDocument()),
-        preImageDoc ||
-            _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired);
-
-    // Even if no pre-image was found, we have to populate the 'fullDocumentBeforeChange' field.
-    MutableDocument outputDoc(input.releaseDocument());
-    outputDoc[kFullDocumentBeforeChangeFieldName] =
-        (preImageDoc ? Value(*preImageDoc) : Value(BSONNULL));
-
-    // Do not propagate preImageId field further through the pipeline.
-    outputDoc.remove(kPreImageIdFieldName);
-
-    return outputDoc.freeze();
-}
-
-boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
-    boost::intrusive_ptr<ExpressionContext> pExpCtx, const Document& preImageId) {
-    // Look up the pre-image document on the local node by id.
-    const auto tenantId = change_stream_serverless_helpers::resolveTenantId(
-        VersionContext::getDecoration(pExpCtx->getOperationContext()),
-        pExpCtx->getNamespaceString().tenantId());
-    auto lookedUpDoc = pExpCtx->getMongoProcessInterface()->lookupSingleDocumentLocally(
-        pExpCtx,
-        NamespaceString::makePreImageCollectionNSS(tenantId),
-        Document{{ChangeStreamPreImage::kIdFieldName, preImageId}});
-
-    // Return boost::none to signify that we failed to find the pre-image.
-    if (!lookedUpDoc) {
-        return boost::none;
-    }
-
-    // Return "preImage" field value from the document.
-    auto preImageField = lookedUpDoc->getField(ChangeStreamPreImage::kPreImageFieldName);
-    tassert(
-        6148000, "Pre-image document must contain the 'preImage' field", !preImageField.nullish());
-    return preImageField.getDocument().getOwned();
-}
-
 Value DocumentSourceChangeStreamAddPreImage::doSerialize(const SerializationOptions& opts) const {
     return opts.isSerializingForExplain()
         ? Value(Document{
@@ -161,15 +95,6 @@ Value DocumentSourceChangeStreamAddPreImage::doSerialize(const SerializationOpti
         : Value(Document{
               {kStageName,
                DocumentSourceChangeStreamAddPreImageSpec(_fullDocumentBeforeChangeMode).toBSON()}});
-}
-
-std::string DocumentSourceChangeStreamAddPreImage::makePreImageNotFoundErrorMsg(
-    const Document& event) {
-    auto errMsgDoc = Document{{"operationType", event["operationType"]},
-                              {"ns", event["ns"]},
-                              {"clusterTime", event["clusterTime"]},
-                              {"txnNumber", event["txnNumber"]}};
-    return errMsgDoc.toString();
 }
 
 }  // namespace mongo

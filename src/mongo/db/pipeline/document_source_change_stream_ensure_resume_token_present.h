@@ -35,7 +35,6 @@
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
@@ -69,18 +68,21 @@ public:
 
     Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage>
+    documentSourceChangeStreamEnsureResumeTokenPresentToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     /**
      * Use the create static method to create a DocumentSourceChangeStreamEnsureResumeTokenPresent.
      */
     DocumentSourceChangeStreamEnsureResumeTokenPresent(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
-
-    GetNextResult doGetNext() final;
-
-    GetNextResult _tryGetNext();
-
-    // Records whether we have observed the token in the resumed stream.
-    bool _hasSeenResumeToken = false;
 };
 }  // namespace mongo

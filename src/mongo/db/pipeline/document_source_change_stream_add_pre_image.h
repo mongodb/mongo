@@ -76,14 +76,6 @@ public:
     static boost::intrusive_ptr<DocumentSourceChangeStreamAddPreImage> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    // Retrieves the pre-image document given the specified 'preImageId'. Returns boost::none if no
-    // such pre-image is available.
-    static boost::optional<Document> lookupPreImage(boost::intrusive_ptr<ExpressionContext> pExpCtx,
-                                                    const Document& preImageId);
-
-    // Removes the internal fields from the event and returns the string representation of it.
-    static std::string makePreImageNotFoundErrorMsg(const Document& event);
-
     DocumentSourceChangeStreamAddPreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           FullDocumentBeforeChangeModeEnum mode)
         : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
@@ -144,10 +136,8 @@ public:
     }
 
 private:
-    /**
-     * Performs the lookup to retrieve the full pre-image document for applicable operations.
-     */
-    GetNextResult doGetNext() final;
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPreImageToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
 
     // Determines whether pre-images are strictly required or may be included only when available.
     FullDocumentBeforeChangeModeEnum _fullDocumentBeforeChangeMode =

@@ -61,7 +61,8 @@ DocumentSourceChangeStreamHandleTopologyChangeV2::create(
 
 DocumentSourceChangeStreamHandleTopologyChangeV2::DocumentSourceChangeStreamHandleTopologyChangeV2(
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSourceInternalChangeStreamStage(kStageName, expCtx) {}
+    : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx) {}
 
 StageConstraints DocumentSourceChangeStreamHandleTopologyChangeV2::constraints(
     PipelineSplitState pipeState) const {

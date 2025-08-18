@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/change_stream_transform_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -1721,7 +1722,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     // multiple documents to be returned from one applyOps.
     auto execPipeline = makeExecPipeline(transactionEntry2, kDefaultSpec);
     auto transform = execPipeline->getStages()[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
@@ -1900,7 +1901,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
     // documents to be returned from one applyOps.
     auto execPipeline = makeExecPipeline(transactionEntry5);
     auto transform = execPipeline->getStages()[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
     getExpCtx()->setMongoProcessInterface(
@@ -1993,7 +1994,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithOnlyEmptyOplogEntries) {
     // documents to be returned from one applyOps.
     auto execPipeline = makeExecPipeline(transactionEntry2);
     auto transform = execPipeline->getStages()[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
@@ -2089,7 +2090,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
     // documents to be returned from one applyOps.
     auto execPipeline = makeExecPipeline(commitEntry);
     auto transform = execPipeline->getStages()[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
@@ -2236,7 +2237,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     // multiple documents to be returned from one applyOps.
     auto execPipeline = makeExecPipeline(commitEntry, kDefaultSpec);
     auto transform = execPipeline->getStages()[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
@@ -2603,8 +2604,9 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformSingle
 
     auto source =
         DocumentSourceMock::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
-    auto transformStage =
+    auto transformDS =
         DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
+    auto transformStage = exec::agg::buildStage(transformDS);
     transformStage->setSource(source.get());
 
     auto next = transformStage->getNext();
@@ -2674,8 +2676,10 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultip
     docs.push_back(Document{entry2.getEntry().toBSON()});
     docs.push_back(Document{entry1.getEntry().toBSON()});
     auto source = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
-    auto transformStage =
+    auto transformDS =
         DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
+    auto transformStage = exec::agg::buildStage(transformDS);
+
     transformStage->setSource(source.get());
 
     auto next = transformStage->getNext();
@@ -2711,8 +2715,9 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTest,
 
     auto source =
         DocumentSourceMock::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
-    auto transformStage =
+    auto transformDS =
         DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
+    auto transformStage = exec::agg::buildStage(transformDS);
     transformStage->setSource(source.get());
 
     ASSERT_THROWS_CODE(transformStage->getNext(), AssertionException, 5052201);
@@ -2780,13 +2785,13 @@ TEST_F(ChangeStreamStageTest, DSCSTransformStageEmptySpecSerializeResumeAfter) {
     std::vector<boost::intrusive_ptr<DocumentSource>> allStages(std::begin(result),
                                                                 std::end(result));
     ASSERT_EQ(allStages.size(), 6);
-    auto transformStage = allStages[2];
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(transformStage.get()));
+    auto transformDS = allStages[2];
+    ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(transformDS.get()));
 
 
     // Verify that an additional start point field is populated while serializing.
     std::vector<Value> serialization;
-    transformStage->serializeToArray(serialization);
+    transformDS->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::object);
     ASSERT(!serialization[0]
@@ -2974,23 +2979,24 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesNonMatchingInputsCorrect
         };
 
         auto source = DocumentSourceMock::createForTest(inputDocs, expCtx);
-        injectControlEvents->setSource(source.get());
+        auto injectControlEventsStage = exec::agg::buildStage(injectControlEvents);
+        injectControlEventsStage->setSource(source.get());
 
-        auto next = injectControlEvents->getNext();
+        auto next = injectControlEventsStage->getNext();
         ASSERT_TRUE(next.isPaused());
 
-        next = injectControlEvents->getNext();
+        next = injectControlEventsStage->getNext();
         ASSERT_TRUE(next.isAdvanced());
         ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc1), next.getDocument());
 
-        next = injectControlEvents->getNext();
+        next = injectControlEventsStage->getNext();
         ASSERT_TRUE(next.isPaused());
 
-        next = injectControlEvents->getNext();
+        next = injectControlEventsStage->getNext();
         ASSERT_TRUE(next.isAdvanced());
         ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc2), next.getDocument());
 
-        next = injectControlEvents->getNext();
+        next = injectControlEventsStage->getNext();
         ASSERT_TRUE(next.isEOF());
     }
 }
@@ -3036,52 +3042,53 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesMatchingInputsCorrectly)
     };
 
     auto source = DocumentSourceMock::createForTest(inputDocs, expCtx);
-    injectControlEvents->setSource(source.get());
+    auto injectControlEventsStage = exec::agg::buildStage(injectControlEvents);
+    injectControlEventsStage->setSource(source.get());
 
-    auto next = injectControlEvents->getNext();
+    auto next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isPaused());
 
-    next = injectControlEvents->getNext();
+    next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc1), next.getDocument());
 
     // This document leads to injecting a follow-up control event.
-    next = injectControlEvents->getNext();
+    next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl1), next.getDocument());
 
     // The injected control event.
-    next = injectControlEvents->getNext();
+    next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isAdvancedControlDocument());
     ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl1), next.getDocument());
 
-    next = injectControlEvents->getNext();
+    next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isPaused());
 
-    next = injectControlEvents->getNext();
+    next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc2), next.getDocument());
 
     // This document gets transformed into a control event.
-    next = injectControlEvents->getNext();
+    next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isAdvancedControlDocument());
     ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl2), next.getDocument());
 
-    next = injectControlEvents->getNext();
+    next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc3), next.getDocument());
 
     // This document leads to injecting a follow-up control event.
-    next = injectControlEvents->getNext();
+    next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl3), next.getDocument());
 
     // The injected control event.
-    next = injectControlEvents->getNext();
+    next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isAdvancedControlDocument());
     ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl3), next.getDocument());
 
-    next = injectControlEvents->getNext();
+    next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isEOF());
 }
 

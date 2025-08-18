@@ -52,7 +52,7 @@ namespace mongo {
  * them. Alternatively, it can pass on such events unmodified, but inject a control event after the
  * original event.
  */
-class DocumentSourceChangeStreamInjectControlEvents
+class DocumentSourceChangeStreamInjectControlEvents final
     : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamInjectControlEvents"_sd;
@@ -129,10 +129,11 @@ public:
         return id;
     }
 
-protected:
-    GetNextResult doGetNext() override;
-
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage>
+    documentSourceChangeStreamInjectControlEventsToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     /**
      * Use the create static method to create a DocumentSourceChangeStreamInjectControlEvents.
      */
@@ -143,11 +144,5 @@ private:
      * A mapping from event name to the actions to take.
      */
     ActionsMap _actions;
-
-    /**
-     * An optional buffered control event. If set, it will be emitted on the next call to
-     * 'doGetNext()' and then resetted to none.
-     */
-    boost::optional<DocumentSource::GetNextResult> _bufferedControlEvent = boost::none;
 };
 }  // namespace mongo

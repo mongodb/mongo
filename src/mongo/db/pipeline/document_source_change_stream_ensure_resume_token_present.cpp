@@ -29,23 +29,22 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 
-#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/str.h"
 
-#include <memory>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamEnsureResumeTokenPresent,
+                            DocumentSourceChangeStreamEnsureResumeTokenPresent::id)
 
 DocumentSourceChangeStreamEnsureResumeTokenPresent::
     DocumentSourceChangeStreamEnsureResumeTokenPresent(
@@ -66,7 +65,6 @@ DocumentSourceChangeStreamEnsureResumeTokenPresent::create(
 const char* DocumentSourceChangeStreamEnsureResumeTokenPresent::getSourceName() const {
     return kStageName.data();
 }
-
 
 StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints(
     PipelineSplitState) const {
@@ -93,75 +91,6 @@ StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints
     constraints.consumesLogicalCollectionData = false;
 
     return constraints;
-}
-
-DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent::doGetNext() {
-    // If we have already verified the resume token is present, return the next doc immediately.
-    if (_resumeStatus == ResumeStatus::kSurpassedToken) {
-        return pSource->getNext();
-    }
-
-    auto nextInput = GetNextResult::makeEOF();
-
-    // If we are starting after an 'invalidate' and the invalidating command (e.g. collection drop)
-    // occurred at the same clusterTime on more than one shard, then we may see multiple identical
-    // resume tokens here. We swallow all of them until the resume status becomes kSurpassedToken.
-    while (_resumeStatus != ResumeStatus::kSurpassedToken) {
-        // Delegate to DocumentSourceChangeStreamCheckResumability to consume all events up to the
-        // token. This will also set '_resumeStatus' to indicate whether we have seen or surpassed
-        // the token.
-        nextInput = _tryGetNext();
-
-        // If there are no more results, return EOF. We will continue checking for the resume token
-        // the next time the getNext method is called. If we hit EOF, then we cannot have surpassed
-        // the resume token on this iteration.
-        if (!nextInput.isAdvanced()) {
-            invariant(_resumeStatus != ResumeStatus::kSurpassedToken);
-            return nextInput;
-        }
-
-        // When we reach here, we have either found the resume token or surpassed it.
-        invariant(_resumeStatus != ResumeStatus::kCheckNextDoc);
-
-        // If the resume status is kFoundToken, record the fact that we have seen the token. When we
-        // have surpassed the resume token, we will assert that we saw the token before doing so. We
-        // cannot simply assert once and then assume we have surpassed the token, because in certain
-        // cases we may see 1..N identical tokens and must swallow them all before proceeding.
-        _hasSeenResumeToken = (_hasSeenResumeToken || _resumeStatus == ResumeStatus::kFoundToken);
-    }
-
-    // Assert that before surpassing the resume token, we observed the token itself in the stream.
-    uassert(ErrorCodes::ChangeStreamFatalError,
-            str::stream() << "cannot resume stream; the resume token was not found. "
-                          << nextInput.getDocument()["_id"].getDocument().toString(),
-            _hasSeenResumeToken);
-
-    // At this point, we have seen the token and swallowed it. Return the next event to the client.
-    invariant(_hasSeenResumeToken && _resumeStatus == ResumeStatus::kSurpassedToken);
-    return nextInput;
-}
-
-DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent::_tryGetNext() {
-    try {
-        return DocumentSourceChangeStreamCheckResumability::doGetNext();
-    } catch (const ExceptionFor<ErrorCodes::ChangeStreamStartAfterInvalidate>& ex) {
-        const auto extraInfo = ex.extraInfo<ChangeStreamStartAfterInvalidateInfo>();
-        tassert(5779200, "Missing ChangeStreamStartAfterInvalidationInfo on exception", extraInfo);
-
-        DocumentSource::GetNextResult nextInput =
-            Document::fromBsonWithMetaData(extraInfo->getStartAfterInvalidateEvent());
-
-        _resumeStatus =
-            DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
-                nextInput.getDocument(), _tokenFromClient);
-
-        // This exception should always contain the client-provided resume token.
-        tassert(5779201,
-                "Client resume token did not match with the resume token on the invalidate event",
-                _resumeStatus == ResumeStatus::kFoundToken);
-
-        return nextInput;
-    }
 }
 
 Value DocumentSourceChangeStreamEnsureResumeTokenPresent::doSerialize(

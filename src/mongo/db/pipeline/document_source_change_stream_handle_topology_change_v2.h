@@ -55,7 +55,8 @@ namespace mongo {
  * remote cursors on these shards as needed.
  */
 class DocumentSourceChangeStreamHandleTopologyChangeV2 final
-    : public DocumentSourceInternalChangeStreamStage {
+    : public DocumentSourceInternalChangeStreamStage,
+      public exec::agg::Stage {
 public:
     static constexpr StringData kStageName =
         change_stream_constants::stage_names::kHandleTopologyChangeV2;

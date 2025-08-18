@@ -29,17 +29,13 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 
-#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -61,87 +57,6 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckResumability,
                                   true);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamCheckResumability,
                             DocumentSourceChangeStreamCheckResumability::id)
-
-// Returns ResumeStatus::kFoundToken if the document retrieved from the resumed pipeline satisfies
-// the client's resume token, ResumeStatus::kCheckNextDoc if it is older than the client's token,
-// and ResumeToken::kSurpassedToken if it is more recent than the client's resume token, indicating
-// that we will never see the token. Return ResumeStatus::kNeedsSplit if we have found the event
-// that produced the resume token, but it was split in the original stream.
-DocumentSourceChangeStreamCheckResumability::ResumeStatus
-DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
-    const Document& eventFromResumedStream, const ResumeTokenData& tokenDataFromClient) {
-    // Parse the stream doc into comprehensible ResumeTokenData.
-    auto tokenDataFromResumedStream =
-        ResumeToken::parse(eventFromResumedStream.metadata().getSortKey().getDocument()).getData();
-
-    // We start the resume with a $gte query on the timestamp, so we never expect it to be lower
-    // than our resume token's timestamp.
-    invariant(tokenDataFromResumedStream.clusterTime >= tokenDataFromClient.clusterTime);
-
-    // If the clusterTime differs from the client's token, this stream cannot be resumed.
-    if (tokenDataFromResumedStream.clusterTime != tokenDataFromClient.clusterTime) {
-        return ResumeStatus::kSurpassedToken;
-    }
-
-    // If the tokenType exceeds the client token's type, then we have passed the resume token point.
-    // This can happen if the client resumes from a synthetic 'high water mark' token from another
-    // shard which happens to have the same clusterTime as an actual change on this shard.
-    if (tokenDataFromResumedStream.tokenType != tokenDataFromClient.tokenType) {
-        return tokenDataFromResumedStream.tokenType > tokenDataFromClient.tokenType
-            ? ResumeStatus::kSurpassedToken
-            : ResumeStatus::kCheckNextDoc;
-    }
-
-    // If the document's 'txnIndex' sorts before that of the client token, we must keep looking.
-    if (tokenDataFromResumedStream.txnOpIndex < tokenDataFromClient.txnOpIndex) {
-        return ResumeStatus::kCheckNextDoc;
-    } else if (tokenDataFromResumedStream.txnOpIndex > tokenDataFromClient.txnOpIndex) {
-        // This could happen if the client provided a txnOpIndex of 0, yet the 0th document in the
-        // applyOps was irrelevant (meaning it was an operation on a collection or DB not being
-        // watched). Signal that we have read beyond the resume token.
-        return ResumeStatus::kSurpassedToken;
-    }
-
-    // If 'fromInvalidate' exceeds the client's token value, then we have passed the resume point.
-    if (tokenDataFromResumedStream.fromInvalidate != tokenDataFromClient.fromInvalidate) {
-        return tokenDataFromResumedStream.fromInvalidate ? ResumeStatus::kSurpassedToken
-                                                         : ResumeStatus::kCheckNextDoc;
-    }
-
-    // It is acceptable for the stream UUID to differ from the client's, if this is a whole-database
-    // or cluster-wide stream and we are comparing operations from different shards at the same
-    // clusterTime. If the stream UUID sorts after the client's, however, then the stream is not
-    // resumable; we are past the point in the stream where the token should have appeared.
-    if (tokenDataFromResumedStream.uuid != tokenDataFromClient.uuid) {
-        return tokenDataFromResumedStream.uuid > tokenDataFromClient.uuid
-            ? ResumeStatus::kSurpassedToken
-            : ResumeStatus::kCheckNextDoc;
-    }
-
-    // If the eventIdentifier matches exactly, then we have found the resume point. However, this
-    // event may have been split by the original stream; we must check the value of the resume
-    // token's fragmentNum field to determine the correct return status.
-    if (ValueComparator::kInstance.evaluate(tokenDataFromResumedStream.eventIdentifier ==
-                                            tokenDataFromClient.eventIdentifier)) {
-        if (tokenDataFromClient.fragmentNum && !tokenDataFromResumedStream.fragmentNum) {
-            return ResumeStatus::kNeedsSplit;
-        }
-        if (tokenDataFromResumedStream.fragmentNum == tokenDataFromClient.fragmentNum) {
-            return ResumeStatus::kFoundToken;
-        }
-        return tokenDataFromResumedStream.fragmentNum > tokenDataFromClient.fragmentNum
-            ? ResumeStatus::kSurpassedToken
-            : ResumeStatus::kCheckNextDoc;
-    }
-
-    // At this point, we know that the tokens differ only by eventIdentifier. The status we return
-    // will depend on whether the stream token is logically before or after the client token. If the
-    // latter, then we will never see the resume token and the stream cannot be resumed.
-    return ValueComparator::kInstance.evaluate(tokenDataFromResumedStream.eventIdentifier >
-                                               tokenDataFromClient.eventIdentifier)
-        ? ResumeStatus::kSurpassedToken
-        : ResumeStatus::kCheckNextDoc;
-}
 
 DocumentSourceChangeStreamCheckResumability::DocumentSourceChangeStreamCheckResumability(
     const intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token)
@@ -170,58 +85,6 @@ DocumentSourceChangeStreamCheckResumability::createFromBson(
 
 const char* DocumentSourceChangeStreamCheckResumability::getSourceName() const {
     return kStageName.data();
-}
-
-DocumentSource::GetNextResult DocumentSourceChangeStreamCheckResumability::doGetNext() {
-    if (_resumeStatus == ResumeStatus::kSurpassedToken) {
-        return pSource->getNext();
-    }
-
-    while (_resumeStatus != ResumeStatus::kSurpassedToken) {
-        // The underlying oplog scan will throw OplogQueryMinTsMissing if the minTs in the change
-        // stream filter has fallen off the oplog. Catch this and throw a more explanatory error.
-        auto nextInput = [this]() {
-            try {
-                return pSource->getNext();
-            } catch (const ExceptionFor<ErrorCodes::OplogQueryMinTsMissing>& ex) {
-                LOGV2_ERROR(6663107,
-                            "Resume of change stream was not possible",
-                            "reason"_attr = ex.reason());
-                uasserted(ErrorCodes::ChangeStreamHistoryLost,
-                          "Resume of change stream was not possible, as the resume point may no "
-                          "longer be in the oplog.");
-            }
-        }();
-
-        // If we hit EOF, return it immediately.
-        if (!nextInput.isAdvanced()) {
-            return nextInput;
-        }
-
-        // Determine whether the current event sorts before, equal to or after the resume token.
-        _resumeStatus =
-            DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
-                nextInput.getDocument(), _tokenFromClient);
-        switch (_resumeStatus) {
-            case ResumeStatus::kCheckNextDoc:
-                // If the result was kCheckNextDoc, we are resumable but must swallow this event.
-                continue;
-            case ResumeStatus::kNeedsSplit:
-                // If the result was kNeedsSplit, we found a resume token which matches the client's
-                // except for the splitNum attribute. Allow this document to pass through so that
-                // the split stage can regenerate the original fragments and their resume tokens.
-                return nextInput;
-            case ResumeStatus::kSurpassedToken:
-                // In this case the resume token wasn't found; it may be on another shard. However,
-                // since the oplog scan did not throw, we know that we are resumable. Fall through
-                // into the following case and return the document.
-                return nextInput;
-            case ResumeStatus::kFoundToken:
-                // We found the actual token! Return the doc so DSEnsureResumeTokenPresent sees it.
-                return nextInput;
-        }
-    }
-    MONGO_UNREACHABLE;
 }
 
 Value DocumentSourceChangeStreamCheckResumability::doSerialize(

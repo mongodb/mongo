@@ -438,11 +438,11 @@ private:
  * shared logic between all of the internal change stream stages. For internally created match
  * stages see 'DocumentSourceInternalChangeStreamMatch'.
  */
-class DocumentSourceInternalChangeStreamStage : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceInternalChangeStreamStage : public DocumentSource {
 public:
     DocumentSourceInternalChangeStreamStage(StringData stageName,
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(stageName, expCtx), exec::agg::Stage(stageName, expCtx) {}
+        : DocumentSource(stageName, expCtx) {}
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override {
         if (opts.isSerializingForQueryStats()) {
