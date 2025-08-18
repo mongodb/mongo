@@ -224,7 +224,8 @@ struct SolutionCacheData {
         : tree(nullptr),
           solnType(USE_INDEX_TAGS_SOLN),
           wholeIXSolnDir(1),
-          indexFilterApplied(false) {}
+          indexFilterApplied(false),
+          solutionHash{0} {}
 
     std::unique_ptr<SolutionCacheData> clone() const;
 

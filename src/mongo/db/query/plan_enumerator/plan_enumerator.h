@@ -507,7 +507,7 @@ private:
 
     // If true, there are no further enumeration states, and getNext should return false.
     // We could be _done immediately after init if we're unable to output an indexed plan.
-    bool _done;
+    bool _done = false;
 
     //
     // Data used by all enumeration strategies

@@ -131,7 +131,7 @@ private:
     bool _usingMap = false;
 
     // Keep track of the id of the first parameter.
-    InputParamId _firstParamId;
+    InputParamId _firstParamId = 0;
 
     // Map from assigned InputParamId to parameterized MatchExpression. It can be safely represented
     // as a vector because in 'MatchExpressionParameterizationVisitorContext' we control that
