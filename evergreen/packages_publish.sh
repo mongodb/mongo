@@ -3,6 +3,11 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 packagesfile=packages.tgz
 
+# we are not publishing atlas packages
+if [[ "${repo_edition}" == "atlas" ]]; then
+    exit 0
+fi
+
 curl https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz >>$packagesfile
 
 podman run \
