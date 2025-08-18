@@ -179,10 +179,10 @@ void OplogCapMaintainerThread::run() {
                                       Date_t::max(),
                                       AutoGetOplogFastPathOptions{.skipRSTLLock = true});
 
-                    const auto& oplogCollection = oplogRead->getCollection();
-                    rs = oplogCollection->getRecordStore();
-                    if (rs) {
-                        return;
+                    const auto& oplog = oplogRead->getCollection();
+                    if (oplog) {
+                        rs = oplog->getRecordStore();
+                        break;
                     }
 
                     // Wait a bit to give the oplog a chance to be created.
