@@ -86,6 +86,12 @@ bool RecordIdDeduplicator::insert(const RecordId& recordId) {
     return true;
 }
 
+void RecordIdDeduplicator::freeMemory(const RecordId& recordId) {
+    recordId.withFormat([&](RecordId::Null _) { hasNullRecordId = false; },
+                        [&](int64_t rid) { _roaring.erase(rid); },
+                        [&](const char* str, int size) { _hashset.erase(recordId); });
+}
+
 void RecordIdDeduplicator::spill(SpillingStats& stats, uint64_t maximumMemoryUsageBytes) {
     uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
             str::stream() << "Exceeded memory limit of " << maximumMemoryUsageBytes

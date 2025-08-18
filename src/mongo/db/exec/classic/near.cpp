@@ -62,6 +62,7 @@ NearStage::NearStage(ExpressionContext* expCtx,
     : RequiresIndexStage(typeName, expCtx, collection, indexDescriptor, workingSet),
       _workingSet(workingSet),
       _searchState(SearchState::Initializing),
+      _seenDocuments(expCtx),
       _nextIntervalStats(nullptr),
       _stageType(type),
       _nextInterval(nullptr) {}
@@ -175,7 +176,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
 
     // The child stage may not dedup so we must dedup them ourselves.
     if (nextMember->hasRecordId()) {
-        if (_seenDocuments.end() != _seenDocuments.find(nextMember->recordId)) {
+        if (!_seenDocuments.insert(nextMember->recordId)) {
             _workingSet->free(nextMemberID);
             return PlanStage::NEED_TIME;
         }
@@ -185,6 +186,9 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     // results.
     auto memberDistance = computeDistance(nextMember);
     if (memberDistance < _nextInterval->minDistance) {
+        if (nextMember->hasRecordId()) {
+            _seenDocuments.freeMemory(nextMember->recordId);
+        }
         _workingSet->free(nextMemberID);
         return PlanStage::NEED_TIME;
     }
@@ -194,11 +198,6 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
     nextMember->makeObjOwnedIfNeeded();
     _resultBuffer.push(SearchResult(nextMemberID, memberDistance));
-
-    // Store the member's RecordId, if available, for deduping.
-    if (nextMember->hasRecordId()) {
-        _seenDocuments.insert(std::make_pair(nextMember->recordId, nextMemberID));
-    }
 
     return PlanStage::NEED_TIME;
 }
@@ -221,9 +220,6 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
         if (inInterval) {
             resultID = result.resultID;
         }
-    } else {
-        // A document should be in _seenDocuments if and only if it's in _resultBuffer
-        invariant(_seenDocuments.empty());
     }
 
     // memberDistance is not in the interval or _resultBuffer is empty,
@@ -244,7 +240,7 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
     // '_seenDocuments' in sync with '_resultBuffer'.
     WorkingSetMember* member = _workingSet->get(*toReturn);
     if (member->hasRecordId()) {
-        _seenDocuments.erase(member->recordId);
+        _seenDocuments.freeMemory(member->recordId);
     }
 
     // This value is used by nextInterval() to determine the size of the next interval.

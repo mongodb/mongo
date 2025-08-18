@@ -46,15 +46,15 @@ public:
 
 protected:
     void assertInsertNew(RecordIdDeduplicator& recordIdDeduplicator, RecordId recordId) {
-        ASSERT_FALSE(recordIdDeduplicator.contains(recordId));
-        ASSERT_TRUE(recordIdDeduplicator.insert(recordId));
-        ASSERT_TRUE(recordIdDeduplicator.contains(recordId));
+        ASSERT_FALSE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
+        ASSERT_TRUE(recordIdDeduplicator.insert(recordId)) << "RecordId " << recordId;
+        ASSERT_TRUE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
     }
 
     void assertInsertExisting(RecordIdDeduplicator& recordIdDeduplicator, RecordId recordId) {
-        ASSERT_TRUE(recordIdDeduplicator.contains(recordId));
-        ASSERT_FALSE(recordIdDeduplicator.insert(recordId));
-        ASSERT_TRUE(recordIdDeduplicator.contains(recordId));
+        ASSERT_TRUE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
+        ASSERT_FALSE(recordIdDeduplicator.insert(recordId)) << "RecordId " << recordId;
+        ASSERT_TRUE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
     }
 };
 
@@ -201,5 +201,48 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
     assertInsertNew(recordIdDeduplicator, stringRecordId2);
     assertInsertNew(recordIdDeduplicator, longRecordId2);
 }
+
+TEST_F(RecordIdDeduplicatorTest, freeMemoryRemovesOnlyInMemoryElements) {
+    _expCtx->setAllowDiskUse(true);
+    RecordIdDeduplicator recordIdDeduplicator{_expCtx.get(), 40, 6, 1'000'000};
+
+    std::vector<RecordId> recordIds = {
+        RecordId{std::span("ABCDE", 5)},
+        RecordId{static_cast<int64_t>(1)},
+        RecordId{},
+    };
+
+    for (const auto& recordId : recordIds) {
+        assertInsertNew(recordIdDeduplicator, recordId);
+    }
+
+    for (const auto& recordId : recordIds) {
+        recordIdDeduplicator.freeMemory(recordId);
+        assertInsertNew(recordIdDeduplicator, recordId);
+    }
+
+    SpillingStats stats;
+    recordIdDeduplicator.spill(stats);
+    ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
+
+    for (const auto& recordId : recordIds) {
+        recordIdDeduplicator.freeMemory(recordId);
+        if (!recordId.isNull()) {
+            // Because we have spilled, old recordIds are not in memory, so they are not affected by
+            // freeMemory call.
+            assertInsertExisting(recordIdDeduplicator, recordId);
+        } else {
+            // Null record is one bool, so it is never spilled.
+            assertInsertNew(recordIdDeduplicator, recordId);
+        }
+    }
+
+    RecordId newRecordId{static_cast<int64_t>(2)};
+    recordIdDeduplicator.freeMemory(newRecordId);
+    assertInsertNew(recordIdDeduplicator, newRecordId);
+    recordIdDeduplicator.freeMemory(newRecordId);
+    assertInsertNew(recordIdDeduplicator, newRecordId);
+}
+
 
 }  // namespace

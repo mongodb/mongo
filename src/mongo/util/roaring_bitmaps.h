@@ -192,6 +192,19 @@ public:
             : false;
     }
 
+    /**
+     * Removes the value from the bitmap.
+     */
+    void erase(uint64_t value) {
+        auto it = _roarings.find(highBytes(value));
+        if (it != _roarings.end()) {
+            it->second.remove(lowBytes(value));
+            if (it->second.isEmpty()) {
+                _roarings.erase(it);
+            }
+        }
+    }
+
     void clear() {
         _roarings.clear();
     }

@@ -29,11 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/exec/classic/recordid_deduplicator.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/record_id.h"
-#include "mongo/stdx/unordered_map.h"
 
 #include <memory>
 #include <queue>
@@ -162,7 +161,7 @@ private:
     enum class SearchState { Initializing, Buffering, Advancing, Finished } _searchState;
 
     // Tracks RecordIds from the child stage to do our own deduping.
-    stdx::unordered_map<RecordId, WorkingSetID, RecordId::Hasher> _seenDocuments;
+    RecordIdDeduplicator _seenDocuments;
 
     // Stats for the stage covering this interval
     // This is owned by _specificStats

@@ -216,6 +216,23 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void erase(uint64_t value) {
+        switch (_state) {
+            case kHashTable:
+                _hashTable.erase(value);
+                return;
+            case kHashTableAndBitmap:
+                _hashTable.erase(value);
+                _bitmap.erase(value);
+                return;
+            case kBitmap:
+                _bitmap.erase(value);
+                return;
+        }
+
+        MONGO_UNREACHABLE_TASSERT(10910000);
+    }
+
     /**
      * Expose the current data structures used by the set at the moment.
      */
