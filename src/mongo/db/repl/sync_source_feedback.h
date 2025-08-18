@@ -35,6 +35,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 struct HostAndPort;
@@ -48,7 +49,7 @@ namespace repl {
 class BackgroundSync;
 class Reporter;
 
-class SyncSourceFeedback {
+class MONGO_MOD_PUB SyncSourceFeedback {
     SyncSourceFeedback(const SyncSourceFeedback&) = delete;
     SyncSourceFeedback& operator=(const SyncSourceFeedback&) = delete;
 

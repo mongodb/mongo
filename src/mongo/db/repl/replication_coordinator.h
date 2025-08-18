@@ -62,6 +62,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -123,7 +124,7 @@ class UpdatePositionArgs;
  * with the rest of the system.  The public methods on ReplicationCoordinator are the public
  * API that the replication subsystem presents to the rest of the codebase.
  */
-class ReplicationCoordinator : public SyncSourceSelector {
+class MONGO_MOD_OPEN ReplicationCoordinator : public SyncSourceSelector {
     ReplicationCoordinator(const ReplicationCoordinator&) = delete;
     ReplicationCoordinator& operator=(const ReplicationCoordinator&) = delete;
 
@@ -229,6 +230,7 @@ public:
      * Version which does not check for the RSTL. Without the RSTL, the return value may be
      * inaccurate by the time the function returns.
      */
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::isInPrimaryOrSecondaryState)
     virtual bool isInPrimaryOrSecondaryState_UNSAFE() const = 0;
 
     /**
@@ -320,6 +322,7 @@ public:
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL held,
      * the return value may be inaccurate by the time the function returns.
      */
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::canAcceptWritesFor)
     virtual bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& nsOrUUID) = 0;
 
@@ -364,9 +367,9 @@ public:
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL held,
      * the return value may be inaccurate by the time the function returns.
      */
-    virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
-                                                const NamespaceString& ns,
-                                                bool secondaryOk) = 0;
+    MONGO_MOD_PRIVATE virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
+                                                                  const NamespaceString& ns,
+                                                                  bool secondaryOk) = 0;
 
     /**
      * Returns true if this node should ignore index constraints for idempotency reasons.
@@ -527,7 +530,7 @@ public:
      * this node and changes every time we become primary.
      * TODO(spencer): Use term instead.
      */
-    virtual OID getElectionId() = 0;
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::getTerm) virtual OID getElectionId() = 0;
 
     /**
      * Returns the id for this node as specified in the current replica set configuration.
@@ -1169,7 +1172,7 @@ public:
     /**
      * A testing only function that cancels and reschedules replication heartbeats immediately.
      */
-    virtual void restartScheduledHeartbeats_forTest() = 0;
+    MONGO_MOD_NEEDS_REPLACEMENT virtual void restartScheduledHeartbeats_forTest() = 0;
 
     /**
      * Records if the cluster-wide write concern is set during sharding initialization.

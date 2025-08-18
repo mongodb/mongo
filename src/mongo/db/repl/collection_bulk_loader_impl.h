@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-
 #pragma once
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index_builds/multi_index_block.h"
@@ -38,6 +36,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>

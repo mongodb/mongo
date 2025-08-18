@@ -28,7 +28,6 @@
  */
 
 #pragma once
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -41,6 +40,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <cstdint>

@@ -28,9 +28,9 @@
  */
 
 #pragma once
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

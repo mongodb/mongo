@@ -33,6 +33,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -41,7 +42,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_OPEN mongo {
 namespace repl {
 
 class StorageInterface;
@@ -95,4 +96,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_OPEN mongo

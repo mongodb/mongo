@@ -35,8 +35,9 @@
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/version_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 class OplogWriterStats {
@@ -166,4 +167,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

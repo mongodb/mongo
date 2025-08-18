@@ -43,6 +43,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
@@ -51,13 +52,13 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
-namespace repl {
+namespace MONGO_MOD_PUB repl {
 
 /**
  * Applies oplog entries.
  * Reads from an OplogBuffer batches of operations that may be applied in parallel.
  */
-class OplogApplier {
+class MONGO_MOD_OPEN OplogApplier {
     OplogApplier(const OplogApplier&) = delete;
     OplogApplier& operator=(const OplogApplier&) = delete;
 
@@ -241,7 +242,7 @@ protected:
 /**
  * The OplogApplier reports its progress using the Observer interface.
  */
-class OplogApplier::Observer {
+class MONGO_MOD_OPEN OplogApplier::Observer {
 public:
     virtual ~Observer() = default;
 
@@ -260,7 +261,7 @@ public:
                             const std::vector<OplogEntry>& operations) = 0;
 };
 
-class NoopOplogApplierObserver : public repl::OplogApplier::Observer {
+class MONGO_MOD_PRIVATE NoopOplogApplierObserver : public repl::OplogApplier::Observer {
 public:
     void onBatchBegin(const std::vector<OplogEntry>&) final {}
     void onBatchEnd(const StatusWith<repl::OpTime>&, const std::vector<OplogEntry>&) final {}
@@ -281,5 +282,5 @@ std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount,
                                                StringData name,
                                                bool isKillableByStepdown = false);
 
-}  // namespace repl
+}  // namespace MONGO_MOD_PUB repl
 }  // namespace mongo

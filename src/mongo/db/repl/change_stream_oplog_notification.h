@@ -36,6 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <set>
@@ -43,7 +44,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /*
  * This function writes a no-op oplog entry on shardCollection event.
@@ -123,4 +124,4 @@ void notifyChangeStreamOnEndOfTransaction(OperationContext* opCtx,
                                           const TxnNumber& txnNumber,
                                           const std::vector<NamespaceString>& affectedNamespaces);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

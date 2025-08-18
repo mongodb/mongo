@@ -28,9 +28,9 @@
  */
 
 #pragma once
-
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

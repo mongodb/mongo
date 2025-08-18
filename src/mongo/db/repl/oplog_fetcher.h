@@ -49,6 +49,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <cstddef>
@@ -62,6 +63,10 @@ namespace mongo {
 namespace repl {
 
 extern FailPoint stopReplProducer;
+
+};
+
+namespace MONGO_MOD_OPEN repl {
 
 /**
  * The oplog fetcher, once started, reads operations from a remote oplog using a tailable,
@@ -140,7 +145,7 @@ public:
     using EnqueueDocumentsFn = std::function<Status(
         Documents::const_iterator begin, Documents::const_iterator end, const DocumentsInfo& info)>;
 
-    class OplogFetcherRestartDecision {
+    class MONGO_MOD_OPEN OplogFetcherRestartDecision {
     public:
         OplogFetcherRestartDecision() {};
 
@@ -522,5 +527,5 @@ public:
 
 typedef OplogFetcherFactoryImpl<OplogFetcher> CreateOplogFetcherFn;
 
-}  // namespace repl
+}  // namespace MONGO_MOD_OPEN repl
 }  // namespace mongo

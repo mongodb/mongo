@@ -28,10 +28,10 @@
  */
 
 #pragma once
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 // TODO SERVER-78399 Remove BSONKey class once featureFlagSecondaryIndexChecksInDbCheck is removed.
 namespace mongo {

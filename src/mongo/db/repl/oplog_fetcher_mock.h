@@ -41,6 +41,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -50,7 +51,7 @@
 
 namespace mongo {
 namespace repl {
-class OplogFetcherMock : public OplogFetcher {
+class MONGO_MOD_OPEN OplogFetcherMock : public OplogFetcher {
 public:
     explicit OplogFetcherMock(
         executor::TaskExecutor* executor,
@@ -152,7 +153,7 @@ private:
     bool _first = true;
 };
 
-typedef OplogFetcherFactoryImpl<OplogFetcherMock> CreateOplogFetcherMockFn;
+MONGO_MOD_PUB typedef OplogFetcherFactoryImpl<OplogFetcherMock> CreateOplogFetcherMockFn;
 
 }  // namespace repl
 }  // namespace mongo

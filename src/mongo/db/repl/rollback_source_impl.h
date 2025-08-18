@@ -28,7 +28,6 @@
  */
 
 #pragma once
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
@@ -36,6 +35,7 @@
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/oplog_interface_remote.h"
 #include "mongo/db/repl/rollback_source.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 

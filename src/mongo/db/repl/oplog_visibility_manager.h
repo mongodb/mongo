@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/slotted_timestamp_list.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace repl {

@@ -32,13 +32,14 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 #include <functional>
 #include <memory>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 /**
@@ -69,27 +70,28 @@ public:
     /**
      * Sets a function that will be run every time chooseNewSyncSource() is called.
      */
-    void setChooseNewSyncSourceHook_forTest(const ChooseNewSyncSourceHook& hook);
+    MONGO_MOD_NEEDS_REPLACEMENT void setChooseNewSyncSourceHook_forTest(
+        const ChooseNewSyncSourceHook& hook);
 
     /**
      * Sets the result for subsequent chooseNewSyncSource() invocations.
      */
-    void setChooseNewSyncSourceResult_forTest(const HostAndPort&);
+    MONGO_MOD_NEEDS_REPLACEMENT void setChooseNewSyncSourceResult_forTest(const HostAndPort&);
 
     /**
      * Returns most recent optime passed to chooseNewSyncSource().
      */
-    OpTime getChooseNewSyncSourceOpTime_forTest() const;
+    MONGO_MOD_NEEDS_REPLACEMENT OpTime getChooseNewSyncSourceOpTime_forTest() const;
 
     /**
      * Returns most recently denylisted sync source.
      */
-    HostAndPort getLastDenylistedSyncSource_forTest() const;
+    MONGO_MOD_NEEDS_REPLACEMENT HostAndPort getLastDenylistedSyncSource_forTest() const;
 
     /**
      * Returns the expiration associated with the most recently denylisted sync source.
      */
-    Date_t getLastDenylistExpiration_forTest() const;
+    MONGO_MOD_NEEDS_REPLACEMENT Date_t getLastDenylistExpiration_forTest() const;
 
 private:
     // This is the sync source that chooseNewSyncSource returns.
@@ -110,4 +112,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

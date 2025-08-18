@@ -28,7 +28,7 @@
  */
 
 #pragma once
-
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

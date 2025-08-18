@@ -28,8 +28,8 @@
  */
 
 #pragma once
-
 #include "mongo/platform/random.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

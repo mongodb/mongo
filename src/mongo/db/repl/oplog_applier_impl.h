@@ -49,10 +49,11 @@
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_OPEN mongo {
 namespace repl {
 
 /**
@@ -146,10 +147,11 @@ protected:
      * This function has been marked as virtual to allow certain unit tests to skip oplog
      * application.
      */
-    virtual Status applyOplogBatchPerWorker(OperationContext* opCtx,
-                                            std::vector<ApplierOperation>* ops,
-                                            WorkerMultikeyPathInfo* workerMultikeyPathInfo,
-                                            bool isDataConsistent);
+    MONGO_MOD_FILE_PRIVATE virtual Status applyOplogBatchPerWorker(
+        OperationContext* opCtx,
+        std::vector<ApplierOperation>* ops,
+        WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+        bool isDataConsistent);
 };
 
 /**
@@ -161,4 +163,4 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                        bool isDataConsistent);
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_OPEN mongo

@@ -35,6 +35,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <iterator>
@@ -58,7 +59,7 @@ enum class ApplicationInstruction {
     applyTopLevelPreparedTxnOp,
 };
 
-struct ApplierOperation {
+struct MONGO_MOD_PUB ApplierOperation {
     const OplogEntry* op;
     ApplicationInstruction instruction;
     boost::optional<const InternalSessionPool::Session&> subSession;
@@ -100,7 +101,7 @@ struct ApplierOperation {
  * applyOplogEntryOrGroupedInserts. This class is immutable and can only be initialized using
  * either a single oplog entry or a range of grouped inserts.
  */
-class OplogEntryOrGroupedInserts {
+class MONGO_MOD_OPEN OplogEntryOrGroupedInserts {
 public:
     using ConstIterator = std::vector<ApplierOperation>::const_iterator;
 

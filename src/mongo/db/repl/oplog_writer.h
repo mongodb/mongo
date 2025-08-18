@@ -34,14 +34,15 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_writer_batcher.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
-namespace repl {
+namespace MONGO_MOD_PUB repl {
 
 /**
  * Writes oplog entries to the oplog and/or the change collection.
  */
-class OplogWriter {
+class MONGO_MOD_OPEN OplogWriter {
     OplogWriter(const OplogWriter&) = delete;
     OplogWriter& operator=(const OplogWriter&) = delete;
 
@@ -61,7 +62,7 @@ public:
     };
 
     // Used to report oplog write progress.
-    class Observer;
+    class MONGO_MOD_PRIVATE Observer;
 
     /**
      * Constructs this OplogWriter with specific options.
@@ -171,7 +172,7 @@ private:
 /**
  * The OplogWriter reports its progress using the Observer interface.
  */
-class OplogWriter::Observer {
+class MONGO_MOD_PRIVATE OplogWriter::Observer {
 public:
     virtual ~Observer() = default;
 
@@ -184,7 +185,7 @@ public:
 /**
  * An Observer implementation that does nothing.
  */
-class NoopOplogWriterObserver : public OplogWriter::Observer {
+class MONGO_MOD_PRIVATE NoopOplogWriterObserver : public OplogWriter::Observer {
 public:
     void onWriteOplogCollection(std::vector<InsertStatement>::const_iterator begin,
                                 std::vector<InsertStatement>::const_iterator end) final {}
@@ -194,5 +195,5 @@ public:
 
 extern NoopOplogWriterObserver noopOplogWriterObserver;
 
-}  // namespace repl
+}  // namespace MONGO_MOD_PUB repl
 }  // namespace mongo

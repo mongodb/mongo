@@ -33,6 +33,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 

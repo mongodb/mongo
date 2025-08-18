@@ -28,9 +28,9 @@
  */
 
 #pragma once
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 

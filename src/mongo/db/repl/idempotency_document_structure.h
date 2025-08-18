@@ -28,11 +28,11 @@
  */
 
 #pragma once
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/repl/idempotency_scalar_generator.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <set>

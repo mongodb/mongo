@@ -32,9 +32,10 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
-namespace repl {
+namespace MONGO_MOD_OPEN repl {
 
 /**
  * Oplog buffer backed by a bounded, in-memory queue that supports batched operations
@@ -97,5 +98,5 @@ private:
     std::list<OplogBatch<Value>> _queue;
 };
 
-}  // namespace repl
+}  // namespace MONGO_MOD_OPEN repl
 }  // namespace mongo

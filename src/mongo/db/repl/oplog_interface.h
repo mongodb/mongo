@@ -33,16 +33,17 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
 #include <string>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
-class OplogInterface {
+class MONGO_MOD_OPEN OplogInterface {
     OplogInterface(const OplogInterface&) = delete;
     OplogInterface& operator=(const OplogInterface&) = delete;
 
@@ -94,4 +95,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

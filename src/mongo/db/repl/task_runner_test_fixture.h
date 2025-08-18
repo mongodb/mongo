@@ -28,11 +28,11 @@
  */
 
 #pragma once
-
 #include "mongo/base/status.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

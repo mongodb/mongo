@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_OPEN mongo {
 namespace repl {
 /**
  * Returns if the provided collection can skip acquiring the RSTL lock.
@@ -44,4 +45,4 @@ inline bool canCollectionSkipRSTLLockAcquisition(const NamespaceString& nss) {
     return nss.isSystemDotProfile();
 }
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_OPEN mongo

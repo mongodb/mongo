@@ -47,6 +47,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -59,7 +60,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_OPEN mongo {
 class Collection;
 class CollectionPtr;
 class Database;
@@ -108,17 +109,18 @@ public:
     BSONObj doc;
 };
 
-namespace repl {
+namespace MONGO_MOD_OPEN repl {
 namespace internal {
-Status insertDocumentsForOplog(OperationContext* opCtx,
-                               const CollectionPtr& oplogCollection,
-                               std::vector<Record>* records,
-                               const std::vector<Timestamp>& timestamps);
+MONGO_MOD_NEEDS_REPLACEMENT Status
+insertDocumentsForOplog(OperationContext* opCtx,
+                        const CollectionPtr& oplogCollection,
+                        std::vector<Record>* records,
+                        const std::vector<Timestamp>& timestamps);
 }  // namespace internal
 
 class ReplSettings;
 
-struct OplogLink {
+struct MONGO_MOD_PRIVATE OplogLink {
     OplogLink() = default;
 
     OpTime prevOpTime;
@@ -349,5 +351,5 @@ auto writeConflictRetryWithLimit(OperationContext* opCtx,
         opCtx, opStr, nssOrUUID, f, repl::writeConflictRetryLimit.loadRelaxed());
 }
 
-}  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_OPEN repl
+}  // namespace MONGO_MOD_OPEN mongo

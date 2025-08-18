@@ -33,10 +33,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 class BSONObjBuilder;
 class OperationContext;
 
@@ -84,4 +85,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -32,6 +32,7 @@
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
@@ -48,7 +49,7 @@ namespace repl {
  * Reads oplog on remote server.
  */
 
-class OplogInterfaceRemote : public OplogInterface {
+class MONGO_MOD_PUB OplogInterfaceRemote : public OplogInterface {
 public:
     /**
      * Type of function to return a connection to the sync source.

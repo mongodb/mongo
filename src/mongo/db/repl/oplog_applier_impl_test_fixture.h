@@ -61,6 +61,7 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -238,7 +239,7 @@ public:
         onCollModFn;
 };
 
-class OplogApplierImplTest : public ServiceContextMongoDTest {
+class MONGO_MOD_OPEN OplogApplierImplTest : public ServiceContextMongoDTest {
 protected:
     explicit OplogApplierImplTest(Options options = {})
         : ServiceContextMongoDTest(options.useReplSettings(true)) {}
@@ -305,7 +306,7 @@ protected:
 
 // Utility class to allow easily scanning a collection.  Scans in forward order, returns
 // Status::CollectionIsEmpty when scan is exhausted.
-class CollectionReader {
+class MONGO_MOD_PUB CollectionReader {
 public:
     CollectionReader(OperationContext* opCtx, const NamespaceString& nss);
 
@@ -315,6 +316,10 @@ private:
     CollectionAcquisition _collToScan;
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 };
+
+}  // namespace repl
+
+namespace MONGO_MOD_PUB repl {
 
 Status failedApplyCommand(OperationContext* opCtx,
                           const BSONObj& theOperation,
@@ -405,5 +410,6 @@ void createIndex(OperationContext* opCtx,
                  UUID collUUID,
                  const BSONObj& spec);
 
-}  // namespace repl
+}  // namespace MONGO_MOD_PUB repl
+
 }  // namespace mongo

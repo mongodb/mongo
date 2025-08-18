@@ -49,6 +49,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
@@ -68,7 +69,7 @@ class ReplicationCoordinatorExternalState;
 class ReplicationProcess;
 class StorageInterface;
 
-class BackgroundSync {
+class MONGO_MOD_OPEN BackgroundSync {
     BackgroundSync(const BackgroundSync&) = delete;
     BackgroundSync& operator=(const BackgroundSync&) = delete;
 

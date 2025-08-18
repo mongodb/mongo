@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
@@ -41,7 +42,7 @@ namespace repl {
  * The batch can be either BSONObj or OplogEntry.
  */
 template <class T>
-class OplogBatch {
+class MONGO_MOD_PUB OplogBatch {
 public:
     OplogBatch() : _batch(), _byteSize(0) {}
 
@@ -108,7 +109,7 @@ private:
 /**
  * Stores a batch of oplog entries for oplog application.
  */
-class OplogApplierBatch : public OplogBatch<OplogEntry> {
+class MONGO_MOD_PUB OplogApplierBatch : public OplogBatch<OplogEntry> {
 public:
     OplogApplierBatch() : OplogBatch<OplogEntry>() {}
 

@@ -35,6 +35,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/time_support.h"
 
@@ -43,7 +44,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace repl {
+namespace MONGO_MOD_OPEN repl {
 
 /**
  * Oplog buffer backed by an in-memory blocking queue that supports point operations
@@ -107,5 +108,5 @@ private:
     const Options _options;
 };
 
-}  // namespace repl
+}  // namespace MONGO_MOD_OPEN repl
 }  // namespace mongo

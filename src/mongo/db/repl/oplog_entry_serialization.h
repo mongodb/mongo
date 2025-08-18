@@ -28,9 +28,9 @@
  */
 
 #pragma once
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/session/logical_session_id.h"  // for StmtId.
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace repl {

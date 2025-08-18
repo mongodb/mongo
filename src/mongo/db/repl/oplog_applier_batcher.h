@@ -40,6 +40,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -68,7 +69,7 @@ public:
      * Controls what can popped from the oplog buffer into a single batch of operations that can be
      * applied using OplogApplier::applyOplogBatch().
      */
-    class BatchLimits {
+    class MONGO_MOD_PUB BatchLimits {
     public:
         size_t bytes = 0;
         size_t ops = 0;
@@ -180,14 +181,15 @@ private:
  * Returns maximum number of operations in each batch that can be applied using
  * applyOplogBatch().
  */
-std::size_t getBatchLimitOplogEntries();
+MONGO_MOD_PUB std::size_t getBatchLimitOplogEntries();
 
 /**
  * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
  * size.  Must not be called from within a WriteUnitOfWork.
  * Batches are limited to 10% of the oplog.
  */
-std::size_t getBatchLimitOplogBytes(OperationContext* opCtx, StorageInterface* storageInterface);
+MONGO_MOD_PUB std::size_t getBatchLimitOplogBytes(OperationContext* opCtx,
+                                                  StorageInterface* storageInterface);
 
 }  // namespace repl
 }  // namespace mongo

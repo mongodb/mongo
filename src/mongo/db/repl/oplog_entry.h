@@ -48,6 +48,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -65,7 +66,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace repl {
+namespace MONGO_MOD_OPEN repl {
 
 /**
  * The first oplog entry is a no-op with this message in its "msg" field.
@@ -997,5 +998,5 @@ bool operator==(const OplogEntry& lhs, const OplogEntry& rhs);
 
 std::ostream& operator<<(std::ostream& s, const ReplOperation& o);
 
-}  // namespace repl
+}  // namespace MONGO_MOD_OPEN repl
 }  // namespace mongo
