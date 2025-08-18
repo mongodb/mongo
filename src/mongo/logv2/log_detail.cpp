@@ -211,12 +211,40 @@ static void checkUniqueAttrs(int32_t id, const TypeErasedAttributeStorage& attrs
     }
 }
 
-void doSafeLog(int32_t id,
-               LogSeverity const& severity,
-               LogOptions const& options,
-               StringData message,
-               TypeErasedAttributeStorage const& attrs) {
-    signalSafeWriteToStderr(fmt::format("{}({}): {}\n", severity.toStringData(), id, message));
+static void doSafeLog(StringData reason,
+                      int32_t id,
+                      LogSeverity const& severity,
+                      LogOptions const& options,
+                      StringData message,
+                      TypeErasedAttributeStorage const& attrs) {
+    std::string s;
+    s += fmt::format("SafeLog: {{\n");
+    s += fmt::format("    reason: {:?},\n", reason);
+    s += fmt::format("    loggingDepth: {},\n", loggingDepth);
+    s += fmt::format("    t: {:?},\n", Date_t::now().toString());
+    s += fmt::format("    severity: {:?},\n", severity.toStringData());
+    s += fmt::format("    id: {},\n", id);
+    s += fmt::format("    ctx: {:?},\n", getThreadName());
+    s += fmt::format("    message: {:?},\n", message);
+    if (!attrs.empty()) {
+        s += fmt::format("    attrs: {{\n");
+        attrs.apply([&]<typename T>(StringData name, const T& val) {
+            s += fmt::format("        {{\n");
+            s += fmt::format("            name: {:?},\n", name);
+            s += fmt::format("            type: {:?},\n", demangleName(typeid(T)));
+            if constexpr (std::is_integral_v<T>) {
+                s += fmt::format("            value: {},\n", val);
+            } else if constexpr (std::is_convertible_v<T, StringData>) {
+                s += fmt::format("            value: {:?},\n", StringData{val});
+            } else {
+                s += fmt::format("            value: {:?},\n", "<unsupported>");
+            }
+            s += fmt::format("        }},\n");
+        });
+        s += fmt::format("    }},\n");
+    }
+    s += fmt::format("}}\n");
+    signalSafeWriteToStderr(s);
 }
 
 void _doLogImpl(int32_t id,
@@ -273,7 +301,7 @@ void doLogImpl(int32_t id,
                StringData message,
                TypeErasedAttributeStorage const& attrs) {
     if (loggingInProgress()) {
-        doSafeLog(id, severity, options, message, attrs);
+        doSafeLog("Logging in Progress", id, severity, options, message, attrs);
         return;
     }
 
@@ -293,7 +321,7 @@ void doLogImpl(int32_t id,
 
         invariant(!kDebugBuild, fmt::format("Exception during log: {}", ex.what()));
     } catch (...) {
-        doSafeLog(id, severity, options, message, attrs);
+        doSafeLog("Exception while creating log record", id, severity, options, message, attrs);
         throw;
     }
 }
