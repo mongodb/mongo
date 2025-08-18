@@ -14,6 +14,7 @@ mongo_cc_library(
     srcs = [
         "all_databases_change_stream_shard_targeter_impl.cpp",
         "change_stream_db_absent_state_event_handler.cpp",
+        "change_stream_db_present_state_event_handler.cpp",
         "change_stream_reader_builder_impl.cpp",
         "collection_change_stream_db_absent_state_event_handler.cpp",
         "collection_change_stream_db_present_state_event_handler.cpp",
@@ -26,6 +27,7 @@ mongo_cc_library(
     hdrs = [
         "all_databases_change_stream_shard_targeter_impl.h",
         "change_stream_db_absent_state_event_handler.h",
+        "change_stream_db_present_state_event_handler.h",
         "change_stream_reader_builder_impl.h",
         "change_stream_shard_targeter_state_event_handler.h",
         "collection_change_stream_db_absent_state_event_handler.h",
@@ -50,6 +52,7 @@ mongo_cc_unit_test(
         "change_stream_reader_builder_impl_test.cpp",
         "change_stream_shard_targeter_state_event_handler_mock.h",
         "collection_change_stream_db_absent_state_event_handler_test.cpp",
+        "collection_change_stream_db_present_state_event_handler_test.cpp",
         "control_events_test.cpp",
         "data_to_shards_allocation_query_service_impl_test.cpp",
         "//src/mongo/db/pipeline:change_stream_reader_context_mock.h",

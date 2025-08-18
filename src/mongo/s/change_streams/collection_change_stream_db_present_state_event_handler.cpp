@@ -29,23 +29,38 @@
 
 #include "mongo/s/change_streams/collection_change_stream_db_present_state_event_handler.h"
 
+#include "mongo/s/change_streams/collection_change_stream_db_absent_state_event_handler.h"
+
 namespace mongo {
 
-ShardTargeterDecision CollectionChangeStreamShardTargeterDbPresentStateEventHandler::handleEvent(
+ShardTargeterDecision
+CollectionChangeStreamShardTargeterDbPresentStateEventHandler::handleMoveChunk(
     OperationContext* opCtx,
-    const ControlEvent& event,
-    ChangeStreamShardTargeterStateEventHandlingContext& context,
-    ChangeStreamReaderContext& readerContext) {
-    MONGO_UNIMPLEMENTED_TASSERT(10908402);
+    const MoveChunkControlEvent& event,
+    ChangeStreamShardTargeterStateEventHandlingContext& ctx,
+    ChangeStreamReaderContext& readerCtx) {
+    // Open a cursor on the data shard 'event.toShard' if not already opened.
+    const auto& currentlyOpenedShards = readerCtx.getCurrentlyTargetedDataShards();
+    const bool isCursorAlreadyOpened = currentlyOpenedShards.count(event.toShard);
+    if (!isCursorAlreadyOpened) {
+        readerCtx.openCursorsOnDataShards(event.clusterTime + 1, {event.toShard});
+    }
+
+    // Close cursor on the data shard 'event.fromShard' if all chunks have been migrated from donor.
+    if (event.allCollectionChunksMigratedFromDonor) {
+        tassert(10917003,
+                "cursor should have been opened",
+                currentlyOpenedShards.count(event.fromShard));
+        readerCtx.closeCursorsOnDataShards({event.fromShard});
+    }
+
+    return ShardTargeterDecision::kContinue;
 }
 
-ShardTargeterDecision
-CollectionChangeStreamShardTargeterDbPresentStateEventHandler::handleEventInDegradedMode(
-    OperationContext* opCtx,
-    const ControlEvent& event,
-    ChangeStreamShardTargeterStateEventHandlingContext& context,
-    ChangeStreamReaderContext& readerContext) {
-    MONGO_UNIMPLEMENTED_TASSERT(10908403);
+std::unique_ptr<ChangeStreamShardTargeterStateEventHandler>
+CollectionChangeStreamShardTargeterDbPresentStateEventHandler::buildDbAbsentStateEventHandler()
+    const {
+    return std::make_unique<CollectionChangeStreamShardTargeterDbAbsentStateEventHandler>();
 }
 
 }  // namespace mongo

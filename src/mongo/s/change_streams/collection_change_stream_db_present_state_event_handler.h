@@ -29,21 +29,26 @@
 
 #pragma once
 
-#include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler.h"
+#include "mongo/s/change_streams/change_stream_db_present_state_event_handler.h"
 
 namespace mongo {
 class CollectionChangeStreamShardTargeterDbPresentStateEventHandler
-    : public ChangeStreamShardTargeterStateEventHandler {
-    ShardTargeterDecision handleEvent(OperationContext* opCtx,
-                                      const ControlEvent& event,
-                                      ChangeStreamShardTargeterStateEventHandlingContext& context,
-                                      ChangeStreamReaderContext& readerContext) override;
+    : public ChangeStreamShardTargeterDbPresentStateEventHandler {
+protected:
+    /**
+     * Opens a cursor on the destination shard if needed and closes the cursor on the donor shard
+     * if all its chunks have been migrated away.
+     */
+    ShardTargeterDecision handleMoveChunk(OperationContext* opCtx,
+                                          const MoveChunkControlEvent& e,
+                                          ChangeStreamShardTargeterStateEventHandlingContext& ctx,
+                                          ChangeStreamReaderContext& readerCtx) override;
 
-    ShardTargeterDecision handleEventInDegradedMode(
-        OperationContext* opCtx,
-        const ControlEvent& event,
-        ChangeStreamShardTargeterStateEventHandlingContext& context,
-        ChangeStreamReaderContext& readerContext) override;
+    /**
+     * Returns CollectionChangeStreamShardTargeterDbAbsentStateEventHandler.
+     */
+    std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> buildDbAbsentStateEventHandler()
+        const override;
 };
 
 }  // namespace mongo
