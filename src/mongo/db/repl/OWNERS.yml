@@ -48,3 +48,7 @@ filters:
   - "*topology_coordinator*":
     approvers:
       - 10gen/server-replication-coordinator
+  - "FCV_AND_FEATURE_FLAG_README.md":
+    approvers:
+      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing

@@ -282,6 +282,28 @@ Note that on downgrade, if the setFCV command fails at any point between 4a and 
 not be able to transition back to the original upgraded FCV, since either the config server and/or
 the shard servers are in the middle of cleaning up internal server metadata.
 
+## Dry-run mode for setFCV Command
+
+The setFCV command supports a dry-run mode to detect uses of forwards or backwards incompatible features without operational impact nor changes to persisted data.
+This mode performs validations and reports for the use of forwards incompatible features (during upgrade) or backwards incompatible features (during downgrade) to
+the user, informing them that the upgrade or downgrade will not succeed.
+The dry-run check is exposed in two complementary ways:
+
+- As an explicit user request, by including the parameter `dryRun: true`, which allows validating the use of incompatible features at any time, without performing
+  the actual FCV upgrade/downgrade.
+  ```
+  db.runCommand({
+    setFeatureCompatibilityVersion: '9.0',
+    dryRun: true
+  })
+  ```
+- Automatically before an actual FCV upgrade/downgrade, to prevent the transition from starting if any use of incompatible features is detected.
+  - For sharded clusters, the config server coordinates the dry-run mode across the shards after its own dry-run has succeeded.
+
+If a setFCV command fails during dry-run mode, a `CannotUpgrade` or `CannotDowngrade` error will be thrown and the transition won't start, preventing the user from leaving the FCV in a transitional state.
+
+The compatibility checks are done respectively in functions `_userCollectionsUassertsForDowngrade` and `_userCollectionsUassertsForUpgrade`, so every added check should be placed in one of those functions.
+
 ## SetFCV Command Errors
 
 The setFCV command can only fail with these error cases:

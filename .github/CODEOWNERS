@@ -2543,6 +2543,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/repl/**/*external_state* @10gen/server-replication-coordinator @svc-auto-approve-bot
 /src/mongo/db/repl/**/*heartbeat* @10gen/server-replication-coordinator @svc-auto-approve-bot
 /src/mongo/db/repl/**/*topology_coordinator* @10gen/server-replication-coordinator @svc-auto-approve-bot
+/src/mongo/db/repl/**/FCV_AND_FEATURE_FLAG_README.md @10gen/server-catalog-and-routing @10gen/server-fcv @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/repl/dbcheck/OWNERS.yml
 /src/mongo/db/repl/dbcheck/**/* @10gen/server-dbcheck @svc-auto-approve-bot
