@@ -68,7 +68,7 @@ typedef struct {
  * extension written for versions in the ranges [v1.0.0, v1.3.2] and [v2.0.0, v2.4.3].
  */
 typedef struct {
-    size_t len;
+    uint64_t len;
     MongoExtensionAPIVersion* versions;
 } MongoExtensionAPIVersionVector;
 
@@ -77,7 +77,7 @@ typedef struct {
  */
 typedef struct MongoExtensionByteView {
     const uint8_t* data;
-    size_t len;
+    uint64_t len;
 } MongoExtensionByteView;
 
 /**
@@ -147,7 +147,7 @@ const int32_t MONGO_EXTENSION_STATUS_OK = 0;
 /**
  * Types of aggregation stages that can be implemented as an extension.
  */
-typedef enum MongoExtensionAggregationStageType {
+typedef enum MongoExtensionAggregationStageType : uint32_t {
     /**
      * NoOp stage.
      */
@@ -221,7 +221,7 @@ typedef struct MongoExtensionHostPortal {
     // Wire versions in MongoDB are stored in an enum. Each service context will have both a min and
     // a max wire version; the extension should only need the max wire version in order to determine
     // if new server features have been added.
-    int hostMongoDBMaxWireVersion;
+    int32_t hostMongoDBMaxWireVersion;
     MongoExtensionStatus* (*registerStageDescriptor)(
         const MongoExtensionAggregationStageDescriptor* descriptor);
 } MongoExtensionHostPortal;
