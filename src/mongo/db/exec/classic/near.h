@@ -33,9 +33,10 @@
 #include "mongo/db/exec/classic/requires_index_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/sorter/sorter.h"
 
+#include <limits>
 #include <memory>
-#include <queue>
 #include <vector>
 
 namespace mongo {
@@ -167,9 +168,64 @@ private:
     // This is owned by _specificStats
     IntervalStats* _nextIntervalStats;
 
-    // Sorted buffered results to be returned - the current interval
-    struct SearchResult;
-    std::priority_queue<SearchResult> _resultBuffer;
+    struct SorterKey {
+        double value;
+
+        SorterKey getOwned() const {
+            return {value};
+        }
+
+        void makeOwned() {}
+
+        int memUsageForSorter() const {
+            return sizeof(SorterKey);
+        }
+
+        struct SorterDeserializeSettings {};
+
+        void serializeForSorter(BufBuilder& buf) const {
+            buf.appendNum(value);
+        }
+
+        static SorterKey deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+            return {buf.read<LittleEndian<double>>()};
+        }
+
+        std::string toString() const {
+            return std::to_string(value);
+        }
+    };
+    using SorterValue = SortableWorkingSetMember;
+    struct SorterKeyComparator {
+        int operator()(const SorterKey& lhs, const SorterKey& rhs) const {
+            if (lhs.value < rhs.value) {
+                return -1;
+            }
+            if (lhs.value > rhs.value) {
+                return 1;
+            }
+            return 0;
+        }
+    };
+
+    // Inside BoundedSorter MakeBound callback is used to determine minimal key value that can be
+    // expected. In case of NearStage this minimal value doesn't depend on sorter values and will be
+    // set externally using BoundedSorter::setBound based on the current interval.
+    struct NoOpBound {
+        SorterKey operator()(const SorterKey& key, const SorterValue& value) const {
+            return {std::numeric_limits<double>::lowest()};
+        }
+
+        Document serialize(const SerializationOptions& opts) const {
+            // MakeBound::serialize is only used when the sorter is serialized. NearStage won't
+            // serialize the sorter, because it is always the same.
+            MONGO_UNIMPLEMENTED_TASSERT(10907700);
+        }
+    };
+
+    using ResultBufferSorter =
+        BoundedSorter<SorterKey, SorterValue, SorterKeyComparator, NoOpBound>;
+    ResultBufferSorter _resultBuffer;
 
     // Stats
     const StageType _stageType;
@@ -189,13 +245,16 @@ private:
  * A covered interval over which a portion of a near search can be run.
  */
 struct NearStage::CoveredInterval {
-    CoveredInterval(PlanStage* covering, double minDistance, double maxDistance, bool inclusiveMax);
+    CoveredInterval(PlanStage* covering,
+                    double minDistance,
+                    double maxDistance,
+                    bool isLastInterval);
 
     PlanStage* const covering;  // Owned in PlanStage::_children.
 
     const double minDistance;
     const double maxDistance;
-    const bool inclusiveMax;
+    const bool isLastInterval;
 };
 
 }  // namespace mongo

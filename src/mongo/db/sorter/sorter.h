@@ -524,6 +524,9 @@ public:
     virtual bool checkInput() const = 0;
 
     virtual void forceSpill() = 0;
+
+    // Update current bound without adding new item.
+    virtual void setBound(Key key) = 0;
 };
 
 /**
@@ -545,7 +548,7 @@ public:
  * less-or-equal to all future Keys that will be seen in the input.
  */
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
-class BoundedSorter : public BoundedSorterInterface<Key, Value> {
+class BoundedSorter final : public BoundedSorterInterface<Key, Value> {
 public:
     // 'Comparator' is a 3-way comparison, but std::priority_queue wants a '<' comparison.
     // But also, std::priority_queue is a max-heap, and we want a min-heap.
@@ -610,6 +613,8 @@ public:
     void forceSpill() override {
         _spill(0 /*maxMemoryUsageBytes*/);
     }
+
+    void setBound(Key key) override;
 
     const Comparator compare;
     const BoundMaker makeBound;

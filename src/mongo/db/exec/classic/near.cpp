@@ -30,28 +30,21 @@
 
 #include "mongo/db/exec/classic/near.h"
 
+#include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/util/assert_util.h"
 
+#include <limits>
 #include <memory>
 
 namespace mongo {
 
-using std::unique_ptr;
+namespace {
 
-/**
- * Holds a generic search result with a distance computed in some fashion.
- */
-struct NearStage::SearchResult {
-    SearchResult(WorkingSetID resultID, double distance) : resultID(resultID), distance(distance) {}
+SortOptions makeSortOptions() {
+    return SortOptions{}.MaxMemoryUsageBytes(std::numeric_limits<int64_t>::max());
+}
 
-    bool operator<(const SearchResult& other) const {
-        // We want increasing distance, not decreasing, so we reverse the <
-        return distance > other.distance;
-    }
-
-    WorkingSetID resultID;
-    double distance;
-};
+}  // namespace
 
 NearStage::NearStage(ExpressionContext* expCtx,
                      const char* typeName,
@@ -64,6 +57,7 @@ NearStage::NearStage(ExpressionContext* expCtx,
       _searchState(SearchState::Initializing),
       _seenDocuments(expCtx),
       _nextIntervalStats(nullptr),
+      _resultBuffer(makeSortOptions(), SorterKeyComparator{}, NoOpBound{}),
       _stageType(type),
       _nextInterval(nullptr) {}
 
@@ -72,11 +66,11 @@ NearStage::~NearStage() {}
 NearStage::CoveredInterval::CoveredInterval(PlanStage* covering,
                                             double minDistance,
                                             double maxDistance,
-                                            bool inclusiveMax)
+                                            bool isLastInterval)
     : covering(covering),
       minDistance(minDistance),
       maxDistance(maxDistance),
-      inclusiveMax(inclusiveMax) {}
+      isLastInterval(isLastInterval) {}
 
 
 PlanStage::StageState NearStage::initNext(WorkingSetID* out) {
@@ -148,17 +142,24 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
         // CoveredInterval and its child stage are owned by _childrenIntervals
         _childrenIntervals.push_back(std::move(interval));
         _nextInterval = _childrenIntervals.back().get();
+
         _specificStats.intervalStats.emplace_back();
         _nextIntervalStats = &_specificStats.intervalStats.back();
         _nextIntervalStats->minDistanceAllowed = _nextInterval->minDistance;
         _nextIntervalStats->maxDistanceAllowed = _nextInterval->maxDistance;
-        _nextIntervalStats->inclusiveMaxDistanceAllowed = _nextInterval->inclusiveMax;
+        _nextIntervalStats->inclusiveMaxDistanceAllowed = _nextInterval->isLastInterval;
     }
 
     WorkingSetID nextMemberID;
     PlanStage::StageState intervalState = _nextInterval->covering->work(&nextMemberID);
 
     if (PlanStage::IS_EOF == intervalState) {
+        if (_nextInterval->isLastInterval) {
+            _resultBuffer.done();
+        } else {
+            _resultBuffer.setBound(SorterKey{_nextInterval->maxDistance});
+        }
+
         _searchState = SearchState::Advancing;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::NEED_YIELD == intervalState) {
@@ -172,32 +173,28 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     // Try to buffer the next covered member
     //
 
-    WorkingSetMember* nextMember = _workingSet->get(nextMemberID);
+    WorkingSetMember nextMember = _workingSet->extract(nextMemberID);
 
     // The child stage may not dedup so we must dedup them ourselves.
-    if (nextMember->hasRecordId()) {
-        if (!_seenDocuments.insert(nextMember->recordId)) {
-            _workingSet->free(nextMemberID);
+    if (nextMember.hasRecordId()) {
+        if (!_seenDocuments.insert(nextMember.recordId)) {
             return PlanStage::NEED_TIME;
         }
     }
 
-    // If the member's distance is in the current distance interval, add it to our buffered
-    // results.
-    auto memberDistance = computeDistance(nextMember);
+    auto memberDistance = computeDistance(&nextMember);
     if (memberDistance < _nextInterval->minDistance) {
-        if (nextMember->hasRecordId()) {
-            _seenDocuments.freeMemory(nextMember->recordId);
+        if (nextMember.hasRecordId()) {
+            _seenDocuments.freeMemory(nextMember.recordId);
         }
-        _workingSet->free(nextMemberID);
         return PlanStage::NEED_TIME;
     }
 
     ++_nextIntervalStats->numResultsBuffered;
 
     // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
-    nextMember->makeObjOwnedIfNeeded();
-    _resultBuffer.push(SearchResult(nextMemberID, memberDistance));
+    nextMember.makeObjOwnedIfNeeded();
+    _resultBuffer.add(SorterKey{memberDistance}, std::move(nextMember));
 
     return PlanStage::NEED_TIME;
 }
@@ -209,16 +206,17 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
 
     // Check if the next member is in the search interval and that the buffer isn't empty
     WorkingSetID resultID = WorkingSet::INVALID_ID;
-    // memberDistance is initialized to produce an error if used before its value is changed
-    double memberDistance = std::numeric_limits<double>::lowest();
-    if (!_resultBuffer.empty()) {
-        SearchResult result = _resultBuffer.top();
-        memberDistance = result.distance;
+    if (_resultBuffer.getState() == ResultBufferSorter::State::kReady) {
+        auto [memberDistance, member] = _resultBuffer.next();
+        if (member->hasRecordId()) {
+            _seenDocuments.freeMemory(member->recordId);
+        }
 
-        bool inInterval = _nextInterval->inclusiveMax ? memberDistance <= _nextInterval->maxDistance
-                                                      : memberDistance < _nextInterval->maxDistance;
+        const bool inInterval = _nextInterval->isLastInterval
+            ? memberDistance.value <= _nextInterval->maxDistance
+            : memberDistance.value < _nextInterval->maxDistance;
         if (inInterval) {
-            resultID = result.resultID;
+            resultID = _workingSet->emplace(member.extract());
         }
     }
 
@@ -231,17 +229,7 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
         return PlanStage::NEED_TIME;
     }
 
-    // The next document in _resultBuffer is in the search interval, so we can return it.
-    _resultBuffer.pop();
-
     *toReturn = resultID;
-
-    // If we're returning something, take it out of our RecordId -> WSID map. This keeps
-    // '_seenDocuments' in sync with '_resultBuffer'.
-    WorkingSetMember* member = _workingSet->get(*toReturn);
-    if (member->hasRecordId()) {
-        _seenDocuments.freeMemory(member->recordId);
-    }
 
     // This value is used by nextInterval() to determine the size of the next interval.
     ++_nextIntervalStats->numResultsReturned;
@@ -253,8 +241,8 @@ bool NearStage::isEOF() const {
     return SearchState::Finished == _searchState;
 }
 
-unique_ptr<PlanStageStats> NearStage::getStats() {
-    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, _stageType);
+std::unique_ptr<PlanStageStats> NearStage::getStats() {
+    auto ret = std::make_unique<PlanStageStats>(_commonStats, _stageType);
     ret->specific = _specificStats.clone();
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
         ret->children.emplace_back(_childrenIntervals[i]->covering->getStats());

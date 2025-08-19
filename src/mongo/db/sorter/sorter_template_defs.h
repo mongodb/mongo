@@ -1687,9 +1687,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::add(Key key, Value value
             !_checkInput || !_min || compare(*_min, key) <= 0);
 
     // Each new item can potentially give us a tighter bound (a higher min).
-    Key newMin = makeBound(key, value);
-    if (!_min || compare(*_min, newMin) < 0)
-        _min = newMin;
+    setBound(makeBound(key, value));
 
     auto memUsage = key.memUsageForSorter() + value.memUsageForSorter();
     _heap.emplace(std::move(key), std::move(value));
@@ -1792,6 +1790,13 @@ std::pair<Key, Value> BoundedSorter<Key, Value, Comparator, BoundMaker>::next() 
     this->_stats.incrementNumSorted();
 
     return result;
+}
+
+template <typename Key, typename Value, typename Comparator, typename BoundMaker>
+void BoundedSorter<Key, Value, Comparator, BoundMaker>::setBound(Key key) {
+    if (!_min || compare(*_min, key) < 0) {
+        _min = key;
+    }
 }
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
