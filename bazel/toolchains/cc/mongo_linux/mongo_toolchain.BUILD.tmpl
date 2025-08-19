@@ -108,6 +108,11 @@ PROPELLER_PROFILE_GENERATE_ENABLED = select({
     "@//conditions:default": False,
 })
 
+DTLTO_ENABLED = select({
+    "@//bazel/config:dtlto_linux_clang_enabled_fission_disabled": True,
+    "@//bazel/config:dtlto_disabled": False,
+}, no_match_error = "Distributed Thin LTO is only available for linux clang with fission disabled.")
+
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
 
 # Helper target for the toolchain (see below):
@@ -161,6 +166,7 @@ mongo_linux_cc_toolchain_config(
     optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
     pgo_profile_generate = PGO_PROFILE_GENERATE_ENABLED,
     pgo_profile_use = PGO_PROFILE_USE_ENABLED,
+    distributed_thin_lto = DTLTO_ENABLED,
 )
 
 mongo_linux_cc_toolchain_config(
@@ -208,6 +214,7 @@ mongo_linux_cc_toolchain_config(
     pgo_profile_generate = PGO_PROFILE_GENERATE_ENABLED,
     pgo_profile_use = PGO_PROFILE_USE_ENABLED,
     propeller_profile_generate = PROPELLER_PROFILE_GENERATE_ENABLED,
+    distributed_thin_lto = DTLTO_ENABLED,
 )
 
 cc_toolchain(

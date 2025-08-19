@@ -638,6 +638,20 @@ thin_lto = rule(
 )
 
 # =========
+# distributed thin lto
+# =========
+
+dtlto_provider = provider(
+    doc = """Enable distributed thin link time optimization (LTO).""",
+    fields = ["enabled"],
+)
+
+dtlto = rule(
+    implementation = lambda ctx: dtlto_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # gcov
 # =========
 

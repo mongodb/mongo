@@ -214,18 +214,6 @@ LIBGCC_LINKFLAGS = select({
     "//conditions:default": [],
 })
 
-DEBUG_TYPES_SECTION_FLAGS = select({
-    "//bazel/config:linux_clang_linkstatic": [
-        "-fdebug-types-section",
-    ],
-    # SUSE15 gcc builds system libraries with dwarf32 and needs -fdebug-types-section to keep
-    # the size of the debug information under the 4GB limit.
-    "//bazel/config:suse15_gcc_linkstatic": [
-        "-fdebug-types-section",
-    ],
-    "//conditions:default": [],
-})
-
 COMPRESS_DEBUG_COPTS = select({
     # Debug compression significantly reduces .o, .dwo, and .a sizes
     "//bazel/config:compress_debug_compile_enabled": [
@@ -354,7 +342,6 @@ MONGO_LINUX_CC_COPTS = (
     THREAD_SANITIZER_COPTS +
     ANY_SANITIZER_AVAILABLE_COPTS +
     COMPRESS_DEBUG_COPTS +
-    DEBUG_TYPES_SECTION_FLAGS +
     IMPLICIT_FALLTHROUGH_COPTS +
     MTUNE_MARCH_COPTS +
     DISABLE_SOURCE_WARNING_AS_ERRORS_COPTS +
@@ -375,7 +362,6 @@ MONGO_LINUX_CC_LINKFLAGS = (
     BIND_AT_LOAD_LINKFLAGS +
     ANY_SANITIZER_AVAILABLE_LINKFLAGS +
     ANY_SANITIZER_GCC_LINKFLAGS +
-    DEBUG_TYPES_SECTION_FLAGS +
     DISABLE_SOURCE_WARNING_AS_ERRORS_LINKFLAGS +
     THIN_LTO_FLAGS +
     SYMBOL_ORDER_LINKFLAGS +

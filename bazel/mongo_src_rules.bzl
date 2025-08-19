@@ -807,6 +807,7 @@ def _mongo_cc_binary_and_test(
         "additional_linker_inputs": additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         "exec_properties": exec_properties | select({
             "//bazel/config:remote_link_enabled": {},
+            "//bazel/config:dtlto_enabled": {},
             "//conditions:default": {"cpp_link.coefficient": "18.0"},
         }) | select({
             "//bazel/config:thin_lto_enabled": {"cpp_link.cpus": str(NUM_CPUS)},

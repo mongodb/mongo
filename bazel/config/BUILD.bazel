@@ -21,6 +21,7 @@ load(
     "detect_odr_violations",
     "disable_streams",
     "disable_warnings_as_errors",
+    "dtlto",
     "dwarf_version",
     "fsan",
     "gcov",
@@ -2254,6 +2255,38 @@ config_setting(
 )
 
 # --------------------------------------
+# distributed thin lto
+# --------------------------------------
+
+bool_flag(
+    name = "dtlto",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "dtlto_enabled",
+    flag_values = {
+        "//bazel/config:dtlto": "True",
+    },
+)
+
+config_setting(
+    name = "dtlto_disabled",
+    flag_values = {
+        "//bazel/config:dtlto": "False",
+    },
+)
+
+selects.config_setting_group(
+    name = "dtlto_linux_clang_enabled_fission_disabled",
+    match_all = [
+        ":linux_clang",
+        ":dtlto_enabled",
+        ":fission_disabled",
+    ],
+)
+
+# --------------------------------------
 # gdbserver options
 # --------------------------------------
 
@@ -2741,6 +2774,13 @@ config_setting(
     name = "fission_enabled",
     values = {
         "fission": "yes",
+    },
+)
+
+config_setting(
+    name = "fission_disabled",
+    values = {
+        "fission": "no",
     },
 )
 

@@ -23,6 +23,7 @@ load(
     "get_common_features",
 )
 load("//bazel/toolchains/cc/mongo_linux:mongo_defines.bzl", "DEFINES")
+load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_flags_v5.bzl", "CLANG_RESOURCE_DIR")
 
 all_non_assembly_compile_actions = [
     ACTION_NAMES.c_compile,
@@ -267,7 +268,7 @@ def _impl(ctx):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = [ACTION_NAMES.c_compile],
+                actions = [ACTION_NAMES.c_compile, ACTION_NAMES.lto_backend],
                 flag_groups = [flag_group(flags = ctx.attr.extra_cflags)],
             ),
         ] if len(ctx.attr.extra_cflags) > 0 else [],
@@ -278,7 +279,7 @@ def _impl(ctx):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = [ACTION_NAMES.cpp_compile],
+                actions = [ACTION_NAMES.cpp_compile, ACTION_NAMES.lto_backend],
                 flag_groups = [flag_group(flags = ctx.attr.extra_cxxflags)],
             ),
         ] if len(ctx.attr.extra_cxxflags) > 0 else [],
@@ -303,7 +304,7 @@ def _impl(ctx):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = all_compile_actions + all_link_actions,
+                actions = all_compile_actions + all_link_actions + lto_index_actions,
                 flag_groups = [flag_group(flags = [
                     "-B{}".format(bin_dir)
                     for bin_dir in ctx.attr.bin_dirs
@@ -317,7 +318,7 @@ def _impl(ctx):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [flag_group(flags = ctx.attr.extra_ldflags)],
             ),
         ] if len(ctx.attr.extra_ldflags) > 0 else [],
@@ -410,6 +411,7 @@ def _impl(ctx):
                     ACTION_NAMES.cpp_compile,
                     ACTION_NAMES.cpp_module_codegen,
                     ACTION_NAMES.cpp_module_compile,
+                    ACTION_NAMES.lto_backend,
                 ],
                 flag_groups = [
                     flag_group(flags = ["-fPIC"], expand_if_available = "pic"),
@@ -431,11 +433,12 @@ def _impl(ctx):
                     ACTION_NAMES.cpp_compile,
                     ACTION_NAMES.cpp_module_codegen,
                     ACTION_NAMES.cpp_module_compile,
+                    ACTION_NAMES.lto_backend,
                 ],
                 flag_groups = [flag_group(flags = ["-fPIE"])],
             ),
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [flag_group(flags = ["-pie"])],
             ),
         ],
@@ -1151,6 +1154,14 @@ def _impl(ctx):
                     ),
                 ],
             ),
+            flag_set(
+                actions = all_link_actions + lto_index_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = ["-resource-dir=" + CLANG_RESOURCE_DIR] if ctx.attr.compiler == COMPILERS.CLANG else [""],
+                    ),
+                ],
+            ),
         ],
     )
 
@@ -1159,10 +1170,7 @@ def _impl(ctx):
         enabled = ctx.attr.pgo_profile_use != None,
         flag_sets = [
             flag_set(
-                actions = [
-                    ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
-                ],
+                actions = all_compile_actions,
                 flag_groups = [
                     flag_group(
                         flags = [
@@ -1242,6 +1250,95 @@ def _impl(ctx):
         ],
     )
 
+    # This is from bazels toolchain. Modified to add our own implies/enabled section.
+    thinlto_feature = feature(
+        name = "thin_lto",
+        enabled = ctx.attr.distributed_thin_lto,
+        implies = ["no_debug_types_section", "supports_start_end_lib"],
+        flag_sets = [
+            flag_set(
+                actions = [
+                    ACTION_NAMES.c_compile,
+                    ACTION_NAMES.cpp_compile,
+                ] + all_link_actions + lto_index_actions,
+                flag_groups = [
+                    flag_group(flags = ["-flto=thin"]),
+                    flag_group(
+                        expand_if_available = "lto_indexing_bitcode_file",
+                        flags = [
+                            "-Xclang",
+                            "-fthin-link-bitcode=%{lto_indexing_bitcode_file}",
+                        ],
+                    ),
+                ],
+            ),
+            flag_set(
+                actions = [ACTION_NAMES.linkstamp_compile],
+                flag_groups = [flag_group(flags = ["-DBUILD_LTO_TYPE=thin"])],
+            ),
+            flag_set(
+                actions = lto_index_actions,
+                flag_groups = [
+                    flag_group(flags = [
+                        "-flto=thin",
+                        "-Wl,-plugin-opt,thinlto-index-only%{thinlto_optional_params_file}",
+                        "-Wl,-plugin-opt,thinlto-emit-imports-files",
+                        "-Wl,-plugin-opt,thinlto-prefix-replace=%{thinlto_prefix_replace}",
+                    ]),
+                    flag_group(
+                        expand_if_available = "thinlto_object_suffix_replace",
+                        flags = [
+                            "-Wl,-plugin-opt,thinlto-object-suffix-replace=%{thinlto_object_suffix_replace}",
+                        ],
+                    ),
+                    flag_group(
+                        expand_if_available = "thinlto_merged_object_file",
+                        flags = [
+                            "-Wl,-plugin-opt,obj-path=%{thinlto_merged_object_file}",
+                        ],
+                    ),
+                ],
+            ),
+            flag_set(
+                actions = [ACTION_NAMES.lto_backend],
+                flag_groups = [
+                    flag_group(flags = [
+                        "-c",
+                        "-fthinlto-index=%{thinlto_index}",
+                        "-o",
+                        "%{thinlto_output_object_file}",
+                        "-x",
+                        "ir",
+                        "%{thinlto_input_bitcode_file}",
+                        "-Wno-unused-command-line-argument",
+                    ]),
+                ],
+            ),
+        ],
+    )
+
+    debug_types_section_feature = feature(
+        name = "debug_types_section",
+        enabled = (ctx.attr.compiler == COMPILERS.CLANG and ctx.attr.linkstatic) or (ctx.attr.compiler == COMPILERS.GCC and ctx.attr.linkstatic and ctx.attr.distro == "suse15"),
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = ["-fdebug-types-section"])],
+            ),
+        ],
+    )
+
+    no_debug_types_section_feature = feature(
+        name = "no_debug_types_section",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = ["-fno-debug-types-section"])],
+            ),
+        ],
+    )
+
     features = [
         enable_all_warnings_feature,
         general_clang_or_gcc_warnings_feature,
@@ -1310,6 +1407,9 @@ def _impl(ctx):
         propeller_profile_generate_feature,
         propeller_profile_use_cc_feature,
         propeller_profile_use_link_feature,
+        thinlto_feature,
+        debug_types_section_feature,
+        no_debug_types_section_feature,
     ] + get_common_features(ctx)
 
     return [
@@ -1366,6 +1466,7 @@ mongo_linux_cc_toolchain_config = rule(
         "bolt_enabled": attr.bool(default = False, mandatory = False),
         "propeller_profile_generate": attr.bool(default = False, mandatory = False),
         "propeller_profile_use": attr.label(default = None, allow_single_file = True, mandatory = False),
+        "distributed_thin_lto": attr.bool(default = False, mandatory = False),
     },
     provides = [CcToolchainConfigInfo],
 )

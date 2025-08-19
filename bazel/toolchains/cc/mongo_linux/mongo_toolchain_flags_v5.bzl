@@ -31,3 +31,5 @@ CLANG_INCLUDE_DIRS = [
     "external/mongo_toolchain_v5/stow/gcc-v5/include/c++/14.2.0/backward",
     "external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/19/include",
 ]
+
+CLANG_RESOURCE_DIR = "external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/19/"

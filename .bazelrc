@@ -182,6 +182,7 @@ common --flag_alias=simple_build_id=//bazel/config:simple_build_id
 common --flag_alias=create_dwp=//bazel/config:create_dwp
 common --flag_alias=win_min_version=//bazel/config:win_min_version
 common --flag_alias=build_atlas=//bazel/config:build_atlas
+common --flag_alias=dtlto=//bazel/config:dtlto
 
 #############################################################################################################################
 # BUILD 'PROFILES' - this is the area to set up configurations of flags to be used by developers.
