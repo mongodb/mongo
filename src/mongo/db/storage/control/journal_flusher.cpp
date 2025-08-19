@@ -94,7 +94,7 @@ void JournalFlusher::run() {
 
     // The thread must not run and access the service context to create an opCtx while unit test
     // infrastructure is still being set up and expects sole access to the service context (there is
-    // no conurrency control on the service context during this phase).
+    // no concurrency control on the service context during this phase).
     if (_disablePeriodicFlushes) {
         stdx::unique_lock<stdx::mutex> lk(_stateMutex);
         _flushJournalNowCV.wait(lk,
@@ -152,7 +152,7 @@ void JournalFlusher::run() {
                 continue;
             }
 
-            // We want to log errors for debugability.
+            // We want to log errors for debuggability.
             LOGV2_WARNING(
                 6148401,
                 "The JournalFlusher encountered an error attempting to flush data to disk",
@@ -232,6 +232,12 @@ void JournalFlusher::pause() {
     {
         stdx::unique_lock<stdx::mutex> lk(_stateMutex);
         _needToPause = true;
+        if (_disablePeriodicFlushes) {
+            // If periodic flushes are disabled, manually trigger one to wake up the periodic
+            // runner. That way, _state will be updated to Paused which will allow this function to
+            // finish.
+            _triggerJournalFlush(lk);
+        }
         _stateChangeCV.wait(lk,
                             [&] { return _state == States::Paused || _state == States::ShutDown; });
     }

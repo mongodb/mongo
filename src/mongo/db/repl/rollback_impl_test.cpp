@@ -65,6 +65,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -788,6 +789,67 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverToStableTimestamp) {
     // to the stable timestamp.
     ASSERT_EQUALS(stableTimestamp, _storageInterface->getCurrentTimestamp());
     ASSERT_EQUALS(stableTimestamp, _stableTimestamp);
+}
+
+class RollbackTestingDurableHistoryPin : public DurableHistoryPin {
+public:
+    bool reconciled = false;
+
+    RollbackTestingDurableHistoryPin(StorageInterface* storageInterface)
+        : _storageInterface(storageInterface) {}
+
+    void expectDocument(BSONObj&& obj) {
+        _expectedDoc = std::move(obj);
+    }
+
+    std::string getName() override {
+        return "testing";
+    }
+
+    // Test that documents inserted before rollback are still visible during execution of
+    // DurableHistoryRegistry::reconcilePins()
+    boost::optional<Timestamp> calculatePin(OperationContext* opCtx) override {
+        auto document = _storageInterface->findById(opCtx, nss, _expectedDoc["_id"]);
+        ASSERT_OK(document);
+        ASSERT_BSONOBJ_EQ(_expectedDoc, document.getValue());
+        reconciled = true;
+        return _oldestTimestamp;
+    }
+
+private:
+    StorageInterface* _storageInterface;
+    BSONObj _expectedDoc;
+    Timestamp _oldestTimestamp = Timestamp(0, 2);
+};
+
+TEST_F(RollbackImplTest, RollbackReconcilesHistoryPins) {
+    // Test StorageInterfaceImpl::recoverToStableTimestamp instead of the mocked version
+    _storageInterface->unmockStableTimestamp();
+    auto uuid = kGenericUUID;
+    auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
+
+    // Register the testing pin
+    auto service = getServiceContext();
+    DurableHistoryRegistry::set(service, std::make_unique<DurableHistoryRegistry>());
+    auto uniquePinPointer = std::make_unique<RollbackTestingDurableHistoryPin>(_storageInterface);
+    auto pin = uniquePinPointer.get();
+    DurableHistoryRegistry::get(service)->registerPin(std::move(uniquePinPointer));
+
+    // Insert a document at Timestamp(1, 1)
+    auto obj = BSON("_id" << 0 << "name" << "kyle");
+    _insertDocAndGenerateOplogEntry(obj, uuid, nss, 1);
+
+    // Set stable timestamp at Timestamp(1, 1)
+    const auto commonOp = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({commonOp});
+    _storageInterface->setStableTimestamp(service, commonOp.first["ts"].timestamp());
+
+    // Make sure rollback opened the catalog and reconciled the pins in the right order
+    pin->expectDocument(std::move(obj));
+    ASSERT_FALSE(pin->reconciled);
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+    // Make sure calculatePin() was called
+    ASSERT(pin->reconciled);
 }
 
 DEATH_TEST_REGEX_F(RollbackImplTest,
