@@ -103,6 +103,22 @@ export const $config = (function() {
                         "Ignoring DuplicateKey error during update due to ongoing migrations");
                     return;
                 }
+
+                const transientErrorCodes = new Set([
+                    ErrorCodes.LockTimeout,
+                    ErrorCodes.StaleConfig,
+                    ErrorCodes.ConflictingOperationInProgress,
+                    ErrorCodes.ShardCannotRefreshDueToLocksHeld,
+                    ErrorCodes.WriteConflict,
+                    ErrorCodes.SnapshotUnavailable,
+                    ErrorCodes.ExceededTimeLimit,
+                ]);
+                if (transientErrorCodes.has(err.code) &&
+                    err.errmsg.includes("was converted into a distributed transaction")) {
+                    jsTest.log(
+                        "Ignoring transient error during an update operation after a WouldChangeOwningShard error");
+                    return;
+                }
             }
 
             assert.commandWorked(res);
