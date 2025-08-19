@@ -16,7 +16,7 @@ import {
     datasets,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
-const collName = "search_rank_fusion";
+const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
 
