@@ -285,6 +285,7 @@ private:
                         const CollectionPtr& collection,
                         const KeyStringEntry& keyStringEntryWithRecordId,
                         const BSONObj& keyStringBson,
+                        const IndexDescriptor* indexDescriptor,
                         const SortedDataIndexAccessMethod* iam,
                         const IndexCatalogEntry* indexCatalogEntry,
                         const BSONObj& indexSpec);

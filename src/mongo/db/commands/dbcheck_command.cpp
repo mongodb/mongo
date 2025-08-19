@@ -1354,6 +1354,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                            collection,
                            currIndexKeyWithRecordId.get(),
                            currKeyStringBson,
+                           index,
                            iam,
                            indexCatalogEntry,
                            index->infoObj());
@@ -1545,14 +1546,12 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
                                const CollectionPtr& collection,
                                const KeyStringEntry& keyStringEntryWithRecordId,
                                const BSONObj& keyStringBson,
+                               const IndexDescriptor* indexDescriptor,
                                const SortedDataIndexAccessMethod* iam,
                                const IndexCatalogEntry* indexCatalogEntry,
                                const BSONObj& indexSpec) {
     auto seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
         opCtx, collection->getRecordStore(), &_info.dataThrottle);
-
-    const IndexDescriptor* indexDescriptor =
-        collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
 
     // WiredTiger always returns a KeyStringEntry with recordID as part of the contract of the
     // indexCursor.
