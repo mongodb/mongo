@@ -484,6 +484,7 @@ env.Library(
         'collection_options',
         'index_catalog',
         'index_key_validate',
+        'storage_engine_collection_options_flags_parser',
         'throttle_cursor',
         'validate_state',
     ],

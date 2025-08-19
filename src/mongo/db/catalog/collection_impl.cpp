@@ -80,6 +80,10 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
 
 MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
+// Simulate the behavior of mixed-schema flag of MongoDB versions without SERVER-91195:
+// Only set the legacy time-series mixed-schema flag at the top level of the catalog,
+// and clear the new durable flag which is stored inside the collection options.
+MONGO_FAIL_POINT_DEFINE(simulateLegacyTimeseriesMixedSchemaFlag);
 
 Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
                                    const NamespaceString& nss,
@@ -866,7 +870,7 @@ void CollectionImpl::setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext
             md.options.storageEngine = setFlagToStorageEngineBson(
                 md.options.storageEngine,
                 backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData,
-                *setting);
+                simulateLegacyTimeseriesMixedSchemaFlag.shouldFail() ? boost::none : setting);
         }
 
         // Also update legacy parameter for compatibility when downgrading to older sub-versions

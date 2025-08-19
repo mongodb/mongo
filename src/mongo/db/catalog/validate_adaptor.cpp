@@ -37,11 +37,13 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/db/catalog/backwards_compatible_collection_options_util.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/column_index_consistency.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_consistency.h"
+#include "mongo/db/catalog/storage_engine_collection_options_flags_parser.h"
 #include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
@@ -821,8 +823,16 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                         results->valid = false;
                     } else if (containsMixedSchemaDataResponse.isOK() &&
                                containsMixedSchemaDataResponse.getValue()) {
-                        bool mixedSchemaAllowed =
-                            coll->getTimeseriesBucketsMayHaveMixedSchemaData().get();
+                        // Only allow mixed-schema data if the new durable mixed-schema flag
+                        // introduced by SERVER-91195 (in `options.storageEngine`) is set.
+                        // Checking against `coll->getTimeseriesBucketsMayHaveMixedSchemaData()` is
+                        // unsafe, since only the legacy mixed-schema flag may be set, which can be
+                        // later lost on collection cloning due to SERVER-91194.
+                        bool mixedSchemaAllowed = getFlagFromStorageEngineBson(
+                                                      coll->getCollectionOptions().storageEngine,
+                                                      backwards_compatible_collection_options::
+                                                          kTimeseriesBucketsMayHaveMixedSchemaData)
+                                                      .value_or(false);
                         if (mixedSchemaAllowed && !bucketMixedSchemaDataWarning) {
                             bucketMixedSchemaDataWarning = true;
                             LOGV2_WARNING(8469901,
