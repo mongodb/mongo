@@ -244,6 +244,12 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+    spillPath:
+        description: "The disk path of the spill engine. Defaults to the dbpath."
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: gSpillPath
+        redact: false
 
 feature_flags:
     featureFlagLargeBatchedOperations:

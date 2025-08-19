@@ -69,7 +69,8 @@ void StorageGlobalParams::reset() {
 }
 
 std::string StorageGlobalParams::getSpillDbPath() const {
-    return (boost::filesystem::path(dbpath) / "_tmp" / "spilldb").string();
+    return gSpillPath.empty() ? (boost::filesystem::path(dbpath) / "_tmp" / "spilldb").string()
+                              : gSpillPath;
 }
 
 StorageGlobalParams storageGlobalParams;
