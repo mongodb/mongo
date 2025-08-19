@@ -158,7 +158,8 @@ void print(std::ostream& os, format_string<T...> fmt, T&&... args) {
 
 FMT_EXPORT template <typename... T>
 void println(std::ostream& os, format_string<T...> fmt, T&&... args) {
-  fmt::print(os, "{}\n", fmt::format(fmt, std::forward<T>(args)...));
+  fmt::print(os, FMT_STRING("{}\n"),
+             fmt::format(fmt, std::forward<T>(args)...));
 }
 
 FMT_END_NAMESPACE

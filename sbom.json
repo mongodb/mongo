@@ -609,7 +609,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/fmtlib/fmt@11.1.3",
+      "bom-ref": "pkg:github/fmtlib/fmt@11.2.0",
       "supplier": {
         "name": "fmt.dev",
         "url": [
@@ -619,7 +619,7 @@
       "author": "Victor Zverovich",
       "group": "fmtlib",
       "name": "{fmt}",
-      "version": "11.1.3",
+      "version": "11.2.0",
       "description": "A modern formatting library",
       "licenses": [
         {
@@ -629,8 +629,8 @@
         }
       ],
       "copyright": "Copyright (c) 2012 - present, Victor Zverovich and {fmt} contributors",
-      "cpe": "cpe:2.3:a:fmt:fmt:11.1.3:*:*:*:*:*:*:*",
-      "purl": "pkg:github/fmtlib/fmt@11.1.3",
+      "cpe": "cpe:2.3:a:fmt:fmt:11.2.0:*:*:*:*:*:*:*",
+      "purl": "pkg:github/fmtlib/fmt@11.2.0",
       "properties": [
         {
           "name": "internal:team_responsible",

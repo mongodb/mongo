@@ -19,10 +19,10 @@ FMT_BEGIN_NAMESPACE
 // A compile-time string which is compiled into fast formatting code.
 FMT_EXPORT class compiled_string {};
 
-namespace detail {
-
 template <typename S>
 struct is_compiled_string : std::is_base_of<compiled_string, S> {};
+
+namespace detail {
 
 /**
  * Converts a string literal `s` into a format string that will be parsed at
@@ -39,16 +39,6 @@ struct is_compiled_string : std::is_base_of<compiled_string, S> {};
 #  define FMT_COMPILE(s) FMT_STRING_IMPL(s, fmt::compiled_string)
 #else
 #  define FMT_COMPILE(s) FMT_STRING(s)
-#endif
-
-#if FMT_USE_NONTYPE_TEMPLATE_ARGS
-template <typename Char, size_t N, fmt::detail::fixed_string<Char, N> Str>
-struct udl_compiled_string : compiled_string {
-  using char_type = Char;
-  constexpr explicit operator basic_string_view<char_type>() const {
-    return {Str.data, N - 1};
-  }
-};
 #endif
 
 template <typename T, typename... Tail>
@@ -425,7 +415,7 @@ constexpr auto compile_format_string(S fmt) {
 }
 
 template <typename... Args, typename S,
-          FMT_ENABLE_IF(detail::is_compiled_string<S>::value)>
+          FMT_ENABLE_IF(is_compiled_string<S>::value)>
 constexpr auto compile(S fmt) {
   constexpr auto str = basic_string_view<typename S::char_type>(fmt);
   if constexpr (str.size() == 0) {
@@ -461,7 +451,7 @@ constexpr FMT_INLINE OutputIt format_to(OutputIt out, const CompiledFormat& cf,
 }
 
 template <typename S, typename... Args,
-          FMT_ENABLE_IF(detail::is_compiled_string<S>::value)>
+          FMT_ENABLE_IF(is_compiled_string<S>::value)>
 FMT_INLINE std::basic_string<typename S::char_type> format(const S&,
                                                            Args&&... args) {
   if constexpr (std::is_same<typename S::char_type, char>::value) {
@@ -488,7 +478,7 @@ FMT_INLINE std::basic_string<typename S::char_type> format(const S&,
 }
 
 template <typename OutputIt, typename S, typename... Args,
-          FMT_ENABLE_IF(detail::is_compiled_string<S>::value)>
+          FMT_ENABLE_IF(is_compiled_string<S>::value)>
 FMT_CONSTEXPR OutputIt format_to(OutputIt out, const S&, Args&&... args) {
   constexpr auto compiled = detail::compile<Args...>(S());
   if constexpr (std::is_same<remove_cvref_t<decltype(compiled)>,
@@ -503,7 +493,7 @@ FMT_CONSTEXPR OutputIt format_to(OutputIt out, const S&, Args&&... args) {
 #endif
 
 template <typename OutputIt, typename S, typename... Args,
-          FMT_ENABLE_IF(detail::is_compiled_string<S>::value)>
+          FMT_ENABLE_IF(is_compiled_string<S>::value)>
 auto format_to_n(OutputIt out, size_t n, const S& fmt, Args&&... args)
     -> format_to_n_result<OutputIt> {
   using traits = detail::fixed_buffer_traits;
@@ -513,7 +503,7 @@ auto format_to_n(OutputIt out, size_t n, const S& fmt, Args&&... args)
 }
 
 template <typename S, typename... Args,
-          FMT_ENABLE_IF(detail::is_compiled_string<S>::value)>
+          FMT_ENABLE_IF(is_compiled_string<S>::value)>
 FMT_CONSTEXPR20 auto formatted_size(const S& fmt, const Args&... args)
     -> size_t {
   auto buf = detail::counting_buffer<>();
@@ -522,7 +512,7 @@ FMT_CONSTEXPR20 auto formatted_size(const S& fmt, const Args&... args)
 }
 
 template <typename S, typename... Args,
-          FMT_ENABLE_IF(detail::is_compiled_string<S>::value)>
+          FMT_ENABLE_IF(is_compiled_string<S>::value)>
 void print(std::FILE* f, const S& fmt, const Args&... args) {
   auto buf = memory_buffer();
   fmt::format_to(appender(buf), fmt, args...);
@@ -530,7 +520,7 @@ void print(std::FILE* f, const S& fmt, const Args&... args) {
 }
 
 template <typename S, typename... Args,
-          FMT_ENABLE_IF(detail::is_compiled_string<S>::value)>
+          FMT_ENABLE_IF(is_compiled_string<S>::value)>
 void print(const S& fmt, const Args&... args) {
   print(stdout, fmt, args...);
 }
@@ -538,9 +528,7 @@ void print(const S& fmt, const Args&... args) {
 #if FMT_USE_NONTYPE_TEMPLATE_ARGS
 inline namespace literals {
 template <detail::fixed_string Str> constexpr auto operator""_cf() {
-  using char_t = remove_cvref_t<decltype(Str.data[0])>;
-  return detail::udl_compiled_string<char_t, sizeof(Str.data) / sizeof(char_t),
-                                     Str>();
+  return FMT_COMPILE(Str.data);
 }
 }  // namespace literals
 #endif

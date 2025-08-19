@@ -5,7 +5,7 @@ set -vxeuo pipefail
 
 FMT_GIT_URL="https://github.com/mongodb-forks/fmt.git"
 
-VERSION=11.1.3
+VERSION=11.2.0
 
 FMT_GIT_DIR=$(mktemp -d /tmp/import-fmt.XXXXXX)
 trap "rm -rf $FMT_GIT_DIR" EXIT

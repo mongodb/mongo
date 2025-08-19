@@ -774,13 +774,13 @@ struct formatter<
     : formatter<detail::all<typename T::container_type>, Char> {
   using all = detail::all<typename T::container_type>;
   template <typename FormatContext>
-  auto format(const T& t, FormatContext& ctx) const -> decltype(ctx.out()) {
+  auto format(const T& value, FormatContext& ctx) const -> decltype(ctx.out()) {
     struct getter : T {
-      static auto get(const T& t) -> all {
-        return {t.*(&getter::c)};  // Access c through the derived class.
+      static auto get(const T& v) -> all {
+        return {v.*(&getter::c)};  // Access c through the derived class.
       }
     };
-    return formatter<all>::format(getter::get(t), ctx);
+    return formatter<all>::format(getter::get(value), ctx);
   }
 };
 

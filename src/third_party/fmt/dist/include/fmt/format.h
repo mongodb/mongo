@@ -117,6 +117,7 @@
 #  define FMT_NOINLINE
 #endif
 
+// GCC 4.9 doesn't support qualified names in specializations.
 namespace std {
 template <typename T> struct iterator_traits<fmt::basic_appender<T>> {
   using iterator_category = output_iterator_tag;
@@ -705,7 +706,7 @@ using is_integer =
 
 #if defined(FMT_USE_FLOAT128)
 // Use the provided definition.
-#elif FMT_CLANG_VERSION && FMT_HAS_INCLUDE(<quadmath.h>)
+#elif FMT_CLANG_VERSION >= 309 && FMT_HAS_INCLUDE(<quadmath.h>)
 #  define FMT_USE_FLOAT128 1
 #elif FMT_GCC_VERSION && defined(_GLIBCXX_USE_FLOAT128) && \
     !defined(__STRICT_ANSI__)
@@ -721,11 +722,10 @@ struct float128 {};
 
 template <typename T> using is_float128 = std::is_same<T, float128>;
 
-template <typename T>
-using is_floating_point =
-    bool_constant<std::is_floating_point<T>::value || is_float128<T>::value>;
+template <typename T> struct is_floating_point : std::is_floating_point<T> {};
+template <> struct is_floating_point<float128> : std::true_type {};
 
-template <typename T, bool = std::is_floating_point<T>::value>
+template <typename T, bool = is_floating_point<T>::value>
 struct is_fast_float : bool_constant<std::numeric_limits<T>::is_iec559 &&
                                      sizeof(T) <= sizeof(double)> {};
 template <typename T> struct is_fast_float<T, false> : std::false_type {};
@@ -1613,7 +1613,7 @@ constexpr auto convert_float(T value) -> convert_float_result<T> {
 }
 
 template <typename Char, typename OutputIt>
-FMT_NOINLINE FMT_CONSTEXPR auto fill(OutputIt it, size_t n,
+FMT_CONSTEXPR FMT_NOINLINE auto fill(OutputIt it, size_t n,
                                      const basic_specs& specs) -> OutputIt {
   auto fill_size = specs.fill_size();
   if (fill_size == 1) return detail::fill_n(it, n, specs.fill_unit<Char>());
@@ -2332,7 +2332,7 @@ template <typename Char, typename OutputIt, typename DecimalFP,
           typename Grouping = digit_grouping<Char>>
 FMT_CONSTEXPR20 auto do_write_float(OutputIt out, const DecimalFP& f,
                                     const format_specs& specs, sign s,
-                                    locale_ref loc) -> OutputIt {
+                                    int exp_upper, locale_ref loc) -> OutputIt {
   auto significand = f.significand;
   int significand_size = get_significand_size(f);
   const Char zero = static_cast<Char>('0');
@@ -2348,7 +2348,7 @@ FMT_CONSTEXPR20 auto do_write_float(OutputIt out, const DecimalFP& f,
     if (specs.type() == presentation_type::fixed) return false;
     // Use the fixed notation if the exponent is in [exp_lower, exp_upper),
     // e.g. 0.0001 instead of 1e-04. Otherwise use the exponent notation.
-    const int exp_lower = -4, exp_upper = 16;
+    const int exp_lower = -4;
     return output_exp < exp_lower ||
            output_exp >= (specs.precision > 0 ? specs.precision : exp_upper);
   };
@@ -2451,12 +2451,13 @@ template <typename Char> class fallback_digit_grouping {
 template <typename Char, typename OutputIt, typename DecimalFP>
 FMT_CONSTEXPR20 auto write_float(OutputIt out, const DecimalFP& f,
                                  const format_specs& specs, sign s,
-                                 locale_ref loc) -> OutputIt {
+                                 int exp_upper, locale_ref loc) -> OutputIt {
   if (is_constant_evaluated()) {
     return do_write_float<Char, OutputIt, DecimalFP,
-                          fallback_digit_grouping<Char>>(out, f, specs, s, loc);
+                          fallback_digit_grouping<Char>>(out, f, specs, s,
+                                                         exp_upper, loc);
   } else {
-    return do_write_float<Char>(out, f, specs, s, loc);
+    return do_write_float<Char>(out, f, specs, s, exp_upper, loc);
   }
 }
 
@@ -2471,8 +2472,8 @@ template <typename T>
 struct has_isfinite<T, enable_if_t<sizeof(std::isfinite(T())) != 0>>
     : std::true_type {};
 
-template <typename T, FMT_ENABLE_IF(std::is_floating_point<T>::value&&
-                                        has_isfinite<T>::value)>
+template <typename T,
+          FMT_ENABLE_IF(is_floating_point<T>::value&& has_isfinite<T>::value)>
 FMT_CONSTEXPR20 auto isfinite(T value) -> bool {
   constexpr T inf = T(std::numeric_limits<double>::infinity());
   if (is_constant_evaluated())
@@ -3288,6 +3289,14 @@ FMT_CONSTEXPR20 auto format_float(Float value, int precision,
   return exp;
 }
 
+// Numbers with exponents greater or equal to the returned value will use
+// the exponential notation.
+template <typename T> constexpr auto exp_upper() -> int {
+  return std::numeric_limits<T>::digits10 != 0
+             ? min_of(16, std::numeric_limits<T>::digits10 + 1)
+             : 16;
+}
+
 template <typename Char, typename OutputIt, typename T>
 FMT_CONSTEXPR20 auto write_float(OutputIt out, T value, format_specs specs,
                                  locale_ref loc) -> OutputIt {
@@ -3303,6 +3312,7 @@ FMT_CONSTEXPR20 auto write_float(OutputIt out, T value, format_specs specs,
     if (specs.width != 0) --specs.width;
   }
 
+  constexpr int exp_upper = detail::exp_upper<T>();
   int precision = specs.precision;
   if (precision < 0) {
     if (specs.type() != presentation_type::none) {
@@ -3311,7 +3321,7 @@ FMT_CONSTEXPR20 auto write_float(OutputIt out, T value, format_specs specs,
       // Use Dragonbox for the shortest format.
       using floaty = conditional_t<sizeof(T) >= sizeof(double), double, float>;
       auto dec = dragonbox::to_decimal(static_cast<floaty>(value));
-      return write_float<Char>(out, dec, specs, s, loc);
+      return write_float<Char>(out, dec, specs, s, exp_upper, loc);
     }
   }
 
@@ -3339,7 +3349,7 @@ FMT_CONSTEXPR20 auto write_float(OutputIt out, T value, format_specs specs,
 
   specs.precision = precision;
   auto f = big_decimal_fp{buffer.data(), static_cast<int>(buffer.size()), exp};
-  return write_float<Char>(out, f, specs, s, loc);
+  return write_float<Char>(out, f, specs, s, exp_upper, loc);
 }
 
 template <typename Char, typename OutputIt, typename T,
@@ -3366,7 +3376,7 @@ FMT_CONSTEXPR20 auto write(OutputIt out, T value) -> OutputIt {
     return write_nonfinite<Char>(out, std::isnan(value), specs, s);
 
   auto dec = dragonbox::to_decimal(static_cast<floaty>(value));
-  return write_float<Char>(out, dec, specs, s, {});
+  return write_float<Char>(out, dec, specs, s, exp_upper<T>(), {});
 }
 
 template <typename Char, typename OutputIt, typename T,
