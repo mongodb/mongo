@@ -521,7 +521,8 @@ public:
                 opCtx->checkForInterrupt();
             }
         } else if (_yieldPolicy->shouldYieldOrInterrupt(opCtx)) {
-            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(opCtx));
+            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(
+                opCtx, nullptr, RestoreContext::RestoreType::kYield));
         }
     }
 

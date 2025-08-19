@@ -100,7 +100,8 @@ void PlanYieldPolicy::resetTimer() {
 }
 
 Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
-                                         std::function<void()> whileYieldingFn) {
+                                         std::function<void()> whileYieldingFn,
+                                         RestoreContext::RestoreType restoreType) {
     invariant(opCtx);
 
     // After we finish yielding (or in any early return), call resetTimer() to prevent yielding
@@ -162,7 +163,8 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                 performYield(opCtx, *yieldable, whileYieldingFn);
             }
 
-            restoreState(opCtx, yieldable);
+            // This copies 'yieldable' back to '_yieldable' where needed.
+            restoreState(opCtx, yieldable, restoreType);
             return Status::OK();
         } catch (const StorageUnavailableException&) {
             if (_callbacks) {
