@@ -3036,6 +3036,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/third_party/OWNERS.yml
 /src/third_party/**/abseil-cpp @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/asio @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/third_party/**/avro-cpp @10gen/streams-engine @svc-auto-approve-bot
 /src/third_party/**/aws-sdk @10gen/streams-engine @svc-auto-approve-bot
 /src/third_party/**/benchmark @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/boost @10gen/server-programmability @svc-auto-approve-bot

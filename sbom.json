@@ -254,6 +254,57 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:github/apache/avro@release-1.12.0",
+      "supplier": {
+        "name": "The Apache Software Foundation",
+        "url": [
+          "https://www.apache.org/"
+        ]
+      },
+      "author": "Apache Avro Developers",
+      "group": "apache",
+      "name": "Apache Avro C++",
+      "version": "1.12.0",
+      "description": "Apache Avro is a data serialization system. This is the C++ implementation.",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Copyright 2010-2024 The Apache Software Foundation",
+      "cpe": "cpe:2.3:a:apache:avro:1.12.0:*:*:*:*:*:*:*",
+      "purl": "pkg:github/apache/avro@release-1.12.0",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Server Programmability"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://avro.apache.org/"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/avro-cpp/scripts/import.sh"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/avro-cpp"
+          }
+        ]
+      },
+      "scope": "required"
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:github/google/benchmark@v1.5.2",
       "supplier": {
         "name": "Google LLC",
@@ -2699,6 +2750,7 @@
         "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
         "pkg:github/abseil/abseil-cpp@20250512.1",
         "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
+        "pkg:github/apache/avro@release-1.12.0",
         "pkg:github/arximboldi/immer@v0.8.0",
         "pkg:github/aws/aws-sdk-cpp@1.11.471",
         "pkg:github/boostorg/boost@boost-1.88.0",
@@ -2775,6 +2827,10 @@
     },
     {
       "ref": "pkg:github/arximboldi/immer@v0.8.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/apache/avro@release-1.12.0",
       "dependsOn": []
     },
     {

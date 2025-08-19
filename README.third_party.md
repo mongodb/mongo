@@ -26,6 +26,7 @@ a notice will be included in
 | [Abseil]                                             | Apache-2.0                                                                                          | 20250512.1                               |                      | ✗                               |
 | [arximboldi/immer]                                   | BSL-1.0                                                                                             | Unknown                                  |                      | ✗                               |
 | [Asio C++ Library]                                   | BSL-1.0                                                                                             | 1.12.2                                   |                      | ✗                               |
+| [Apache Avro C++]                                    | Apache-2.0                                                                                          | 1.12.0                                   |                      | ✗                               |
 | [aws-sdk - the AWS SDK client library]               | Apache-2.0                                                                                          | 1.11.471                                 |                      | ✗                               |
 | [benchmark]                                          | Apache-2.0                                                                                          | v1.5.2                                   |                      |                                 |
 | [Boost C++ Libraries - boost]                        | BSL-1.0                                                                                             | 1.88.0                                   |                      | ✗                               |
@@ -79,6 +80,7 @@ a notice will be included in
 
 [Abseil]: https://github.com/abseil/abseil-cpp
 [Asio C++ Library]: https://github.com/chriskohlhoff/asio
+[Apache Avro C++]: https://avro.apache.org/
 [Boost C++ Libraries - boost]: http://www.boost.org/
 [Cyrus SASL]: https://www.cyrusimap.org/sasl/
 [ICU for C/C++ (ICU4C)]: http://site.icu-project.org/download/

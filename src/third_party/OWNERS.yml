@@ -6,6 +6,9 @@ filters:
   - "asio":
     approvers:
       - 10gen/server-networking-and-observability
+  - "avro-cpp":
+    approvers:
+      - 10gen/streams-engine
   - "aws-sdk":
     approvers:
       - 10gen/streams-engine
