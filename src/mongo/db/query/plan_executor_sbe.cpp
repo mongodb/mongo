@@ -149,22 +149,23 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         classicRuntimePlannerStage.reset();
     }
 
+    // '_solution' can be a nullptr. The following stunt using the "querySolutionPtr" variable is
+    // necessary to pacify a Coverity check.
+    const QuerySolution* querySolutionPtr = nullptr;
     if (_solution) {
         _secondaryNssVector = _solution->getAllSecondaryNamespaces(_nss);
+        querySolutionPtr = _solution.get();
     }
 
-    _planExplainer =
-        plan_explainer_factory::make(_root.get(),
-                                     &_rootData,
-                                     // '_solution' can be a nullptr here. The following ternary is
-                                     // needed to silence a Coverity check.
-                                     _solution ? _solution.get() : nullptr,
-                                     isMultiPlan,
-                                     isCachedCandidate,
-                                     cachedPlanHash,
-                                     _rootData.debugInfo,
-                                     std::move(classicRuntimePlannerStage),
-                                     _remoteExplains.get());
+    _planExplainer = plan_explainer_factory::make(_root.get(),
+                                                  &_rootData,
+                                                  querySolutionPtr,  ///< May be a nullptr.
+                                                  isMultiPlan,
+                                                  isCachedCandidate,
+                                                  cachedPlanHash,
+                                                  _rootData.debugInfo,
+                                                  std::move(classicRuntimePlannerStage),
+                                                  _remoteExplains.get());
     _cursorType = _rootData.staticData->cursorType;
 
     if (_remoteCursors) {
