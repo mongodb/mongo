@@ -54,7 +54,7 @@ function testSuccessfulDryRun(conn, fromFCV, toFCV, fromConfigServer) {
 
     jsTestLog(`Performing dry-run validation for transition from ${fromFCV} to ${toFCV}.`);
 
-    const commandObj = {setFeatureCompatibilityVersion: toFCV, dryRun: true, confirm: true};
+    const commandObj = {setFeatureCompatibilityVersion: toFCV, dryRun: true};
 
     // Include `fromConfigServer` if specified in the test case
     if (fromConfigServer) {
@@ -88,7 +88,6 @@ function testFailedDryRun(conn, fromFCV, toFCV, failPointName, expectedError, sh
     const res = db.runCommand({
         setFeatureCompatibilityVersion: toFCV,
         dryRun: true,
-        confirm: true,
     });
 
     jsTestLog("Validating the error code returned from the dry-run.");

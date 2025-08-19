@@ -62,7 +62,6 @@ function testConflictingParametersWithSkipDryRun(conn) {
         setFeatureCompatibilityVersion: lastLTSFCV,
         dryRun: true,
         skipDryRun: true,
-        confirm: true
     });
     assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
 
@@ -117,7 +116,6 @@ function testFailureWithSkipDryRun(conn, shardConn, failPointName, expectedError
     assert.commandFailedWithCode(db.runCommand({
         setFeatureCompatibilityVersion: lastLTSFCV,
         dryRun: true,
-        confirm: true,
     }),
                                  expectedError);
     checkFCV(db, lastLTSFCV, lastLTSFCV);
@@ -126,8 +124,7 @@ function testFailureWithSkipDryRun(conn, shardConn, failPointName, expectedError
 
     // If the user runs an explicit dryRun at this point, it will succeed but still keep the FCV in
     // the transitional state
-    assert.commandWorked(
-        db.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, dryRun: true, confirm: true}));
+    assert.commandWorked(db.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, dryRun: true}));
     checkFCV(db, lastLTSFCV, lastLTSFCV);
 
     jsTestLog("SkipDryRun tests completed successfully.");

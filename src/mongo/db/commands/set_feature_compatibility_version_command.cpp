@@ -511,7 +511,7 @@ public:
                 (requestedVersion > actualVersion ? upgradeMsg : downgradeMsg),
                 // If the request is from a config svr, skip requiring the 'confirm: true'
                 // parameter.
-                (isFromConfigServer || isConfirmed));
+                (isFromConfigServer || isConfirmed || isDryRun));
 
         // Always wait for at least majority writeConcern to ensure all writes involved in the
         // upgrade/downgrade process cannot be rolled back. There is currently no mechanism to
