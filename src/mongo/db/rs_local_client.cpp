@@ -228,7 +228,7 @@ Status RSLocalClient::runAggregation(
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-    repl::ReadConcernArgs requestReadConcernArgs = [&] {
+    repl::ReadConcernArgs requestReadConcernArgs = [&]() -> repl::ReadConcernArgs {
         if (!aggRequest.getReadConcern()) {
             // Default concern is local at the lastOp applied timestamp.
             return repl::ReadConcernArgs{_getLastOpTime(),
