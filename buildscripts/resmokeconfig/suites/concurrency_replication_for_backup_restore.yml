@@ -25,6 +25,9 @@ selector:
     # TODO BACKPORT-25689: reenable this workload after backport to 8.0.
     - jstests/concurrency/fsm_workloads/query/remove/update_and_batched_delete.js
 
+    # TODO BACKPORT-25148: reenable this workload after backport to 8.0.
+    - jstests/concurrency/fsm_workloads/query/yield/repl_set_resize_oplog.js
+
   exclude_with_any_tags:
     - requires_standalone
     # The ability to shut down a node while its in the middle of applying ops is required for
