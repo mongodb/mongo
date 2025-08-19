@@ -217,8 +217,9 @@ private:
  */
 class HostStatusHandle : public OwnedHandle<::MongoExtensionStatus> {
 public:
-    HostStatusHandle(::MongoExtensionStatus* status)
-        : OwnedHandle<::MongoExtensionStatus>(status) {}
+    HostStatusHandle(::MongoExtensionStatus* status) : OwnedHandle<::MongoExtensionStatus>(status) {
+        _assertValidVTable();
+    }
 
     /**
      * Return a non-zero code associated with `error`.
@@ -235,6 +236,12 @@ public:
         assertValid();
         return byteViewAsStringView(vtable().get_reason(get()));
     }
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10930105, "HostStatus 'get_code' is null", vtable.get_code != nullptr);
+        tassert(10930106, "HostStatus 'get_reason' is null", vtable.get_reason != nullptr);
+    };
 };
 
 /**

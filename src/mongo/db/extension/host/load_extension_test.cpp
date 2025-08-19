@@ -105,12 +105,6 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
         AssertionException,
         10615505);
 
-    // null_initialize_function_bad_extension has a null initialization function.
-    ASSERT_THROWS_CODE(
-        ExtensionLoader::load(getExtensionPath("libnull_initialize_function_bad_extension.so")),
-        AssertionException,
-        10615506);
-
     // major_version_max_int_bad_extension has the maximum uint32_t value as its major version.
     ASSERT_THROWS_CODE(
         ExtensionLoader::load(getExtensionPath("libmajor_version_max_int_bad_extension.so")),
@@ -123,6 +117,11 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
         ExtensionLoader::load(getExtensionPath("libduplicate_stage_descriptor_bad_extension.so")),
         AssertionException,
         10696402);
+}
+
+// null_initialize_function_bad_extension has a null initialization function.
+DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullInitialize, "10930101") {
+    ExtensionLoader::load(getExtensionPath("libnull_initialize_function_bad_extension.so"));
 }
 
 // TODO SERVER-109108: Switch this to use the foo extension once we can reset state in between

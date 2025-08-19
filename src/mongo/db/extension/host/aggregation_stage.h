@@ -47,7 +47,12 @@ class ExtensionLogicalAggregationStageHandle
     : public OwnedHandle<::MongoExtensionLogicalAggregationStage> {
 public:
     ExtensionLogicalAggregationStageHandle(::MongoExtensionLogicalAggregationStage* ptr)
-        : OwnedHandle<::MongoExtensionLogicalAggregationStage>(ptr) {}
+        : OwnedHandle<::MongoExtensionLogicalAggregationStage>(ptr) {
+        _assertValidVTable();
+    }
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {}
 };
 
 /**
@@ -59,7 +64,9 @@ class ExtensionAggregationStageDescriptorHandle
 public:
     ExtensionAggregationStageDescriptorHandle(
         absl::Nonnull<const ::MongoExtensionAggregationStageDescriptor*> descriptor)
-        : UnownedHandle<const ::MongoExtensionAggregationStageDescriptor>(descriptor) {}
+        : UnownedHandle<const ::MongoExtensionAggregationStageDescriptor>(descriptor) {
+        _assertValidVTable();
+    }
 
     /**
      * Returns a StringData containing the name of this aggregation stage.
@@ -94,6 +101,19 @@ public:
         sdk::enterC(
             [&]() { return vtbl.parse(ptr, sdk::objAsByteView(stageBson), &logicalStagePtr); });
         return ExtensionLogicalAggregationStageHandle(logicalStagePtr);
+    }
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10930102,
+                "ExtensionAggregationStageDescriptor 'get_name' is null",
+                vtable.get_name != nullptr);
+        tassert(10930103,
+                "ExtensionAggregationStageDescriptor 'get_type' is null",
+                vtable.get_type != nullptr);
+        tassert(10930104,
+                "ExtensionAggregationStageDescriptor 'parse' is null",
+                vtable.parse != nullptr);
     }
 };
 }  // namespace mongo::extension::host

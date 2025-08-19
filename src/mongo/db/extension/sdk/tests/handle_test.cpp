@@ -40,7 +40,7 @@ namespace {
  * DestroyableAPI is an abstraction that allows an object that crosses the extension API boundary.
  */
 struct DestroyableAPI {
-    const struct DestroyableVTable* vtable;
+    const struct DestroyableVTable* const vtable;
 };
 
 /**
@@ -85,8 +85,28 @@ private:
 const DestroyableVTable DestroyableImpl::VTABLE =
     DestroyableVTable{.destroy = &DestroyableImpl::destroy};
 
-using OwnedDestroyableHandle = mongo::extension::sdk::OwnedHandle<DestroyableAPI>;
-using UnownedDestroyableHandle = mongo::extension::sdk::UnownedHandle<DestroyableAPI>;
+class OwnedDestroyableHandle : public mongo::extension::sdk::OwnedHandle<DestroyableAPI> {
+public:
+    explicit OwnedDestroyableHandle(DestroyableAPI* ptr)
+        : mongo::extension::sdk::OwnedHandle<DestroyableAPI>(ptr) {
+        _assertValidVTable();
+    }
+
+protected:
+    void _assertVTableConstraints(const VTable_t&) const override {}
+};
+
+class UnownedDestroyableHandle : public mongo::extension::sdk::UnownedHandle<DestroyableAPI> {
+public:
+    explicit UnownedDestroyableHandle(DestroyableAPI* ptr)
+        : mongo::extension::sdk::UnownedHandle<DestroyableAPI>(ptr) {
+        _assertValidVTable();
+    }
+
+protected:
+    void _assertVTableConstraints(const VTable_t&) const override {}
+};
+
 
 TEST(HandleTest, ownedHandleMoveAndDestroy) {
     DestroyableImpl::resetDestroyCount();
@@ -203,6 +223,22 @@ TEST(HandleTest, unownedHandleMoveAndDestroy) {
     }
     // unique_ptr finally goes out of scope, calls destructor.
     ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 1);
+}
+
+DEATH_TEST(HandleTest, ownedHandleConstructorRejectsNullVtable, "10596404") {
+    DestroyableAPI obj{nullptr};
+    OwnedDestroyableHandle handle(&obj);
+}
+
+DEATH_TEST(HandleTest, unownedHandleConstructorRejectsNullVtable, "10596404") {
+    DestroyableAPI obj{nullptr};
+    OwnedDestroyableHandle handle(&obj);
+}
+
+DEATH_TEST(HandleTest, ownedHandleConstructorRejectsNullDestroyPointer, "10930100") {
+    DestroyableVTable invalidVtable{.destroy = nullptr};
+    DestroyableAPI obj{&invalidVtable};
+    OwnedDestroyableHandle handle(&obj);
 }
 }  // namespace
 }  // namespace mongo

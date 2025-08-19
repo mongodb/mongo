@@ -100,14 +100,7 @@ ExtensionHandle getMongoExtension(SharedLibrary& extensionLib, const std::string
                           << "': get_mongodb_extension failed to set an extension",
             extension != nullptr);
 
-    const auto extHandle = ExtensionHandle{extension};
-
-    uassert(10615506,
-            str::stream() << "Loading extension '" << extensionPath
-                          << "' failed: initialize function is not defined",
-            extHandle.vtable().initialize != nullptr);
-
-    return extHandle;
+    return ExtensionHandle{extension};
 }
 }  // namespace
 

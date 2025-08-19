@@ -85,7 +85,7 @@ typedef struct MongoExtensionByteView {
  * The underlying buffer is owned by MongoExtensionByteBuf.
  */
 typedef struct MongoExtensionByteBuf {
-    const struct MongoExtensionByteBufVTable* vtable;
+    const struct MongoExtensionByteBufVTable* const vtable;
 } MongoExtensionByteBuf;
 
 /**
@@ -112,7 +112,7 @@ typedef struct MongoExtensionByteBufVTable {
  * stage consumes input from a host provided aggregation stage.
  */
 typedef struct MongoExtensionStatus {
-    const struct MongoExtensionStatusVTable* vtable;
+    const struct MongoExtensionStatusVTable* const vtable;
 } MongoExtensionStatus;
 
 /**
@@ -161,7 +161,7 @@ typedef enum MongoExtensionAggregationStageType : uint32_t {
  * These objects are owned by extensions so no method is provided to free them.
  */
 typedef struct MongoExtensionAggregationStageDescriptor {
-    const struct MongoExtensionAggregationStageDescriptorVTable* vtable;
+    const struct MongoExtensionAggregationStageDescriptorVTable* const vtable;
 } MongoExtensionAggregationStageDescriptor;
 
 /**
@@ -198,7 +198,7 @@ typedef struct MongoExtensionAggregationStageDescriptorVTable {
  * be used to generate objects for execution.
  */
 typedef struct MongoExtensionLogicalAggregationStage {
-    const struct MongoExtensionLogicalAggregationStageVTable* vtable;
+    const struct MongoExtensionLogicalAggregationStageVTable* const vtable;
 } MongoExtensionLogicalAggregationStage;
 
 /**
@@ -234,7 +234,7 @@ typedef struct MongoExtensionHostPortal {
  * version with the server's API version then invoke the initializer.
  */
 typedef struct MongoExtension {
-    const struct MongoExtensionVTable* vtable;
+    const struct MongoExtensionVTable* const vtable;
     MongoExtensionAPIVersion version;
 } MongoExtension;
 

@@ -41,7 +41,9 @@ namespace mongo::extension::host {
 class ExtensionHandle : public UnownedHandle<const ::MongoExtension> {
 
 public:
-    ExtensionHandle(const ::MongoExtension* ext) : UnownedHandle<const ::MongoExtension>(ext) {}
+    ExtensionHandle(const ::MongoExtension* ext) : UnownedHandle<const ::MongoExtension>(ext) {
+        _assertValidVTable();
+    }
 
     void initialize(const ::MongoExtensionHostPortal* portal) const {
         sdk::enterC([&] {
@@ -54,6 +56,11 @@ public:
         assertValid();
         return get()->version;
     }
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10930101, "Extension 'initialize' is null", vtable.initialize != nullptr);
+    };
 };
 
 }  // namespace mongo::extension::host

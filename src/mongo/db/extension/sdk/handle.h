@@ -59,8 +59,6 @@ public:
     using VTablePtr_t = decltype(std::declval<T>().vtable);
     using VTable_t = typename std::remove_pointer<VTablePtr_t>::type;
 
-    explicit Handle(T* ptr) : _ptr(ptr) {}
-
     virtual ~Handle() {}
 
     // Move only semantics if IsOwned = true.
@@ -68,6 +66,9 @@ public:
     Handle(const Handle& other)
     requires std::copy_constructible<UnderlyingPtr_t>
     {
+        if (other.isValid()) {
+            other._assertValidVTable();
+        }
         _ptr = other._ptr;
     }
 
@@ -75,12 +76,23 @@ public:
     requires std::copy_constructible<UnderlyingPtr_t>
     {
         _ptr = other._ptr;
+        if (_ptr) {
+            _assertValidVTable();
+        }
         return *this;
     }
-    Handle(Handle&& other) : _ptr(std::move(other._ptr)) {}
+    Handle(Handle&& other) {
+        if (other.isValid()) {
+            other._assertValidVTable();
+        }
+        _ptr = std::move(other._ptr);
+    }
 
     Handle& operator=(Handle&& other) {
         _ptr = std::move(other._ptr);
+        if (_ptr) {
+            _assertValidVTable();
+        }
         return *this;
     }
 
@@ -114,6 +126,23 @@ public:
     const VTable_t& vtable() const {
         tassert(10596404, "Invalid vtable ptr!", _ptr->vtable != nullptr);
         return *_ptr->vtable;
+    }
+
+protected:
+    explicit Handle(T* ptr) : _ptr(ptr) {}
+
+    // Derived classes must implement this function to confirm the vtable does not contain nullptrs.
+    virtual void _assertVTableConstraints(const VTable_t& vtable) const = 0;
+
+    // NOTE: Derivations of Handle MUST call _assertValidVTable() from the constructor.
+    void _assertValidVTable() const {
+        if (isValid()) {
+            const auto& vtbl = vtable();
+            if constexpr (IsOwned) {
+                tassert(10930100, "OwnedHandle's 'destroy' is null", vtbl.destroy != nullptr);
+            }
+            _assertVTableConstraints(vtbl);
+        }
     }
 
 private:
