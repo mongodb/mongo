@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
@@ -51,6 +52,32 @@ namespace mongo {
 using std::endl;
 using std::string;
 using std::unique_ptr;
+
+namespace {
+
+AtomicWord<int64_t> profilerWritesTotal{0};
+AtomicWord<int64_t> profilerWritesActive{0};
+
+class ProfilerSection : public ServerStatusSection {
+public:
+    ProfilerSection() : ServerStatusSection("profiler") {}
+
+    ~ProfilerSection() override = default;
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        BSONObjBuilder bob;
+        bob.append("totalWrites", profilerWritesTotal.loadRelaxed());
+        bob.append("activeWriters", profilerWritesActive.loadRelaxed());
+        return bob.obj();
+    }
+} profilerSection;
+
+}  // namespace
 
 void profile(OperationContext* opCtx, NetworkOp op) {
     // Initialize with 1kb at start in order to avoid realloc later
@@ -106,6 +133,10 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         });
         AlternativeClientRegion acr(newClient);
         const auto dbProfilingNS = NamespaceString::makeSystemDotProfileNamespace(ns.dbName());
+
+        profilerWritesActive.fetchAndAddRelaxed(1);
+        ON_BLOCK_EXIT([&] { profilerWritesActive.fetchAndAddRelaxed(-1); });
+
         AutoGetCollection autoColl(newCtx.get(), dbProfilingNS, MODE_IX);
         Database* const db = autoColl.getDb();
         if (!db) {
@@ -126,6 +157,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         uassertStatusOK(collection_internal::insertDocument(
             newCtx.get(), coll, InsertStatement(p), nullOpDebug, false));
         wuow.commit();
+        profilerWritesTotal.fetchAndAddRelaxed(1);
     } catch (const AssertionException& assertionEx) {
         LOGV2_WARNING(20703,
                       "Caught Assertion while trying to profile {operation} against "

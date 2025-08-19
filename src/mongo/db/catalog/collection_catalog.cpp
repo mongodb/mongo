@@ -2256,19 +2256,27 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
     }
 
 
-    if (!nss.isOnInternalDb() && !nss.isSystem()) {
-        _stats.userCollections += 1;
-        if (coll->isCapped()) {
-            _stats.userCapped += 1;
+    if (!nss.isOnInternalDb()) {
+        if (!nss.isSystem()) {
+            _stats.userCollections += 1;
+            if (coll->isCapped()) {
+                _stats.userCapped += 1;
+            }
+            if (coll->isClustered()) {
+                _stats.userClustered += 1;
+            }
+            if (coll->getCollectionOptions().encryptedFieldConfig) {
+                _stats.queryableEncryption += 1;
+            }
+            if (isCSFLE1Validator(coll->getValidatorDoc())) {
+                _stats.csfle += 1;
+            }
+        } else {
+            _stats.internal += 1;
         }
-        if (coll->isClustered()) {
-            _stats.userClustered += 1;
-        }
-        if (coll->getCollectionOptions().encryptedFieldConfig) {
-            _stats.queryableEncryption += 1;
-        }
-        if (isCSFLE1Validator(coll->getValidatorDoc())) {
-            _stats.csfle += 1;
+
+        if (nss.isSystemDotProfile()) {
+            _stats.systemProfile += 1;
         }
     } else {
         _stats.internal += 1;
@@ -2327,19 +2335,27 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
         _pushCatalogIdForNSSAndUUID(ns, uuid, boost::none, commitTime);
     }
 
-    if (!ns.isOnInternalDb() && !ns.isSystem()) {
-        _stats.userCollections -= 1;
-        if (coll->isCapped()) {
-            _stats.userCapped -= 1;
+    if (!ns.isOnInternalDb()) {
+        if (!ns.isSystem()) {
+            _stats.userCollections -= 1;
+            if (coll->isCapped()) {
+                _stats.userCapped -= 1;
+            }
+            if (coll->isClustered()) {
+                _stats.userClustered -= 1;
+            }
+            if (coll->getCollectionOptions().encryptedFieldConfig) {
+                _stats.queryableEncryption -= 1;
+            }
+            if (isCSFLE1Validator(coll->getValidatorDoc())) {
+                _stats.csfle -= 1;
+            }
+        } else {
+            _stats.internal -= 1;
         }
-        if (coll->isClustered()) {
-            _stats.userClustered -= 1;
-        }
-        if (coll->getCollectionOptions().encryptedFieldConfig) {
-            _stats.queryableEncryption -= 1;
-        }
-        if (isCSFLE1Validator(coll->getValidatorDoc())) {
-            _stats.csfle -= 1;
+
+        if (ns.isSystemDotProfile()) {
+            _stats.systemProfile -= 1;
         }
     } else {
         _stats.internal -= 1;
