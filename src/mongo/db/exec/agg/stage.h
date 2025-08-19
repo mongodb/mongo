@@ -223,7 +223,7 @@ public:
     }
 
     /**
-     * Set the underlying source this source should use to get Documents from. Must not throw
+     * Set the underlying source this stage should use to get Documents from. Must not throw
      * exceptions.
      */
     virtual void setSource(Stage* source) {

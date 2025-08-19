@@ -38,10 +38,8 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/memory_tracking/memory_usage_tracker.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
@@ -49,10 +47,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/spilling/spillable_deque.h"
-#include "mongo/db/pipeline/spilling/spillable_map.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
@@ -63,9 +58,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
-#include <cstddef>
 #include <memory>
 #include <set>
 #include <string>
@@ -78,7 +71,18 @@
 
 namespace mongo {
 
-class DocumentSourceGraphLookUp final : public DocumentSource, public exec::agg::Stage {
+struct GraphLookUpParams {
+    NamespaceString from;
+    FieldPath as;
+    FieldPath connectFromField;
+    FieldPath connectToField;
+    boost::intrusive_ptr<Expression> startWith;
+    boost::optional<BSONObj> additionalFilter;
+    boost::optional<FieldPath> depthField;
+    boost::optional<long long> maxDepth;
+};
+
+class DocumentSourceGraphLookUp final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$graphLookup"_sd;
 
@@ -115,8 +119,6 @@ public:
     DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp&,
                               const boost::intrusive_ptr<ExpressionContext>&);
 
-    ~DocumentSourceGraphLookUp() override;
-
     const char* getSourceName() const final;
 
     static const Id& id;
@@ -125,16 +127,16 @@ public:
         return id;
     }
 
-    const FieldPath& getConnectFromField() const {
-        return _connectFromField;
+    inline const FieldPath& getConnectFromField() const {
+        return _params.connectFromField;
     }
 
-    const FieldPath& getConnectToField() const {
-        return _connectToField;
+    inline const FieldPath& getConnectToField() const {
+        return _params.connectToField;
     }
 
-    Expression* getStartWithField() const {
-        return _startWith.get();
+    inline Expression* getStartWithField() const {
+        return _params.startWith.get();
     }
 
     const boost::intrusive_ptr<DocumentSourceUnwind>& getUnwindSource() const {
@@ -152,20 +154,21 @@ public:
     /*
      * Returns a ref to '_startWith' that can be swapped out with a new expression.
      */
-    boost::intrusive_ptr<Expression>& getMutableStartWithField() {
-        return _startWith;
+    inline boost::intrusive_ptr<Expression>& getMutableStartWithField() {
+        return _params.startWith;
     }
 
     void setStartWithField(boost::intrusive_ptr<Expression> startWith) {
-        _startWith.swap(startWith);
+        _params.startWith.swap(startWith);
     }
 
-    boost::optional<BSONObj> getAdditionalFilter() const {
-        return _additionalFilter;
+    inline boost::optional<BSONObj> getAdditionalFilter() const {
+        return _params.additionalFilter;
     };
 
     void setAdditionalFilter(boost::optional<BSONObj> additionalFilter) {
-        _additionalFilter = additionalFilter ? additionalFilter->getOwned() : additionalFilter;
+        _params.additionalFilter =
+            additionalFilter ? additionalFilter->getOwned() : additionalFilter;
     };
 
     void serializeToArray(std::vector<Value>& array,
@@ -181,30 +184,25 @@ public:
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
-        expression::addDependencies(_startWith.get(), deps);
+        expression::addDependencies(_params.startWith.get(), deps);
         return DepsTracker::State::SEE_NEXT;
     };
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {
-        expression::addVariableRefs(_startWith.get(), refs);
-        if (_additionalFilter) {
+        expression::addVariableRefs(_params.startWith.get(), refs);
+        if (_params.additionalFilter) {
             dependency_analysis::addVariableRefs(
-                uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, _fromExpCtx))
+                uassertStatusOK(
+                    MatchExpressionParser::parse(*_params.additionalFilter, _fromExpCtx))
                     .get(),
                 refs);
         }
     }
     void addInvolvedCollections(stdx::unordered_set<NamespaceString>* collectionNames) const final;
 
-    void detachFromOperationContext() final;
-
     void detachSourceFromOperationContext() final;
 
-    void reattachToOperationContext(OperationContext* opCtx) final;
-
     void reattachSourceToOperationContext(OperationContext* opCtx) final;
-
-    bool validateOperationContext(const OperationContext* opCtx) const final;
 
     bool validateSourceOperationContext(const OperationContext* opCtx) const final;
 
@@ -226,25 +224,23 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
-    bool usedDisk() const override {
-        return _visitedDocuments.usedDisk() || _visitedFromValues.usedDisk() || _queue.usedDisk();
+    inline const NamespaceString& getFromNs() const {
+        return _params.from;
     }
 
-    const SpecificStats* getSpecificStats() const final {
-        return &_stats;
+    inline const FieldPath& getAsField() const {
+        return _params.as;
     }
 
-    const NamespaceString& getFromNs() const {
-        return _from;
+    inline const boost::optional<FieldPath>& getDepthField() const {
+        return _params.depthField;
     }
 
-    void doForceSpill() final {
-        spill(0);
+    inline const boost::optional<long long>& getMaxDepth() const {
+        return _params.maxDepth;
     }
 
 protected:
-    GetNextResult doGetNext() final;
-    void doDispose() final;
     boost::optional<ShardId> computeMergeShardId() const final;
 
     /**
@@ -254,19 +250,12 @@ protected:
                                                    DocumentSourceContainer* container) final;
 
 private:
-    static constexpr StringData kFrontierValueField = "f"_sd;
-    static constexpr StringData kDepthField = "d"_sd;
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceGraphLookUpToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
 
     DocumentSourceGraphLookUp(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        NamespaceString from,
-        std::string as,
-        std::string connectFromField,
-        std::string connectToField,
-        boost::intrusive_ptr<Expression> startWith,
-        boost::optional<BSONObj> additionalFilter,
-        boost::optional<FieldPath> depthField,
-        boost::optional<long long> maxDepth,
+        GraphLookUpParams params,
         boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc);
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
@@ -274,141 +263,29 @@ private:
         MONGO_UNREACHABLE_TASSERT(7484306);
     }
 
-    void spill(int64_t maximumMemoryUsage);
-
-    void spillDuringVisitedUnwinding();
-
-    /**
-     * Prepares the query to execute on the 'from' collection wrapped in a $match by using the
-     * contents of '_queue'. Consumes from the _queue until it is empty or the match stage reached
-     * BSONObjMaxUserSize.
-     */
-    struct Query {
-        // Valid $match stage that we have to query, or boost::none if no query is needed.
-        boost::optional<BSONObj> match;
-        // Documents that are returned from in-memory cache.
-        DocumentUnorderedSet cached;
-        // Values from _queue that are processed by this query.
-        ValueFlatUnorderedSet queried;
-        // Depth of the documents, returned by the given query.
-        long long depth;
-    };
-    Query makeQueryFromQueue();
-
-    /**
-     * Create pipeline to get documents from the foreign collection.
-     */
-    std::unique_ptr<Pipeline> makePipeline(BSONObj match, bool allowForeignSharded);
-
-    /**
-     * If we have internalized a $unwind, getNext() dispatches to this function.
-     */
-    GetNextResult getNextUnwound();
-
-    /**
-     * Perform a breadth-first search of the 'from' collection. '_queue' should already be
-     * populated with the values for the initial query. Populates '_visited' with the result(s)
-     * of the query.
-     */
-    void doBreadthFirstSearch();
-
-    /**
-     * Populates '_queue' with the '_startWith' value(s) from '_input' and then performs a
-     * breadth-first search. Caller should check that _input is not boost::none.
-     */
-    void performSearch();
-
-    /**
-     * Updates '_cache' with 'result' appropriately, given that 'result' was retrieved when querying
-     * for 'queried'.
-     */
-    void addToCache(const Document& result, const ValueFlatUnorderedSet& queried);
-
-    /**
-     * Assert that '_visited' and '_queue' have not exceeded the maximum meory usage, and then
-     * evict from '_cache' until this source is using less than 'maxMemoryUsageBytes'.
-     */
-    void checkMemoryUsage();
-
-    /**
-     * Wraps frontier value and depth into a Document format for the _queue.
-     */
-    Document wrapFrontierValue(Value value, long long depth) const;
-
-    /**
-     * Process 'result', adding it to '_visited' with the given 'depth', and updating '_queue'
-     * with the object's 'connectTo' values.
-     */
-    void addToVisitedAndQueue(Document result, long long depth);
-
-    /**
-     * Try to add given id to search queue. If id is already visited or is already in the queue,
-     * will do nothing.
-     */
-    void addFromValueToQueueIfNeeded(Value id, long long depth);
-
     /**
      * Returns true if we are not in a transaction.
      */
     bool foreignShardedGraphLookupAllowed() const;
 
-    void updateSpillingStats();
-
-    // $graphLookup options.
-    NamespaceString _from;
-    FieldPath _as;
-    FieldPath _connectFromField;
-    FieldPath _connectToField;
-    boost::intrusive_ptr<Expression> _startWith;
-    boost::optional<BSONObj> _additionalFilter;
-    boost::optional<FieldPath> _depthField;
-    boost::optional<long long> _maxDepth;
+    GraphLookUpParams _params;
 
     // The ExpressionContext used when performing aggregation pipelines against the '_from'
     // namespace.
     boost::intrusive_ptr<ExpressionContext> _fromExpCtx;
 
+    // TODO: SERVER-105521 Check if '_fromPipeline' can be moved instead of copied.
     // The aggregation pipeline to perform against the '_from' namespace.
     std::vector<BSONObj> _fromPipeline;
 
-    // Tracks memory for _queue and _visited. _cache is allowed to use the remaining memory limit.
-    MemoryUsageTracker _memoryUsageTracker;
-
-    // Only used during the breadth-first search, tracks the set of values on the current frontier.
-    // Contains documents with two fields: kFrontierValueField with a lookup value and kDepthField
-    // with depth.
-    SpillableDeque _queue;
-
-    // Tracks nodes that have been discovered for a given input.
-    // Contains visited documents by _id.
-    SpillableDocumentMap _visitedDocuments;
-    // Contains visited or already enqueued values of "connectFromField" to avoid duplicated
-    // queries.
-    SpillableValueSet _visitedFromValues;
-
-    // Caches query results to avoid repeating any work. This structure is maintained across calls
-    // to getNext().
-    LookupSetCache _cache;
-
-    // When we have internalized a $unwind, we must keep track of the input document, since we will
-    // need it for multiple "getNext()" calls.
-    boost::optional<Document> _input;
-
     // Keep track of a $unwind that was absorbed into this stage.
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> _unwind;
-    boost::optional<SpillableDocumentMap::Iterator> _unwindIterator;
-
-    // If we absorbed a $unwind that specified 'includeArrayIndex', this is used to populate that
-    // field, tracking how many results we've returned so far for the current input document.
-    long long _outputIndex = 0;
 
     // Holds variables defined both in this stage and in parent pipelines. These are copied to the
     // '_fromExpCtx' ExpressionContext's 'variables' and 'variablesParseState' for use in the
     // '_fromPipeline' execution.
     Variables _variables;
     VariablesParseState _variablesParseState;
-
-    DocumentSourceGraphLookupStats _stats;
 };
 
 }  // namespace mongo
