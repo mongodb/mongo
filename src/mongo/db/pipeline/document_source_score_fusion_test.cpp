@@ -4249,6 +4249,587 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameContainsDot) {
                        16412);
 }
 
+TEST_F(DocumentSourceScoreFusionTest, QueryShapeDebugString) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $score: { score: "$year", normalization: "none" } }
+                    ],
+                    matchDistance: [
+                        {
+                            $geoNear: {
+                                near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                                maxDistance: 2,
+                                query: { category: "Parks" },
+                                spherical: true
+                            }
+                        },
+                        { $score: { score: { $meta: "geoNearDistance" }, normalization: "sigmoid" } }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 2,
+                    matchDistance: 3
+                }
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), expCtx);
+    const auto pipeline = Pipeline::create(desugaredList, expCtx);
+
+    SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson(opts));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "HASH<author>": {
+                            "$eq": "?string"
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": "$HASH<year>"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "HASH<docs>": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "HASH<internal_raw_score>": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$HASH<docs>"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "HASH<_internal_scoreFusion_docs>": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "HASH<_internal_scoreFusion_internal_fields>": {
+                            "HASH<matchAuthor_score>": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    "?number"
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "HASH<pipeline_test>",
+                        "pipeline": [
+                            {
+                                "$geoNear": {
+                                    "near": "?object",
+                                    "maxDistance": "?number",
+                                    "query": {
+                                        "HASH<category>": {
+                                            "$eq": "?string"
+                                        }
+                                    },
+                                    "spherical": "?bool"
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$meta": "geoNearDistance"
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "HASH<docs>": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "HASH<internal_raw_score>": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$divide": [
+                                            "?number",
+                                            {
+                                                "$add": [
+                                                    "?number",
+                                                    {
+                                                        "$exp": [
+                                                            {
+                                                                "$multiply": [
+                                                                    "?number",
+                                                                    {
+                                                                        "$meta": "score"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$HASH<docs>"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "HASH<_internal_scoreFusion_docs>": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "HASH<_internal_scoreFusion_internal_fields>": {
+                                        "HASH<matchDistance_score>": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                "?number"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$HASH<_internal_scoreFusion_docs>.HASH<_id>",
+                        "HASH<_internal_scoreFusion_docs>": {
+                            "$first": "$HASH<_internal_scoreFusion_docs>"
+                        },
+                        "HASH<_internal_scoreFusion_internal_fields>": {
+                            "$push": {
+                                "HASH<matchAuthor_score>": {
+                                    "$ifNull": [
+                                        "$HASH<_internal_scoreFusion_internal_fields>.HASH<matchAuthor_score>",
+                                        "?number"
+                                    ]
+                                },
+                                "HASH<matchDistance_score>": {
+                                    "$ifNull": [
+                                        "$HASH<_internal_scoreFusion_internal_fields>.HASH<matchDistance_score>",
+                                        "?number"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "HASH<_id>": true,
+                        "HASH<_internal_scoreFusion_docs>": true,
+                        "HASH<_internal_scoreFusion_internal_fields>": {
+                            "$reduce": {
+                                "input": "$HASH<_internal_scoreFusion_internal_fields>",
+                                "initialValue": "?object",
+                                "in": {
+                                    "HASH<matchAuthor_score>": {
+                                        "$max": [
+                                            "$$HASH<value>.HASH<matchAuthor_score>",
+                                            "$$HASH<this>.HASH<matchAuthor_score>"
+                                        ]
+                                    },
+                                    "HASH<matchDistance_score>": {
+                                        "$max": [
+                                            "$$HASH<value>.HASH<matchDistance_score>",
+                                            "$$HASH<this>.HASH<matchDistance_score>"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$HASH<_internal_scoreFusion_docs>",
+                                "$$ROOT"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "HASH<_internal_scoreFusion_docs>": false,
+                        "HASH<_id>": true
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$HASH<_internal_scoreFusion_internal_fields>.HASH<matchAuthor_score>",
+                                "$HASH<_internal_scoreFusion_internal_fields>.HASH<matchDistance_score>"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "HASH<_id>": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "HASH<_internal_scoreFusion_internal_fields>": false,
+                        "HASH<_id>": true
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, RepresentativeQueryShape) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $score: { score: "$year", normalization: "none" } }
+                    ],
+                    matchDistance: [
+                        {
+                            $geoNear: {
+                                near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                                maxDistance: 2,
+                                query: { category: "Parks" },
+                                spherical: true
+                            }
+                        },
+                        { $score: { score: { $meta: "geoNearDistance" }, normalization: "sigmoid" } }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 2,
+                    matchDistance: 3
+                }
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), expCtx);
+    const auto pipeline = Pipeline::create(desugaredList, expCtx);
+
+    SerializationOptions opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson(opts));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": {
+                            "$eq": "?"
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": "$year"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "matchAuthor_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    1
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$geoNear": {
+                                    "near": {
+                                        "$const": {
+                                            "?": "?"
+                                        }
+                                    },
+                                    "maxDistance": 1,
+                                    "query": {
+                                        "category": {
+                                            "$eq": "?"
+                                        }
+                                    },
+                                    "spherical": true
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$meta": "geoNearDistance"
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$divide": [
+                                            1,
+                                            {
+                                                "$add": [
+                                                    1,
+                                                    {
+                                                        "$exp": [
+                                                            {
+                                                                "$multiply": [
+                                                                    1,
+                                                                    {
+                                                                        "$meta": "score"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchDistance_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                1
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "_internal_scoreFusion_internal_fields": {
+                            "$push": {
+                                "matchAuthor_score": {
+                                    "$ifNull": [
+                                        "$_internal_scoreFusion_internal_fields.matchAuthor_score",
+                                        1
+                                    ]
+                                },
+                                "matchDistance_score": {
+                                    "$ifNull": [
+                                        "$_internal_scoreFusion_internal_fields.matchDistance_score",
+                                        1
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": true,
+                        "_internal_scoreFusion_docs": true,
+                        "_internal_scoreFusion_internal_fields": {
+                            "$reduce": {
+                                "input": "$_internal_scoreFusion_internal_fields",
+                                "initialValue": {
+                                    "$const": {
+                                        "?": "?"
+                                    }
+                                },
+                                "in": {
+                                    "matchAuthor_score": {
+                                        "$max": [
+                                            "$$value.matchAuthor_score",
+                                            "$$this.matchAuthor_score"
+                                        ]
+                                    },
+                                    "matchDistance_score": {
+                                        "$max": [
+                                            "$$value.matchDistance_score",
+                                            "$$this.matchDistance_score"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                "$$ROOT"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_docs": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.matchAuthor_score",
+                                "$_internal_scoreFusion_internal_fields.matchDistance_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
+        asOneObj);  // NOLINT
+
+    // Ensure the representative query shape is reparseable.
+    ASSERT_DOES_NOT_THROW(Pipeline::parseFromArray(asOneObj.firstElement(), expCtx));
+}
+
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfGeoNearPipeline) {
     auto spec = fromjson(R"({
          $scoreFusion: {
