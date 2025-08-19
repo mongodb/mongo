@@ -13,7 +13,7 @@ buildvariants:
     expansions:
       test_flags: >-
         --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source
-        --enableEnterpriseTests=off
+        --modules=none
       push_path: linux
       push_bucket: downloads.mongodb.org
       push_bucket_new: cdn-origin-mongodb-server-community
@@ -111,7 +111,7 @@ buildvariants:
     expansions:
       test_flags: >-
         --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source
-        --enableEnterpriseTests=off
+        --modules=none
       push_path: linux
       push_bucket: downloads.mongodb.org
       push_bucket_new: cdn-origin-mongodb-server-community
@@ -215,7 +215,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
-        --enableEnterpriseTests=off
+        --modules=none
       has_packages: true
       packager_script: packager.py
       packager_arch: x86_64
@@ -353,7 +353,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
-        --enableEnterpriseTests=off
+        --modules=none
       has_packages: true
       packager_script: packager.py
       packager_arch: aarch64

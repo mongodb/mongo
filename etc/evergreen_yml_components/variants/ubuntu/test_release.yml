@@ -26,7 +26,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
-        --enableEnterpriseTests=off
+        --modules=none
       multiversion_platform: ubuntu2204
       multiversion_edition: targeted
       has_packages: true
@@ -86,7 +86,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_updated_oscrypto
-        --enableEnterpriseTests=off
+        --modules=none
       multiversion_platform: ubuntu2404
       multiversion_edition: targeted
       has_packages: true
@@ -145,7 +145,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source
-        --enableEnterpriseTests=off
+        --modules=none
       multiversion_platform: ubuntu2004
       multiversion_edition: targeted
       has_packages: true
@@ -404,7 +404,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source
-        --enableEnterpriseTests=off
+        --modules=none
       resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
       has_packages: true
       packager_script: packager.py
@@ -503,7 +503,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source
-        --enableEnterpriseTests=off
+        --modules=none
       resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
       has_packages: true
       packager_script: packager.py
@@ -607,7 +607,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
-        --enableEnterpriseTests=off
+        --modules=none
       resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
       has_packages: true
       packager_script: packager.py

@@ -14,6 +14,7 @@ import subprocess
 import sys
 import textwrap
 import traceback
+from functools import cache
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -29,6 +30,7 @@ from buildscripts.idl import gen_all_feature_flag_list
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import mongo_fuzzer_configs, multiversionsetupconstants, utils
 from buildscripts.resmokelib.run import TestRunner
+from buildscripts.resmokelib.utils import autoloader
 from buildscripts.resmokelib.utils.batched_baggage_span_processor import BatchedBaggageSpanProcessor
 from buildscripts.resmokelib.utils.file_span_exporter import FileSpanExporter
 from buildscripts.util.read_config import read_config_file
@@ -52,12 +54,52 @@ def validate_and_update_config(
     _update_config_vars(parser, args, should_configure_otel)
     _update_symbolizer_secrets()
     _validate_config(parser)
+    _set_up_modules()
     _set_logging_config()
 
 
 def process_feature_flag_file(path: str) -> list[str]:
     with open(path) as fd:
         return fd.read().split()
+
+@cache
+def _get_module_configs() -> dict:
+    with open(_config.MODULES_CONFIG_PATH, "r") as file:
+        return yaml.safe_load(file)
+
+def _set_up_modules():
+    module_configs = _get_module_configs()
+    # verify all enabled modules exist
+    for module in _config.MODULES:
+        if module not in module_configs:
+            raise RuntimeError(f"Could not find configuration for module {module}")
+    
+    # loop through all modules, we need to act on both enabled and disabled modules
+    for module in module_configs.keys():
+        module_config = module_configs[module]
+        all_paths_present = True
+        for key in ("fixture_dirs", "hook_dirs", "suite_dirs", "jstest_dirs"):
+            if key not in module_config:
+                continue
+            assert type(module_config[key]) == list, f"{key} in {module} did not have the expected type of list"
+            for module_dir in module_config[key]:
+                if not os.path.exists(module_dir):
+                    all_paths_present = False
+                    break
+
+
+        if module in _config.MODULES and all_paths_present:
+            # both the fixures and the hooks just need to be loaded once for resmoke to recognize them
+            for resource_dir in module_config.get("fixture_dirs", []) + module_config.get("hook_dirs", []):
+                norm_path = os.path.normpath(resource_dir)
+                package = norm_path.replace("/", ".")
+                autoloader.load_all_modules(package, [norm_path])
+                
+            for suite_dir in module_config.get("suite_dirs", []):
+                _config.MODULE_SUITE_DIRS.append(suite_dir)
+        else:
+            for jstest_dir in module_config.get("jstest_dirs", []):
+                _config.MODULE_DISABLED_JSTEST_DIRS.append(jstest_dir)
 
 
 def _validate_options(parser: argparse.ArgumentParser, args: dict):
@@ -497,7 +539,18 @@ flags in common: {common_set}
     _config.JOBS = config.pop("jobs")
     _config.LINEAR_CHAIN = config.pop("linear_chain") == "on"
     _config.MAJORITY_READ_CONCERN = config.pop("majority_read_concern") == "on"
-    _config.ENABLE_ENTERPRISE_TESTS = config.pop("enable_enterprise_tests")
+    _config.MODULES_CONFIG_PATH = config.pop("resmoke_modules_path")
+    modules = config.pop("modules").strip()
+    if modules == "default":
+        # try turning on all modules
+        _config.MODULES = list(_get_module_configs().keys())
+    elif modules == "none":
+        _config.MODULES = []
+    elif not modules:
+        raise RuntimeError("--modules must contain content. Specify 'none' to define no modules")
+    else:
+        _config.MODULES = modules.split(",")
+
     _config.MIXED_BIN_VERSIONS = config.pop("mixed_bin_versions")
     if _config.MIXED_BIN_VERSIONS is not None:
         _config.MIXED_BIN_VERSIONS = _config.MIXED_BIN_VERSIONS.split("-")

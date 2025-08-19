@@ -345,7 +345,7 @@ class Variant(object):
 
     def is_enterprise_build(self) -> bool:
         """Determine if the build variant is configured for enterprise builds."""
-        pattern = r"--enableEnterpriseTests\s*=?\s*off"
+        pattern = r"--modules\s*=?\s*none"
         return not re.search(pattern, str(self.raw))
 
     @property

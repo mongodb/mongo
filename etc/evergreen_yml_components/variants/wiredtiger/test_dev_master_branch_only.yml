@@ -88,7 +88,7 @@ buildvariants:
         --build_enterprise=False
       test_flags: >-
         --excludeWithAnyTags=requires_http_client
-        --enableEnterpriseTests=off
+        --modules=none
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       compile_variant: *linux_x86_dynamic_debug_wtdevelop_compile_variant_name
     tasks:
