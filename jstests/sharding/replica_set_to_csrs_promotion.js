@@ -1,7 +1,7 @@
 /**
  * @tags: [
  *   requires_persistence,
- *   featureFlagEnableReplicasetTransitionToCSRS,
+ *   requires_fcv_83,
  * ]
  */
 import {afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

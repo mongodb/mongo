@@ -3,7 +3,7 @@
  * movement
  * @tags: [
  *   requires_persistence,
- *   featureFlagEnableReplicasetTransitionToCSRS,
+ *   requires_fcv_83,
  *   # The test caches authenticated connections, so we do not support stepdowns
  *   does_not_support_stepdowns,
  * ]

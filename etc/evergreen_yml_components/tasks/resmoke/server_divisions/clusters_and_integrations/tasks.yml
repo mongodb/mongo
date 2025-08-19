@@ -1398,12 +1398,7 @@ tasks:
 
   - <<: *gen_task_template
     name: replica_sets_transition_to_csrs_jscore_passthrough_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "requires_all_feature_flags",
-      ]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 

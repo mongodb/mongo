@@ -1,6 +1,6 @@
 /**
  * @tags: [
- *   featureFlagEnableReplicasetTransitionToCSRS,
+ *   requires_fcv_83,
  * ]
  */
 import {describe, it} from "jstests/libs/mochalite.js";

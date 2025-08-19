@@ -227,10 +227,12 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagDropIndexesDDLCoordinator
         default: false
         fcv_gated: true
+    # TODO (SERVER-109312): remove feature once 9.0 becomes LTS.
     featureFlagEnableReplicasetTransitionToCSRS:
         description: "Enable the transitioning from a replica set to a sharded cluster with an embedded config server"
         cpp_varname: feature_flags::gFeatureFlagEnableReplicasetTransitionToCSRS
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true
     # TODO (SERVER-109004): remove feature flag once 9.0 becomes last LTS.
     featureFlagPreventDirectShardDDLsDuringPromotion:
