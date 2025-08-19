@@ -5288,4 +5288,57 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
 
     return {std::move(stage), std::move(outputs)};
 }
+
+std::ostream& operator<<(std::ostream& os, const PlanStageSlots::SlotType& slotType) {
+    switch (slotType) {
+        case PlanStageSlots::SlotType::kMeta:
+            os << "kMeta";
+            break;
+        case PlanStageSlots::SlotType::kField:
+            os << "kField";
+            break;
+        case PlanStageSlots::SlotType::kSortKey:
+            os << "kSortKey";
+            break;
+        case PlanStageSlots::SlotType::kPathExpr:
+            os << "kPathExpr";
+            break;
+        case PlanStageSlots::SlotType::kFilterCellField:
+            os << "kFilterCellField";
+            break;
+    };
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const PlanStageSlots& slots) {
+    os << "PlanStageSlots[";
+    bool first = true;
+    for (const auto& [slotTypeAndName, slot] : slots.getSlotNameToIdMap()) {
+        auto slotType = slotTypeAndName.first;
+        auto slotName = slotTypeAndName.second;
+        os << (first ? "" : ", ");
+        os << "s" << slot.getId() << ":" << slotType;
+        if (slotTypeAndName.first == PlanStageSlots::kResult.first &&
+            slotTypeAndName.second == PlanStageSlots::kResult.second && slots.hasResultObj()) {
+            os << " (materialized)";
+        }
+        os << " = " << slotName;
+        first = false;
+    }
+    os << "]";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const PlanStageReqs& reqs) {
+    os << "PlanStageReqs[";
+    bool first = true;
+    for (const auto& [slotType, slotName] : reqs.getSlotNameSet()) {
+        os << (first ? "" : ", ");
+        os << slotName << ":" << slotType;
+        first = false;
+    }
+    os << "]";
+    return os;
+}
+
 }  // namespace mongo::stage_builder

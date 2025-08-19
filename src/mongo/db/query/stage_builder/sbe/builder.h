@@ -484,6 +484,10 @@ public:
     // appear in list produced by calling 'getRequiredNamesInOrder(reqs)'.
     void clearNonRequiredSlots(const PlanStageReqs& reqs, bool saveResultObj = true);
 
+    const SlotNameMap& getSlotNameToIdMap() const {
+        return _data->slotNameToIdMap;
+    }
+
 private:
     template <typename T>
     SbSlotVector getSlotsByNameImpl(const T& names) const {
@@ -504,6 +508,9 @@ private:
 
     std::unique_ptr<Data> _data;
 };  // class PlanStageSlots
+
+std::ostream& operator<<(std::ostream& os, const PlanStageSlots::SlotType& slotType);
+std::ostream& operator<<(std::ostream& os, const PlanStageSlots& slots);
 
 /**
  * The PlanStageReqs class is used by SlotBasedStageBuilder to represent the context and parent's
@@ -817,6 +824,10 @@ public:
         return *this;
     }
 
+    const PlanStageSlots::SlotNameSet& getSlotNameSet() const {
+        return _data->slotNameSet;
+    }
+
 private:
     bool hasType(SlotType t) const {
         return std::any_of(_data->slotNameSet.begin(), _data->slotNameSet.end(), [t](auto& item) {
@@ -844,6 +855,8 @@ private:
 
     std::unique_ptr<Data> _data;
 };  // class PlanStageReqs
+
+std::ostream& operator<<(std::ostream& os, const PlanStageReqs& reqs);
 
 struct ProjectionPlan {
     PlanStageReqs childReqs;
