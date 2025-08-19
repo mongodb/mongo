@@ -239,7 +239,10 @@ Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCt
                     3,
                     "Waiting for completion of an in-progress request to ensure Read Your Writes "
                     "consistency");
-        countPromiseWaitersClusterParameterRefresh.shouldFail();
+        // Not checking the return value because shouldFail is called solely to increment the
+        // failpoint's '_hitCount' internal counter, representing in this context the number
+        // of pending cluster-wide parameters refresh requests.
+        std::ignore = countPromiseWaitersClusterParameterRefresh.shouldFail();
         future.wait();
         lk.lock();
     }
@@ -258,7 +261,10 @@ Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCt
                         "Cluster parameter refresh request unexpectedly joining on "
                         "already-fulfilled refresh call");
         }
-        countPromiseWaitersClusterParameterRefresh.shouldFail();
+        // Not checking the return value because shouldFail is called solely to increment the
+        // failpoint's '_hitCount' internal counter, representing in this context the number
+        // of pending cluster-wide parameters refresh requests.
+        std::ignore = countPromiseWaitersClusterParameterRefresh.shouldFail();
         // Wait for the job to finish and return its result with getNoThrow.
         lk.unlock();
         return future.getNoThrow();
