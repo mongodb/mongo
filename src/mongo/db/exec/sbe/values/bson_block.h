@@ -95,26 +95,68 @@ struct FilterPositionInfoRecorder {
     std::unique_ptr<HeterogeneousBlock> outputArr;
 };
 
+/**
+ * A utility class for building projected paths as SBE values. There is a many-to-one relationship
+ * of recorders to 'BsonWalkNode.' Each recorder corresponds to a projected path.
+ * 'ProjectionPositionInfoRecorder' exposes an interface; its subclasses implement the interface
+ * with the 'Curiously Recurring Template Pattern' idiom.
+ */
+template <class T>
 struct ProjectionPositionInfoRecorder {
-    ProjectionPositionInfoRecorder() : outputArr(std::make_unique<HeterogeneousBlock>()) {}
-
+    /**
+     * Record a given typeTag and value at the current array nestedness level.
+     */
     void recordValue(TypeTags tag, Value val);
+    /**
+     * For this projected path, enter a new level of array nestedness.
+     */
+    void startArray();
+    /**
+     * For this projected path, exit the current array nestedness level.
+     */
+    void endArray();
+    std::vector<std::unique_ptr<value::Array>> arrayStack;
+};
+
+/**
+ * Implements the 'ProjectionPositionInfoRecorder' interface for block processing. Multiple
+ * documents are processed. Projected values are stored in 'outputArr.'
+ */
+struct BlockProjectionPositionInfoRecorder final
+    : ProjectionPositionInfoRecorder<BlockProjectionPositionInfoRecorder> {
+    BlockProjectionPositionInfoRecorder() : outputArr(std::make_unique<HeterogeneousBlock>()) {}
     void newDoc();
     void endDoc();
-    void startArray();
-    void endArray();
     std::unique_ptr<HeterogeneousBlock> extractValues();
-
     std::unique_ptr<HeterogeneousBlock> outputArr;
-    std::vector<std::unique_ptr<value::Array>> arrayStack;
     bool isNewDoc = false;
+    void onNewValue() {
+        isNewDoc = false;
+    }
+    void saveValue(TypeTags tag, Value val) {
+        outputArr->push_back(tag, val);
+    }
+};
+
+/**
+ * Implements the 'ProjectionPositionInfoRecorder' interface for efficient field path projection. A
+ * single document is processed. The projected value is stored in 'outputValue.'
+ */
+struct ScalarProjectionPositionInfoRecorder final
+    : ProjectionPositionInfoRecorder<ScalarProjectionPositionInfoRecorder> {
+    MoveableValueGuard extractValue();
+    MoveableValueGuard outputValue;
+    void onNewValue() { /* Noop */ }
+    void saveValue(TypeTags tag, Value val) {
+        outputValue = MoveableValueGuard{tag, val};
+    }
 };
 
 struct BsonWalkNode {
     FilterPositionInfoRecorder* filterPosInfoRecorder = nullptr;
 
-    std::vector<ProjectionPositionInfoRecorder*> childProjRecorders;
-    ProjectionPositionInfoRecorder* projRecorder = nullptr;
+    std::vector<BlockProjectionPositionInfoRecorder*> childProjRecorders;
+    BlockProjectionPositionInfoRecorder* projRecorder = nullptr;
 
     // Children which are Get nodes.
     StringMap<std::unique_ptr<BsonWalkNode>> getChildren;
@@ -124,7 +166,7 @@ struct BsonWalkNode {
 
     void add(const CellBlock::Path& path,
              FilterPositionInfoRecorder* recorder,
-             ProjectionPositionInfoRecorder* outProjBlockRecorder,
+             BlockProjectionPositionInfoRecorder* outProjBlockRecorder,
              size_t pathIdx = 0);
 };
 }  // namespace mongo::sbe::value

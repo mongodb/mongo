@@ -81,22 +81,22 @@ std::unique_ptr<HeterogeneousBlock> FilterPositionInfoRecorder::extractValues() 
     return out;
 }
 
-void ProjectionPositionInfoRecorder::recordValue(TypeTags tag, Value val) {
-    isNewDoc = false;
-
+template <class T>
+void ProjectionPositionInfoRecorder<T>::recordValue(TypeTags tag, Value val) {
+    static_cast<T*>(this)->onNewValue();
     auto [cpyTag, cpyVal] = copyValue(tag, val);
     if (arrayStack.empty()) {
-        outputArr->push_back(cpyTag, cpyVal);
+        static_cast<T*>(this)->saveValue(cpyTag, cpyVal);
     } else {
         arrayStack.back()->push_back(cpyTag, cpyVal);
     }
 }
 
-void ProjectionPositionInfoRecorder::newDoc() {
+void BlockProjectionPositionInfoRecorder::newDoc() {
     isNewDoc = true;
 }
 
-void ProjectionPositionInfoRecorder::endDoc() {
+void BlockProjectionPositionInfoRecorder::endDoc() {
     if (isNewDoc) {
         // We didn't record anything for the last document, so add a Nothing to our block.
         outputArr->push_back(TypeTags::Nothing, Value(0));
@@ -104,35 +104,41 @@ void ProjectionPositionInfoRecorder::endDoc() {
     isNewDoc = false;
 }
 
-void ProjectionPositionInfoRecorder::startArray() {
-    isNewDoc = false;
+template <class T>
+void ProjectionPositionInfoRecorder<T>::startArray() {
+    static_cast<T*>(this)->onNewValue();
     arrayStack.push_back(std::make_unique<Array>());
 }
 
-void ProjectionPositionInfoRecorder::endArray() {
-    invariant(!arrayStack.empty());
-
+template <class T>
+void ProjectionPositionInfoRecorder<T>::endArray() {
+    tassert(10926200, "expects nonempty arrayStack", !arrayStack.empty());
     if (arrayStack.size() > 1) {
         // For a nested array, we cram it into its parent.
         auto releasedArray = arrayStack.back().release();
         arrayStack.pop_back();
         arrayStack.back()->push_back(TypeTags::Array, bitcastFrom<Array*>(releasedArray));
     } else {
-        outputArr->push_back(TypeTags::Array, bitcastFrom<Array*>(arrayStack.front().release()));
-
+        static_cast<T*>(this)->saveValue(TypeTags::Array,
+                                         bitcastFrom<Array*>(arrayStack.front().release()));
         arrayStack.clear();
     }
 }
 
-std::unique_ptr<HeterogeneousBlock> ProjectionPositionInfoRecorder::extractValues() {
+std::unique_ptr<HeterogeneousBlock> BlockProjectionPositionInfoRecorder::extractValues() {
     auto out = std::move(outputArr);
     outputArr = std::make_unique<HeterogeneousBlock>();
     return out;
 }
 
+MoveableValueGuard ScalarProjectionPositionInfoRecorder::extractValue() {
+    tassert(10926202, "expects empty arrayStack", arrayStack.empty());
+    return std::move(outputValue);
+}
+
 void BsonWalkNode::add(const CellBlock::Path& path,
                        FilterPositionInfoRecorder* recorder,
-                       ProjectionPositionInfoRecorder* outProjBlockRecorder,
+                       BlockProjectionPositionInfoRecorder* outProjBlockRecorder,
                        size_t pathIdx /*= 0*/) {
     if (pathIdx == 0) {
         // Check some invariants about the path.
@@ -269,7 +275,7 @@ private:
 
     std::vector<CellBlock::PathRequest> _pathReqs;
     std::vector<FilterPositionInfoRecorder> _filterPositionInfoRecorders;
-    std::vector<ProjectionPositionInfoRecorder> _projPositionInfoRecorders;
+    std::vector<BlockProjectionPositionInfoRecorder> _projPositionInfoRecorders;
     BsonWalkNode _root;
 };
 

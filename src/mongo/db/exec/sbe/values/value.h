@@ -460,6 +460,50 @@ private:
     Value _value;
 };
 
+/**
+ * The same as ValueGuard, but with a move constructor and move assignment operator.
+ */
+class MoveableValueGuard {
+public:
+    MONGO_COMPILER_ALWAYS_INLINE MoveableValueGuard(const std::pair<TypeTags, Value> typedValue)
+        : MoveableValueGuard(typedValue.first, typedValue.second) {}
+    MONGO_COMPILER_ALWAYS_INLINE MoveableValueGuard(TypeTags tag, Value val)
+        : _tag(tag), _value(val) {}
+    MONGO_COMPILER_ALWAYS_INLINE MoveableValueGuard(bool owned, TypeTags tag, Value val)
+        : MoveableValueGuard(owned ? tag : TypeTags::Nothing, owned ? val : 0) {}
+    MONGO_COMPILER_ALWAYS_INLINE MoveableValueGuard(
+        const FastTuple<bool, value::TypeTags, value::Value>& tuple)
+        : MoveableValueGuard(tuple.a, tuple.b, tuple.c) {}
+    MoveableValueGuard() = delete;
+    MoveableValueGuard(const MoveableValueGuard&) = delete;
+    MoveableValueGuard(MoveableValueGuard&& other) : _tag(other._tag), _value(other._value) {
+        other.shallowClear();
+    }
+    MONGO_COMPILER_ALWAYS_INLINE ~MoveableValueGuard() {
+        releaseValue(_tag, _value);
+    }
+
+    MoveableValueGuard& operator=(const MoveableValueGuard&) = delete;
+    MoveableValueGuard& operator=(MoveableValueGuard&& other) {
+        if (this != &other) {
+            releaseValue(_tag, _value);
+            _tag = other._tag;
+            _value = other._value;
+            other.shallowClear();
+        }
+        return *this;
+    }
+
+private:
+    void shallowClear() {
+        _tag = TypeTags::Nothing;
+        _value = 0;
+    }
+
+    TypeTags _tag;
+    Value _value;
+};
+
 class ValueVectorGuard {
 public:
     MONGO_COMPILER_ALWAYS_INLINE ValueVectorGuard(std::vector<TypeTags>& tags,
