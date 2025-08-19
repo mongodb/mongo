@@ -37,6 +37,7 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/disagg_storage/server_parameters_gen.h"
 #include "mongo/db/index_builds/index_build_block.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_catalog.h"
@@ -853,8 +854,9 @@ Collection* DatabaseImpl::_createCollection(
                 collectionPtr,
                 !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collectionPtr),
                 boost::none));
-            uassertStatusOK(IndexBuildBlock::buildEmptyIndex(
-                opCtx, collection, fullIdIndexSpec, *catalogIdentifierForColl->idIndexIdent));
+            IndexBuildInfo indexBuildInfo(fullIdIndexSpec, catalogIdentifierForColl->idIndexIdent);
+            indexBuildInfo.setInternalIdents(*opCtx->getServiceContext()->getStorageEngine());
+            uassertStatusOK(IndexBuildBlock::buildEmptyIndex(opCtx, collection, indexBuildInfo));
         } else {
             // autoIndexId: false is only allowed on unreplicated collections.
             uassert(50001,

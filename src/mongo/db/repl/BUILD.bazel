@@ -1713,6 +1713,7 @@ mongo_cc_library(
         "optime",
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/index_builds:index_builds_common",
         "//src/mongo/db/session:logical_session_id",
     ],
 )

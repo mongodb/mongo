@@ -43,18 +43,49 @@ class DatabaseName;
  * Encapsulates metadata fields associated with an index build.
  */
 struct IndexBuildInfo {
-    IndexBuildInfo(BSONObj specObj, boost::optional<std::string> indexIdent);
+    IndexBuildInfo(BSONObj specObj, boost::optional<std::string> idxIdent);
 
-    std::string name;
+    /**
+     * Generates new idents and initializes all ident-related member fields.
+     */
+    IndexBuildInfo(BSONObj specObj, StorageEngine& storageEngine, const DatabaseName& dbName);
+
+    /**
+     * Extracts index name from the spec and returns it.
+     */
+    StringData getIndexName() const;
+
+    /**
+     * Generates new idents and initializes all member fields tracking idents of temporary tables.
+     */
+    void setInternalIdents(StorageEngine& storageEngine);
+
+    /**
+     * Initializes all member fields tracking idents of temporary tables with the given idents.
+     */
+    void setInternalIdents(boost::optional<std::string> sorterIdent,
+                           boost::optional<std::string> sideWritesIdent,
+                           boost::optional<std::string> skippedRecordsTrackerIdent,
+                           boost::optional<std::string> constraintViolationsTrackerIdent);
+
+    BSONObj toBSON() const;
+
     BSONObj spec;
+    // Ident of the index table itself.
     std::string indexIdent;
+    // Idents of temporary tables used during an index build. Some of these may or may not be used
+    // depending on the index type and the index build method being used.
+    boost::optional<std::string> sorterIdent;
+    boost::optional<std::string> sideWritesIdent;
+    boost::optional<std::string> skippedRecordsTrackerIdent;
+    boost::optional<std::string> constraintViolationsTrackerIdent;
 };
 
 /**
  * Constructs IndexBuildInfo instances from the given index specs.
  */
 std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& specs,
-                                                StorageEngine* storageEngine,
+                                                StorageEngine& storageEngine,
                                                 const DatabaseName& dbName);
 
 /**

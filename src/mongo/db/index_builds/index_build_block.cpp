@@ -101,13 +101,12 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
 
 Status IndexBuildBlock::initForResume(OperationContext* opCtx,
                                       Collection* collection,
-                                      const IndexStateInfo& stateInfo,
+                                      const IndexBuildInfo& indexBuildInfo,
                                       IndexBuildPhaseEnum phase) {
-
-    _indexName = std::string{_spec.getStringField("name")};
+    _indexBuildInfo = indexBuildInfo;
     auto writableEntry = collection->getIndexCatalog()->getWritableEntryByName(
         opCtx,
-        _indexName,
+        getIndexName(),
         IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
 
     uassert(4945000,
@@ -131,12 +130,8 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
             return status;
     }
 
-    _indexBuildInterceptor =
-        std::make_unique<IndexBuildInterceptor>(opCtx,
-                                                writableEntry,
-                                                stateInfo.getSideWritesTable(),
-                                                stateInfo.getDuplicateKeyTrackerTable(),
-                                                stateInfo.getSkippedRecordTrackerTable());
+    _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(
+        opCtx, writableEntry, indexBuildInfo, /*resume=*/true);
     writableEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
     _completeInit(opCtx, collection);
@@ -146,7 +141,7 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
 
 Status IndexBuildBlock::init(OperationContext* opCtx,
                              Collection* collection,
-                             StringData ident,
+                             const IndexBuildInfo& indexBuildInfo,
                              bool forRecovery) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
@@ -155,13 +150,13 @@ Status IndexBuildBlock::init(OperationContext* opCtx,
     BSONObj keyPattern = _spec.getObjectField("key");
     auto descriptor = IndexDescriptor(IndexNames::findPluginName(keyPattern), _spec);
 
-    _indexName = descriptor.indexName();
+    _indexBuildInfo = indexBuildInfo;
 
-    // Since the index build block is being initialized, the index build for _indexName is
-    // beginning. Accordingly, emit an audit event indicating this.
+    // Since the index build block is being initialized, the index build is beginning. Accordingly,
+    // emit an audit event indicating this.
     audit::logCreateIndex(opCtx->getClient(),
                           &_spec,
-                          _indexName,
+                          getIndexName(),
                           collection->ns(),
                           "IndexBuildStarted",
                           ErrorCodes::OK);
@@ -169,7 +164,8 @@ Status IndexBuildBlock::init(OperationContext* opCtx,
     if (!forRecovery) {
         // Setup on-disk structures. We skip this during startup recovery for unfinished indexes as
         // everything is already in-place.
-        Status status = collection->prepareForIndexBuild(opCtx, &descriptor, ident, _buildUUID);
+        Status status = collection->prepareForIndexBuild(
+            opCtx, &descriptor, _indexBuildInfo->indexIdent, _buildUUID);
         if (!status.isOK())
             return status;
     }
@@ -177,8 +173,9 @@ Status IndexBuildBlock::init(OperationContext* opCtx,
     if (isBackgroundBuilding(_method)) {
         auto indexCatalog = collection->getIndexCatalog();
         auto indexCatalogEntry = indexCatalog->getWritableEntryByName(
-            opCtx, _indexName, IndexCatalog::InclusionPolicy::kUnfinished);
-        _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(opCtx, indexCatalogEntry);
+            opCtx, getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
+        _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(
+            opCtx, indexCatalogEntry, *_indexBuildInfo, /*resume=*/false);
         indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
     }
 
@@ -198,7 +195,7 @@ void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
     // Audit that the index build is being aborted.
     audit::logCreateIndex(opCtx->getClient(),
                           &_spec,
-                          _indexName,
+                          getIndexName(),
                           collection->ns(),
                           "IndexBuildAborted",
                           ErrorCodes::IndexBuildAborted);
@@ -210,7 +207,7 @@ void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
         invariant(
             collection->getIndexCatalog()->dropIndexEntry(opCtx, collection, indexCatalogEntry));
     } else {
-        collection->getIndexCatalog()->deleteIndexFromDisk(opCtx, collection, _indexName);
+        collection->getIndexCatalog()->deleteIndexFromDisk(opCtx, collection, getIndexName());
     }
 }
 
@@ -239,14 +236,14 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
     // Before committing the index build, optimistically audit that the index build has succeeded.
     audit::logCreateIndex(opCtx->getClient(),
                           &_spec,
-                          _indexName,
+                          getIndexName(),
                           collection->ns(),
                           "IndexBuildSucceeded",
                           ErrorCodes::OK);
 
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [svcCtx,
-         indexName = _indexName,
+         indexName = getIndexName(),
          spec = _spec,
          ident = indexCatalogEntry->getIdent(),
          coll = collection,
@@ -283,7 +280,7 @@ const IndexCatalogEntry* IndexBuildBlock::getEntry(OperationContext* opCtx,
                                                    const CollectionPtr& collection) const {
     auto descriptor = collection->getIndexCatalog()->findIndexByName(
         opCtx,
-        _indexName,
+        getIndexName(),
         IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
 
     return descriptor->getEntry();
@@ -293,17 +290,17 @@ IndexCatalogEntry* IndexBuildBlock::getWritableEntry(OperationContext* opCtx,
                                                      Collection* collection) {
     return collection->getIndexCatalog()->getWritableEntryByName(
         opCtx,
-        _indexName,
+        getIndexName(),
         IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
 }
 
 Status IndexBuildBlock::buildEmptyIndex(OperationContext* opCtx,
                                         Collection* collection,
-                                        BSONObj spec,
-                                        StringData ident) {
+                                        const IndexBuildInfo& indexBuildInfo) {
     IndexBuildBlock indexBuildBlock(
-        collection->ns(), spec, IndexBuildMethodEnum::kForeground, boost::none);
-    if (auto status = indexBuildBlock.init(opCtx, collection, ident, /*forRecovery=*/false);
+        collection->ns(), indexBuildInfo.spec, IndexBuildMethodEnum::kForeground, boost::none);
+    if (auto status =
+            indexBuildBlock.init(opCtx, collection, indexBuildInfo, /*forRecovery=*/false);
         !status.isOK()) {
         return status;
     }

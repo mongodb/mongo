@@ -984,11 +984,11 @@ public:
 
         auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
             writableColl->ns(), indexSpec, IndexBuildMethodEnum::kForeground, UUID::gen());
-        uassertStatusOK(
-            indexBuildBlock->init(opCtx,
-                                  writableColl,
-                                  storageEngine->generateNewCollectionIdent(nss.dbName()),
-                                  /*forRecover=*/false));
+        IndexBuildInfo indexBuildInfo(indexSpec, *storageEngine, nss.dbName());
+        uassertStatusOK(indexBuildBlock->init(opCtx,
+                                              writableColl,
+                                              indexBuildInfo,
+                                              /*forRecover=*/false));
         uassertStatusOK(indexBuildBlock->getWritableEntry(opCtx, writableColl)
                             ->accessMethod()
                             ->initializeAsEmpty());

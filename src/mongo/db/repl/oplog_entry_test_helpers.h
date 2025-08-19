@@ -47,6 +47,8 @@
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_PUB mongo {
+
+struct IndexBuildInfo;
 namespace repl {
 /**
  * Creates an OplogEntry with given parameters and preset defaults.
@@ -108,11 +110,9 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
  */
 OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
                                          const NamespaceString& nss,
-                                         const std::string& indexName,
-                                         const BSONObj& keyPattern,
                                          const UUID& uuid,
                                          const UUID& indexBuildUUID,
-                                         StringData ident);
+                                         const IndexBuildInfo& indexBuildInfo);
 
 /**
  * Creates a two-phase index build commit oplog entry with a given optime, namespace, and index
@@ -120,10 +120,9 @@ OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
  */
 OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,
                                           const NamespaceString& nss,
-                                          const std::string& indexName,
-                                          const BSONObj& keyPattern,
                                           const UUID& uuid,
-                                          const UUID& indexBuildUUID);
+                                          const UUID& indexBuildUUID,
+                                          const IndexBuildInfo& indexBuildInfo);
 
 /**
  * Creates an oplog entry for 'command' with the given 'optime', 'namespace' and optional 'uuid'.

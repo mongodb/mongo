@@ -247,9 +247,7 @@ public:
                     }
 
                     indexes.push_back(IndexBuildInfo(
-                        bob.obj(),
-                        opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(
-                            dbName)));
+                        bob.obj(), *opCtx->getServiceContext()->getStorageEngine(), dbName));
                 }
 
                 const BSONObj key = spec.getObjectField("key");

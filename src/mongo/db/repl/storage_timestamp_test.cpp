@@ -198,8 +198,8 @@ Status createIndexFromSpec(OperationContext* opCtx,
         wunit.commit();
     }
 
-    auto indexBuildInfo =
-        IndexBuildInfo(spec, ident::generateNewIndexIdent(nss.dbName(), false, false));
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo = IndexBuildInfo(spec, *storageEngine, nss.dbName());
     MultiIndexBlock indexer;
     CollectionWriter collection(opCtx, nss);
     ScopeGuard abortOnExit(
@@ -486,9 +486,11 @@ public:
     }
 
     void createIndex(CollectionWriter& coll, std::string indexName, const BSONObj& indexKey) {
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         auto indexBuildInfo =
             IndexBuildInfo(BSON("v" << 2 << "name" << indexName << "key" << indexKey),
-                           ident::generateNewIndexIdent(coll->ns().dbName(), false, false));
+                           *storageEngine,
+                           coll->ns().dbName());
 
         // Build an index.
         MultiIndexBlock indexer;
@@ -517,6 +519,7 @@ public:
                 coll.getWritableCollection(_opCtx),
                 [&](const BSONObj& indexSpec, StringData ident) {
                     auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
+                    indexBuildInfo.setInternalIdents(*storageEngine);
                     _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                         _opCtx, coll->ns(), coll->uuid(), indexBuildInfo, false);
                 },
@@ -2102,6 +2105,7 @@ public:
                                                           << "a_1"
                                                           << "key" << BSON("a" << 1)),
                                                  indexIdent);
+            indexBuildInfo.setInternalIdents(*storageEngine);
             auto swIndexInfoObj = indexer.init(
                 _opCtx,
                 coll,
@@ -2131,6 +2135,7 @@ public:
                         // The timestamping responsibility for each index is placed
                         // on the caller.
                         auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
+                        indexBuildInfo.setInternalIdents(*storageEngine);
                         _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                             _opCtx, nss, coll->uuid(), indexBuildInfo, false);
                     } else {
@@ -2696,6 +2701,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
         NamespaceString::createNamespaceString_forTest("unittests.timestampIndexBuilds");
     create(nss);
 
+    const auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto collectionAcquisition = acquireCollection(
         _opCtx,
         CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
@@ -2752,6 +2758,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
                                                           << "ns" << collection->ns().ns_forTest()
                                                           << "key" << BSON("a" << 1 << "b" << 1)),
                                                  std::string{"index-ident"});
+            indexBuildInfo.setInternalIdents(*storageEngine);
             auto swSpecs = indexer.init(
                 _opCtx,
                 collection,
@@ -2845,6 +2852,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
             collection.getWritableCollection(_opCtx),
             [&](const BSONObj& indexSpec, StringData ident) {
                 auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
+                indexBuildInfo.setInternalIdents(*storageEngine);
                 _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                     _opCtx, collection->ns(), collection->uuid(), indexBuildInfo, false);
             },
@@ -2920,13 +2928,17 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
     // the applyOps command no longer allows createIndexes (see SERVER-41554).
     _coordinatorMock->alwaysAllowWrites(false);
     {
+        const auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         const auto beforeBuildTime = _clock->tickClusterTime(2);
         const auto startBuildTs = beforeBuildTime.addTicks(1).asTimestamp();
 
         auto keyPattern = BSON("field" << 1);
+        auto spec = BSON("v" << 2 << "name" << "field_1" << "key" << keyPattern);
         auto startBuildOpTime = repl::OpTime(startBuildTs, _presentTerm);
         UUID indexBuildUUID = UUID::gen();
         const auto indexIdent = "index-ident"_sd;
+        IndexBuildInfo indexBuildInfo(spec, std::string{indexIdent});
+        indexBuildInfo.setInternalIdents(*storageEngine);
 
         // Wait for the index build thread to start the collection scan before proceeding with
         // checking the catalog and applying the commitIndexBuild oplog entry.
@@ -2939,7 +2951,7 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
             FailPointEnableBlock fpb("hangAfterStartingIndexBuild");
 
             auto start = repl::makeStartIndexBuildOplogEntry(
-                startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID, indexIdent);
+                startBuildOpTime, nss, collUUID, indexBuildUUID, indexBuildInfo);
             const bool dataIsConsistent = true;
             ASSERT_OK(
                 repl::applyOplogEntryOrGroupedInserts(_opCtx,
@@ -2972,7 +2984,7 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
         }  // release read lock so commit index build oplog entry can take its own locks.
 
         auto commit = repl::makeCommitIndexBuildOplogEntry(
-            startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID);
+            startBuildOpTime, nss, collUUID, indexBuildUUID, indexBuildInfo);
         const bool dataIsConsistent = true;
         ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(_opCtx,
                                                         repl::ApplierOperation{&commit},

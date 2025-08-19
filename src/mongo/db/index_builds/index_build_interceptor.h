@@ -64,6 +64,7 @@ namespace mongo {
 
 class BSONObj;
 class IndexAccessMethod;
+struct IndexBuildInfo;
 struct InsertDeleteOptions;
 class OperationContext;
 
@@ -86,23 +87,13 @@ public:
     enum class TrackDuplicates { kNoTrack, kTrack };
 
     /**
-     * Creates a temporary table for writes during an index build. Additionally creates a temporary
-     * table to store any duplicate key constraint violations found during the build, if the index
-     * being built has uniqueness constraints.
-     */
-    IndexBuildInterceptor(OperationContext* opCtx, const IndexCatalogEntry* entry);
-
-    /**
-     * Finds the temporary table associated with storing writes during this index build. Only used
-     * Only used when resuming an index build and the temporary table already exists on disk.
-     * Additionally will find the temporary table associated with storing duplicate key constraint
-     * violations found during the build, if the index being built has uniqueness constraints.
+     * If 'resume' is false, creates temporary tables needed during an index build. If 'resume' is
+     * true, uses the temporary tables that were previously created.
      */
     IndexBuildInterceptor(OperationContext* opCtx,
                           const IndexCatalogEntry* entry,
-                          StringData sideWritesIdent,
-                          boost::optional<StringData> duplicateKeyTrackerIdent,
-                          boost::optional<StringData> skippedRecordTrackerIdent);
+                          const IndexBuildInfo& indexBuildInfo,
+                          bool resume);
 
     /**
      * Keeps the temporary side writes and duplicate key constraint violations tables.

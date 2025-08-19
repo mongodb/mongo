@@ -338,11 +338,11 @@ void createIndexForApplyOps(OperationContext* opCtx,
     IndexBuildsCoordinator::updateCurOpOpDescription(opCtx, indexNss, {indexSpec});
     auto collUUID = indexCollection->uuid();
 
-    std::string indexIdent = [&] {
+    IndexBuildInfo indexBuildInfo = [&] {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         if (!indexMetadata ||
             !shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
-            return opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(
-                indexCollection->ns().dbName());
+            return IndexBuildInfo(indexSpec, *storageEngine, indexCollection->ns().dbName());
         }
 
         auto identField = indexMetadata->getField("ident");
@@ -354,14 +354,14 @@ void createIndexForApplyOps(OperationContext* opCtx,
                 "Failed to create index because ident field in metadata o2 was invalid: " +
                     indexMetadata->toString(),
                 identField.type() == BSONType::string && !identField.valueStringData().empty());
-        return identField.String();
+        IndexBuildInfo indexBuildInfo(indexSpec, identField.String());
+        indexBuildInfo.setInternalIdents(*storageEngine);
+        return indexBuildInfo;
     }();
 
     auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
-    indexBuildsCoordinator->createIndex(opCtx,
-                                        collUUID,
-                                        IndexBuildInfo(indexSpec, indexIdent),
-                                        IndexBuildsManager::IndexConstraints::kRelax);
+    indexBuildsCoordinator->createIndex(
+        opCtx, collUUID, indexBuildInfo, IndexBuildsManager::IndexConstraints::kRelax);
 }
 
 /**
@@ -947,14 +947,15 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 
           // Sanitize storage engine options to remove options which might not apply to this node.
           // See SERVER-68122.
+          auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
           for (auto& indexBuildInfo : oplogEntry.indexes) {
               indexBuildInfo.spec =
                   getObjWithSanitizedStorageEngineOptions(opCtx, indexBuildInfo.spec);
               if (indexBuildInfo.indexIdent.empty()) {
                   indexBuildInfo.indexIdent =
-                      opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(
-                          entry.getNss().dbName());
+                      storageEngine->generateNewIndexIdent(entry.getNss().dbName());
               }
+              indexBuildInfo.setInternalIdents(*storageEngine);
           }
 
           IndexBuildsCoordinator::ApplicationMode applicationMode =

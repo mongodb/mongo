@@ -418,15 +418,13 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 stateInfo = *stateInfoIt;
                 auto status = index.block->initForResume(opCtx,
                                                          collection.getWritableCollection(opCtx),
-                                                         *stateInfo,
+                                                         indexes[i],
                                                          resumeInfo->getPhase());
                 if (!status.isOK())
                     return status;
             } else {
-                auto status = index.block->init(opCtx,
-                                                collection.getWritableCollection(opCtx),
-                                                forRecovery ? "" : indexes[i].indexIdent,
-                                                forRecovery);
+                auto status = index.block->init(
+                    opCtx, collection.getWritableCollection(opCtx), indexes[i], forRecovery);
                 if (!status.isOK())
                     return status;
             }
@@ -467,6 +465,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                   "numSpecs"_attr = indexes.size(),
                   "method"_attr = _method,
                   "ident"_attr = indexCatalogEntry->getIdent(),
+                  "indexBuildInfo"_attr = indexes[i].toBSON(),
                   "collectionIdent"_attr = collection->getSharedIdent()->getIdent(),
                   "maxTemporaryMemoryUsageMB"_attr =
                       eachIndexBuildMaxMemoryUsageBytes / 1024 / 1024);
@@ -1295,8 +1294,22 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
             auto ident = StringData(*duplicateKeyTrackerTableIdent);
             indexStateInfo.setDuplicateKeyTrackerTable(ident);
         }
+
+        if (!indexBuildInterceptor->getSkippedRecordTracker()->getTableIdent()) {
+            // IndexBuildInterceptor requires the the skipped records tracker table ident to
+            // be present in the resume case, so create the table if it hasn't been created yet.
+            // TODO(SERVER-109460): Remove the code to create the skipped records tracker table
+            // here.
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            auto tempTable = storageEngine->makeTemporaryRecordStore(
+                opCtx,
+                *index.block->getIndexBuildInfo().skippedRecordsTrackerIdent,
+                KeyFormat::Long);
+            tempTable->keep();
+        }
         indexStateInfo.setSkippedRecordTrackerTable(
-            indexBuildInterceptor->getSkippedRecordTracker()->getTableIdent());
+            *index.block->getIndexBuildInfo().skippedRecordsTrackerIdent);
+
         indexStateInfo.setSpec(index.block->getSpec());
         indexStateInfo.setIsMultikey(index.bulk->isMultikey());
 

@@ -140,7 +140,7 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
                     _secondaryIndexesBlock->ignoreUniqueConstraint();
 
                     auto indexes =
-                        toIndexBuildInfoVec(specs, storageEngine, collWriter->ns().dbName());
+                        toIndexBuildInfoVec(specs, *storageEngine, collWriter->ns().dbName());
                     auto maxSecondaryIndexMemoryUsageBytes =
                         maxInitialSyncIndexBuildMemoryUsageBytes /
                         totalIndexBuildsIncludingIdIndex * specs.size();
@@ -161,8 +161,7 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
                 }
                 if (!idIndexSpec.isEmpty()) {
                     IndexBuildInfo idIndexBuildInfo(
-                        idIndexSpec,
-                        storageEngine->generateNewIndexIdent(collWriter->ns().dbName()));
+                        idIndexSpec, *storageEngine, collWriter->ns().dbName());
                     auto maxIdIndexMemoryUsageBytes =
                         maxInitialSyncIndexBuildMemoryUsageBytes / totalIndexBuildsIncludingIdIndex;
                     auto status = _idIndexBlock

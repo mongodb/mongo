@@ -30,35 +30,82 @@
 #include "mongo/db/index_builds/index_builds_common.h"
 
 #include "mongo/db/database_name.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
 
-IndexBuildInfo::IndexBuildInfo(BSONObj specObj, boost::optional<std::string> indexIdent)
-    : spec(std::move(specObj)) {
-    name = std::string{spec.getStringField(IndexDescriptor::kIndexNameFieldName)};
-    if (indexIdent) {
-        this->indexIdent = *indexIdent;
+static constexpr StringData kIndexNameFieldName = "name"_sd;
+
+IndexBuildInfo::IndexBuildInfo(BSONObj specObj, boost::optional<std::string> idxIdent)
+    : spec(std::move(specObj)), indexIdent(idxIdent.value_or("")) {}
+
+IndexBuildInfo::IndexBuildInfo(BSONObj specObj,
+                               StorageEngine& storageEngine,
+                               const DatabaseName& dbName)
+    : spec(std::move(specObj)), indexIdent(storageEngine.generateNewIndexIdent(dbName)) {
+    setInternalIdents(storageEngine);
+}
+
+StringData IndexBuildInfo::getIndexName() const {
+    return spec.getStringField(kIndexNameFieldName);
+}
+
+void IndexBuildInfo::setInternalIdents(StorageEngine& storageEngine) {
+    setInternalIdents(storageEngine.generateNewInternalIdent(),
+                      storageEngine.generateNewInternalIdent(),
+                      storageEngine.generateNewInternalIdent(),
+                      storageEngine.generateNewInternalIdent());
+}
+
+void IndexBuildInfo::setInternalIdents(
+    boost::optional<std::string> sorterIdent,
+    boost::optional<std::string> sideWritesIdent,
+    boost::optional<std::string> skippedRecordsTrackerIdent,
+    boost::optional<std::string> constraintViolationsTrackerIdent) {
+    this->sorterIdent = std::move(sorterIdent);
+    this->sideWritesIdent = std::move(sideWritesIdent);
+    this->skippedRecordsTrackerIdent = std::move(skippedRecordsTrackerIdent);
+    this->constraintViolationsTrackerIdent = std::move(constraintViolationsTrackerIdent);
+}
+
+BSONObj IndexBuildInfo::toBSON() const {
+    BSONObjBuilder bsonObjBuilder;
+    bsonObjBuilder.append("name", getIndexName());
+    if (!indexIdent.empty()) {
+        bsonObjBuilder.append("indexIdent", indexIdent);
     }
+    if (sorterIdent) {
+        bsonObjBuilder.append("sorterIdent", *sorterIdent);
+    }
+    if (sideWritesIdent) {
+        bsonObjBuilder.append("sideWritesIdent", *sideWritesIdent);
+    }
+    if (skippedRecordsTrackerIdent) {
+        bsonObjBuilder.append("skippedRecordsTrackerIdent", *skippedRecordsTrackerIdent);
+    }
+    if (constraintViolationsTrackerIdent) {
+        bsonObjBuilder.append("constraintViolationsTrackerIdent",
+                              *constraintViolationsTrackerIdent);
+    }
+    return bsonObjBuilder.obj();
 }
 
 std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& specs) {
     std::vector<IndexBuildInfo> indexes;
     indexes.reserve(specs.size());
     for (const auto& spec : specs) {
-        indexes.push_back(IndexBuildInfo(spec, boost::none));
+        indexes.emplace_back(spec, boost::none);
     }
     return indexes;
 }
 
 std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& specs,
-                                                StorageEngine* storageEngine,
+                                                StorageEngine& storageEngine,
                                                 const DatabaseName& dbName) {
     std::vector<IndexBuildInfo> indexes;
     indexes.reserve(specs.size());
     for (const auto& spec : specs) {
-        indexes.push_back(IndexBuildInfo(spec, storageEngine->generateNewIndexIdent(dbName)));
+        indexes.emplace_back(spec, storageEngine, dbName);
     }
     return indexes;
 }
@@ -67,7 +114,7 @@ std::vector<std::string> toIndexNames(const std::vector<IndexBuildInfo>& indexes
     std::vector<std::string> indexNames;
     indexNames.reserve(indexes.size());
     for (const auto& indexBuildInfo : indexes) {
-        indexNames.push_back(indexBuildInfo.name);
+        indexNames.push_back(std::string{indexBuildInfo.getIndexName()});
     }
     return indexNames;
 }

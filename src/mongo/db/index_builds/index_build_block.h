@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
@@ -47,6 +48,8 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+struct IndexBuildInfo;
 
 /**
  * Interface for building a single index from an index spec and persisting its state to disk.
@@ -79,7 +82,7 @@ public:
      */
     Status init(OperationContext* opCtx,
                 Collection* collection,
-                StringData ident,
+                const IndexBuildInfo& indexBuildInfo,
                 bool forRecovery);
 
     /**
@@ -89,7 +92,7 @@ public:
      */
     Status initForResume(OperationContext* opCtx,
                          Collection* collection,
-                         const IndexStateInfo& stateInfo,
+                         const IndexBuildInfo& indexBuildInfo,
                          IndexBuildPhaseEnum phase);
 
     /**
@@ -118,8 +121,12 @@ public:
     /**
      * Returns the name of the index managed by this index builder.
      */
-    const std::string& getIndexName() const {
-        return _indexName;
+    std::string getIndexName() const {
+        return std::string{_indexBuildInfo->getIndexName()};
+    }
+
+    const IndexBuildInfo& getIndexBuildInfo() const {
+        return *_indexBuildInfo;
     }
 
     /**
@@ -131,8 +138,7 @@ public:
 
     static Status buildEmptyIndex(OperationContext* opCtx,
                                   Collection* collection,
-                                  BSONObj spec,
-                                  StringData ident);
+                                  const IndexBuildInfo& indexBuildInfo);
 
 private:
     void _completeInit(OperationContext* opCtx, Collection* collection);
@@ -143,7 +149,7 @@ private:
     IndexBuildMethodEnum _method;
     boost::optional<UUID> _buildUUID;
 
-    std::string _indexName;
+    boost::optional<IndexBuildInfo> _indexBuildInfo;
     std::string _indexNamespace;
 
     std::unique_ptr<IndexBuildInterceptor> _indexBuildInterceptor;

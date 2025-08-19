@@ -48,6 +48,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/clustered_collection_util.h"
@@ -2118,11 +2119,10 @@ public:
 
         // Create a unique index.
         const auto indexName = "a";
+        const auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                           << static_cast<int>(kIndexVersion) << "unique" << true);
         {
-            const auto indexKey = BSON("a" << 1);
-            auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
-                                                          << static_cast<int>(kIndexVersion)
-                                                          << "unique" << true));
+            auto status = createIndexFromSpec(indexSpec);
             ASSERT_OK(status);
         }
 
@@ -2167,10 +2167,15 @@ public:
 
             // Insert the key on _id.
             {
+                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto descriptor = indexCatalog->findIdIndex(&_opCtx);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
+                                              entry->getIdent());
+                indexBuildInfo.setInternalIdents(*storageEngine);
                 auto iam = entry->accessMethod()->asSortedData();
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
+                auto interceptor = std::make_unique<IndexBuildInterceptor>(
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -2436,10 +2441,15 @@ public:
 
             // Insert the key on _id.
             {
+                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto descriptor = indexCatalog->findIdIndex(&_opCtx);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod()->asSortedData();
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
+                IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
+                                              entry->getIdent());
+                indexBuildInfo.setInternalIdents(*storageEngine);
+                auto interceptor = std::make_unique<IndexBuildInterceptor>(
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -2666,11 +2676,11 @@ public:
         }
 
         const auto indexNameB = "b";
+        const auto indexKeyB = BSON("b" << 1);
+        const auto indexSpecB = BSON("name" << indexNameB << "key" << indexKeyB << "v"
+                                            << static_cast<int>(kIndexVersion) << "unique" << true);
         {
-            const auto indexKeyB = BSON("b" << 1);
-            auto status = createIndexFromSpec(BSON("name" << indexNameB << "key" << indexKeyB << "v"
-                                                          << static_cast<int>(kIndexVersion)
-                                                          << "unique" << true));
+            auto status = createIndexFromSpec(indexSpecB);
             ASSERT_OK(status);
         }
 
@@ -2761,10 +2771,15 @@ public:
 
             // Insert the key on _id.
             {
+                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto descriptor = indexCatalog->findIdIndex(&_opCtx);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod()->asSortedData();
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
+                IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
+                                              entry->getIdent());
+                indexBuildInfo.setInternalIdents(*storageEngine);
+                auto interceptor = std::make_unique<IndexBuildInterceptor>(
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -2809,10 +2824,14 @@ public:
 
             // Insert the key on b.
             {
+                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexNameB);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod()->asSortedData();
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
+                IndexBuildInfo indexBuildInfo(indexSpecB, entry->getIdent());
+                indexBuildInfo.setInternalIdents(*storageEngine);
+                auto interceptor = std::make_unique<IndexBuildInterceptor>(
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -3350,11 +3369,11 @@ public:
 
         // Create a unique index.
         const auto indexName = "a";
+        const auto indexKey = BSON("a" << 1);
+        const auto indexSpec = BSON("name" << indexName << "key" << indexKey << "v"
+                                           << static_cast<int>(kIndexVersion) << "unique" << true);
         {
-            const auto indexKey = BSON("a" << 1);
-            auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
-                                                          << static_cast<int>(kIndexVersion)
-                                                          << "unique" << true));
+            auto status = createIndexFromSpec(indexSpec);
             ASSERT_OK(status);
         }
 
@@ -3407,10 +3426,15 @@ public:
 
             // Insert the key on _id.
             {
+                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto descriptor = indexCatalog->findIdIndex(&_opCtx);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod()->asSortedData();
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
+                IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
+                                              entry->getIdent());
+                indexBuildInfo.setInternalIdents(*storageEngine);
+                auto interceptor = std::make_unique<IndexBuildInterceptor>(
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -3455,10 +3479,14 @@ public:
 
             // Insert the key on "a".
             {
+                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod()->asSortedData();
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
+                IndexBuildInfo indexBuildInfo(indexSpec, entry->getIdent());
+                indexBuildInfo.setInternalIdents(*storageEngine);
+                auto interceptor = std::make_unique<IndexBuildInterceptor>(
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -4610,9 +4638,9 @@ public:
         // Create a unique index on {a: 1}
         const auto indexName = "a";
         const auto indexKey = BSON("a" << 1);
-        auto status = createIndexFromSpec(BSON("name" << indexName << "key" << indexKey << "v"
-                                                      << static_cast<int>(kIndexVersion) << "unique"
-                                                      << true));
+        const auto indexSpec = BSON("name" << indexName << "key" << indexKey << "v"
+                                           << static_cast<int>(kIndexVersion) << "unique" << true);
+        auto status = createIndexFromSpec(indexSpec);
         ASSERT_OK(status);
 
 
@@ -4669,10 +4697,14 @@ public:
 
             // Insert the key on "a".
             {
+                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod()->asSortedData();
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
+                IndexBuildInfo indexBuildInfo(indexSpec, entry->getIdent());
+                indexBuildInfo.setInternalIdents(*storageEngine);
+                auto interceptor = std::make_unique<IndexBuildInterceptor>(
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,

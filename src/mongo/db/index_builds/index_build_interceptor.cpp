@@ -44,6 +44,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
 #include "mongo/db/index_builds/index_build_interceptor_gen.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
@@ -88,48 +89,34 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhase);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhaseSecond);
 
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
-                                             const IndexCatalogEntry* entry)
-    : _sideWritesTable(opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-          opCtx,
-          opCtx->getServiceContext()->getStorageEngine()->generateNewInternalIdent(),
-          KeyFormat::Long)),
-      _skippedRecordTracker(
-          opCtx,
-          opCtx->getServiceContext()->getStorageEngine()->generateNewInternalIdent(),
-          /*tableExists=*/false) {
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    if (entry->descriptor()->unique()) {
-        _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(
-            opCtx, entry, storageEngine->generateNewInternalIdent(), /*tableExists=*/false);
-    }
-}
-
-IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
                                              const IndexCatalogEntry* entry,
-                                             StringData sideWritesIdent,
-                                             boost::optional<StringData> duplicateKeyTrackerIdent,
-                                             boost::optional<StringData> skippedRecordTrackerIdent)
-    : _sideWritesTable(
-          opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
-              opCtx, sideWritesIdent, KeyFormat::Long)),
-      _skippedRecordTracker([&]() {
+                                             const IndexBuildInfo& indexBuildInfo,
+                                             bool resume)
+    : _sideWritesTable([&]() {
+          uassert(10709201, "sideWritesIdent is not provided", indexBuildInfo.sideWritesIdent);
           auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-          bool tableExists = static_cast<bool>(skippedRecordTrackerIdent);
-          std::string skippedRecordTrackerIdentStr = skippedRecordTrackerIdent
-              ? std::string{*skippedRecordTrackerIdent}
-              : storageEngine->generateNewInternalIdent();
-          return SkippedRecordTracker(opCtx, skippedRecordTrackerIdentStr, tableExists);
+          if (resume) {
+              return storageEngine->makeTemporaryRecordStoreFromExistingIdent(
+                  opCtx, *indexBuildInfo.sideWritesIdent, KeyFormat::Long);
+          } else {
+              return storageEngine->makeTemporaryRecordStore(
+                  opCtx, *indexBuildInfo.sideWritesIdent, KeyFormat::Long);
+          }
+      }()),
+      _skippedRecordTracker([&]() {
+          uassert(10709202,
+                  "skippedRecordsTrackerIdent is not provided",
+                  indexBuildInfo.skippedRecordsTrackerIdent);
+          return SkippedRecordTracker(
+              opCtx, *indexBuildInfo.skippedRecordsTrackerIdent, /*tableExists=*/resume);
       }()),
       _skipNumAppliedCheck(true) {
-    auto dupKeyTrackerIdentExists = duplicateKeyTrackerIdent ? true : false;
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "Resume info must contain the duplicate key tracker ident ["
-                          << duplicateKeyTrackerIdent
-                          << "] if and only if the index is unique: " << entry->descriptor(),
-            entry->descriptor()->unique() == dupKeyTrackerIdentExists);
-    if (duplicateKeyTrackerIdent) {
+    if (entry->descriptor()->unique()) {
+        uassert(10709203,
+                "constraintViolationsTrackerIdent is not provided",
+                indexBuildInfo.constraintViolationsTrackerIdent);
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(
-            opCtx, entry, *duplicateKeyTrackerIdent, /*tableExists=*/true);
+            opCtx, entry, *indexBuildInfo.constraintViolationsTrackerIdent, /*tableExists=*/resume);
     }
 }
 

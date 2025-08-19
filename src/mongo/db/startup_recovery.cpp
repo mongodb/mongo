@@ -229,9 +229,9 @@ Status buildMissingIdIndex(OperationContext* opCtx, const NamespaceString nss) {
         [&] { indexer.abortIndexBuild(opCtx, collWriter, MultiIndexBlock::kNoopOnCleanUpFn); });
 
     const auto indexCatalog = collWriter->getIndexCatalog();
-    IndexBuildInfo idIndexBuildInfo(
-        indexCatalog->getDefaultIdIndexSpec(collWriter.get()),
-        opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(nss.dbName()));
+    IndexBuildInfo idIndexBuildInfo(indexCatalog->getDefaultIdIndexSpec(collWriter.get()),
+                                    *opCtx->getServiceContext()->getStorageEngine(),
+                                    nss.dbName());
     auto swSpecs = indexer.init(opCtx,
                                 collWriter,
                                 {std::move(idIndexBuildInfo)},

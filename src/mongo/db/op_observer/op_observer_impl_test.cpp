@@ -454,13 +454,17 @@ protected:
         return ChangeStreamPreImage::parse(IDLParserContext("pre-image"), *container);
     }
 
-    std::vector<IndexBuildInfo> makeSpecs(std::vector<std::string> keys) {
+    std::vector<IndexBuildInfo> makeSpecs(OperationContext* opCtx,
+                                          const std::vector<std::string>& keys) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         std::vector<IndexBuildInfo> indexes;
         for (size_t i = 0; i < keys.size(); ++i) {
             const auto& keyName = keys[i];
-            indexes.push_back(IndexBuildInfo(
+            IndexBuildInfo indexBuildInfo(
                 BSON("v" << 2 << "key" << BSON(keyName << 1) << "name" << (keyName + "_1")),
-                fmt::format("index-{}", i + 1)));
+                fmt::format("index-{}", i + 1));
+            indexBuildInfo.setInternalIdents(*storageEngine);
+            indexes.push_back(std::move(indexBuildInfo));
         }
         return indexes;
     }
@@ -712,7 +716,7 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     UUID indexBuildUUID = UUID::gen();
 
-    auto indexes = makeSpecs({"x", "a"});
+    auto indexes = makeSpecs(opCtx.get(), {"x", "a"});
 
     // Write to the oplog.
     {
@@ -5306,7 +5310,7 @@ TEST_F(OpObserverTest, MagicRestoreNoOplog) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     UUID indexBuildUUID = UUID::gen();
 
-    auto indexes = makeSpecs({"x", "a"});
+    auto indexes = makeSpecs(opCtx.get(), {"x", "a"});
 
     storageGlobalParams.magicRestore = true;
 
@@ -5329,7 +5333,7 @@ TEST_F(OpObserverTest, OnCreateIndexReplicateLocalCatalogIdentifiers) {
     auto opCtx = cc().makeOperationContext();
 
     auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto indexes = makeSpecs({"a"});
+    auto indexes = makeSpecs(opCtx.get(), {"a"});
 
     for (bool enable : {false, true}) {
         RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
@@ -5361,7 +5365,7 @@ TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {
     auto opCtx = cc().makeOperationContext();
 
     auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto indexes = makeSpecs({"a", "a"});
+    auto indexes = makeSpecs(opCtx.get(), {"a", "a"});
 
     {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
@@ -5387,7 +5391,7 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
     auto opCtx = cc().makeOperationContext();
 
     auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto indexes = makeSpecs({"a", "a"});
+    auto indexes = makeSpecs(opCtx.get(), {"a", "a"});
 
     {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
@@ -5411,8 +5415,13 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
     auto entry1 = assertGet(OplogEntry::parse(oplogEntries[0]));
     auto entry2 = assertGet(OplogEntry::parse(oplogEntries[1]));
 
-    ASSERT_BSONOBJ_EQ(*entry1.getObject2(),
-                      BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << indexes[0].indexIdent))));
+    ASSERT_TRUE(entry1.getObject2());
+    auto o2 = entry1.getObject2();
+    auto indexesElem = o2->getField("indexes");
+    auto indexesElemVec = indexesElem.Array();
+    ASSERT_EQ(indexesElemVec.size(), 1);
+    auto indexElemObj = indexesElemVec[0].Obj();
+    ASSERT_EQ(indexElemObj.getField("indexIdent").str(), indexes[0].indexIdent);
     ASSERT_FALSE(entry2.getObject2());
 }
 

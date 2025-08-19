@@ -644,7 +644,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collWriter->ns(), MODE_X));
 
     for (auto& indexBuildInfo : indexes) {
-        if (indexBuildInfo.name.empty()) {
+        if (indexBuildInfo.getIndexName().empty()) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream()
                               << "Cannot create an index for a spec '" << indexBuildInfo.spec
@@ -664,31 +664,27 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         }
 
         if (storageGlobalParams.repair) {
-            std::vector<std::string> indexNames;
-            indexNames.reserve(indexes.size());
-            for (auto& indexBuildInfo : indexes) {
-                indexNames.push_back(indexBuildInfo.name);
-            }
-
+            std::vector<std::string> indexNames = toIndexNames(indexes);
             Status status = _dropIndexesForRepair(opCtx, collWriter, indexNames);
             if (!status.isOK()) {
                 return status;
             }
 
-
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             for (auto& indexBuildInfo : indexes) {
                 indexBuildInfo.indexIdent =
-                    opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(
-                        collWriter->ns().dbName());
+                    storageEngine->generateNewIndexIdent(collWriter->ns().dbName());
+                indexBuildInfo.setInternalIdents(*storageEngine);
             }
         } else {
             // Unfinished index builds that are not resumable will drop and recreate the index table
             // using the same ident to avoid doing untimestamped writes to the catalog.
-            for (const auto& indexBuildInfo : indexes) {
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            for (auto& indexBuildInfo : indexes) {
                 auto indexCatalog = collWriter.getWritableCollection(opCtx)->getIndexCatalog();
                 auto writableEntry = indexCatalog->getWritableEntryByName(
                     opCtx,
-                    indexBuildInfo.name,
+                    indexBuildInfo.getIndexName(),
                     IndexCatalog::InclusionPolicy::kUnfinished |
                         IndexCatalog::InclusionPolicy::kFrozen);
                 Status status = indexCatalog->resetUnfinishedIndexForRecovery(
@@ -697,7 +693,8 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                     return status;
                 }
 
-                const auto durableBuildUUID = collWriter->getIndexBuildUUID(indexBuildInfo.name);
+                const auto durableBuildUUID =
+                    collWriter->getIndexBuildUUID(indexBuildInfo.getIndexName());
 
                 // A build UUID is present if and only if we are rebuilding a two-phase build.
                 invariant((protocol == IndexBuildProtocol::kTwoPhase) ==
@@ -707,6 +704,9 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                 invariant(!durableBuildUUID || *durableBuildUUID == buildUUID,
                           str::stream() << "durable build UUID: " << durableBuildUUID
                                         << "buildUUID: " << buildUUID);
+
+                indexBuildInfo.indexIdent = writableEntry->getIdent();
+                indexBuildInfo.setInternalIdents(*storageEngine);
             }
         }
 
@@ -805,7 +805,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     invariant(collection);
     const auto mdbCatalog = MDBCatalog::get(opCtx);
     for (const auto& indexBuildInfo : indexes) {
-        if (indexBuildInfo.name.empty()) {
+        if (indexBuildInfo.getIndexName().empty()) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream()
                               << "Cannot create an index for a spec '" << indexBuildInfo.spec
@@ -815,24 +815,24 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
         // Check that the information in the durable catalog matches the resume info.
         uassert(4841702,
                 "Index not found in durable catalog while attempting to resume index build",
-                collection->isIndexPresent(indexBuildInfo.name));
+                collection->isIndexPresent(indexBuildInfo.getIndexName()));
 
-        const auto durableBuildUUID = collection->getIndexBuildUUID(indexBuildInfo.name);
+        const auto durableBuildUUID = collection->getIndexBuildUUID(indexBuildInfo.getIndexName());
         uassert(ErrorCodes::IndexNotFound,
                 str::stream() << "Cannot resume index build with a buildUUID: " << buildUUID
                               << " that did not match the buildUUID in the durable catalog: "
                               << durableBuildUUID,
                 durableBuildUUID == buildUUID);
 
-        auto indexIdent =
-            mdbCatalog->getIndexIdent(opCtx, collection->getCatalogId(), indexBuildInfo.name);
+        auto indexIdent = mdbCatalog->getIndexIdent(
+            opCtx, collection->getCatalogId(), indexBuildInfo.getIndexName());
         uassert(
             4841703,
             str::stream() << "No index ident found on disk that matches the index build to resume: "
-                          << indexBuildInfo.name,
+                          << indexBuildInfo.getIndexName(),
             indexIdent.size() > 0);
-        uassertStatusOK(
-            collection->checkMetaDataForIndex(indexBuildInfo.name, indexBuildInfo.spec));
+        uassertStatusOK(collection->checkMetaDataForIndex(
+            std::string{indexBuildInfo.getIndexName()}, indexBuildInfo.spec));
     }
 
     if (!collection->isInitialized()) {
@@ -1897,7 +1897,6 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
     auto catalog = CollectionCatalog::get(opCtx);
 
     stdx::unordered_set<UUID, UUID::Hash> successfullyResumed;
-
     for (const auto& resumeInfo : buildsToResume) {
         auto buildUUID = resumeInfo.getBuildUUID();
         auto collUUID = resumeInfo.getCollectionUUID();
@@ -1906,10 +1905,34 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
             catalog->lookupNSSByUUID(opCtx, resumeInfo.getCollectionUUID());
         invariant(nss);
 
-        std::vector<BSONObj> indexSpecs;
-        indexSpecs.reserve(resumeInfo.getIndexes().size());
-        for (const auto& index : resumeInfo.getIndexes()) {
-            indexSpecs.push_back(index.getSpec());
+        // Build IndexBuildInfo instances corresponding to the ResumeIndexInfo instances.
+        std::vector<IndexBuildInfo> indexes;
+        indexes.reserve(resumeInfo.getIndexes().size());
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        for (const auto& indexStateInfo : resumeInfo.getIndexes()) {
+            IndexBuildInfo indexBuildInfo(indexStateInfo.getSpec(), boost::none);
+            boost::optional<std::string> skippedRecordsTrackerIdent;
+            boost::optional<std::string> constraintViolationsTrackerIdent;
+            if (indexStateInfo.getSkippedRecordTrackerTable()) {
+                skippedRecordsTrackerIdent =
+                    std::string{*indexStateInfo.getSkippedRecordTrackerTable()};
+            } else {
+                // IndexBuildInterceptor requires the the skipped records tracker table ident to
+                // be present in the resume case, so create a new table if none exists already.
+                skippedRecordsTrackerIdent = storageEngine->generateNewInternalIdent();
+                auto tempTable = storageEngine->makeTemporaryRecordStore(
+                    opCtx, *skippedRecordsTrackerIdent, KeyFormat::Long);
+                tempTable->keep();
+            }
+            if (indexStateInfo.getDuplicateKeyTrackerTable()) {
+                constraintViolationsTrackerIdent =
+                    std::string{*indexStateInfo.getDuplicateKeyTrackerTable()};
+            }
+            indexBuildInfo.setInternalIdents(boost::none,
+                                             std::string{indexStateInfo.getSideWritesTable()},
+                                             std::move(skippedRecordsTrackerIdent),
+                                             std::move(constraintViolationsTrackerIdent));
+            indexes.push_back(std::move(indexBuildInfo));
         }
 
         LOGV2(4841700,
@@ -1922,8 +1945,8 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
         try {
             // This spawns a new thread and returns immediately. These index builds will resume and
             // wait for a commit or abort to be replicated.
-            [[maybe_unused]] auto fut = uassertStatusOK(resumeIndexBuild(
-                opCtx, nss->dbName(), collUUID, indexSpecs, buildUUID, resumeInfo));
+            [[maybe_unused]] auto fut = uassertStatusOK(
+                resumeIndexBuild(opCtx, nss->dbName(), collUUID, indexes, buildUUID, resumeInfo));
             successfullyResumed.insert(buildUUID);
         } catch (const DBException& e) {
             LOGV2(4841701,
@@ -1983,16 +2006,25 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
         // replaced.
         indexBuildOptions.applicationMode = ApplicationMode::kStartupRepair;
 
+        // Convert each index spec into a corresponding IndexBuildInfo instance.
+        std::vector<IndexBuildInfo> indexes;
+        indexes.reserve(build.indexSpecs.size());
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        for (const auto& spec : build.indexSpecs) {
+            IndexBuildInfo indexBuildInfo(spec, boost::none);
+            indexBuildInfo.setInternalIdents(*storageEngine);
+            indexes.push_back(std::move(indexBuildInfo));
+        }
+
         // This spawns a new thread and returns immediately. These index builds will start and wait
         // for a commit or abort to be replicated.
-        [[maybe_unused]] auto fut =
-            uassertStatusOK(startIndexBuild(opCtx,
-                                            nss->dbName(),
-                                            build.collUUID,
-                                            toIndexBuildInfoVec(build.indexSpecs),
-                                            buildUUID,
-                                            IndexBuildProtocol::kTwoPhase,
-                                            indexBuildOptions));
+        [[maybe_unused]] auto fut = uassertStatusOK(startIndexBuild(opCtx,
+                                                                    nss->dbName(),
+                                                                    build.collUUID,
+                                                                    indexes,
+                                                                    buildUUID,
+                                                                    IndexBuildProtocol::kTwoPhase,
+                                                                    indexBuildOptions));
     }
 }
 
@@ -2104,9 +2136,7 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
               str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
 
     IndexBuildInfo indexBuildInfo(
-        spec,
-        opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(
-            collection->ns().dbName()));
+        spec, *opCtx->getServiceContext()->getStorageEngine(), collection->ns().dbName());
     _createIndex(opCtx, collection, indexBuildInfo, indexConstraints, fromMigrate);
 }
 
@@ -2215,8 +2245,8 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
         indexBuildInfo.spec = uassertStatusOK(indexCatalog->prepareSpecForCreate(
             opCtx, collectionPtr, indexBuildInfo.spec, boost::none));
         opObserver->onCreateIndex(opCtx, nss, collectionUUID, indexBuildInfo, fromMigrate);
-        uassertStatusOK(IndexBuildBlock::buildEmptyIndex(
-            opCtx, writeableCollection, indexBuildInfo.spec, indexBuildInfo.indexIdent));
+        uassertStatusOK(
+            IndexBuildBlock::buildEmptyIndex(opCtx, writeableCollection, indexBuildInfo));
     }
 }
 
@@ -2225,7 +2255,7 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
                                                             const std::vector<BSONObj>& specs,
                                                             bool fromMigrate) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto indexes = toIndexBuildInfoVec(specs, storageEngine, collection->ns().dbName());
+    auto indexes = toIndexBuildInfoVec(specs, *storageEngine, collection->ns().dbName());
     createIndexesOnEmptyCollection(opCtx, collection, indexes, fromMigrate);
 }
 
@@ -3492,11 +3522,7 @@ std::vector<IndexBuildInfo> IndexBuildsCoordinator::prepareSpecListForCreate(
     CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, collection->ns());
     invariant(collection);
 
-    std::vector<BSONObj> indexSpecs;
-    indexSpecs.reserve(indexes.size());
-    for (const auto& indexBuildInfo : indexes) {
-        indexSpecs.push_back(indexBuildInfo.spec);
-    }
+    std::vector<BSONObj> indexSpecs = toIndexSpecs(indexes);
 
     // During secondary oplog application, the index specs have already been normalized in the
     // oplog entries read from the primary. We should not be modifying the specs any further.
@@ -3561,8 +3587,9 @@ std::vector<IndexBuildInfo> IndexBuildsCoordinator::prepareSpecListForCreate(
         // out as we can't make this index build depend on the pre-existing one, and the
         // index would otherwise possibly still not be complete when we tell the user that
         // this build is done.
-        filteredIndexes.push_back(
-            IndexBuildInfo(uassertStatusOK(prepareResult), indexes[i].indexIdent));
+        auto indexBuildInfo = indexes[i];
+        indexBuildInfo.spec = uassertStatusOK(prepareResult);
+        filteredIndexes.push_back(std::move(indexBuildInfo));
     }
 
     // Verify that each spec is compatible with the collection's sharding state.

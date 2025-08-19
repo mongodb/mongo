@@ -68,6 +68,8 @@ public:
      */
     void createCollection(const NamespaceString& nss, UUID uuid);
 
+    std::vector<IndexBuildInfo> makeSpecs(std::vector<std::string> keys, std::vector<int32_t> ids);
+
     const UUID _testFooUUID = UUID::gen();
     const NamespaceString _testFooNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID _testBarUUID = UUID::gen();
@@ -122,15 +124,19 @@ void IndexBuildsCoordinatorMongodTest::createCollection(const NamespaceString& n
                                                  repl::OpTime::kUninitializedTerm));
 }
 
-std::vector<IndexBuildInfo> makeSpecs(std::vector<std::string> keys, std::vector<int32_t> ids) {
+std::vector<IndexBuildInfo> IndexBuildsCoordinatorMongodTest::makeSpecs(
+    std::vector<std::string> keys, std::vector<int32_t> ids) {
     invariant(keys.size());
     invariant(keys.size() == ids.size());
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     std::vector<IndexBuildInfo> indexes;
     for (size_t i = 0; i < keys.size(); ++i) {
         const auto& keyName = keys[i];
-        indexes.push_back(IndexBuildInfo(
+        IndexBuildInfo indexBuildInfo(
             BSON("v" << 2 << "key" << BSON(keyName << 1) << "name" << (keyName + "_1")),
-            fmt::format("index-{}", ids[i])));
+            fmt::format("index-{}", ids[i]));
+        indexBuildInfo.setInternalIdents(*storageEngine);
+        indexes.push_back(std::move(indexBuildInfo));
     }
     return indexes;
 }

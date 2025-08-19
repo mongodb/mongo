@@ -268,11 +268,9 @@ StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMongod::resumeIndexBuild(OperationContext* opCtx,
                                                const DatabaseName& dbName,
                                                const UUID& collectionUUID,
-                                               const std::vector<BSONObj>& specs,
+                                               const std::vector<IndexBuildInfo>& indexes,
                                                const UUID& buildUUID,
                                                const ResumeIndexInfo& resumeInfo) {
-    auto indexes = toIndexBuildInfoVec(specs);
-
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
     indexBuildOptions.applicationMode = ApplicationMode::kStartupRepair;
     return _startIndexBuild(opCtx,

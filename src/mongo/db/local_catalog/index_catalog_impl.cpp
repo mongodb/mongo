@@ -50,6 +50,7 @@
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/s2_bucket_access_method.h"
 #include "mongo/db/index_builds/index_build_block.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/local_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/local_catalog/clustered_collection_util.h"
@@ -732,12 +733,10 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     if (!statusWithSpec.isOK())
         return statusWithSpec;
 
-    spec = statusWithSpec.getValue();
-
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto ident = storageEngine->generateNewIndexIdent(collection->ns().dbName());
-    invariant(!ident.empty());
-    if (auto status = IndexBuildBlock::buildEmptyIndex(opCtx, collection, spec, ident);
+    IndexBuildInfo indexBuildInfo(
+        statusWithSpec.getValue(), *storageEngine, collection->ns().dbName());
+    if (auto status = IndexBuildBlock::buildEmptyIndex(opCtx, collection, indexBuildInfo);
         !status.isOK()) {
         return status;
     }

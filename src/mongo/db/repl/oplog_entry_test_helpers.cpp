@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -40,23 +41,6 @@
 
 namespace mongo {
 namespace repl {
-namespace {
-void populateTwoPhaseIndexBuildOplogEntry(BSONObjBuilder& oplogEntryBuilder,
-                                          const UUID& indexBuildUUID,
-                                          const BSONObj& keyPattern,
-                                          const std::string& indexName) {
-    indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
-    //"indexes" : [ { "v" : 2, "key" : { "a" : 1 }, "name" : "a_1" } ] }
-    BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
-    BSONObjBuilder indexDoc;
-    indexDoc.append("v", 2);
-    indexDoc.append("key", keyPattern);
-    indexDoc.append("name", indexName);
-    indexesArr.append(indexDoc.obj());
-    indexesArr.done();
-}
-
-}  // namespace
 
 OplogEntry makeCommandOplogEntry(OpTime opTime,
                                  const NamespaceString& nss,
@@ -192,31 +176,31 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
 
 OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
                                          const NamespaceString& nss,
-                                         const std::string& indexName,
-                                         const BSONObj& keyPattern,
                                          const UUID& uuid,
                                          const UUID& indexBuildUUID,
-                                         StringData ident) {
+                                         const IndexBuildInfo& indexBuildInfo) {
     BSONObjBuilder oplogEntryBuilder;
     oplogEntryBuilder.append("startIndexBuild", nss.coll());
-    populateTwoPhaseIndexBuildOplogEntry(oplogEntryBuilder, indexBuildUUID, keyPattern, indexName);
+    indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
+    oplogEntryBuilder.append("indexes", BSON_ARRAY(indexBuildInfo.spec));
 
-    return makeCommandOplogEntry(opTime,
-                                 nss,
-                                 oplogEntryBuilder.obj(),
-                                 BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << ident))),
-                                 uuid);
+    return makeCommandOplogEntry(
+        opTime,
+        nss,
+        oplogEntryBuilder.obj(),
+        BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << indexBuildInfo.indexIdent))),
+        uuid);
 }
 
 OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,
                                           const NamespaceString& nss,
-                                          const std::string& indexName,
-                                          const BSONObj& keyPattern,
                                           const UUID& uuid,
-                                          const UUID& indexBuildUUID) {
+                                          const UUID& indexBuildUUID,
+                                          const IndexBuildInfo& indexBuildInfo) {
     BSONObjBuilder oplogEntryBuilder;
     oplogEntryBuilder.append("commitIndexBuild", nss.coll());
-    populateTwoPhaseIndexBuildOplogEntry(oplogEntryBuilder, indexBuildUUID, keyPattern, indexName);
+    indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
+    oplogEntryBuilder.append("indexes", BSON_ARRAY(indexBuildInfo.spec));
 
     return makeCommandOplogEntry(
         opTime, nss, oplogEntryBuilder.obj(), boost::none /* object2 */, uuid);

@@ -68,8 +68,10 @@ protected:
     }
 
     std::unique_ptr<IndexBuildInterceptor> createIndexBuildInterceptor(BSONObj spec) {
-        return std::make_unique<IndexBuildInterceptor>(operationContext(),
-                                                       createIndex(std::move(spec)));
+        auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+        IndexBuildInfo indexBuildInfo(spec, *storageEngine, _nss.dbName());
+        return std::make_unique<IndexBuildInterceptor>(
+            operationContext(), createIndex(std::move(spec)), indexBuildInfo, false /* resume */);
     }
 
     std::unique_ptr<TemporaryRecordStore> getSideWritesTable(

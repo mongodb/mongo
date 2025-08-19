@@ -188,11 +188,13 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
     AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
     CollectionWriter coll(operationContext(), autoColl);
 
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
         IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
                                   << "a_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
-                       boost::none);
+                       *storageEngine,
+                       getNSS().dbName());
 
     {
         WriteUnitOfWork wuow(operationContext());
@@ -225,16 +227,19 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
     CollectionWriter coll(operationContext(), autoColl);
 
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo1 =
         IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
                                   << "a_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
                        std::string{"index-1"});
+    indexBuildInfo1.setInternalIdents(*storageEngine);
     auto indexBuildInfo2 =
         IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
                                   << "a_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
                        std::string{"index-2"});
+    indexBuildInfo2.setInternalIdents(*storageEngine);
 
     // Starting multiple index builds that conflicts with each other fails, but not with
     // IndexBuildAlreadyInProgress
@@ -253,6 +258,7 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // Start one index build is OK
     {
         WriteUnitOfWork wuow(operationContext());
+        indexBuildInfo1.setInternalIdents(*storageEngine);
         ASSERT_OK(
             indexer
                 ->init(operationContext(), coll, {indexBuildInfo1}, MultiIndexBlock::kNoopOnInitFn)
@@ -265,6 +271,7 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // Trying to start the index build again fails with IndexBuildAlreadyInProgress
     {
         WriteUnitOfWork wuow(operationContext());
+        indexBuildInfo1.setInternalIdents(*storageEngine);
         ASSERT_EQ(
             secondaryIndexer
                 ->init(operationContext(), coll, {indexBuildInfo1}, MultiIndexBlock::kNoopOnInitFn)
@@ -276,6 +283,8 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // IndexBuildAlreadyInProgress if there is an existing index build matching any spec
     {
         WriteUnitOfWork wuow(operationContext());
+        indexBuildInfo1.setInternalIdents(*storageEngine);
+        indexBuildInfo2.setInternalIdents(*storageEngine);
         ASSERT_EQ(secondaryIndexer
                       ->init(operationContext(),
                              coll,
@@ -290,11 +299,13 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
                                   << "b_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
                        std::string{"index-2"});
+    indexBuildInfo3.setInternalIdents(*storageEngine);
 
     // If one of the requested specs are already in progress we fail with
     // IndexBuildAlreadyInProgress
     {
         WriteUnitOfWork wuow(operationContext());
+        indexBuildInfo1.setInternalIdents(*storageEngine);
         ASSERT_EQ(secondaryIndexer
                       ->init(operationContext(),
                              coll,
@@ -313,11 +324,13 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
     AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
     CollectionWriter coll(operationContext(), autoColl);
 
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
         IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
                                   << "a_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
                        std::string{"index-1"});
+    indexBuildInfo.setInternalIdents(*storageEngine);
 
     {
         WriteUnitOfWork wuow(operationContext());

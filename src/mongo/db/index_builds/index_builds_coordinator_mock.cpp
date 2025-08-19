@@ -52,7 +52,7 @@ StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMock::resumeIndexBuild(OperationContext* opCtx,
                                              const DatabaseName& dbName,
                                              const UUID& collectionUUID,
-                                             const std::vector<BSONObj>& specs,
+                                             const std::vector<IndexBuildInfo>& indexes,
                                              const UUID& buildUUID,
                                              const ResumeIndexInfo& resumeInfo) {
     return {ErrorCodes::InternalError, "Method not implemented"};

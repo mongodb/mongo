@@ -1209,7 +1209,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
                            auto indexes =
                                toIndexBuildInfoVec(indexSpecs,
-                                                   storageEngine,
+                                                   *storageEngine,
                                                    _metadata.getTempReshardingNss().dbName());
                            auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
                            auto indexBuildFuture = indexBuildsCoordinator->startIndexBuild(

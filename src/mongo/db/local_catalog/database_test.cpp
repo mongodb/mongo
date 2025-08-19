@@ -394,6 +394,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
             wuow.commit();
         }
 
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT_EQUALS(indexCatalog->numIndexesInProgress(), 0);
         auto indexInfoObj =
@@ -404,7 +405,9 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
             collection->ns(), indexInfoObj, IndexBuildMethodEnum::kHybrid, UUID::gen());
         {
             WriteUnitOfWork wuow(opCtx);
-            ASSERT_OK(indexBuildBlock.init(opCtx, collection, "ident", /*forRecovery=*/false));
+            IndexBuildInfo indexBuildInfo(indexInfoObj, *storageEngine, collection->ns().dbName());
+            ASSERT_OK(
+                indexBuildBlock.init(opCtx, collection, indexBuildInfo, /*forRecovery=*/false));
             wuow.commit();
         }
         ON_BLOCK_EXIT([&indexBuildBlock, opCtx, collection] {

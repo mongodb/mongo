@@ -113,7 +113,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/storage:ident",
     ],
 )
 
@@ -201,6 +201,7 @@ mongo_cc_library(
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
+        ":index_builds_common",
         ":two_phase_index_build_knobs_idl",
         "//src/mongo/db:server_base",
         "//src/mongo/db/index:preallocated_container_pool",
