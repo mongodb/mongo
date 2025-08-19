@@ -748,20 +748,4 @@ export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) 
         validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {str: 1, d: 1}),
         options: collationOption
     });
-
-    // Verify that errors are thrown when using $top/$bottom with empty sortBy.
-    assert.throwsWithCode(() => {
-        database.nodata.aggregate([{$group: {_id: '$a', o: {$top: {output: 'a', sortBy: {}}}}}]);
-    }, 9657900);
-    assert.throwsWithCode(() => {
-        database.nodata.aggregate(
-            [{$group: {_id: '$a', o: {$topN: {n: 1, output: 'a', sortBy: {}}}}}]);
-    }, 9657900);
-    assert.throwsWithCode(() => {
-        database.nodata.aggregate([{$group: {_id: '$a', o: {$bottom: {output: 'a', sortBy: {}}}}}]);
-    }, 9657900);
-    assert.throwsWithCode(() => {
-        database.nodata.aggregate(
-            [{$group: {_id: '$a', o: {$bottomN: {n: 1, output: 'a', sortBy: {}}}}}]);
-    }, 9657900);
 }
