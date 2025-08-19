@@ -53,7 +53,7 @@ const st = new ShardingTest({
     config: 1,
     mongosOptions: extOpts,
     configOptions: extOpts,
-    shardOptions: extOpts
+    rsOptions: extOpts
 });
 
 coll = st.s0.getCollection('test.foo');

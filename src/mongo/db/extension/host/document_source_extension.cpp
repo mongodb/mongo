@@ -66,7 +66,7 @@ void DocumentSourceExtension::registerStage(
     const std::string& name,
     DocumentSource::Id id,
     extension::host::ExtensionAggregationStageDescriptorHandle descriptor) {
-    DocumentSource::registerExtensionParser(
+    DocumentSource::registerParser(
         name,
         [id, descriptor](BSONElement specElem,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)

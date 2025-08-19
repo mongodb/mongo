@@ -58,9 +58,15 @@ void LiteParsedDocumentSource::registerParser(const std::string& name,
                                               Parser parser,
                                               AllowedWithApiStrict allowedWithApiStrict,
                                               AllowedWithClientType allowedWithClientType) {
+    // It's possible an extension stage is being registered to override an existing server stage
+    // (like $vectorSearch), so we should skip re-initializing a counter. We do not assert that
+    // this is legal since we do that validation in DocumentSource::registerParser().
+    if (!parserMap.contains(name)) {
+        // Initialize a counter for this document source to track how many times it is used.
+        aggStageCounters.addMetric(name);
+    }
+
     parserMap[name] = {parser, allowedWithApiStrict, allowedWithClientType};
-    // Initialize a counter for this document source to track how many times it is used.
-    aggStageCounters.addMetric(name);
 }
 
 void LiteParsedDocumentSource::unregisterParser_forTest(const std::string& name) {

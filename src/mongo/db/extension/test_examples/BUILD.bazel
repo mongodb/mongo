@@ -16,6 +16,14 @@ package(default_visibility = ["//visibility:public"])
     ]
 ]
 
+# "vector_search" is used to test that we can override the existing $vectorSearch implementation.
+# It must not have the _mongo_extension suffix so that it doesn't get loaded in the
+# Extensions-enabled variant since that would break real $vectorSearch tests.
+mongo_cc_extension_shared_library(
+    name = "vector_search_extension",
+    srcs = ["vector_search.cpp"],
+)
+
 # Extensions under test_examples/loading/
 [
     mongo_cc_extension_shared_library(

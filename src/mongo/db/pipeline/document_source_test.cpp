@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -100,9 +101,8 @@ protected:
 
 using DocumentSourceExtensionParserTest = AggregationContextFixture;
 
-TEST_F(DocumentSourceExtensionParserTest, ShouldSuccessfullyRegisterExtensionParser) {
-    DocumentSource::registerExtensionParser("$customExtension",
-                                            DocumentSourceMockExtension::createFromBson);
+TEST_F(DocumentSourceExtensionParserTest, ShouldSuccessfullyregisterParser) {
+    DocumentSource::registerParser("$customExtension", DocumentSourceMockExtension::createFromBson);
 
     // Verify registration by parsing a stage with the new parser.
     BSONObj stageSpec = BSON("$customExtension" << BSON("field" << 1));
@@ -110,48 +110,38 @@ TEST_F(DocumentSourceExtensionParserTest, ShouldSuccessfullyRegisterExtensionPar
     ASSERT_EQUALS(sourceList.size(), 1U);
 }
 
-TEST_F(DocumentSourceExtensionParserTest, ShouldThrowOnDuplicateRegistration) {
-    DocumentSource::registerExtensionParser("$duplicateTest",
-                                            DocumentSourceMockExtension::createFromBson);
+DEATH_TEST_F(DocumentSourceExtensionParserTest, ShouldThrowOnDuplicateRegistration, "28707") {
+    DocumentSource::registerParser("$duplicateTest", DocumentSourceMockExtension::createFromBson);
 
     // Should throw assertion on duplicate registration.
-    ASSERT_THROWS_CODE(DocumentSource::registerExtensionParser(
-                           "$duplicateTest", DocumentSourceMockExtension::createFromBson),
-                       AssertionException,
-                       10597200);
+    DocumentSource::registerParser("$duplicateTest", DocumentSourceMockExtension::createFromBson);
 }
-
-TEST_F(DocumentSourceExtensionParserTest, ShouldThrowOnExistingStage) {
+DEATH_TEST_F(DocumentSourceExtensionParserTest, ShouldThrowOnExistingStage, "28707") {
     // Should throw when trying to override an existing stage that's not eligible for overrides.
-    ASSERT_THROWS_CODE(DocumentSource::registerExtensionParser(
-                           "$match", DocumentSourceMockExtension::createFromBson),
-                       AssertionException,
-                       10597200);
+    DocumentSource::registerParser("$match", DocumentSourceMockExtension::createFromBson);
 }
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldAllowVectorSearchOverride) {
-    BSONObj vectorSearchSpec =
-        BSON("$vectorSearch" << BSON("index" << "test" << "path" << "embedding"));
+    BSONObj vectorSearchSpec = BSON("$vectorSearch" << BSON("index" << "test"
+                                                                    << "path"
+                                                                    << "embedding"));
     auto sourceList = DocumentSource::parse(getExpCtx(), vectorSearchSpec);
     ASSERT_TRUE(sourceList.size() > 0);
 
     // Allow $vectorSearch override without assertion.
-    DocumentSource::registerExtensionParser("$vectorSearch",
-                                            DocumentSourceMockExtension::createFromBson);
+    DocumentSource::registerParser("$vectorSearch", DocumentSourceMockExtension::createFromBson);
 
     // Test that we can override it multiple times.
-    DocumentSource::registerExtensionParser("$vectorSearch",
-                                            DocumentSourceMockExtension::createFromBson);
+    DocumentSource::registerParser("$vectorSearch", DocumentSourceMockExtension::createFromBson);
 
     // Global Initializers are only called once per unit test invocation, so if we change
     // the parserMap for one test, that change will persist. We need to restore the original.
-    DocumentSource::registerExtensionParser("$vectorSearch",
-                                            DocumentSourceVectorSearch::createFromBson);
+    DocumentSource::registerParser("$vectorSearch", DocumentSourceVectorSearch::createFromBson);
 }
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldCreateDocumentSourceFromExtensionParser) {
-    DocumentSource::registerExtensionParser("$workingExtension",
-                                            DocumentSourceMockExtension::createFromBson);
+    DocumentSource::registerParser("$workingExtension",
+                                   DocumentSourceMockExtension::createFromBson);
 
     BSONObj stageSpec = BSON("$workingExtension" << BSON("field" << 1));
 
@@ -163,8 +153,7 @@ TEST_F(DocumentSourceExtensionParserTest, ShouldCreateDocumentSourceFromExtensio
 }
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldIntegrateWithBuiltinStages) {
-    DocumentSource::registerExtensionParser("$integrationTest",
-                                            DocumentSourceMockExtension::createFromBson);
+    DocumentSource::registerParser("$integrationTest", DocumentSourceMockExtension::createFromBson);
 
     // Check for both built-in and extension parsers using a vector to avoid duplication.
     std::vector<std::pair<std::string, BSONObj>> stageTests = {

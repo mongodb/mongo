@@ -70,47 +70,34 @@ void DocumentSource::unregisterParser_forTest(const std::string& name) {
 }
 
 void DocumentSource::registerParser(std::string name, Parser parser, FeatureFlag* featureFlag) {
+    // Set of aggregation stages that are allowed to be overridden (via extensions).
+    static const stdx::unordered_set<StringData> allowedOverrideStages = {
+        DocumentSourceVectorSearch::kStageName,
+    };
+
     auto it = parserMap.find(name);
-    massert(28707,
-            str::stream() << "Duplicate document source (" << name << ") registered.",
-            it == parserMap.end());
+    // Allow override only for stages in the allowed list, otherwise assert on duplicates.
+    if (it != parserMap.end() && !allowedOverrideStages.contains(name)) {
+        // Parser registration only takes place during startup, so any issues with parser
+        // registration should fail startup completely. For clarity, that is why we use fassert
+        // (shuts down the whole process) instead of tassert (fails an individual operation),
+        // although a tassert would technically fail the process anyways.
+        LOGV2_FATAL(28707, "Cannot register duplicate aggregation stage.", "stageName"_attr = name);
+    }
+
+
     parserMap[std::move(name)] = {std::move(parser), featureFlag};
 }
 
 void DocumentSource::registerParser(std::string name,
                                     SimpleParser simpleParser,
                                     FeatureFlag* featureFlag) {
-
     Parser parser = [simpleParser = std::move(simpleParser)](
                         BSONElement stageSpec, const intrusive_ptr<ExpressionContext>& expCtx)
         -> std::list<intrusive_ptr<DocumentSource>> {
         return {simpleParser(std::move(stageSpec), expCtx)};
     };
     return registerParser(std::move(name), std::move(parser), std::move(featureFlag));
-}
-
-void DocumentSource::registerExtensionParser(std::string name, SimpleParser simpleParser) {
-    // Set of aggregation stages that are allowed to be overridden by extensions.
-    static const stdx::unordered_set<StringData> allowedOverrideStages = {
-        DocumentSourceVectorSearch::kStageName};
-
-    auto it = parserMap.find(name);
-
-    // Allow override only for stages in the allowed list, otherwise assert on duplicates.
-    uassert(10597200,
-            str::stream() << "Extension cannot register duplicate aggregation stage (" << name
-                          << "). Stage name already exists.",
-            it == parserMap.end() || allowedOverrideStages.count(name) > 0);
-
-    // Convert SimpleParser to Parser (same pattern as existing registerParser).
-    Parser parser = [simpleParser = std::move(simpleParser)](
-                        BSONElement stageSpec, const intrusive_ptr<ExpressionContext>& expCtx)
-        -> std::list<intrusive_ptr<DocumentSource>> {
-        return {simpleParser(std::move(stageSpec), expCtx)};
-    };
-
-    // This may override an existing entry, but only for stages in allowedOverrideStages.
-    parserMap[std::move(name)] = {std::move(parser), nullptr};
 }
 
 DocumentSource::Id DocumentSource::allocateId(StringData name) {
