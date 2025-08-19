@@ -43,3 +43,14 @@ rules:
   semi: 2
   use-isnan: 2
   valid-typeof: 2
+  no-restricted-syntax: [
+    'error',
+    {
+      message: "Invalid import. Please do not import replsettest.js in MongoDB v8.0 and below.",
+      selector: "ImportDeclaration[source.value=/^jstests\\u002Flibs\\u002Freplsettest.js$/]"
+    },
+    {
+      message: "Invalid import. Please do not import shardingtest.js in MongoDB v8.0 and below.",
+      selector: "ImportDeclaration[source.value=/^jstests\\u002Flibs\\u002Fshardingtest.js$/]"
+    },
+  ]
