@@ -233,10 +233,9 @@ public:
             try {
                 return std::forward<Callback>(cb)();
             } catch (const ExceptionFor<ErrorCategory::ExceededTimeLimitError>&) {
-                // TODO (SERVER-104462): remove the comment below, and restore the catch statement
-                // above to use ExceptionFor.
                 // Need to catch the entire category of errors because there are parts across the
                 // code base where we throw a specific error, ignoring the one set on the opCtx.
+                // Please, see SERVER-104462 for more details.
                 const auto now = opCtx->fastClockSource().now();
                 if (now >= deadline) {
                     // Convert the error code to a specific one, indicating that the
