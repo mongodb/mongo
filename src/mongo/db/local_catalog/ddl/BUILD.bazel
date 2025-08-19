@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -174,5 +174,32 @@ mongo_cc_library(
     hdrs = ["replica_set_ddl_tracker.h"],
     deps = [
         "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "direct_connection_ddl_hook",
+    srcs = [
+        "direct_connection_ddl_hook.cpp",
+    ],
+    hdrs = [
+        "direct_connection_ddl_hook.h",
+    ],
+    deps = [
+        "replica_set_ddl_tracker",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "direct_connection_ddl_hook_test",
+    srcs = [
+        "direct_connection_ddl_hook_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_seventh_group",
+    ],
+    deps = [
+        ":direct_connection_ddl_hook",
+        "//src/mongo/db/s:shard_server_test_fixture",
     ],
 )

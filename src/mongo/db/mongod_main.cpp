@@ -101,6 +101,7 @@
 #include "mongo/db/local_catalog/database_holder.h"
 #include "mongo/db/local_catalog/database_holder_impl.h"
 #include "mongo/db/local_catalog/db_raii.h"
+#include "mongo/db/local_catalog/ddl/direct_connection_ddl_hook.h"
 #include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/local_catalog/health_log.h"
 #include "mongo/db/local_catalog/health_log_interface.h"
@@ -1382,6 +1383,7 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
 
 void setUpReplicaSetDDLHooks(ServiceContext* serviceContext) {
     ReplicaSetDDLTracker::create(serviceContext);
+    DirectConnectionDDLHook::create(serviceContext);
 }
 
 void setUpReplication(ServiceContext* serviceContext) {

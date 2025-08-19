@@ -3267,6 +3267,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:authserver",
         "//src/mongo/db/local_catalog:catalog_impl",
         "//src/mongo/db/local_catalog:collection_options",
+        "//src/mongo/db/local_catalog/ddl:direct_connection_ddl_hook",
         "//src/mongo/db/local_catalog:document_validation",
         "//src/mongo/db/local_catalog:health_log_interface",
         "//src/mongo/db/local_catalog:index_key_validate",
