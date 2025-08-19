@@ -801,13 +801,13 @@ void startupRepair(OperationContext* opCtx,
 // Perform collection validation for singular collection
 bool offlineValidateCollection(OperationContext* opCtx, NamespaceString nss) {
     ValidateResults validateResults;
-    Status status = CollectionValidation::validate(
-        opCtx,
-        nss,
-        {CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount,
-         CollectionValidation::RepairMode::kNone,
-         /*logDiagnostics=*/false},
-        &validateResults);
+    Status status =
+        CollectionValidation::validate(opCtx,
+                                       nss,
+                                       {CollectionValidation::ValidateMode::kForegroundFull,
+                                        CollectionValidation::RepairMode::kNone,
+                                        /*logDiagnostics=*/false},
+                                       &validateResults);
 
     if (!status.isOK()) {
         uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
