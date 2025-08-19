@@ -120,8 +120,7 @@ DEFAULTS = {
     "shuffle": None,
     "stagger_jobs": None,
     "majority_read_concern": "on",
-    "modules": "default",
-    "resmoke_modules_path": os.path.join("buildscripts", "resmokeconfig", "resmoke_modules.yml"),
+    "enable_enterprise_tests": "on",
     "enable_evergreen_api_test_selection": False,
     "test_selection_strategies_array": None,
     "mongo_version_file": None,
@@ -363,17 +362,8 @@ DRY_RUN = None
 # If set, specifies which node is the config shard. Can also be set to 'any'.
 CONFIG_SHARD = None
 
-# path for the resmoke module config, should only be changed in testing.
-MODULES_CONFIG_PATH = None
-
-# list of enabled modules
-MODULES = None
-
-# list of dirs from enabled modules to get suites from
-MODULE_SUITE_DIRS = []
-
-# list of dirs from disabled modules to filter out of suite selectors
-MODULE_DISABLED_JSTEST_DIRS = []
+# if set, enables enterprise jstest to automatically be included
+ENABLE_ENTERPRISE_TESTS = None
 
 # if set, enables test selection using the Evergreen API
 ENABLE_EVERGREEN_API_TEST_SELECTION = None

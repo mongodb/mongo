@@ -75,7 +75,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
-        --modules=none
+        --enableEnterpriseTests=off
       multiversion_platform: suse15
       multiversion_edition: targeted
       has_packages: true

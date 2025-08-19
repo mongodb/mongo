@@ -105,9 +105,7 @@ class TestRunner(Subcommand):
             elif self.__command == "generate-matrix-suites":
                 suitesconfig.generate()
             elif config.DRY_RUN == "tests":
-                self.dry_run(only_included=False)
-            elif config.DRY_RUN == "included-tests":
-                self.dry_run(only_included=True)
+                self.dry_run()
             else:
                 self.run_tests()
         finally:
@@ -185,16 +183,15 @@ class TestRunner(Subcommand):
                 memberships[test] = test_membership[test]
         return memberships
 
-    def dry_run(self,  only_included=False):
+    def dry_run(self):
         """List which tests would run and which tests would be excluded in a resmoke invocation."""
         suites = self._get_suites()
         for suite in suites:
             self._shuffle_tests(suite)
             sb = ["Tests that would be run in suite {}".format(suite.get_display_name())]
             sb.extend(suite.tests or ["(no tests)"])
-            if not only_included:
-                sb.append("Tests that would be excluded from suite {}".format(suite.get_display_name()))
-                sb.extend(suite.excluded or ["(no tests)"])
+            sb.append("Tests that would be excluded from suite {}".format(suite.get_display_name()))
+            sb.extend(suite.excluded or ["(no tests)"])
             self._exec_logger.info("\n".join(sb))
 
     def run_tests(self):
@@ -1456,7 +1453,7 @@ class RunPlugin(PluginInterface):
             "--dryRun",
             action="store",
             dest="dry_run",
-            choices=("off", "tests", "included-tests"),
+            choices=("off", "tests"),
             metavar="MODE",
             help=(
                 "Instead of running the tests, outputs the tests that would be run"
@@ -1842,13 +1839,6 @@ class RunPlugin(PluginInterface):
             dest="releases_file",
             help="An explicit releases YAML, if you do not want resmoke to fetch the latest one automatically.",
         )
-        parser.add_argument(
-            "--modules",
-            dest="modules",
-            type=str,
-            help="Comma separated list of modules enabled, by default all modules that exist on dist will be enabled.",
-            default="default",
-        )
 
         configure_resmoke.add_otel_args(parser)
 
@@ -1922,6 +1912,16 @@ class RunPlugin(PluginInterface):
             choices=("on", "off"),
             metavar="ON|OFF",
             help=("Enable or disable majority read concern support." " Defaults to %(default)s."),
+        )
+
+        mongodb_server_options.add_argument(
+            "--enableEnterpriseTests",
+            action="store",
+            dest="enable_enterprise_tests",
+            default="on",
+            choices=("on", "off"),
+            metavar="ON|OFF",
+            help=("Enable or disable enterprise tests. Defaults to 'on'."),
         )
 
         mongodb_server_options.add_argument(
@@ -2158,15 +2158,6 @@ class RunPlugin(PluginInterface):
             help=(
                 "Sets TestData.pauseAfterPopulate so that golden tests can pause after data population"
                 " to allow for easier debugging"
-            ),
-        )
-        
-        internal_options.add_argument(
-            "--resmokeModulesPath",
-            dest="resmoke_modules_path",
-            type=str,
-            help=(
-                "Sets the path to the resmoke modules config to allow testing different configurations."
             ),
         )
 

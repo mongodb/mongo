@@ -20,7 +20,7 @@ buildvariants:
       build_mongoreplay: true
       test_flags: >-
         --excludeWithAnyTags=requires_os_access
-        --modules=none
+        --enableEnterpriseTests=off
       compile_variant: ubi8
     tasks:
       - name: compile_and_archive_dist_test_TG
@@ -51,7 +51,7 @@ buildvariants:
         --build_enterprise=False
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
-        --modules=none
+        --enableEnterpriseTests=off
       multiversion_platform: rhel8
       multiversion_edition: targeted
       has_packages: true
@@ -158,7 +158,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
-        --modules=none
+        --enableEnterpriseTests=off
       has_packages: true
       packager_script: packager.py
       packager_arch: aarch64
@@ -252,7 +252,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source
-        --modules=none
+        --enableEnterpriseTests=off
       multiversion_platform: rhel93
       multiversion_edition: targeted
       has_packages: true
@@ -350,7 +350,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source
-        --modules=none
+        --enableEnterpriseTests=off
       has_packages: true
       packager_script: packager.py
       packager_arch: aarch64

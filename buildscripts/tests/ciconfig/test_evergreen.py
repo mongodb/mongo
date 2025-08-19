@@ -478,7 +478,7 @@ class TestVariant(unittest.TestCase):
     def test_expansion(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
         self.assertEqual(
-            "--param=value --ubuntu --modules=none",
+            "--param=value --ubuntu --enableEnterpriseTests=off",
             variant_ubuntu.expansion("test_flags"),
         )
         self.assertEqual(None, variant_ubuntu.expansion("not_a_valid_expansion_name"))
@@ -486,7 +486,7 @@ class TestVariant(unittest.TestCase):
     def test_expansions(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
         self.assertEqual(
-            {"test_flags": "--param=value --ubuntu --modules=none"},
+            {"test_flags": "--param=value --ubuntu --enableEnterpriseTests=off"},
             variant_ubuntu.expansions,
         )
 
@@ -519,7 +519,7 @@ class TestVariant(unittest.TestCase):
     def test_test_flags(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
         self.assertEqual(
-            "--param=value --ubuntu --modules=none", variant_ubuntu.test_flags
+            "--param=value --ubuntu --enableEnterpriseTests=off", variant_ubuntu.test_flags
         )
 
         variant_osx = self.conf.get_variant("osx-108")
@@ -551,7 +551,7 @@ class TestVariant(unittest.TestCase):
         resmoke_task = variant_ubuntu.get_task("resmoke_task")
         self.assertEqual(
             {
-                "resmoke_task": "--suites=resmoke_task --storageEngine=wiredTiger --param=value --ubuntu --modules=none"
+                "resmoke_task": "--suites=resmoke_task --storageEngine=wiredTiger --param=value --ubuntu --enableEnterpriseTests=off"
             },
             resmoke_task.combined_suite_to_resmoke_args_map,
         )
@@ -560,7 +560,7 @@ class TestVariant(unittest.TestCase):
         passing_task = variant_ubuntu.get_task("passing_test")
         self.assertEqual(
             {
-                "passing_test": "--suites=passing_test --param=value --ubuntu --modules=none"
+                "passing_test": "--suites=passing_test --param=value --ubuntu --enableEnterpriseTests=off"
             },
             passing_task.combined_suite_to_resmoke_args_map,
         )

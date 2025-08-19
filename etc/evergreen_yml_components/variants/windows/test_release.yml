@@ -31,7 +31,7 @@ buildvariants:
       large_distro_name: windows-2022-large
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source
-        --modules=none
+        --enableEnterpriseTests=off
       compile_variant: windows
     tasks:
       - name: compile_test_and_package_serial_TG

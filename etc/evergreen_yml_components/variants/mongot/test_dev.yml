@@ -86,7 +86,7 @@ buildvariants:
         --build_enterprise=False
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
-        --modules=none
+        --enableEnterpriseTests=off
         --runAllFeatureFlagTests
       has_packages: false
       multiversion_platform: amazon2023

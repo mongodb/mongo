@@ -273,15 +273,14 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
         """Populate the named suites by scanning config_dir/suites."""
         with cls._name_suites_lock:
             if not cls._named_suites:
-                suites_dirs = [os.path.join(_config.CONFIG_DIR, "suites")] + _config.MODULE_SUITE_DIRS
-                for suites_dir in suites_dirs:
-                    root = os.path.abspath(suites_dir)
-                    files = os.listdir(root)
-                    for filename in files:
-                        (short_name, ext) = os.path.splitext(filename)
-                        if ext in (".yml", ".yaml"):
-                            pathname = os.path.join(root, filename)
-                            cls._named_suites[short_name] = pathname
+                suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
+                root = os.path.abspath(suites_dir)
+                files = os.listdir(root)
+                for filename in files:
+                    (short_name, ext) = os.path.splitext(filename)
+                    if ext in (".yml", ".yaml"):
+                        pathname = os.path.join(root, filename)
+                        cls._named_suites[short_name] = pathname
 
             return cls._named_suites
 

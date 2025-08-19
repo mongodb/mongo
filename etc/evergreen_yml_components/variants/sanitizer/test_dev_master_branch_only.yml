@@ -266,7 +266,7 @@ buildvariants:
       large_distro_name: windows-2022-large
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_windows_tls
-        --modules=none
+        --enableEnterpriseTests=off
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       compile_variant: *windows-debug-suggested
     tasks:
@@ -335,7 +335,7 @@ buildvariants:
       compile_variant: *macos-debug-suggested
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_macos
-        --modules=none
+        --enableEnterpriseTests=off
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       resmoke_jobs_max: 6
       bazel_compile_flags: >-

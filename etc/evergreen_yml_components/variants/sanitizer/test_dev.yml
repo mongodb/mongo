@@ -281,7 +281,7 @@ buildvariants:
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
       test_flags: >-
         --excludeWithAnyTags=requires_http_client
-        --modules=none
+        --enableEnterpriseTests=off
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       target_resmoke_time: 15
       max_sub_suites: 5
@@ -420,7 +420,7 @@ buildvariants:
       hang_analyzer_dump_core: false
       test_flags: >-
         --excludeWithAnyTags=requires_fast_memory,corrupts_data
-        --modules=none
+        --enableEnterpriseTests=off
       compile_variant: rhel8-asan
     tasks:
       - name: compile_test_serial_TG

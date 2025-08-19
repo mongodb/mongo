@@ -25,7 +25,7 @@ buildvariants:
         --linkopt=-s
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
-        --modules=none
+        --enableEnterpriseTests=off
       multiversion_platform: debian12
       multiversion_edition: targeted
       has_packages: true
