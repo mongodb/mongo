@@ -505,6 +505,8 @@ last-continuous:
     ticket: SERVER-89618
   - test_file: jstests/core/timeseries/timeseries_computed_field.js
     ticket: SERVER-88072
+  - test_file: jstests/auth/commands_builtin_roles_replset.js
+    ticket: SERVER-92411
   - test_file: jstests/core/timeseries/timeseries_geonear_lookup.js
     ticket: SERVER-81454
   - test_file: jstests/sharding/move_chunk_deferred_lookup.js
@@ -1170,6 +1172,8 @@ last-lts:
     ticket: SERVER-89618
   - test_file: jstests/core/timeseries/timeseries_computed_field.js
     ticket: SERVER-88072
+  - test_file: jstests/auth/commands_builtin_roles_replset.js
+    ticket: SERVER-92411
   - test_file: jstests/core/timeseries/timeseries_geonear_lookup.js
     ticket: SERVER-81454
   - test_file: jstests/sharding/move_chunk_deferred_lookup.js
