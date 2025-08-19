@@ -1812,7 +1812,7 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
 
     write_ops_exec::LastOpFixer lastOpFixer(opCtx);
 
-    std::vector<int> validatedNamespaces = std::vector<int>();
+    std::vector<int> validatedNamespaces;
     validatedNamespaces.assign(req.getNsInfo().size(), 0);
 
     // Create an insertGrouper to group consecutive inserts to the same namespace.
@@ -1935,7 +1935,14 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
 
     // It does not matter if this final flush had errors or not since we finished processing
     // the last op already.
-    handleGroupedInserts(opCtx, req, insertGrouper, lastOpFixer, responses);
+    // We can ignore the return value of "handleGroupedInserts()" here as its return value only
+    // signals whether or not we can continue sending more bulk write operations.
+    [[maybe_unused]] bool result =
+        handleGroupedInserts(opCtx, req, insertGrouper, lastOpFixer, responses);
+
+    // This invariant should always be satisfied, because "handleGroupedInserts" calls
+    // "insertGrouper.getGroupedInsertsAndReset()" upon entry if the "insertGrouper" still contains
+    // some bulk write operations.
     invariant(insertGrouper.isEmpty());
 
     return make_tuple(
