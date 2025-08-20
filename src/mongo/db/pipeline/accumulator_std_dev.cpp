@@ -101,7 +101,7 @@ void AccumulatorStdDev::processInternal(const Value& input, bool merging) {
         if (delta != 0.0) {
             // Avoid potential numerical stability issues.
             _mean = ((_count * _mean) + (count * mean)) / newCount;
-            _m2 += delta * delta * (double(_count) * count / newCount);
+            _m2 += (delta * (double(_count) * count / newCount)) * delta;
         }
         _m2 += m2;
 
