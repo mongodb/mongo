@@ -14,6 +14,10 @@ LARGE_FILE_THRESHOLD = 10 * 1024 * 1024 #10MiB
 
 SUPPORTED_EXTENSIONS = (".cpp", ".c", ".h", ".hpp", ".py", ".js", ".mjs", ".json", ".lock", ".toml", ".defs", ".inl", ".idl")
 
+
+class LinterFail(Exception):
+    pass
+
 def create_build_files_in_new_js_dirs() -> None:
     base_dirs = ["src/mongo/db/modules/enterprise/jstests", "jstests"]
     for base_dir in base_dirs:
@@ -52,81 +56,103 @@ def list_files_with_targets(bazel_bin: str) -> List:
         ).stdout.splitlines()
     ]
 
+class LintRunner:
+    def __init__(self, keep_going: bool, bazel_bin: str):
+        self.keep_going = keep_going
+        self.bazel_bin = bazel_bin
+        self.fail = False
 
-def list_files_without_targets(
-    files_with_targets: List[str],
-    type_name: str,
-    ext: str,
-    dirs: List[str],
-) -> bool:
-    # rules_lint only checks files that are in targets, verify that all files in the source tree
-    # are contained within targets.
+    def list_files_without_targets(
+        self,
+        files_with_targets: List[str],
+        type_name: str,
+        ext: str,
+        dirs: List[str],
+    ) -> bool:
+        # rules_lint only checks files that are in targets, verify that all files in the source tree
+        # are contained within targets.
 
-    exempt_list = {
-        # TODO(SERVER-101360): Remove the exemptions below once resolved.
-        "src/mongo/crypto/fle_options.cpp",
-        # TODO(SERVER-101368): Remove the exemptions below once resolved.
-        "src/mongo/db/modules/enterprise/src/streams/commands/update_connection.cpp",
-        # TODO(SERVER-101370): Remove the exemptions below once resolved.
-        "src/mongo/db/modules/enterprise/src/streams/third_party/mongocxx/dist/mongocxx/test_util/client_helpers.cpp",
-        # TODO(SERVER-101371): Remove the exemptions below once resolved.
-        "src/mongo/db/modules/enterprise/src/streams/util/tests/concurrent_memory_aggregator_test.cpp",
-        # TODO(SERVER-101373): Remove the exemptions below once resolved.
-        "src/mongo/executor/network_interface_thread_pool_test.cpp",
-        # TODO(SERVER-101375): Remove the exemptions below once resolved.
-        "src/mongo/platform/decimal128_dummy.cpp",
-        # TODO(SERVER-101377): Remove the exemptions below once resolved.
-        "src/mongo/util/icu_init_stub.cpp",
-        # TODO(SERVER-101377): Remove the exemptions below once resolved.
-        "src/mongo/util/processinfo_emscripten.cpp",
-        "src/mongo/util/processinfo_macOS.cpp",
-        "src/mongo/util/processinfo_solaris.cpp",
-    }
+        exempt_list = {
+            # TODO(SERVER-101360): Remove the exemptions below once resolved.
+            "src/mongo/crypto/fle_options.cpp",
+            # TODO(SERVER-101368): Remove the exemptions below once resolved.
+            "src/mongo/db/modules/enterprise/src/streams/commands/update_connection.cpp",
+            # TODO(SERVER-101370): Remove the exemptions below once resolved.
+            "src/mongo/db/modules/enterprise/src/streams/third_party/mongocxx/dist/mongocxx/test_util/client_helpers.cpp",
+            # TODO(SERVER-101371): Remove the exemptions below once resolved.
+            "src/mongo/db/modules/enterprise/src/streams/util/tests/concurrent_memory_aggregator_test.cpp",
+            # TODO(SERVER-101373): Remove the exemptions below once resolved.
+            "src/mongo/executor/network_interface_thread_pool_test.cpp",
+            # TODO(SERVER-101375): Remove the exemptions below once resolved.
+            "src/mongo/platform/decimal128_dummy.cpp",
+            # TODO(SERVER-101377): Remove the exemptions below once resolved.
+            "src/mongo/util/icu_init_stub.cpp",
+            # TODO(SERVER-101377): Remove the exemptions below once resolved.
+            "src/mongo/util/processinfo_emscripten.cpp",
+            "src/mongo/util/processinfo_macOS.cpp",
+            "src/mongo/util/processinfo_solaris.cpp",
+        }
 
-    typed_files_in_targets = [line for line in files_with_targets if line.endswith(f".{ext}")]
+        typed_files_in_targets = [line for line in files_with_targets if line.endswith(f".{ext}")]
 
-    print(f"Checking that all {type_name} files have BUILD.bazel targets...")
+        print(f"Checking that all {type_name} files have BUILD.bazel targets...")
 
-    all_typed_files = (
-        subprocess.check_output(
-            ["find", *dirs, "-name", f"*.{ext}"],
-            stderr=subprocess.STDOUT,
+        all_typed_files = (
+            subprocess.check_output(
+                ["find", *dirs, "-name", f"*.{ext}"],
+                stderr=subprocess.STDOUT,
+            )
+            .decode("utf-8")
+            .splitlines()
         )
-        .decode("utf-8")
-        .splitlines()
-    )
 
-    # Convert typed_files_in_targets to a set for easy comparison
-    typed_files_in_targets_set = set()
-    for file in typed_files_in_targets:
-        # Remove the leading "//" and replace ":" with "/"
-        clean_file = file.lstrip("//").replace(":", "/")
-        typed_files_in_targets_set.add(clean_file)
+        # Convert typed_files_in_targets to a set for easy comparison
+        typed_files_in_targets_set = set()
+        for file in typed_files_in_targets:
+            # Remove the leading "//" and replace ":" with "/"
+            clean_file = file.lstrip("//").replace(":", "/")
+            typed_files_in_targets_set.add(clean_file)
 
-    # Create a new list of files that are in all_typed_files but not in typed_files_in_targets
-    new_list = []
-    for file in all_typed_files:
-        if file not in typed_files_in_targets_set and file not in exempt_list:
-            if "bazel_rules_mongo" in file:
-                # Skip files in bazel_rules_mongo, since it has its own Bazel repo
-                continue
+        # Create a new list of files that are in all_typed_files but not in typed_files_in_targets
+        new_list = []
+        for file in all_typed_files:
+            if file not in typed_files_in_targets_set and file not in exempt_list:
+                if "bazel_rules_mongo" in file:
+                    # Skip files in bazel_rules_mongo, since it has its own Bazel repo
+                    continue
 
-            new_list.append(file)
+                new_list.append(file)
 
-    if len(new_list) != 0:
-        print(f"Found {type_name} files without BUILD.bazel definitions:")
-        for file in new_list:
-            print(f"\t{file}")
-        print("")
-        print(
-            f"Please add these to a {ext}_library target in a BUILD.bazel file in their directory"
-        )
-        print("Run the following to attempt to fix the issue automatically:")
-        print("\tbazel run lint --fix")
-        return False
+        if len(new_list) != 0:
+            print(f"Found {type_name} files without BUILD.bazel definitions:")
+            for file in new_list:
+                print(f"\t{file}")
+            print("")
+            print(
+                f"Please add these to a {ext}_library target in a BUILD.bazel file in their directory"
+            )
+            print("Run the following to attempt to fix the issue automatically:")
+            print("\tbazel run lint --fix")
+            self.fail = True
+            if not self.keep_going:
+                raise LinterFail("File missing bazel target.")
 
-    print(f"All {type_name} files have BUILD.bazel targets!")
-    return True
+        print(f"All {type_name} files have BUILD.bazel targets!")
+
+    def run_bazel(self, target: str, args: List = []):
+        p = subprocess.run([self.bazel_bin, "run", target] + (["--"] + args if args else []))
+        if p.returncode != 0:
+            self.fail = True
+            if not self.keep_going:
+                raise LinterFail("Linter failed")
+
+    def simple_file_size_check(self, files_to_lint: List[str]):
+        for file in files_to_lint:
+            if os.path.getsize(file) > LARGE_FILE_THRESHOLD:
+                print(f"File {file} exceeds large file threshold of {LARGE_FILE_THRESHOLD}")
+                self.fail = True
+                if not self.keep_going:
+                    raise LinterFail("File too large")
 
 
 def _git_distance(args: list) -> int:
@@ -223,37 +249,40 @@ def get_parsed_args(args):
         action="store_true",
         default=False
     )
+    parser.add_argument(
+        "--keep-going",
+        action="store_true",
+        default=False,
+        help="Keep going after failures",
+    )
     return parser.parse_known_args(args)
 
-def lint_mod(bazel_bin: str) -> bool:
-    subprocess.run([bazel_bin, "run", "//modules_poc:mod_mapping", "--", "--validate-modules"], check=True)
+def lint_mod(lint_runner: LintRunner):
+    lint_runner.run_bazel("//modules_poc:mod_mapping", ["--validate-modules"])
     #TODO add support for the following steps
     #subprocess.run([bazel_bin, "run", "//modules_poc:merge_decls"], check=True)
     #subprocess.run([bazel_bin, "run", "//modules_poc:browse", "--", "merged_decls.json", "--parse-only"], check=True)
 
-def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
+def run_rules_lint(bazel_bin: str, args: List[str]):
     parsed_args, args = get_parsed_args(args)
     if platform.system() == "Windows":
         print("eslint not supported on windows")
-        return False
+        raise LinterFail("Unsupported platform")
 
     if parsed_args.fix:
         create_build_files_in_new_js_dirs()
 
+    keep_going = parsed_args.keep_going
+    lr = LintRunner(keep_going, bazel_bin)
+
     files_with_targets = list_files_with_targets(bazel_bin)
-    if not list_files_without_targets(files_with_targets, "C++", "cpp", ["src/mongo"]):
-        return False
-
-    if not list_files_without_targets(
-        files_with_targets, "javascript", "js", ["src/mongo", "jstests"]
-    ):
-        return False
-
-    if not list_files_without_targets(
-        files_with_targets, "python", "py", ["src/mongo", "buildscripts", "evergreen"]
-    ):
-        return False
-
+    lr.list_files_without_targets(files_with_targets, "C++", "cpp", ["src/mongo"])
+    lr.list_files_without_targets(
+        files_with_targets, "javascript", "js", ["src/mongo", "jstests"],
+    )
+    lr.list_files_without_targets(
+        files_with_targets, "python", "py", ["src/mongo", "buildscripts", "evergreen"],
+    )
     lint_all = parsed_args.all or "..." in args or "//..." in args
     files_to_lint = [arg for arg in args if not arg.startswith("-")]
     if not lint_all and files_to_lint:
@@ -276,48 +305,47 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
             ]
 
     if lint_all or "sbom.json" in files_to_lint:
-        subprocess.run([bazel_bin, "run", "//buildscripts:sbom_linter"], check=True)
+        lr.run_bazel("//buildscripts:sbom_linter")
 
     if lint_all or any(file.endswith((".h", ".cpp")) for file in files_to_lint):
-        subprocess.run(
-            [bazel_bin, "run", "//buildscripts:quickmongolint", "--", "lint"], check=True
-        )
+        lr.run_bazel("//buildscripts:quickmongolint", ["lint"])
 
     if lint_all or any(
         file.endswith((".cpp", ".c", ".h", ".py", ".idl"))
         for file in files_to_lint
     ):
-        subprocess.run([bazel_bin, "run", "//buildscripts:errorcodes", "--", "--quiet"], check=True)
+        lr.run_bazel("//buildscripts:errorcodes", ["--quiet"])
 
     if lint_all:
-        subprocess.run([bazel_bin, "run", "//buildscripts:pyrightlint", "--", "lint-all"], check=True)
+        lr.run_bazel("//buildscripts:pyrightlint", ["lint-all"])
     elif any(file.endswith(".py") for file in files_to_lint):
-        subprocess.run([bazel_bin, "run", "//buildscripts:pyrightlint", "--", "lints"] + files_to_lint, check=True)
+        lr.run_bazel("//buildscripts:pyrightlint", ["lints"] + files_to_lint)
 
     if lint_all or "poetry.lock" in files_to_lint or "pyproject.toml" in files_to_lint:
-        subprocess.run([bazel_bin, "run", "//buildscripts:poetry_lock_check"], check=True)
+        lr.run_bazel("//buildscripts:poetry_lock_check")
 
     if lint_all or any(file.endswith(".yml") for file in files_to_lint):
-        subprocess.run([bazel_bin, "run", "//buildscripts:validate_evg_project_config", "--", f"--evg-project-name={parsed_args.lint_yaml_project}", "--evg-auth-config=.evergreen.yml"], check=True)
+        lr.run_bazel("buildscripts:validate_evg_project_config", [f"--evg-project-name={parsed_args.lint_yaml_project}", "--evg-auth-config=.evergreen.yml"])
 
     if lint_all or parsed_args.large_files:
-        subprocess.run([bazel_bin, "run", "//buildscripts:large_file_check", "--", "--exclude", "src/third_party/*"], check=True)
+        lr.run_bazel("buildscripts:large_file_check", ["--exclude", "src/third_party/*"])
     else:
-        # simple check
-        for file in files_to_lint:
-            if os.path.getsize(file) > LARGE_FILE_THRESHOLD:
-                print(f"File {file} exceeds large file threshold of {LARGE_FILE_THRESHOLD}")
-                return False
+        lr.simple_file_size_check(files_to_lint)
 
-    # Default to linting everything in rules_lint if no path was passed in.
-    if len([arg for arg in args if not arg.startswith("--")]) == 0:
-        args = ["//..."] + args
+
 
     if lint_all or any(
         file.endswith((".cpp", ".c", ".h", ".hpp", ".idl", ".inl", ".defs"))
         for file in files_to_lint
     ):
-        lint_mod(bazel_bin)
+        lint_mod(lr)
+
+    if lr.fail:
+        raise LinterFail("Linter(s) failed")
+
+    # Default to linting everything in rules_lint if no path was passed in.
+    if len([arg for arg in args if not arg.startswith("--")]) == 0:
+        args = ["//..."] + args
 
     fix = ""
     with tempfile.NamedTemporaryFile(delete=False) as buildevents:
@@ -425,7 +453,6 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
                 )
             else:
                 print(f"ERROR: unknown fix type {fix}", file=sys.stderr)
-                return False
+                raise LinterFail("Unknown fix type")
     elif failing_reports != 0:
-        return False
-    return True
+        raise LinterFail("Failing reports")

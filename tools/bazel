@@ -189,6 +189,15 @@ MONGO_BAZEL_WRAPPER_ARGS=$MONGO_BAZEL_WRAPPER_ARGS \
 MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query \
 >&2 $python $REPO_ROOT/bazel/wrapper_hook/wrapper_hook.py $bazel_real "$@"
 exit_code=$?
+# Linter fails preempt bazel run.
+if [[ $exit_code == 3 ]]; then
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  NO_COLOR='\033[0m'
+  echo -e "${RED}ERROR:${NO_COLOR} Linter run failed, see details above"
+  echo -e "${GREEN}INFO:${NO_COLOR} Run the following to try to auto-fix the errors:\n\nbazel run lint --fix"
+  exit $exit_code
+fi
 if [[ $exit_code != 0 ]]; then
   if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
     >&2 echo "wrapper script failed! falling back to normal bazel call..."

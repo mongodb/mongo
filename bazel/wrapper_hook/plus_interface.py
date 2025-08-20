@@ -21,7 +21,6 @@ class BinAndSourceIncompatible(Exception):
 class DuplicateSourceNames(Exception):
     pass
 
-
 def get_buildozer_output(autocomplete_query):
     from buildscripts.install_bazel import install_bazel
 
@@ -114,9 +113,9 @@ def test_runner_interface(
                 command_start_index = args.index(lint_arg) + 1
             except ValueError:
                 pass
-        if run_rules_lint(args[0], args[command_start_index:]):
-            return ["run", "lint", "--", "ALL_PASSING"]
-        return args[1:command_start_index]
+        run_rules_lint(args[0], args[command_start_index:])
+
+        return ["run", "lint", "--", "ALL_PASSING"]
 
     if skip_plus_interface and not autocomplete_query:
         return args[1:]
