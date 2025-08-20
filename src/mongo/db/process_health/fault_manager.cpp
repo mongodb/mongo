@@ -31,9 +31,7 @@
 #include <algorithm>
 #include <iterator>
 #include <mutex>
-#include <ratio>
 #include <set>
-#include <tuple>
 #include <type_traits>
 
 #include <absl/container/node_hash_map.h>
@@ -50,13 +48,11 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/process_health/fault.h"
 #include "mongo/db/process_health/fault_facet_impl.h"
 #include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_observer_registration.h"
-#include "mongo/db/server_options.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor.h"
@@ -672,7 +668,7 @@ void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
         return;
     }
 
-    if (!_fault) {
+    if (!fault) {
         fault = createFault();  // Create fault if it doesn't exist.
     }
 
