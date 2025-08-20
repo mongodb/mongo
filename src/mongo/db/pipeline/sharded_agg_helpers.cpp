@@ -598,7 +598,7 @@ void propagateDocLimitToShards(Pipeline* shardPipe, Pipeline* mergePipe) {
  * Documents.
  */
 void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe) {
-    DepsTracker mergeDeps(mergePipe->getDependencies(DepsTracker::kNoMetadata));
+    DepsTracker mergeDeps(mergePipe->getDependencies(DepsTracker::NoMetadataValidation()));
     if (mergeDeps.needWholeDocument)
         return;  // the merge needs all fields, so nothing we can do.
 
@@ -616,7 +616,7 @@ void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe)
     // 2) Optimization IS NOT applied immediately following a $project or $group since it would
     //    add an unnecessary project (and therefore a deep-copy).
     for (auto&& source : shardPipe->getSources()) {
-        DepsTracker dt(DepsTracker::kNoMetadata);
+        DepsTracker dt;
         if (source->getDependencies(&dt) & DepsTracker::State::EXHAUSTIVE_FIELDS)
             return;
     }
@@ -1037,15 +1037,11 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
     // half to the shards, as possible.
     auto mergePipeline = std::move(pipeline);
 
-    // Before splitting the pipeline, we need to do dependency analysis to validate if we have text
-    // score metadata. This is because the planner will not have any way of knowing whether the
-    // split half provides this metadata after shards are targeted, because the shard executing the
-    // merging half only sees a $mergeCursors stage.
-    auto queryObj = mergePipeline->getInitialQuery();
-    auto unavailableMetadata = DocumentSourceMatch::isTextQuery(queryObj)
-        ? DepsTracker::kNoMetadata
-        : DepsTracker::kOnlyTextScore;
-    mergePipeline->getDependencies(unavailableMetadata);
+    // Before splitting the pipeline, we need to do dependency analysis to validate if we have
+    // text score metadata. This is because the planner will not have any way of knowing
+    // whether the split half provides this metadata after shards are targeted, because the
+    // shard executing the merging half only sees a $mergeCursors stage.
+    mergePipeline->validateMetaDependencies();
 
     auto [shardsPipeline, inputsSort] = findSplitPoint(mergePipeline.get());
 
@@ -1093,6 +1089,11 @@ BSONObj createPassthroughCommandForShard(
     if (requestQueryStatsFromRemotes) {
         targetedCmd[AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName] = Value(true);
     }
+
+    if (expCtx->isRankFusion()) {
+        targetedCmd[AggregateCommandRequest::kIsRankFusionFieldName] = Value(true);
+    }
+
     auto shardCommand = genericTransformForShards(
         std::move(targetedCmd), expCtx, explainVerbosity, std::move(readConcern));
 
@@ -1140,6 +1141,10 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
     // send to the shards.
     targetedCmd[AggregateCommandRequest::kPipelineFieldName] =
         Value(splitPipeline.shardsPipeline->serialize());
+
+    if (expCtx->isRankFusion()) {
+        targetedCmd[AggregateCommandRequest::kIsRankFusionFieldName] = Value(true);
+    }
 
     // When running on many shards with the exchange we may not need merging.
     if (needsMerge) {

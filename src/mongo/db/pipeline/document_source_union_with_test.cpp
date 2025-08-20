@@ -491,6 +491,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithoutPipelineAreCorrect) {
                                         StageConstraints::TransactionRequirement::kNotAllowed,
                                         StageConstraints::LookupRequirement::kAllowed,
                                         StageConstraints::UnionRequirement::kAllowed);
+    defaultConstraints.noFieldModifications = true;
     ASSERT_TRUE(emptyUnion->constraints(Pipeline::SplitState::kUnsplit) == defaultConstraints);
 }
 
@@ -504,6 +505,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithMixedSubPipelineAreCorrect) {
                                         StageConstraints::TransactionRequirement::kNotAllowed,
                                         StageConstraints::LookupRequirement::kNotAllowed,
                                         StageConstraints::UnionRequirement::kAllowed);
+    stricterConstraint.noFieldModifications = true;
     mock->mockConstraints = stricterConstraint;
     auto unionWithOne = DocumentSourceUnionWith(
         getExpCtx(),
@@ -513,7 +515,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithMixedSubPipelineAreCorrect) {
 
 TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) {
     const auto mockOne = DocumentSourceMock::createForTest(getExpCtx());
-    StageConstraints constraintTmpDataFacetLookupNotAllowed(
+    StageConstraints constraintTmpDataFacetLookupNotAllowedNoFieldMod(
         StageConstraints::StreamType::kStreaming,
         StageConstraints::PositionRequirement::kNone,
         StageConstraints::HostTypeRequirement::kAnyShard,
@@ -522,7 +524,10 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) 
         StageConstraints::TransactionRequirement::kAllowed,
         StageConstraints::LookupRequirement::kNotAllowed,
         StageConstraints::UnionRequirement::kAllowed);
-    mockOne->mockConstraints = constraintTmpDataFacetLookupNotAllowed;
+    // Since this is the only sub-constraint that marks noFieldModifications = true, the strict
+    // constraints should have noFieldModifications = false (which is the default).
+    constraintTmpDataFacetLookupNotAllowedNoFieldMod.noFieldModifications = true;
+    mockOne->mockConstraints = constraintTmpDataFacetLookupNotAllowedNoFieldMod;
     const auto mockTwo = DocumentSourceMock::createForTest(getExpCtx());
     StageConstraints constraintPermissive(StageConstraints::StreamType::kStreaming,
                                           StageConstraints::PositionRequirement::kNone,

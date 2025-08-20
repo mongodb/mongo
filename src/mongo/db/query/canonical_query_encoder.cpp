@@ -1407,9 +1407,6 @@ std::string encodeSBE(const CanonicalQuery& cq, const Optimizer optimizer) {
     encodeFindCommandRequest(cq, &bufBuilder);
 
     encodePipeline(cq.getExpCtx(), cq.cqPipeline(), &bufBuilder, optimizer);
-    if (const auto& bitset = cq.searchMetadata(); bitset.any()) {
-        bufBuilder.appendStrBytes(bitset.to_string());
-    }
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
 

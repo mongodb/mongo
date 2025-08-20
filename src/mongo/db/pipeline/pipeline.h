@@ -413,12 +413,12 @@ public:
         const SerializationOptions& opts = SerializationOptions{}) const;
 
     /**
-     * Returns the dependencies needed by this pipeline. 'unavailableMetadata' should reflect what
-     * metadata is not present on documents that are input to the front of the pipeline. If
-     * 'unavailableMetadata' is specified, this method will throw if any of the dependencies
+     * Returns the dependencies needed by this pipeline. 'availableMetadata' should reflect what
+     * metadata is present on documents that are input to the front of the pipeline. If
+     * 'availableMetadata' is specified, this method will throw if any of the dependencies
      * reference unavailable metadata.
      */
-    DepsTracker getDependencies(boost::optional<QueryMetadataBitSet> unavailableMetadata) const;
+    DepsTracker getDependencies(DepsTracker::MetadataDependencyValidation availableMetadata) const;
 
     /**
      * Populate 'refs' with the variables referred to by this pipeline, including user and system
@@ -427,15 +427,42 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const;
 
     /**
-     * Returns the dependencies needed by the SourceContainer. 'unavailableMetadata' should reflect
-     * what metadata is not present on documents that are input to the front of the pipeline. If
-     * 'unavailableMetadata' is specified, this method will throw if any of the dependencies
+     * Returns the dependencies needed by the SourceContainer. 'availableMetadata' should reflect
+     * what metadata is present on documents that are input to the front of the pipeline. If
+     * 'availableMetadata' is specified, this method will throw if any of the dependencies
      * reference unavailable metadata.
      */
     static DepsTracker getDependenciesForContainer(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const SourceContainer& container,
-        boost::optional<QueryMetadataBitSet> unavailableMetadata);
+        DepsTracker::MetadataDependencyValidation availableMetadata);
+
+    /**
+     * Validates metadata field dependencies in the pipeline and throws user errors if there are any
+     * invalid references. For example, if the pipeline refers to {$meta: "geoNearDistance"} but
+     * there is no $geoNear stage to generate that metadata, this will throw an error.
+     * 'availableMetadata' should reflect what metadata is present on documents that are input to
+     * the front of the pipeline.
+     *
+     * TODO SERVER-40900 This function is currently best-effort and does not guarantee to detect all
+     * such errors.
+     */
+    void validateMetaDependencies(
+        QueryMetadataBitSet availableMetadata = DepsTracker::kNoMetadata) const;
+
+
+    /**
+     * Returns a boolean that indicates whether or not a pipeline generates the provided metadata
+     * 'type'.
+     *
+     * WARNING: Calling this function will also validate that the metadata dependencies in the
+     * pipeline are valid, since tracking "available metadata" is currently tied to validating
+     * dependencies as well. This function could throw a uassert if there are invalid $meta
+     * references to unavailable metadata fields.
+     * TODO SERVER-100902: Consider separating these concerns so that this function can be called
+     * without risk of throwing a uassert.
+     */
+    bool generatesMetadataType(DocumentMetadataFields::MetaType type) const;
 
     const SourceContainer& getSources() const {
         return _sources;

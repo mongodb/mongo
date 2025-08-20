@@ -89,7 +89,7 @@ TEST(CstLiteralsTest, TranslatesDouble) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -103,7 +103,7 @@ TEST(CstLiteralsTest, TranslatesString) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -116,7 +116,7 @@ TEST(CstLiteralsTest, TranslatesBinary) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -128,7 +128,7 @@ TEST(CstLiteralsTest, TranslatesUndefined) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -141,7 +141,7 @@ TEST(CstLiteralsTest, TranslatesObjectId) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -153,7 +153,7 @@ TEST(CstLiteralsTest, TranslatesBoolean) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -166,7 +166,7 @@ TEST(CstLiteralsTest, TranslatesDate) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -178,7 +178,7 @@ TEST(CstLiteralsTest, TranslatesNull) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -190,7 +190,7 @@ TEST(CstLiteralsTest, TranslatesRegex) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -204,7 +204,7 @@ TEST(CstLiteralsTest, TranslatesDBPointer) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -216,7 +216,7 @@ TEST(CstLiteralsTest, TranslatesJavascript) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -228,7 +228,7 @@ TEST(CstLiteralsTest, TranslatesSymbol) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -241,7 +241,7 @@ TEST(CstLiteralsTest, TranslatesJavascriptWithScope) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -253,7 +253,7 @@ TEST(CstLiteralsTest, TranslatesInt) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -265,7 +265,7 @@ TEST(CstLiteralsTest, TranslatesTimestamp) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -277,7 +277,7 @@ TEST(CstLiteralsTest, TranslatesLong) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -290,7 +290,7 @@ TEST(CstLiteralsTest, TranslatesDecimal) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -302,7 +302,7 @@ TEST(CstLiteralsTest, TranslatesMinKey) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -314,7 +314,7 @@ TEST(CstLiteralsTest, TranslatesMaxKey) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -326,7 +326,7 @@ TEST(CstLiteralsTest, TranslatesArray) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -338,7 +338,7 @@ TEST(CstLiteralsTest, TranslatesObject) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 
@@ -359,7 +359,7 @@ TEST(CstLiteralsTest, TranslatesNestedLiteral) {
         dynamic_cast<DocumentSourceSingleDocumentTransformation&>(
             **cst_pipeline_translation::translatePipeline(cst, getExpCtx())->getSources().begin())
             .getTransformer()
-            .serializeTransformation(boost::none)
+            .serializeTransformation()
             .toBson()));
 }
 

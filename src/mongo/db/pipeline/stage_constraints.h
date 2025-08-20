@@ -154,6 +154,8 @@ struct StageConstraints {
                 std::min(newReqs.lookupRequirement, stageConstraints.lookupRequirement);
             newReqs.unionRequirement =
                 std::min(newReqs.unionRequirement, stageConstraints.unionRequirement);
+            newReqs.noFieldModifications =
+                std::min(newReqs.noFieldModifications, stageConstraints.noFieldModifications);
         }
         return newReqs;
     }
@@ -383,6 +385,10 @@ struct StageConstraints {
     // If set, merge should be performed on the specified shard.
     boost::optional<ShardId> mergeShardId = boost::none;
 
+    // If true, then this stage only retrieves and/or reorders documents from a base collection
+    // without making any modifications or transformations to the fields.
+    bool noFieldModifications = false;
+
     bool operator==(const StageConstraints& other) const {
         return requiredPosition == other.requiredPosition &&
             hostRequirement == other.hostRequirement && diskRequirement == other.diskRequirement &&
@@ -399,7 +405,8 @@ struct StageConstraints {
             isAllowedWithinUpdatePipeline == other.isAllowedWithinUpdatePipeline &&
             unionRequirement == other.unionRequirement &&
             preservesOrderAndMetadata == other.preservesOrderAndMetadata &&
-            mergeShardId == other.mergeShardId;
+            mergeShardId == other.mergeShardId &&
+            noFieldModifications == other.noFieldModifications;
     }
 };
 }  // namespace mongo

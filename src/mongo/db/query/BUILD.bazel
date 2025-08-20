@@ -519,6 +519,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/util:deferred_test.cpp",
         "//src/mongo/db/query/util:hash_roaring_set_test.cpp",
         "//src/mongo/db/query/util:memory_util_test.cpp",
+        "//src/mongo/db/query/util:string_util_test.cpp",
     ],
     data = [
         "//src/mongo/db/test_output/exec/sbe:test_data",
@@ -878,5 +879,12 @@ mongo_cc_benchmark(
     deps = [
         ":query_test_service_context",
         "//src/mongo/db/catalog:catalog_test_fixture",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_string_util",
+    srcs = [
+        "//src/mongo/db/query/util:string_util.cpp",
     ],
 )

@@ -133,7 +133,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSample::create(
 
     intrusive_ptr<DocumentSourceSample> sample(new DocumentSourceSample(expCtx));
     sample->_size = size;
-    sample->_sortStage = DocumentSourceSort::create(expCtx, {randSortSpec, expCtx}, sample->_size);
+    sample->_sortStage = DocumentSourceSort::create(
+        expCtx, {randSortSpec, expCtx}, {.limit = static_cast<uint64_t>(sample->_size)});
     return sample;
 }
 

@@ -410,6 +410,7 @@ mongo_cc_unit_test(
         "document_source_geo_near_test.cpp",
         "document_source_graph_lookup_test.cpp",
         "document_source_group_test.cpp",
+        "document_source_hybrid_scoring_util_test.cpp",
         "document_source_internal_all_collection_stats_test.cpp",
         "document_source_internal_apply_oplog_update_test.cpp",
         "document_source_internal_compute_geo_near_distance_test.cpp",
@@ -426,10 +427,12 @@ mongo_cc_unit_test(
         "document_source_project_test.cpp",
         "document_source_query_stats_test.cpp",
         "document_source_queue_test.cpp",
+        "document_source_rank_fusion_test.cpp",
         "document_source_redact_test.cpp",
         "document_source_replace_root_test.cpp",
         "document_source_sample_test.cpp",
         "document_source_sequential_document_cache_test.cpp",
+        "document_source_set_metadata_test.cpp",
         "document_source_set_variable_from_subpipeline_test.cpp",
         "document_source_set_window_fields_test.cpp",
         "document_source_skip_test.cpp",
@@ -672,6 +675,7 @@ mongo_cc_benchmark(
 mongo_cc_library(
     name = "document_sources_idl",
     srcs = [
+        "//src/mongo/db/pipeline:document_source_hybrid_scoring_input_util.cpp",
         "//src/mongo/db/pipeline:document_source_merge_spec.cpp",
         "//src/mongo/db/pipeline:document_source_parsing_validators.cpp",
         "//src/mongo/db/pipeline:document_source_query_stats_validators.cpp",
@@ -700,6 +704,8 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:document_source_out_idl",
         "//src/mongo/db/pipeline:document_source_query_settings_idl",
         "//src/mongo/db/pipeline:document_source_query_stats_idl",
+        "//src/mongo/db/pipeline:document_source_rank_fusion_idl",
+        "//src/mongo/db/pipeline:document_source_rank_fusion_inputs_idl",
         "//src/mongo/db/pipeline:document_source_replace_root_idl",
         "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline_idl",
         "//src/mongo/db/pipeline:document_source_set_window_fields_idl",
@@ -739,6 +745,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:document_source_graph_lookup.cpp",
         "//src/mongo/db/pipeline:document_source_group.cpp",
         "//src/mongo/db/pipeline:document_source_group_base.cpp",
+        "//src/mongo/db/pipeline:document_source_hybrid_scoring_util.cpp",
         "//src/mongo/db/pipeline:document_source_index_stats.cpp",
         "//src/mongo/db/pipeline:document_source_internal_all_collection_stats.cpp",
         "//src/mongo/db/pipeline:document_source_internal_compute_geo_near_distance.cpp",
@@ -768,11 +775,13 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:document_source_project.cpp",
         "//src/mongo/db/pipeline:document_source_query_stats.cpp",
         "//src/mongo/db/pipeline:document_source_queue.cpp",
+        "//src/mongo/db/pipeline:document_source_rank_fusion.cpp",
         "//src/mongo/db/pipeline:document_source_redact.cpp",
         "//src/mongo/db/pipeline:document_source_replace_root.cpp",
         "//src/mongo/db/pipeline:document_source_sample.cpp",
         "//src/mongo/db/pipeline:document_source_sample_from_random_cursor.cpp",
         "//src/mongo/db/pipeline:document_source_sequential_document_cache.cpp",
+        "//src/mongo/db/pipeline:document_source_set_metadata.cpp",
         "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.cpp",
         "//src/mongo/db/pipeline:document_source_set_window_fields.cpp",
         "//src/mongo/db/pipeline:document_source_sharded_data_distribution.cpp",
@@ -857,6 +866,7 @@ mongo_cc_library(
         "//src/mongo/db/query:cursor_response_idl",
         "//src/mongo/db/query:projection_ast",
         "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query:query_string_util",
         "//src/mongo/db/query:sort_pattern",
         "//src/mongo/db/query:spill_util",
         "//src/mongo/db/query/collation:collator_factory_interface",
@@ -1127,6 +1137,30 @@ mongo_idl_library(
     deps = [
         "//src/mongo/db:basic_types_idl",
         "//src/mongo/db/query/query_stats:transform_algorithm_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "document_source_rank_fusion_idl",
+    src = "document_source_rank_fusion.idl",
+    idl_deps = [
+        "//src/mongo/db/pipeline:document_source_rank_fusion_inputs_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline:document_source_rank_fusion_inputs_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "document_source_rank_fusion_inputs_idl",
+    src = "document_source_rank_fusion_inputs.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+        "//src/mongo/db/pipeline:aggregate_command_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+        "//src/mongo/db/pipeline:aggregate_command_idl",
     ],
 )
 

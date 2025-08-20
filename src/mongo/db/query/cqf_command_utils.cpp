@@ -588,6 +588,10 @@ public:
         unsupportedExpression();
     }
 
+    void visit(const ExpressionInternalRawSortKey*) final {
+        unsupportedExpression();
+    }
+
     void visit(const ExpressionMap* expr) final {
         unsupportedExpression();
     }

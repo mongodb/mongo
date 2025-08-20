@@ -135,7 +135,7 @@ auto getIncludeExcludeProjectAndType(DocumentSource* src) {
     if (const auto proj = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(src); proj &&
         (proj->getType() == TransformerInterface::TransformerType::kInclusionProjection ||
          proj->getType() == TransformerInterface::TransformerType::kExclusionProjection)) {
-        return std::pair{proj->getTransformer().serializeTransformation(boost::none).toBson(),
+        return std::pair{proj->getTransformer().serializeTransformation().toBson(),
                          proj->getType() ==
                              TransformerInterface::TransformerType::kInclusionProjection};
     }
@@ -146,12 +146,13 @@ auto getIncludeExcludeProjectAndType(DocumentSource* src) {
  * Creates a new DocumentSourceSort by pulling out the logic for getting maxMemoryUsageBytes.
  */
 boost::intrusive_ptr<DocumentSourceSort> createNewSortWithMemoryUsage(
-    const DocumentSourceSort& sort, const SortPattern& pattern, long long limit) {
+    const DocumentSourceSort& sort, const SortPattern& pattern, uint64_t limit) {
     boost::optional<uint64_t> maxMemoryUsageBytes;
     if (auto sortStatsPtr = dynamic_cast<const SortStats*>(sort.getSpecificStats())) {
         maxMemoryUsageBytes = sortStatsPtr->maxMemoryUsageBytes;
     }
-    return DocumentSourceSort::create(sort.getContext(), pattern, limit, maxMemoryUsageBytes);
+    return DocumentSourceSort::create(
+        sort.getContext(), pattern, {.limit = limit, .maxMemoryUsageBytes = maxMemoryUsageBytes});
 }
 
 /**
@@ -1149,7 +1150,7 @@ void DocumentSourceInternalUnpackBucket::setEventFilter(BSONObj eventFilterBson,
     pExpCtx->sbeCompatibility =
         std::min(originalSbeCompatibility, _isEventFilterSbeCompatible.get());
 
-    _eventFilterDeps = {};
+    _eventFilterDeps = DepsTracker();
     match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
 }
 
@@ -1714,7 +1715,9 @@ DepsTracker DocumentSourceInternalUnpackBucket::getRestPipelineDependencies(
     Pipeline::SourceContainer* container,
     bool includeEventFilter) const {
     auto deps = Pipeline::getDependenciesForContainer(
-        pExpCtx, Pipeline::SourceContainer{std::next(itr), container->end()}, boost::none);
+        pExpCtx,
+        Pipeline::SourceContainer{std::next(itr), container->end()},
+        DepsTracker::NoMetadataValidation());
     if (_eventFilter && includeEventFilter) {
         match_expression::addDependencies(_eventFilter.get(), &deps);
     }

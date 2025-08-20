@@ -381,8 +381,6 @@ bool DocumentSourceGeoNear::hasQuery() const {
 void DocumentSourceGeoNear::parseOptions(BSONObj options,
                                          const boost::intrusive_ptr<ExpressionContext>& pCtx) {
 
-    const std::string nearStr = "near";
-    const std::string distanceFieldStr = "distanceField";
     // First, check for explicitly-disallowed fields.
 
     // The old geoNear command used to accept a collation. We explicitly ban it here, since the
@@ -402,16 +400,17 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
     uassert(50856, "$geoNear no longer supports the 'start' argument.", !options["start"]);
 
     // The "near" and "distanceField" parameters are required.
-    uassert(5860400, "$geoNear requires a 'near' argument", options[nearStr]);
-    uassert(25278, "$geoNear requires a 'distanceField' argument", options[distanceFieldStr]);
+    uassert(5860400, "$geoNear requires a 'near' argument", options[kNearFieldName]);
+    uassert(
+        25278, "$geoNear requires a 'distanceField' argument", options[kDistanceFieldFieldName]);
 
     // go through all the fields
     for (auto&& argument : options) {
         const auto argName = argument.fieldNameStringData();
-        if (argName == nearStr) {
+        if (argName == kNearFieldName) {
             _nearGeometry =
                 Expression::parseOperand(pCtx.get(), argument, pCtx->variablesParseState);
-        } else if (argName == distanceFieldStr) {
+        } else if (argName == kDistanceFieldFieldName) {
             uassert(16606,
                     "$geoNear requires a 'distanceField' option as a String",
                     argument.type() == String);
@@ -435,7 +434,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
             query = argument.embeddedObject().getOwned();
         } else if (argName == "spherical") {
             spherical = argument.trueValue();
-        } else if (argName == "includeLocs") {
+        } else if (argName == kIncludeLocsFieldName) {
             uassert(16607,
                     "$geoNear requires that 'includeLocs' option is a String",
                     argument.type() == String);
@@ -529,8 +528,18 @@ DepsTracker::State DocumentSourceGeoNear::getDependencies(DepsTracker* deps) con
     // produced by this stage, and we could inform the query system that it need not include it in
     // its response. For now, assume that we require the entire document as well as the appropriate
     // geoNear metadata.
-    deps->setNeedsMetadata(DocumentMetadataFields::kGeoNearDist, true);
-    deps->setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint, needsGeoNearPoint());
+
+    // This may look confusing, but we must call two setters on the DepsTracker for different
+    // purposes. We mark the fields as available metadata that can be consumed by any
+    // downstream stage for $meta field validation. We also also mark that this stage does
+    // require the meta fields so that the executor knows to produce the metadata.
+    // TODO SERVER-100902 Split $meta validation out of dependency tracking.
+    deps->setMetadataAvailable(DocumentMetadataFields::kGeoNearDist);
+    deps->setNeedsMetadata(DocumentMetadataFields::kGeoNearDist);
+    if (needsGeoNearPoint()) {
+        deps->setMetadataAvailable(DocumentMetadataFields::kGeoNearPoint);
+        deps->setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint);
+    }
 
     deps->needWholeDocument = true;
     return DepsTracker::State::EXHAUSTIVE_FIELDS;

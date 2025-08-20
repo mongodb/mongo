@@ -224,7 +224,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
         _sortPattern = std::move(parsedFind->sort);
 
         // Be sure to track and add any metadata dependencies from the sort (e.g. text score).
-        _metadataDeps |= _sortPattern->metadataDeps(parsedFind->unavailableMetadata);
+        _metadataDeps |= _sortPattern->metadataDeps(parsedFind->availableMetadata);
 
         // If the results of this query might have to be merged on a remote node, then that node
         // might need the sort key metadata. Request that the plan generates this metadata.
@@ -254,7 +254,9 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
         }
     }
     // The tree must always be valid after normalization.
-    dassert(parsed_find_command::isValid(_primaryMatchExpression.get(), *_findCommand).isOK());
+    dassert(parsed_find_command::validateAndGetAvailableMetadata(_primaryMatchExpression.get(),
+                                                                 *_findCommand)
+                .getStatus());
     if (auto status = isValidNormalized(_primaryMatchExpression.get()); !status.isOK()) {
         uasserted(status.code(), status.reason());
     }

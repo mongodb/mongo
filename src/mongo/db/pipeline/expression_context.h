@@ -779,6 +779,18 @@ public:
      */
     bool isFeatureFlagBinDataConvertEnabled();
 
+    bool isBasicRankFusionEnabled() const {
+        return _featureFlagRankFusionBasic.get();
+    }
+
+    void setIsRankFusion() {
+        _isRankFusion = true;
+    }
+
+    bool isRankFusion() const {
+        return _isRankFusion;
+    }
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 
@@ -865,6 +877,13 @@ private:
     // collection in the local database.
     bool _allowGenericForeignDbLookup = false;
 
+
+    // Indicates that the pipeline is a desugared representation of a user's $rankFusion
+    // pipeline. This is necessary for guarding that $rankFusion is not yet allowed to be run
+    // over views.
+    // TODO SERVER-101661 Remove this internal flag once $rankFusion works on views.
+    bool _isRankFusion = false;
+
     // We use this set to indicate whether or not a system variable was referenced in the query that
     // is being executed (if the variable was referenced, it is an element of this set).
     stdx::unordered_set<Variables::Id> _systemVarsReferencedInQuery;
@@ -898,6 +917,11 @@ private:
     // feature flag check would refer to the same FCV once it has been obtained.
     Deferred<bool (*)()> _featureFlagBinDataConvertValue{[] {
         return feature_flags::gFeatureFlagBinDataConvert.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    }};
+
+    Deferred<bool (*)()> _featureFlagRankFusionBasic{[] {
+        return feature_flags::gFeatureFlagRankFusionBasic.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     }};
 };

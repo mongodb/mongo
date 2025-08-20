@@ -208,6 +208,7 @@ class Expression : public RefCountable {
 public:
     using Parser = std::function<boost::intrusive_ptr<Expression>(
         ExpressionContext* const, BSONElement, const VariablesParseState&)>;
+    using ExpressionVector = std::vector<boost::intrusive_ptr<Expression>>;
 
     /**
      * Represents new paths computed by an expression. Computed paths are partitioned into renames
@@ -386,8 +387,6 @@ public:
     }
 
 protected:
-    using ExpressionVector = std::vector<boost::intrusive_ptr<Expression>>;
-
     Expression(ExpressionContext* const expCtx) : Expression(expCtx, {}) {}
 
     Expression(ExpressionContext* const expCtx, ExpressionVector&& children)
@@ -2613,7 +2612,48 @@ public:
     }
 
 private:
+    /**
+     * Asserts that if the API version is strict, that the requested metadata field is compatible
+     * with it.
+     */
+    static void _assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* expCtx,
+                                                        DocumentMetadataFields::MetaType type);
+    /**
+     * Asserts that 'featureFlagRankFusionFull' feature flag is enabled, if the
+     * requested metadata field requires it.
+     */
+    static void _assertMetaFieldCompatibleWithHybridScoringFF(
+        ExpressionContext* expCtx, DocumentMetadataFields::MetaType type);
+
     DocumentMetadataFields::MetaType _metaType;
+};
+
+/**
+ * A 'flavor' of {$meta: "sortKey"} which is intended for efficient comparisons internally. This is
+ * in contrast to the public facing expression which is meant to return a user-comprehensible sort
+ * key, represented as an array. That expression will materialize a new array. Constructing this
+ * array is not necessary for just making internal comparisons.
+ */
+class ExpressionInternalRawSortKey final : public Expression {
+public:
+    static constexpr StringData kName = "$_internalSortKey"_sd;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext*,
+                                                  BSONElement,
+                                                  const VariablesParseState&);
+
+    ExpressionInternalRawSortKey(ExpressionContext* expCtx) : Expression(expCtx) {}
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionMillisecond final : public DateExpressionAcceptingTimeZone<ExpressionMillisecond> {

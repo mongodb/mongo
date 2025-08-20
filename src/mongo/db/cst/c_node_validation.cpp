@@ -385,7 +385,7 @@ StatusWith<IsPositional> validateProjectionPathAsNormalOrPositional(
 Status validateSortPath(const std::vector<std::string>& pathComponents) {
     try {
         for (auto&& component : pathComponents) {
-            FieldPath::uassertValidFieldName(component);
+            uassertStatusOK(FieldPath::validateFieldName(component));
         }
     } catch (AssertionException& ae) {
         return Status{ae.code(), ae.reason()};

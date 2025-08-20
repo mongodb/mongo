@@ -84,6 +84,7 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
     bool performApiVersionChecks = !viewDef.timeseries();
 
     liteParsedPipeline.validate(opCtx, performApiVersionChecks);
+    liteParsedPipeline.checkStagesAllowedInViewDefinition();
 
     // Verify that this is a legitimate pipeline specification by making sure it parses
     // correctly. In order to parse a pipeline we need to resolve any namespaces involved to a

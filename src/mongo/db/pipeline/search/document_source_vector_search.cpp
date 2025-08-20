@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/pipeline/search/vector_search_helper.h"
@@ -89,6 +90,13 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
 
     auto explainObj =
         _originalSpec.addFields(BSON("explain" << opts.serializeLiteral(explainInfo)));
+
+    // Redact queryVector (embeddings field) if it exists to avoid including all
+    // embeddings values and keep explainObj data concise.
+    if (opts.verbosity && explainObj.hasField("queryVector")) {
+        explainObj = explainObj.addFields(BSON("queryVector"
+                                               << "redacted"));
+    }
     return Value(Document{{kStageName, explainObj}});
 }
 
@@ -124,19 +132,21 @@ DocumentSource::GetNextResult DocumentSourceVectorSearch::getNextAfterSetup() {
         return DocumentSource::GetNextResult::makeEOF();
     }
 
-    // Populate $sortKey metadata field so that mongos can properly merge sort the document stream.
-    if (pExpCtx->needsMerge) {
-        // Metadata can't be changed on a Document. Create a MutableDocument to set the sortKey.
-        MutableDocument output(Document::fromBsonWithMetaData(response.value()));
+    // Populate $sortKey metadata field so that downstream operators can correctly reason about the
+    // sort order. This can be important for mongos, so it can properly merge sort the document
+    // stream, or for $rankFusion to calculate the ranks of the results. This metadata can be safely
+    // ignored if nobody ends up needing it. It will be stripped out before a response is sent back
+    // to a client.
 
-        tassert(7828500,
-                "Expected vector search distance to be present",
-                output.metadata().hasVectorSearchScore());
-        output.metadata().setSortKey(Value{output.metadata().getVectorSearchScore()},
-                                     true /* isSingleElementKey */);
-        return output.freeze();
-    }
-    return Document::fromBsonWithMetaData(response.value());
+    // Metadata can't be changed on a Document. Create a MutableDocument to set the sortKey.
+    MutableDocument output(Document::fromBsonWithMetaData(response.value()));
+
+    tassert(7828500,
+            "Expected vector search distance to be present",
+            output.metadata().hasVectorSearchScore());
+    output.metadata().setSortKey(Value{output.metadata().getVectorSearchScore()},
+                                 true /* isSingleElementKey */);
+    return output.freeze();
 }
 
 DocumentSource::GetNextResult DocumentSourceVectorSearch::doGetNext() {
@@ -214,8 +224,44 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
     return desugaredPipeline;
 }
 
+std::pair<Pipeline::SourceContainer::iterator, bool>
+DocumentSourceVectorSearch::_attemptSortAfterVectorSearchOptimization(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    auto isSortOnVectorSearchMeta = [](const SortPattern& sortPattern) -> bool {
+        return isSortOnSingleMetaField(sortPattern,
+                                       (1 << DocumentMetadataFields::MetaType::kVectorSearchScore));
+    };
+    auto optItr = std::next(itr);
+    if (optItr != container->end()) {
+        if (auto sortStage = dynamic_cast<DocumentSourceSort*>(optItr->get())) {
+            // A $sort stage has been found directly after this stage.
+            // $vectorSearch results are always sorted by 'vectorSearchScore',
+            // so if the $sort stage is also sorted by 'vectorSearchScore', the $sort stage
+            // is redundant and can safely be removed.
+            if (isSortOnVectorSearchMeta(sortStage->getSortKeyPattern())) {
+                // Optimization successful.
+                container->remove(*optItr);
+                return {itr, true};  // Return the same pointer in case there are other
+                                     // optimizations to still be applied.
+            }
+        }
+    }
+
+    // Optimization not possible.
+    return {itr, false};
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceVectorSearch::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    // Attempt to remove a $sort on metadata after this $vectorSearch stage.
+    {
+        const auto&& [returnItr, optimizationSucceeded] =
+            _attemptSortAfterVectorSearchOptimization(itr, container);
+        if (optimizationSucceeded) {
+            return returnItr;
+        }
+    }
+
     auto stageItr = std::next(itr);
     // Only attempt to get the limit from the query if there are further stages in the pipeline.
     if (stageItr != container->end()) {

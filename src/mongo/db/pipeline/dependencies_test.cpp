@@ -59,54 +59,244 @@ TEST(DependenciesTest, CheckClassConstants) {
     ASSERT_TRUE(DepsTracker::kAllGeoNearData[DocumentMetadataFields::kGeoNearDist]);
     ASSERT_EQ(DepsTracker::kAllGeoNearData.count(), 2);
     ASSERT_TRUE(DepsTracker::kAllMetadata.all());
-    ASSERT_EQ(DepsTracker::kOnlyTextScore.count(), 1);
+    ASSERT_EQ(DepsTracker::kOnlyTextScore.count(), 2);
     ASSERT_TRUE(DepsTracker::kOnlyTextScore[DocumentMetadataFields::kTextScore]);
+    ASSERT_TRUE(DepsTracker::kOnlyTextScore[DocumentMetadataFields::kScore]);
 }
 
 TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfMetadataAvailableAndNeeded) {
-    DepsTracker deps(~DepsTracker::kOnlyTextScore);
-    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldThrowIfTextMetadataUnavailableButNeeded) {
+    DepsTracker deps(DepsTracker::kAllGeoNearData);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore), AssertionException);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScore), AssertionException);
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldThrowIfGeoMetadataUnavailableButNeeded) {
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearDist), AssertionException);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint), AssertionException);
+}
+
+
+TEST(DependenciesNeedsMetadataTest, ShouldThrowIfScoreDetailsUnavailableButNeeded) {
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScoreDetails), AssertionException);
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfNotTrackingAvailableMetadataAndIsNeeded) {
+    DepsTracker deps((DepsTracker::NoMetadataValidation()));
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+}
+
+// Same as above but tests that the default constructor sets availableMetadata =
+// NoMetadataValidation.
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfDefaultNotTrackingAvailableMetadataAndIsNeeded) {
+    DepsTracker deps;
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
     ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
     ASSERT_TRUE(deps.getNeedsAnyMetadata());
 }
 
 TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfAllMetadataAvailableAndNeeded) {
-    DepsTracker deps(DepsTracker::kNoMetadata);
-    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    DepsTracker deps(DepsTracker::kAllMetadata);
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
     ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
     ASSERT_TRUE(deps.getNeedsAnyMetadata());
 
-    deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint, true);
+    deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint);
     ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kGeoNearPoint));
     ASSERT_TRUE(deps.getNeedsAnyMetadata());
 }
 
-TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfMetadataUnavailableAndNotNeeded) {
+// Tests that any field chosen to be validated should throw if unavailable when requested, and that
+// no other meta fields throw in that case.
+TEST(DependenciesNeedsMetadataTest, OnlyChosenMetadataFieldsShouldThrowIfUnavailable) {
+    static const std::set<DocumentMetadataFields::MetaType> kMetadataFieldsToBeValidated = {
+        DocumentMetadataFields::MetaType::kTextScore,
+        DocumentMetadataFields::MetaType::kGeoNearDist,
+        DocumentMetadataFields::MetaType::kGeoNearPoint,
+        DocumentMetadataFields::MetaType::kScore,
+        DocumentMetadataFields::MetaType::kScoreDetails,
+    };
+
+    DepsTracker deps(DepsTracker::kNoMetadata);
+
+    for (int i = 1; i < DocumentMetadataFields::kNumFields; i++) {
+        DocumentMetadataFields::MetaType type = static_cast<DocumentMetadataFields::MetaType>(i);
+        if (kMetadataFieldsToBeValidated.contains(type)) {
+            ASSERT_THROWS(deps.setNeedsMetadata(type), AssertionException);
+        } else {
+            ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(type));
+        }
+    }
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedScorePopulatedByTextScore) {
     DepsTracker deps(DepsTracker::kOnlyTextScore);
-    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, false);
+    deps.setNeedsMetadata(DocumentMetadataFields::kScore);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kScore));
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedScoreDetailsPopulatedBySearchScoreDetails) {
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    deps.setMetadataAvailable(DocumentMetadataFields::kSearchScoreDetails);
+    deps.setNeedsMetadata(DocumentMetadataFields::kScore);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kScore));
+}
+
+// Only a handful of metadata fields will throw if you try to reference them when not available.
+// This confirms that trying to access other fields won't throw even if the field isn't marked
+// available.
+TEST(DependenciesNeedsMetadataTest, ShouldAlwaysSucceedForNonValidatedField) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kRandVal);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kRandVal));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfMetadataUnavailableAndNotNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
     ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
     ASSERT_FALSE(deps.getNeedsAnyMetadata());
 }
 
 TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfMetadataAvailableAndNotNeeded) {
-    DepsTracker deps(~DepsTracker::kOnlyTextScore);
-    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, false);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
     ASSERT_FALSE(deps.getNeedsAnyMetadata());
 }
 
-TEST(DependenciesNeedsMetadataTest, ShouldThrowIfMetadataUnavailableButNeeded) {
-    DepsTracker deps(DepsTracker::kOnlyTextScore);
-    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true),
-                  AssertionException);
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfNotTrackingAvailableMetadataAndIsNotNeeded) {
+    DepsTracker deps((DepsTracker::NoMetadataValidation()));
+    ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
 }
 
-TEST(DependenciesNeedsMetadataTest, ShouldThrowIfNoMetadataAvailableButNeeded) {
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfSetTextMetadataAvailableThenIsNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    // Set text score metadata available, even though no metadata was originally available.
+    deps.setMetadataAvailable(DocumentMetadataFields::kTextScore);
+
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kScore);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kScore));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfSetGeoMetadataAvailableThenIsNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    // Set text score metadata available, even though no metadata was originally available.
+    deps.setMetadataAvailable(DepsTracker::kAllGeoNearData);
+
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearDist);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kGeoNearDist));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kGeoNearPoint));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfSetScoreDetailsMetadataAvailableThenIsNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    // Set search score details metadata available, even though no metadata was originally
+    // available.
+    deps.setMetadataAvailable(DocumentMetadataFields::kSearchScoreDetails);
+
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kSearchScoreDetails);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kSearchScoreDetails));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kScoreDetails);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kScoreDetails));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldThrowIfSetTextMetadataAvailableButGeoIsNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    // Set text score metadata available, even though no metadata was originally available.
+    deps.setMetadataAvailable(DocumentMetadataFields::kTextScore);
+
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearDist), AssertionException);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint), AssertionException);
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldThrowIfSetGeoMetadataAvailableButTextScoreIsNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    // Set geo metadata available, even though no metadata was originally available.
+    deps.setMetadataAvailable(DepsTracker::kAllGeoNearData);
+
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScore), AssertionException);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore), AssertionException);
+}
+
+// TODO SERVER-100443 This should apply to all validated fields, not just "score" and
+// "scoreDetails".
+TEST(DependenciesNeedsMetadataTest, OnlyScoreAndScoreDetailsShouldThrowIfAvailableMetadataCleared) {
     DepsTracker deps(DepsTracker::kAllMetadata);
-    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true),
-                  AssertionException);
-    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint, true),
-                  AssertionException);
+    deps.clearMetadataAvailable();
+
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScore), AssertionException);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScoreDetails), AssertionException);
+
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kSearchScore));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kSearchScoreDetails));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearDist));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint));
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfMetadataClearedAndRepopulated) {
+    DepsTracker deps(DepsTracker::kAllMetadata);
+    deps.clearMetadataAvailable();
+    deps.setMetadataAvailable(DocumentMetadataFields::kScore);
+    deps.setMetadataAvailable(DocumentMetadataFields::kScoreDetails);
+
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kScore));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kScoreDetails));
+
+    // TODO SERVER-100443 These fields would need to be set available to pass validation.
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kSearchScore));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kSearchScoreDetails));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearDist));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint));
 }
 
 TEST(DependenciesToProjectionTest, ShouldIncludeAllFieldsAndExcludeIdIfNotSpecified) {
@@ -239,10 +429,10 @@ TEST(DependenciesToProjectionTest, ShouldOutputEmptyObjectIfEntireDocumentNeeded
 
 TEST(DependenciesToProjectionTest, ShouldOnlyRequestTextScoreIfEntireDocumentAndTextScoreNeeded) {
     const char* array[] = {"a"};  // needTextScore with needWholeDocument
-    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     deps.fields = arrayToSet(array);
     deps.needWholeDocument = true;
-    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
     ASSERT_EQ(deps.metadataDeps().count(), 1u);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
@@ -251,27 +441,27 @@ TEST(DependenciesToProjectionTest, ShouldOnlyRequestTextScoreIfEntireDocumentAnd
 TEST(DependenciesToProjectionTest,
      ShouldRequireFieldsAndTextScoreIfTextScoreNeededWithoutWholeDocument) {
     const char* array[] = {"a"};  // needTextScore without needWholeDocument
-    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     deps.fields = arrayToSet(array);
-    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "_id" << 0));
     ASSERT_EQ(deps.metadataDeps().count(), 1u);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
 }
 
 TEST(DependenciesToProjectionTest, ShouldProduceEmptyObjectIfThereAreNoDependencies) {
-    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    DepsTracker deps;
     deps.fields = {};
     deps.needWholeDocument = false;
-    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, false);
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
 }
 
 TEST(DependenciesToProjectionTest, ShouldReturnEmptyObjectIfOnlyTextScoreIsNeeded) {
-    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     deps.fields = {};
     deps.needWholeDocument = false;
-    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
 
     ASSERT_EQ(deps.metadataDeps().count(), 1u);
@@ -280,10 +470,10 @@ TEST(DependenciesToProjectionTest, ShouldReturnEmptyObjectIfOnlyTextScoreIsNeede
 
 TEST(DependenciesToProjectionTest,
      ShouldRequireTextScoreIfNoFieldsPresentButWholeDocumentIsNeeded) {
-    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     deps.fields = {};
     deps.needWholeDocument = true;
-    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
     ASSERT_EQ(deps.metadataDeps().count(), 1u);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);

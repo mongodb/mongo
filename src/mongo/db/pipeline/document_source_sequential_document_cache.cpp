@@ -132,13 +132,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
 
     auto prefixSplit = container->begin();
 
-    // In the context of this optimization, we are only interested in figuring out
-    // which external variables are referenced in the pipeline. We are not attempting
-    // to enforce that any referenced metadata are in fact unavailable, this is done
-    // elsewhere. So without knowledge of what metadata is in fact unavailable, here
-    // we "lie" and say that all metadata is available to avoid tripping any
-    // assertions.
-    DepsTracker deps(DepsTracker::kNoMetadata);
+    DepsTracker deps;
 
     // Iterate through the pipeline stages until we find one which cannot be cached.
     // A stage cannot be cached if it either:

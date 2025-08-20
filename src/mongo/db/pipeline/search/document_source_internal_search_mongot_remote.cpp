@@ -52,6 +52,29 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+namespace {
+auto withSortKeyMetadata(auto&& resultBson, const auto& sortSpec, const auto& sortKeyGen) {
+    // Metadata can't be changed on a Document. Create a MutableDocument to set the sortKey.
+    MutableDocument output(Document::fromBsonWithMetaData(std::move(resultBson)));
+
+    // If we have a sortSpec, then we use that to set sortKey. Otherwise, use the 'searchScore'
+    // if the document has one.
+    if (sortSpec.has_value()) {
+        tassert(7320402,
+                "_sortKeyGen must be initialized if _sortSpec is present",
+                sortKeyGen.has_value());
+        auto sortKey = sortKeyGen->computeSortKeyFromDocument(output.peek());
+        output.metadata().setSortKey(sortKey, sortKeyGen->isSingleElementKey());
+    } else if (output.metadata().hasSearchScore()) {
+        // If this stage is getting metadata documents from mongot, those don't include
+        // searchScore.
+        output.metadata().setSortKey(Value{output.metadata().getSearchScore()},
+                                     true /* isSingleElementKey */);
+    }
+    return output.freeze();
+}
+
+}  // namespace
 MONGO_FAIL_POINT_DEFINE(failClassicSearch);
 
 using boost::intrusive_ptr;
@@ -196,6 +219,21 @@ boost::optional<long long> DocumentSourceInternalSearchMongotRemote::calcDocsNee
     }
 }
 
+DepsTracker::State DocumentSourceInternalSearchMongotRemote::getDependencies(
+    DepsTracker* deps) const {
+    // This stage doesn't currently support tracking field dependencies since mongot is
+    // responsible for determining what fields to return. We do need to track metadata
+    // dependencies though, so downstream stages know they are allowed to access "searchScore"
+    // metadata.
+    // TODO SERVER-101100 Implement logic for dependency analysis.
+
+    deps->setMetadataAvailable(DocumentMetadataFields::kSearchScore);
+    if (hasScoreDetails()) {
+        deps->setMetadataAvailable(DocumentMetadataFields::kSearchScoreDetails);
+    }
+    return DepsTracker::State::NOT_SUPPORTED;
+}
+
 boost::optional<BSONObj> DocumentSourceInternalSearchMongotRemote::_getNext() {
     try {
         return _cursor->getNext(pExpCtx->opCtx);
@@ -291,28 +329,12 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextA
     }
 
     ++_docsReturned;
-    // Populate $sortKey metadata field so that mongos can properly merge sort the document stream.
-    if (pExpCtx->needsMerge) {
-        // Metadata can't be changed on a Document. Create a MutableDocument to set the sortKey.
-        MutableDocument output(Document::fromBsonWithMetaData(response.value()));
-
-        // If we have a sortSpec, then we use that to set sortKey. Otherwise, use the 'searchScore'
-        // if the document has one.
-        if (_sortSpec.has_value()) {
-            tassert(7320402,
-                    "_sortKeyGen must be initialized if _sortSpec is present",
-                    _sortKeyGen.has_value());
-            auto sortKey = _sortKeyGen->computeSortKeyFromDocument(Document(*response));
-            output.metadata().setSortKey(sortKey, _sortKeyGen->isSingleElementKey());
-        } else if (output.metadata().hasSearchScore()) {
-            // If this stage is getting metadata documents from mongot, those don't include
-            // searchScore.
-            output.metadata().setSortKey(Value{output.metadata().getSearchScore()},
-                                         true /* isSingleElementKey */);
-        }
-        return output.freeze();
-    }
-    return Document::fromBsonWithMetaData(response.value());
+    // Populate $sortKey metadata field so that downstream operators can correctly reason about the
+    // sort order. This can be important for mongos, so it can properly merge sort the document
+    // stream, or for $rankFusion to calculate the ranks of the results. This metadata can be safely
+    // ignored if nobody ends up needing it. It will be stripped out before a response is sent back
+    // to a client.
+    return withSortKeyMetadata(std::move(response.value()), _sortSpec, _sortKeyGen);
 }
 
 executor::TaskExecutorCursor DocumentSourceInternalSearchMongotRemote::establishCursor() {

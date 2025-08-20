@@ -485,10 +485,7 @@ DepsTracker::State DocumentSourceUnionWith::getDependencies(DepsTracker* deps) c
         return DepsTracker::State::SEE_NEXT;
     }
 
-    // We only need to know what variable dependencies exist in the subpipeline. So without
-    // knowledge of what metadata is in fact unavailable, we "lie" and say that all metadata
-    // is available to avoid tripping any assertions.
-    DepsTracker subDeps(DepsTracker::kNoMetadata);
+    DepsTracker subDeps;
     // Get the subpipeline dependencies.
     for (auto&& source : _pipeline->getSources()) {
         source->getDependencies(&subDeps);

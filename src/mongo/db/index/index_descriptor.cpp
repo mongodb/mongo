@@ -217,14 +217,12 @@ IndexDescriptor::SharedState::SharedState(const std::string& accessMethodName, B
         IndexPathProjection indexPathProjection =
             static_cast<IndexPathProjection>(WildcardKeyGenerator::createProjectionExecutor(
                 BSON("$**" << 1), wildcardProjection.Obj()));
-        _normalizedProjection =
-            indexPathProjection.exec()->serializeTransformation(boost::none).toBson();
+        _normalizedProjection = indexPathProjection.exec()->serializeTransformation().toBson();
     } else if (columnStoreProjection) {
         IndexPathProjection indexPathProjection = static_cast<IndexPathProjection>(
             column_keygen::ColumnKeyGenerator::createProjectionExecutor(
                 BSON("$**" << IndexNames::COLUMN), columnStoreProjection.Obj()));
-        _normalizedProjection =
-            indexPathProjection.exec()->serializeTransformation(boost::none).toBson();
+        _normalizedProjection = indexPathProjection.exec()->serializeTransformation().toBson();
     }
 }
 

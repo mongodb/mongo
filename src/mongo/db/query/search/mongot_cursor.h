@@ -49,6 +49,7 @@ static constexpr StringData kIntermediateField = "intermediate"_sd;
 static constexpr StringData kCursorOptionsField = "cursorOptions"_sd;
 static constexpr StringData kDocsRequestedField = "docsRequested"_sd;
 static constexpr StringData kRequiresSearchSequenceToken = "requiresSearchSequenceToken"_sd;
+static constexpr StringData kScoreDetailsFieldName = "scoreDetails"_sd;
 
 // Default sort spec is to sort decreasing by search score.
 static const BSONObj kSortSpec = BSON("$searchScore" << -1);

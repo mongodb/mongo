@@ -331,9 +331,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
     auto shouldBuildMetadataPipeline =
         expectsMetaCursorFromMongot && origSearchStage->queryReferencesSearchMeta();
 
-    uassert(
-        6253506, "Cannot have exchange specified in a $search pipeline", !request.getExchange());
-
     // Some tests build $search pipelines without actually setting up a mongot. In this case either
     // return a dummy stage or nothing depending on the environment. Note that in this case we don't
     // actually make any queries, the document source will return eof immediately.

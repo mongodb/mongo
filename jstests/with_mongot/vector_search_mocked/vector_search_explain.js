@@ -78,7 +78,9 @@ function testExplainVerbosity(verbosity) {
     const stage = searchStage["$vectorSearch"];
     assert(stage.hasOwnProperty("explain"), stage);
     assert.eq(explainContents, stage["explain"]);
-    assert.eq({...vectorSearchQuery, explain: explainContents}, stage);
+
+    const vectorSearchExplainQuery = Object.assign(vectorSearchQuery, {queryVector: "redacted"});
+    assert.eq({...vectorSearchExplainQuery, explain: explainContents}, stage);
 }
 
 testExplainVerbosity("queryPlanner");

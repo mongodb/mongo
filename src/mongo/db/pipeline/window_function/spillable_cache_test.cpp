@@ -64,6 +64,8 @@
 
 namespace mongo {
 namespace {
+static constexpr bool isSingleElementSortKey = true;
+static const Value sortKeyVal = Value(1.0);
 
 class MongoProcessInterfaceForTest : public StubMongoProcessInterface {
 public:
@@ -99,7 +101,7 @@ public:
         AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
         auto foundDoc = rs->findRecord(expCtx->opCtx, RecordId(rID), &possibleRecord);
         tassert(5643001, str::stream() << "Could not find document id " << rID, foundDoc);
-        return Document(possibleRecord.toBson());
+        return Document::fromBsonWithMetaData(possibleRecord.toBson());
     }
 
     void deleteRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -136,28 +138,42 @@ public:
 
     void buildAndLoadDocumentSet(int numDocs, SpillableCache* cache) {
         for (int i = _lastIndex; i < _lastIndex + numDocs; ++i) {
-            _docSet.emplace_back(Document{{"val", i}});
+            // Make sure we can load metadata to/from the store.
+            _docSet.emplace_back(addMetadata(Document{{"val", i}}));
             cache->addDocument(_docSet.back());
         }
     }
 
     void verifyDocsInCache(int start, int end, SpillableCache* cache) {
         for (int i = start; i < end; ++i) {
-            ASSERT_DOCUMENT_EQ(cache->getDocumentById(i), _docSet[i]);
+            auto foundDoc = cache->getDocumentById(i);
+            ASSERT_DOCUMENT_EQ(foundDoc, _docSet[i]);
+            assertMetaIsStillPresent(foundDoc);
         }
+    }
+
+    Document addMetadata(Document&& mockInput) const {
+        MutableDocument doc(std::move(mockInput));
+        doc.metadata().setSortKey(sortKeyVal, isSingleElementSortKey);
+        std::cout << doc.peek().memUsageForSorter() << std::endl;
+        return doc.freeze();
+    }
+
+    void assertMetaIsStillPresent(const Document& foundDoc) const {
+        ASSERT_VALUE_EQ(foundDoc.metadata().getSortKey(), sortKeyVal);
     }
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
     std::unique_ptr<MemoryUsageTracker> _tracker;
 
-    // Docs are ~200 each.
+    // Docs are ~500 each.
     std::vector<Document> _docSet;
     int _lastIndex = 0;
 };
 
 TEST_F(SpillableCacheTest, CanReadAndWriteDocumentsInMem) {
     _expCtx->allowDiskUse = false;
-    auto cache = createSpillableCache(1000);
+    auto cache = createSpillableCache(2000);
     buildAndLoadDocumentSet(2, cache.get());
     verifyDocsInCache(0, 2, cache.get());
 }
@@ -178,8 +194,8 @@ TEST_F(SpillableCacheTest, CanReadAndWriteDocumentsToDisk) {
 
 TEST_F(SpillableCacheTest, CanReturnDocumentsFromCacheAndDisk) {
     _expCtx->allowDiskUse = true;
-    // Docs are ~200 each.
-    auto cache = createSpillableCache(250);
+    // Docs are ~500 each.
+    auto cache = createSpillableCache(700);
     buildAndLoadDocumentSet(3, cache.get());
     verifyDocsInCache(0, 3, cache.get());
     _expCtx->allowDiskUse = false;
@@ -188,7 +204,7 @@ TEST_F(SpillableCacheTest, CanReturnDocumentsFromCacheAndDisk) {
 
 DEATH_TEST_F(SpillableCacheTest, RemovesDocumentsWhenExpired, "Requested expired document") {
     _expCtx->allowDiskUse = false;
-    auto cache = createSpillableCache(1000);
+    auto cache = createSpillableCache(2000);
     buildAndLoadDocumentSet(4, cache.get());
     cache->freeUpTo(0);
     verifyDocsInCache(1, 4, cache.get());
@@ -205,7 +221,7 @@ TEST_F(SpillableCacheTest, ReturnsCorrectDocumentsIfSomeHaveBeenRemovedMemOnly) 
 
 TEST_F(SpillableCacheTest, ReturnsCorrectDocumentsIfSomeHaveBeenRemovedMixed) {
     _expCtx->allowDiskUse = true;
-    auto cache = createSpillableCache(1000);
+    auto cache = createSpillableCache(2000);
     buildAndLoadDocumentSet(10, cache.get());
     // Only mark documents on disk as freed.
     cache->freeUpTo(4);

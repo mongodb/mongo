@@ -93,7 +93,9 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
     vector<pair<string, vector<BSONObj>>> rawFacetPipelines;
     for (auto&& facetElem : elem.embeddedObject()) {
         const auto facetName = facetElem.fieldNameStringData();
-        FieldPath::uassertValidFieldName(facetName);
+        uassertStatusOKWithContext(
+            FieldPath::validateFieldName(facetName),
+            "$facet pipeline names must follow the naming rules of field path expressions.");
         uassert(40170,
                 str::stream() << "arguments to $facet must be arrays, " << facetName << " is type "
                               << typeName(facetElem.type()),
@@ -306,21 +308,11 @@ bool DocumentSourceFacet::usedDisk() {
 
 DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const {
     for (auto&& facet : _facets) {
-        auto subDepsTracker = facet.pipeline->getDependencies(deps->getUnavailableMetadata());
+        auto subDepsTracker = facet.pipeline->getDependencies(deps->getAvailableMetadata());
 
         deps->fields.insert(subDepsTracker.fields.begin(), subDepsTracker.fields.end());
-
         deps->needWholeDocument = deps->needWholeDocument || subDepsTracker.needWholeDocument;
-
-        // If the subpipeline needs any search metadata, the top level pipeline must know to
-        // generate it.
-        deps->searchMetadataDeps() |= subDepsTracker.searchMetadataDeps();
-
-        // The text score is the only type of metadata that could be needed by $facet.
-        deps->setNeedsMetadata(
-            DocumentMetadataFields::kTextScore,
-            deps->getNeedsMetadata(DocumentMetadataFields::kTextScore) ||
-                subDepsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+        deps->setNeedsMetadata(subDepsTracker.metadataDeps());
 
         if (deps->needWholeDocument && deps->getNeedsMetadata(DocumentMetadataFields::kTextScore)) {
             break;

@@ -84,7 +84,7 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
     // The event filter must work on top of "traversed" version of the data, which, when accessed,
     // has array elements flattened.
     if (unpackNode->eventFilter) {
-        DepsTracker eventFilterDeps = {};
+        DepsTracker eventFilterDeps;
         match_expression::addDependencies(unpackNode->eventFilter.get(), &eventFilterDeps);
         for (const auto& path : eventFilterDeps.fields) {
             auto rootField = FieldPath::extractFirstFieldFromDottedPath(path).toString();
@@ -434,7 +434,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     // simplest case of such pipeline: [{$project: {x: 1}},{$match: {y: 42}}]). We'll stub out the
     // non-produced fields with the 'Nothing' slot.
     {
-        DepsTracker eventFilterDeps = {};
+        DepsTracker eventFilterDeps;
         match_expression::addDependencies(eventFilter, &eventFilterDeps);
         for (const std::string& eventFilterPath : eventFilterDeps.fields) {
             const auto& name =

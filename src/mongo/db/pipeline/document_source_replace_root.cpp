@@ -118,7 +118,7 @@ boost::intrusive_ptr<DocumentSourceMatch> ReplaceRootTransformation::createTypeN
 void ReplaceRootTransformation::reportRenames(const MatchExpression* expr,
                                               const std::string& prefixPath,
                                               StringMap<std::string>& renames) {
-    DepsTracker deps = {};
+    DepsTracker deps;
     match_expression::addDependencies(expr, &deps);
     for (const auto& path : deps.fields) {
         // Only record renames for top level paths.

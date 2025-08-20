@@ -159,6 +159,13 @@ public:
     }
 
     /**
+     * Returns true iff the pipeline begins with a $rankFusion stage.
+     */
+    bool startsWithRankFusionStage() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->isRankFusionStage();
+    }
+
+    /**
      * Returns true if the pipeline contains at least one stage that requires the aggregation
      * command to be exempt from ingress admission control.
      */
@@ -256,6 +263,12 @@ public:
      * 'validatePipelineStagesforAPIVersion' with 'opCtx'.
      */
     void validate(const OperationContext* opCtx, bool performApiVersionChecks = true) const;
+
+    /**
+     * Checks that specific stage types are not present in the pipeline that are disallowed
+     * in the definition of a view. Recursively checks sub-pipelines.
+     */
+    void checkStagesAllowedInViewDefinition() const;
 
 private:
     // This is logically const - any changes to _stageSpecs will invalidate cached copies of

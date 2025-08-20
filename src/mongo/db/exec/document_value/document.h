@@ -126,6 +126,8 @@ public:
     static constexpr StringData metaFieldIndexKey = "$indexKey"_sd;
     static constexpr StringData metaFieldVectorSearchScore = "$vectorSearchScore"_sd;
     static constexpr StringData metaFieldSearchSequenceToken = "$searchSequenceToken"_sd;
+    static constexpr StringData metaFieldScore = "$score"_sd;
+    static constexpr StringData metaFieldScoreDetails = "$scoreDetails"_sd;
 
     static const StringDataSet allMetadataFieldNames;
 
@@ -142,7 +144,7 @@ public:
     /**
      * Create a new document from key, value pairs. Enables constructing a document using this
      * syntax:
-     * auto document = Document{{"hello", "world"}, {"number": 1}};
+     * auto document = Document{{"hello", "world"}, {"number", 1}};
      */
     Document(std::initializer_list<std::pair<StringData, ImplicitValue>> initializerList);
     Document(std::vector<std::pair<StringData, Value>> fields);

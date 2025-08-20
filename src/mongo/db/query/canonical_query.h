@@ -121,7 +121,8 @@ public:
 
     /**
      * Perform validation checks on the normalized 'root' which could not be checked before
-     * normalization - those should happen in parsed_find_command::isValid().
+     * normalization - those should happen in
+     * parsed_find_command::validateAndGetAvailableMetadata().
      */
     static Status isValidNormalized(const MatchExpression* root);
 
@@ -183,36 +184,6 @@ public:
      */
     void requestAdditionalMetadata(const QueryMetadataBitSet& additionalDeps) {
         _metadataDeps |= additionalDeps;
-    }
-
-    /**
-     * Returns a bitset indicating what search metadata has been requested by the pipeline.
-     */
-    const QueryMetadataBitSet& searchMetadata() const {
-        return _searchMetadataDeps;
-    }
-
-    /**
-     * Set the bitset indicating what search metadata has been requested by the pipeline.
-     */
-    void setSearchMetadata(const QueryMetadataBitSet& deps) {
-        _searchMetadataDeps = deps;
-    }
-
-    /**
-     * Returns a bitset indicating what metadata has been requested by stages remaining in the
-     * pipeline.
-     */
-    const QueryMetadataBitSet& remainingSearchMetadata() const {
-        return _remainingSearchMetadataDeps;
-    }
-
-    /**
-     * Set the bitset indicating what metadata has been requested by stages remaining in the
-     * pipeline.
-     */
-    void setRemainingSearchMetadata(const QueryMetadataBitSet& deps) {
-        _remainingSearchMetadataDeps = deps;
     }
 
     /**
@@ -438,14 +409,6 @@ private:
 
     // Keeps track of what metadata has been explicitly requested.
     QueryMetadataBitSet _metadataDeps;
-
-    // Keeps track of what search metadata has been explicitly requested.
-    QueryMetadataBitSet _searchMetadataDeps;
-
-    // Keeps track of what search metadata has been explicitly requested for stages in pipeline that
-    // are not pushed down into '_cqPipeline'. This is used by the executor to prepare corresponding
-    // metadata.
-    QueryMetadataBitSet _remainingSearchMetadataDeps;
 
     // True if this query can be executed by the SBE.
     bool _sbeCompatible = false;

@@ -133,8 +133,7 @@ function testExplainVerbosity(shard0Conn, shard1Conn, verbosity, userLimit) {
         const vectorSearchInfo = vectorSearchStage["$vectorSearch"];
         assert(vectorSearchInfo.hasOwnProperty("explain"), tojson(vectorSearchInfo));
         assert.eq(explainContents, vectorSearchInfo.explain);
-        assert.eq(
-            vectorSearchQuery.queryVector, vectorSearchInfo.queryVector, tojson(vectorSearchInfo));
+        assert.eq("redacted", vectorSearchInfo.queryVector, tojson(vectorSearchInfo));
         assert.eq(vectorSearchQuery.path, vectorSearchInfo.path, tojson(vectorSearchInfo));
         assert.eq(vectorSearchQuery.numCandidates,
                   vectorSearchInfo.numCandidates,

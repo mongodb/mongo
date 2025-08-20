@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/stacktrace.h"
@@ -102,6 +103,8 @@ public:
         // DocumentSourceSearch.
         MONGO_UNREACHABLE_TASSERT(7815902);
     }
+
+    DepsTracker::State getDependencies(DepsTracker* deps) const override;
 
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
@@ -183,6 +186,11 @@ public:
         return _searchQuery.hasField(kReturnStoredSourceArg)
             ? _searchQuery[kReturnStoredSourceArg].Bool()
             : false;
+    }
+
+    auto hasScoreDetails() const {
+        auto scoreDetailsElem = _searchQuery[mongot_cursor::kScoreDetailsFieldName];
+        return !scoreDetailsElem.eoo() && scoreDetailsElem.Bool();
     }
 
 protected:

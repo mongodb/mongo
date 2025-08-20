@@ -111,7 +111,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     size_t plannerOptions = QueryPlannerParams::DEFAULT,
     Pipeline* pipeline = nullptr,
     bool needsMerge = false,
-    QueryMetadataBitSet unavailableMetadata = QueryMetadataBitSet{},
     boost::optional<TraversalPreference> traversalPreference = boost::none,
     ExecShardFilterPolicy = AutomaticShardFiltering{});
 

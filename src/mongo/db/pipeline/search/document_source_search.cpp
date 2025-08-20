@@ -180,17 +180,21 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
 }
 
 StageConstraints DocumentSourceSearch::constraints(Pipeline::SplitState pipeState) const {
-    return DocumentSourceInternalSearchMongotRemote::getSearchDefaultConstraints();
+    auto constraints = DocumentSourceInternalSearchMongotRemote::getSearchDefaultConstraints();
+    if (!isStoredSource()) {
+        constraints.noFieldModifications = true;
+    }
+    return constraints;
 }
 bool checkRequiresSearchSequenceToken(Pipeline::SourceContainer::iterator itr,
                                       Pipeline::SourceContainer* container) {
-    DepsTracker deps = DepsTracker::kNoMetadata;
+    DepsTracker deps;
     while (itr != container->end()) {
         auto nextStage = itr->get();
         nextStage->getDependencies(&deps);
         ++itr;
     }
-    return deps.searchMetadataDeps()[DocumentMetadataFields::kSearchSequenceToken];
+    return deps.getNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken);
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSearch::doOptimizeAt(
@@ -281,6 +285,20 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSearch::dist
     logic.canMovePast = canMovePastDuringSplit;
 
     return logic;
+}
+
+DepsTracker::State DocumentSourceSearch::getDependencies(DepsTracker* deps) const {
+    // This stage doesn't currently support tracking field dependencies since mongot is
+    // responsible for determining what fields to return. We do need to track metadata
+    // dependencies though, so downstream stages know they are allowed to access "searchScore"
+    // metadata.
+    // TODO SERVER-101100 Implement logic for dependency analysis.
+
+    deps->setMetadataAvailable(DocumentMetadataFields::kSearchScore);
+    if (hasScoreDetails()) {
+        deps->setMetadataAvailable(DocumentMetadataFields::kSearchScoreDetails);
+    }
+    return DepsTracker::State::NOT_SUPPORTED;
 }
 
 bool DocumentSourceSearch::canMovePastDuringSplit(const DocumentSource& ds) {

@@ -353,7 +353,7 @@ TEST_F(ProjectionExecutorTestWithFallBackToDefault, ExecutorOptimizesExpression)
     auto proj = parseWithDefaultPolicies(fromjson("{a: 1, b: {$add: [1, 2]}}"));
     auto executor = createProjectionExecutor(proj);
     ASSERT_DOCUMENT_EQ(Document{fromjson("{_id: true, a: true, b: {$const: 3}}")},
-                       executor->serializeTransformation(boost::none));
+                       executor->serializeTransformation());
 }
 }  // namespace
 }  // namespace mongo::projection_executor

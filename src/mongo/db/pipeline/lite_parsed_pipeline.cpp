@@ -160,8 +160,15 @@ void LiteParsedPipeline::tickGlobalStageCounters() const {
 void LiteParsedPipeline::validate(const OperationContext* opCtx,
                                   bool performApiVersionChecks) const {
 
-    for (auto&& stage : _stageSpecs) {
-        const auto& stageName = stage->getParseTimeName();
+    for (auto stage_it = _stageSpecs.begin(); stage_it != _stageSpecs.end(); stage_it++) {
+        const auto& stage = *stage_it;
+        // TODO SERVER-101722: Re-implement this validation with a more generic
+        // StageConstraints-like validation.
+        uassert(10170100,
+                "$rankFusion can only be the first stage of an aggregation pipeline.",
+                !((stage_it != _stageSpecs.begin()) && stage->isRankFusionStage()));
+
+        const auto& stageName = (*stage_it)->getParseTimeName();
         const auto& stageInfo = LiteParsedDocumentSource::getInfo(stageName);
 
         // Validate that the stage is API version compatible.
@@ -183,6 +190,21 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
 
         for (auto&& subPipeline : stage->getSubPipelines()) {
             subPipeline.validate(opCtx, performApiVersionChecks);
+        }
+    }
+}
+
+void LiteParsedPipeline::checkStagesAllowedInViewDefinition() const {
+    for (auto stage_it = _stageSpecs.begin(); stage_it != _stageSpecs.end(); stage_it++) {
+        const auto& stage = *stage_it;
+
+        // TODO SERVER-101721 Enable $rankFusion run in a view definition.
+        uassert(ErrorCodes::OptionNotSupportedOnView,
+                "$rankFusion is currently unsupported in a view definition",
+                !stage->isRankFusionStage());
+
+        for (auto&& subPipeline : stage->getSubPipelines()) {
+            subPipeline.checkStagesAllowedInViewDefinition();
         }
     }
 }

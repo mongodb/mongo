@@ -59,6 +59,27 @@ const char* DocumentSourceSingleDocumentTransformation::getSourceName() const {
     return _name.c_str();
 }
 
+StageConstraints DocumentSourceSingleDocumentTransformation::constraints(
+    Pipeline::SplitState pipeState) const {
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kNone,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kAllowed,
+                                 TransactionRequirement::kAllowed,
+                                 LookupRequirement::kAllowed,
+                                 UnionRequirement::kAllowed,
+                                 ChangeStreamRequirement::kAllowlist);
+    constraints.canSwapWithMatch = true;
+    constraints.canSwapWithSkippingOrLimitingStage = true;
+    constraints.isAllowedWithinUpdatePipeline = true;
+    // This transformation could be part of a 'collectionless' change stream on an entire
+    // database or cluster, mark as independent of any collection if so.
+    constraints.isIndependentOfAnyCollection = _isIndependentOfAnyCollection;
+    constraints.noFieldModifications = getTransformer().noFieldModifications();
+    return constraints;
+}
+
 DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::doGetNext() {
     if (!_transformationProcessor) {
         return DocumentSource::GetNextResult::makeEOF();
@@ -85,19 +106,19 @@ intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimi
 void DocumentSourceSingleDocumentTransformation::doDispose() {
     if (_transformationProcessor) {
         // Cache the stage options document in case this stage is serialized after disposing.
-        _cachedStageOptions =
-            _transformationProcessor->getTransformer().serializeTransformation(pExpCtx->explain);
+        _cachedStageOptions = _transformationProcessor->getTransformer().serializeTransformation(
+            SerializationOptions{.verbosity = pExpCtx->explain});
         _transformationProcessor.reset();
     }
 }
 
 Value DocumentSourceSingleDocumentTransformation::serialize(
     const SerializationOptions& opts) const {
-    return Value(Document{{getSourceName(),
-                           _transformationProcessor
-                               ? _transformationProcessor->getTransformer().serializeTransformation(
-                                     opts.verbosity, opts)
-                               : _cachedStageOptions}});
+    return Value(
+        Document{{getSourceName(),
+                  _transformationProcessor
+                      ? _transformationProcessor->getTransformer().serializeTransformation(opts)
+                      : _cachedStageOptions}});
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(

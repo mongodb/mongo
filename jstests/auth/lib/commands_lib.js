@@ -6866,7 +6866,7 @@ export const authCommandsLib = {
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
           ]
-        },    
+        },
         {
           testname: "updateRole_authenticationRestrictions",
           command: {updateRole: "testRole", authenticationRestrictions: []},
@@ -8528,7 +8528,92 @@ export const authCommandsLib = {
             },
             {runOnDb: firstDbName, privileges: [], expectAuthzFailure: true},
         ]
-      }
+      },
+      {
+        testname: "aggregate_$rankFusion",
+        command: {
+          aggregate: "foo",
+          cursor: {},
+          pipeline: [
+            {
+              $rankFusion: {
+                input: {
+                  pipelines: {
+                    geo: [
+                      {
+                        $geoNear: {near: [50, 50], distanceField: "dist"}
+                      },
+                      {
+                        $limit: 2
+                      }
+                    ],
+                    matchPipe: [
+                      {
+                        $match: {a: 1}
+                      },
+                      {
+                        $sort: {x: 1}
+                      }
+                    ],
+                    search: [
+                      {
+                        $search: { /* empty query */ }
+                      }
+                    ],
+                    vector: [
+                      {
+                        $vectorSearch: { /* empty query */ }
+                      }
+                    ]
+                  }
+                },
+              }
+            }
+          ]
+        },
+        setup: function(db) {
+          db.createCollection("foo");
+          assert.commandWorked(db.foo.createIndex({loc: "2d"}));
+          assert.commandWorked(db.foo.insert({loc: [45.32, 51.12]}));
+        },
+        skipSharded: false,
+        disableSearch: true,
+        skipTest: (conn) => {
+          return !TestData.setParameters.featureFlagRankFusionBasic;
+        },
+        // Expect this to fail since there's no mongot set up to execute the $search/vectorSearch.
+        testcases: testcases_transformationOnlyExpectFail,
+      },
+      {
+        testname: "aggregate_$setMetadata",
+        command: {
+            aggregate: "foo",
+            cursor: {},
+            pipeline: [{$setMetadata: {score: 5}}]
+        },
+        setup: db => { db.createCollection("foo"); },
+        disableSearch: true,
+        testcases: [
+          {
+            runOnDb: firstDbName,
+            roles: { __system: 1 },
+            // $setMetadata requires __system role OR a user with internal and find action types as privileges.
+            expectFail: true,
+            privileges: [
+              { resource: { cluster: true }, actions: ["internal"] },
+              { resource: { db: firstDbName, collection: "foo" }, actions: ["find"] },
+            ],
+          },
+          {
+            runOnDb: firstDbName,
+            // Find action type as a privilege alone is not sufficient for $setMetadata.
+            expectAuthzFailure: true,
+            privileges: [
+              { resource: { db: firstDbName, collection: "foo" }, actions: ["find"] },
+            ],
+          },
+        ],
+      },
     ],
 
     /************* SHARED TEST LOGIC ****************/

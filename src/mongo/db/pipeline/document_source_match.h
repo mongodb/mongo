@@ -64,6 +64,8 @@ namespace mongo {
 
 class DocumentSourceMatch : public DocumentSource {
 public:
+    static bool containsTextOperator(const MatchExpression& expr);
+
     DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -126,15 +128,17 @@ public:
     const char* getSourceName() const override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                HostTypeRequirement::kNone,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kAllowed,
-                TransactionRequirement::kAllowed,
-                LookupRequirement::kAllowed,
-                UnionRequirement::kAllowed,
-                ChangeStreamRequirement::kAllowlist};
+        StageConstraints constraints{StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed,
+                                     ChangeStreamRequirement::kAllowlist};
+        constraints.noFieldModifications = true;
+        return constraints;
     }
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override;

@@ -779,6 +779,12 @@ public:
      * all paths needed to apply their transformation to 'deps->fields', and call
      * 'deps->setNeedsMetadata()' to indicate what metadata (e.g. text score), if any, is required.
      *
+     * getDependencies() is also used to implement validation / error reporting for $meta
+     * dependencies. There may be some incomplete implementations of getDependencies() that return
+     * NOT_SUPPORTED even though they call to 'deps->setMetadataAvailable()'. This is because
+     * they've been implemented correctly for error reporting but not for dependency analysis.
+     * TODO SERVER-100902 Split $meta validation separate from dependency analysis.
+     *
      * See DepsTracker::State for the possible return values and what they mean.
      */
     virtual DepsTracker::State getDependencies(DepsTracker* deps) const {

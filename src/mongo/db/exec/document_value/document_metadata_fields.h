@@ -40,6 +40,8 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
@@ -80,10 +82,21 @@ public:
         kSearchSortValues,
         kVectorSearchScore,
         kSearchSequenceToken,
+        kScore,
+        kScoreDetails,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
     };
+
+    /**
+     * Parses the MetaType from a given type name.
+     *
+     * Throws a user exception if the provided name is not a recognized name as argument to $meta.
+     */
+    static DocumentMetadataFields::MetaType parseMetaType(StringData name);
+
+    static StringData serializeMetaType(DocumentMetadataFields::MetaType type);
 
     /**
      * Reads serialized metadata out of 'buf', and uses it to populate 'out'. Expects 'buf' to have
@@ -151,6 +164,17 @@ public:
         return static_cast<bool>(_holder);
     }
 
+    /**
+     * Sets the given MetaType field to the Value provided.
+     *
+     * Throws a user exception if the type of the Value is not compatible with the type held in the
+     * metadata holder.
+     *
+     * The sort key cannot be set using this method since it must also be specified if the sort key
+     * is a single element sort key.
+     */
+    void setMetaFieldFromValue(MetaType type, Value val);
+
     bool hasTextScore() const {
         return _holder && _holder->metaFields.test(MetaType::kTextScore);
     }
@@ -163,6 +187,8 @@ public:
     void setTextScore(double score) {
         _setCommon(MetaType::kTextScore);
         _holder->textScore = score;
+        // The 'score' metadata field is also set, with the value of the 'textScore'.
+        setScore(score);
     }
 
     bool hasRandVal() const {
@@ -184,7 +210,7 @@ public:
     }
 
     Value getSortKey() const {
-        invariant(hasSortKey());
+        tassert(9973200, "Attempt to get sort key which has not been populated", hasSortKey());
         return _holder->sortKey;
     }
 
@@ -238,6 +264,8 @@ public:
     void setSearchScore(double score) {
         _setCommon(MetaType::kSearchScore);
         _holder->searchScore = score;
+        // The 'score' metadata field is also set, with the value of the 'searchScore'.
+        setScore(score);
     }
 
     bool hasSearchHighlights() const {
@@ -294,6 +322,9 @@ public:
     void setSearchScoreDetails(BSONObj details) {
         _setCommon(MetaType::kSearchScoreDetails);
         _holder->searchScoreDetails = details.getOwned();
+        // The 'scoreDetails' metadata field is also set. The Value constructor takes an owned copy
+        // of details.
+        setScoreDetails(Value(details));
     }
 
     bool hasTimeseriesBucketMinTime() const {
@@ -354,6 +385,8 @@ public:
     void setVectorSearchScore(double vectorSearchScore) {
         _setCommon(MetaType::kVectorSearchScore);
         _holder->vectorSearchScore = vectorSearchScore;
+        // The 'score' metadata field is also set, with the value of the 'vectorSearchScore'.
+        setScore(vectorSearchScore);
     }
 
     bool hasSearchSequenceToken() const {
@@ -369,6 +402,48 @@ public:
         _setCommon(MetaType::kSearchSequenceToken);
         _holder->searchSequenceToken = details;
     }
+
+    bool hasScore() const {
+        return _holder && _holder->metaFields.test(MetaType::kScore);
+    }
+
+    double getScore() const {
+        tassert(9484100, "score must be present in metadata", hasScore());
+        return _holder->score;
+    }
+
+    // TODO SERVER-85426 Remove all feature flag logic.
+    void setScore(double score, bool featureFlagAlreadyValidated = false) {
+        if (featureFlagAlreadyValidated ||
+            feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            _setCommon(MetaType::kScore);
+            _holder->score = score;
+        }
+    }
+
+    bool hasScoreDetails() const {
+        return _holder && _holder->metaFields.test(MetaType::kScoreDetails);
+    }
+
+    Value getScoreDetails() const {
+        tassert(9679301, "score details must be present in metadata", hasScoreDetails());
+        return _holder->scoreDetails;
+    }
+
+    // TODO SERVER-85426 Remove all feature flag logic.
+    void setScoreDetails(Value scoreDetails, bool featureFlagAlreadyValidated = false);
+
+    /**
+     * This sets 'scoreDetails' and retrieves the "value" field from 'scoreDetails' to set the
+     * 'score' meta field as well.
+     *
+     * This is the default way to set 'scoreDetails' (for example, this is used for
+     * {$setMetadata: kScoreDetails}), and will tassert if the "value" field isn't present.
+     * However, setting 'scoreDetails' via 'searchScoreDetails' will just go through
+     * setScoreDetails() without setting the 'score' too.
+     */
+    void setScoreAndScoreDetails(Value scoreDetails);
 
     void serializeForSorter(BufBuilder& buf) const;
 
@@ -418,6 +493,10 @@ private:
         BSONObj searchSortValues;
         double vectorSearchScore{0.0};
         Value searchSequenceToken;
+        double score{0.0};
+        // scoreDetails expects a Document as the underlying type, but to avoid dependency cycles,
+        // it's easier to store as Value.
+        Value scoreDetails;
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.

@@ -55,7 +55,7 @@ void GroupFromFirstDocumentTransformation::optimize() {
 }
 
 Document GroupFromFirstDocumentTransformation::serializeTransformation(
-    boost::optional<ExplainOptions::Verbosity> explain, const SerializationOptions& options) const {
+    const SerializationOptions& options) const {
     MutableDocument newRoot(_accumulatorExprs.size());
 
     for (auto&& expr : _accumulatorExprs) {

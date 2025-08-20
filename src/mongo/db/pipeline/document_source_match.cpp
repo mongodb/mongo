@@ -61,19 +61,6 @@
 
 namespace mongo {
 
-namespace {
-
-bool containsTextOperator(const MatchExpression& expr) {
-    if (expr.matchType() == MatchExpression::MatchType::TEXT)
-        return true;
-    for (auto child : expr) {
-        if (containsTextOperator(*child))
-            return true;
-    }
-    return false;
-}
-
-}  // namespace
 using boost::intrusive_ptr;
 using std::pair;
 using std::string;
@@ -84,6 +71,16 @@ REGISTER_DOCUMENT_SOURCE(match,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceMatch::createFromBson,
                          AllowedWithApiStrict::kAlways);
+
+bool DocumentSourceMatch::containsTextOperator(const MatchExpression& expr) {
+    if (expr.matchType() == MatchExpression::MatchType::TEXT)
+        return true;
+    for (auto child : expr) {
+        if (containsTextOperator(*child))
+            return true;
+    }
+    return false;
+}
 
 DocumentSourceMatch::DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
@@ -114,8 +111,7 @@ void DocumentSourceMatch::rebuild(BSONObj predicate, std::unique_ptr<MatchExpres
     _backingBsonForPredicate = std::move(predicate);
     _isTextQuery = containsTextOperator(*expr);
     DepsTracker dependencies =
-        DepsTracker(_isTextQuery ? DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore
-                                 : DepsTracker::kAllMetadata);
+        DepsTracker(_isTextQuery ? DepsTracker::kOnlyTextScore : DepsTracker::kNoMetadata);
     getDependencies(expr.get(), &dependencies);
     _matchProcessor.emplace(MatchProcessor(std::move(expr), std::move(dependencies)));
 }
@@ -624,7 +620,14 @@ DepsTracker::State DocumentSourceMatch::getDependencies(const MatchExpression* e
         // A $text aggregation field should return EXHAUSTIVE_FIELDS, since we don't necessarily
         // know what field it will be searching without examining indices.
         deps->needWholeDocument = true;
-        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+
+        // This may look confusing, but we must call two setters on the DepsTracker for different
+        // purposes. We mark "textScore" as available metadata that can be consumed by any
+        // downstream stage for $meta field validation. We also also mark that this stage does
+        // require "textScore" so that the executor knows to produce the metadata.
+        // TODO SERVER-100902 Split $meta validation out of dependency tracking.
+        deps->setMetadataAvailable(DocumentMetadataFields::kTextScore);
+        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore);
         return DepsTracker::State::EXHAUSTIVE_FIELDS;
     }
 

@@ -707,24 +707,29 @@ void Pipeline::addVariableRefs(std::set<Variables::Id>* refs) const {
 }
 
 DepsTracker Pipeline::getDependencies(
-    boost::optional<QueryMetadataBitSet> unavailableMetadata) const {
-    return getDependenciesForContainer(getContext(), _sources, unavailableMetadata);
+    DepsTracker::MetadataDependencyValidation availableMetadata) const {
+    return getDependenciesForContainer(getContext(), _sources, availableMetadata);
 }
 
 DepsTracker Pipeline::getDependenciesForContainer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const SourceContainer& container,
-    boost::optional<QueryMetadataBitSet> unavailableMetadata) {
-    // If 'unavailableMetadata' was not specified, we assume all metadata is available. This allows
-    // us to call 'deps.setNeedsMetadata()' without throwing.
-    DepsTracker deps(unavailableMetadata.get_value_or(DepsTracker::kNoMetadata));
+    DepsTracker::MetadataDependencyValidation availableMetadata) {
+    DepsTracker deps(availableMetadata);
 
     OrderedPathSet generatedPaths;
     bool hasUnsupportedStage = false;
+
+    // knowAllFields / knowAllMeta means we have determined all the field / metadata dependencies of
+    // the pipeline, and further stages will not affect that result.
     bool knowAllFields = false;
     bool knowAllMeta = false;
+
+    // It's important to iterate through the stages left-to-right so that metadata validation is
+    // done correctly. A stage anywhere in the pipeline may setMetadataAvailable(), but
+    // references to that metadata are only valid downstream of the metadata-generating stage.
     for (auto&& source : container) {
-        DepsTracker localDeps(deps.getUnavailableMetadata());
+        DepsTracker localDeps(deps.getAvailableMetadata());
         DepsTracker::State status = source->getDependencies(&localDeps);
 
         deps.needRandomGenerator |= localDeps.needRandomGenerator;
@@ -737,7 +742,9 @@ DepsTracker Pipeline::getDependenciesForContainer(
         }
 
         // If we ever saw an unsupported stage, don't bother continuing to track field and metadata
-        // deps: we already have to assume the pipeline depends on everything.
+        // deps: we already have to assume the pipeline depends on everything. We should keep
+        // tracking available metadata (by setMetadataAvailable()) so that requests to read metadata
+        // (by setNeedsMetadata()) can be validated correctly.
         if (!hasUnsupportedStage && !knowAllFields) {
             for (const auto& field : localDeps.fields) {
                 // If a field was generated within the pipeline, we don't need to count it as a
@@ -768,29 +775,58 @@ DepsTracker Pipeline::getDependenciesForContainer(
             }
         }
 
+        // This stage may have generated more available metadata; add to set of all available
+        // metadata in the pipeline so we can correctly validate if downstream stages want to access
+        // the metadata.
+        deps.setMetadataAvailable(localDeps.getAvailableMetadata());
         if (!hasUnsupportedStage && !knowAllMeta) {
-            deps.requestMetadata(localDeps.metadataDeps());
+            deps.setNeedsMetadata(localDeps.metadataDeps());
             knowAllMeta = status & DepsTracker::State::EXHAUSTIVE_META;
         }
-        deps.requestMetadata(localDeps.searchMetadataDeps());
     }
 
     if (!knowAllFields)
         deps.needWholeDocument = true;  // don't know all fields we need
 
-    if (!deps.getUnavailableMetadata()[DocumentMetadataFields::kTextScore]) {
+    if (expCtx->needsMerge && !knowAllMeta) {
         // There is a text score available. If we are the first half of a split pipeline, then we
         // have to assume future stages might depend on the textScore (unless we've encountered a
         // stage that doesn't preserve metadata).
-        if (expCtx->needsMerge && !knowAllMeta) {
-            deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+
+        // TODO SERVER-100404: This would be more correct if we did the same for all meta fields
+        // like deps.setNeedsMetadata(deps.getAvailableMetadata()).
+        if (deps.getAvailableMetadata()[DocumentMetadataFields::kTextScore]) {
+            deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
         }
-    } else {
-        // There is no text score available, so we don't need to ask for it.
-        deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, false);
     }
 
     return deps;
+}
+
+// TODO SERVER-100902 Split $meta validation out of DepsTracker.
+void Pipeline::validateMetaDependencies(QueryMetadataBitSet availableMetadata) const {
+    // TODO SERVER-35424 / SERVER-99965 Right now we don't validate geo near metadata here, so
+    // we mark it as available. We should implement better dependency tracking for $geoNear.
+    availableMetadata |= DepsTracker::kAllGeoNearData;
+
+    DepsTracker deps(availableMetadata);
+    for (auto&& source : _sources) {
+        // Calls to setNeedsMetadata() inside the per-stage implementations of getDependencies() may
+        // trigger a uassert if the metadata requested is not available to that stage. That is where
+        // validation occurs.
+        DepsTracker::State status = source->getDependencies(&deps);
+        auto mayDestroyMetadata = status & DepsTracker::State::EXHAUSTIVE_META;
+        if (mayDestroyMetadata) {
+            // TODO SERVER-100443 Right now this only actually clears "score" and "scoreDetails",
+            // but we should reset all fields to be validated in downstream stages.
+            deps.clearMetadataAvailable();
+        }
+    }
+}
+
+bool Pipeline::generatesMetadataType(DocumentMetadataFields::MetaType type) const {
+    DepsTracker deps = getDependencies(DepsTracker::kNoMetadata);
+    return deps.getAvailableMetadata()[type];
 }
 
 Status Pipeline::canRunOnMongos() const {

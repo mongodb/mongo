@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/executor/task_executor_cursor.h"
 
 namespace mongo {
@@ -85,11 +86,17 @@ public:
     StageConstraints constraints(Pipeline::SplitState pipeState) const override;
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+    DepsTracker::State getDependencies(DepsTracker* deps) const override;
 
     auto isStoredSource() const {
         return _searchQuery.hasField(kReturnStoredSourceArg)
             ? _searchQuery[kReturnStoredSourceArg].Bool()
             : false;
+    }
+
+    auto hasScoreDetails() const {
+        auto scoreDetailsElem = _searchQuery[mongot_cursor::kScoreDetailsFieldName];
+        return !scoreDetailsElem.eoo() && scoreDetailsElem.Bool();
     }
 
     std::list<boost::intrusive_ptr<DocumentSource>> desugar();

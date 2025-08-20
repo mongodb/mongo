@@ -20,6 +20,12 @@ selector:
   roots:
   - jstests/with_mongot/e2e/*.js
   - jstests/with_mongot/e2e_infrastructure_tests/*.js
+  - jstests/with_mongot/e2e/hybridSearch/*.js
+  - jstests/with_mongot/e2e/metadata/*.js
+  - jstests/with_mongot/e2e/lib/*_test.js
+  exclude_with_any_tags:
+    - assumes_against_mongod_not_mongos
+    - assumes_unsharded_collection
 
 executor:
   config:

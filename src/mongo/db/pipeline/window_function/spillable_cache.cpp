@@ -151,7 +151,7 @@ void SpillableCache::spillToDisk() {
     int64_t spilledBytes = 0;
     int64_t spilledRecords = 0;
     for (auto& memoryTokenWithDoc : _memCache) {
-        auto bsonDoc = memoryTokenWithDoc.value().toBson();
+        auto bsonDoc = memoryTokenWithDoc.value().toBsonWithMetaData();
         size_t objSize = bsonDoc.objsize();
         if (records.size() == 1000 || batchSize + objSize > kMaxWriteSize) {
             writeBatchToDisk(records);

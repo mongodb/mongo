@@ -1653,11 +1653,13 @@ TEST_F(BottomRemoveTest, BottomRemoveNoUnderflow) {
     testNoRemoveUnderflow();
 }
 
+template <typename RankType>
+auto makeLegacyRank(ExpressionContext* const expCtx) {
+    return RankType::create(expCtx, true /* isAscending */);
+}
+
 TEST(Accumulators, Rank) {
     auto expCtx = ExpressionContextForTest{};
-    auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        return AccumulatorRank::create(expCtx, true /* isAscending */);
-    };
     assertExpectedResults(
         &expCtx,
         {
@@ -1676,15 +1678,12 @@ TEST(Accumulators, Rank) {
             {{Value{}, Value{}}, Value(1)},
 
         },
-        accInit,
+        makeLegacyRank<AccumulatorRank>,
         true /* rank can't be merged */);
 }
 
 TEST(Accumulators, DenseRank) {
     auto expCtx = ExpressionContextForTest{};
-    auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        return AccumulatorDenseRank::create(expCtx, true /* isAscending */);
-    };
     assertExpectedResults(
         &expCtx,
         {
@@ -1700,15 +1699,12 @@ TEST(Accumulators, DenseRank) {
             {{Value(1), Value(1), Value(1), Value(3), Value(3), Value(7)}, Value(3)},
 
         },
-        accInit,
+        makeLegacyRank<AccumulatorDenseRank>,
         true /* denseRank can't be merged */);
 }
 
 TEST(Accumulators, DocumentNumberRank) {
     auto expCtx = ExpressionContextForTest{};
-    auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        return AccumulatorDocumentNumber::create(expCtx, true /* isAscending */);
-    };
     assertExpectedResults(
         &expCtx,
         {
@@ -1723,8 +1719,8 @@ TEST(Accumulators, DocumentNumberRank) {
             {{Value(1), Value(1), Value(1), Value(3), Value(3), Value(7)}, Value(6)},
 
         },
-        accInit,
-        true /* denseRank can't be merged */);
+        makeLegacyRank<AccumulatorDocumentNumber>,
+        true /* documentNumber can't be merged */);
 }
 
 TEST(Accumulators, AddToSetRespectsCollation) {

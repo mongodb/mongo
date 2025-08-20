@@ -2410,7 +2410,9 @@ intrusive_ptr<ExpressionObject> ExpressionObject::parse(ExpressionContext* const
     for (auto&& elem : obj) {
         // Make sure this element has a valid field name. Use StringData here so that we can detect
         // if the field name contains a null byte.
-        FieldPath::uassertValidFieldName(elem.fieldNameStringData());
+        uassertStatusOKWithContext(
+            FieldPath::validateFieldName(elem.fieldNameStringData()),
+            "Consider using $getField or $setField for a field path with '.' or '$'.");
 
         auto fieldName = elem.fieldName();
         uassert(16406,
@@ -3217,6 +3219,8 @@ Expression::ComputedPaths ExpressionMap::getComputedPaths(const std::string& exp
 
 /* ------------------------- ExpressionMeta ----------------------------- */
 
+using MetaType = DocumentMetadataFields::MetaType;
+
 REGISTER_EXPRESSION_CONDITIONALLY(meta,
                                   ExpressionMeta::parse,
                                   AllowedWithApiStrict::kConditionally,
@@ -3224,111 +3228,67 @@ REGISTER_EXPRESSION_CONDITIONALLY(meta,
                                   boost::none,
                                   true);
 
-namespace {
-const std::string textScoreName = "textScore";
-const std::string randValName = "randVal";
-const std::string searchScoreName = "searchScore";
-const std::string searchHighlightsName = "searchHighlights";
-const std::string geoNearDistanceName = "geoNearDistance";
-const std::string geoNearPointName = "geoNearPoint";
-const std::string recordIdName = "recordId";
-const std::string indexKeyName = "indexKey";
-const std::string sortKeyName = "sortKey";
-const std::string searchScoreDetailsName = "searchScoreDetails";
-const std::string searchSequenceTokenName = "searchSequenceToken";
-const std::string timeseriesBucketMinTimeName = "timeseriesBucketMinTime";
-const std::string timeseriesBucketMaxTimeName = "timeseriesBucketMaxTime";
-const std::string vectorSearchScoreName = "vectorSearchScore";
+void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* const expCtx,
+                                                             MetaType type) {
+    const bool apiStrict =
+        expCtx->opCtx && APIParameters::get(expCtx->opCtx).getAPIStrict().value_or(false);
+    static const std::set<MetaType> kUnstableMetaFields = {MetaType::kSearchScore,
+                                                           MetaType::kIndexKey,
+                                                           MetaType::kTextScore,
+                                                           MetaType::kSearchHighlights,
+                                                           MetaType::kSearchSequenceToken,
+                                                           MetaType::kScore,
+                                                           MetaType::kScoreDetails};
+    const bool usesUnstableField = kUnstableMetaFields.contains(type);
+    uassert(ErrorCodes::APIStrictError,
+            str::stream() << "Provided apiStrict is true with an unstable meta field \""
+                          << DocumentMetadataFields::serializeMetaType(type) << "\"",
+            !apiStrict || !usesUnstableField);
+}
 
-using MetaType = DocumentMetadataFields::MetaType;
-const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
-    {vectorSearchScoreName, MetaType::kVectorSearchScore},
-    {geoNearDistanceName, MetaType::kGeoNearDist},
-    {geoNearPointName, MetaType::kGeoNearPoint},
-    {indexKeyName, MetaType::kIndexKey},
-    {randValName, MetaType::kRandVal},
-    {recordIdName, MetaType::kRecordId},
-    {searchHighlightsName, MetaType::kSearchHighlights},
-    {searchScoreName, MetaType::kSearchScore},
-    {searchScoreDetailsName, MetaType::kSearchScoreDetails},
-    {searchSequenceTokenName, MetaType::kSearchSequenceToken},
-    {sortKeyName, MetaType::kSortKey},
-    {textScoreName, MetaType::kTextScore},
-    {timeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
-    {timeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
-};
-
-const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTypeToMetaName = {
-    {MetaType::kVectorSearchScore, vectorSearchScoreName},
-    {MetaType::kGeoNearDist, geoNearDistanceName},
-    {MetaType::kGeoNearPoint, geoNearPointName},
-    {MetaType::kIndexKey, indexKeyName},
-    {MetaType::kRandVal, randValName},
-    {MetaType::kRecordId, recordIdName},
-    {MetaType::kSearchHighlights, searchHighlightsName},
-    {MetaType::kSearchScore, searchScoreName},
-    {MetaType::kSearchScoreDetails, searchScoreDetailsName},
-    {MetaType::kSearchSequenceToken, searchSequenceTokenName},
-    {MetaType::kSortKey, sortKeyName},
-    {MetaType::kTextScore, textScoreName},
-    {MetaType::kTimeseriesBucketMinTime, timeseriesBucketMinTimeName},
-    {MetaType::kTimeseriesBucketMaxTime, timeseriesBucketMaxTimeName},
-};
-
-}  // namespace
+void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFF(ExpressionContext* const expCtx,
+                                                                   MetaType type) {
+    static const std::set<MetaType> kHybridScoringProtectedFields = {MetaType::kScore,
+                                                                     MetaType::kScoreDetails};
+    const bool usesHybridScoringProtectedField = kHybridScoringProtectedFields.contains(type);
+    const bool hybridScoringFFEnabled =
+        feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    uassert(ErrorCodes::FailedToParse,
+            "'featureFlagRankFusionFull' must be enabled to use "
+            "'score' or 'scoreDetails' meta field",
+            !usesHybridScoringProtectedField || hybridScoringFFEnabled);
+}
 
 intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
                                                 BSONElement expr,
                                                 const VariablesParseState& vpsIn) {
     uassert(17307, "$meta only supports string arguments", expr.type() == String);
 
-    const auto iter = kMetaNameToMetaType.find(expr.valueStringData());
+    const auto typeName = expr.valueStringData();
+    // parseMetaType() validates by throwing a uassert if typeName is an invalid meta type name.
+    const auto metaType = DocumentMetadataFields::parseMetaType(typeName);
 
-    if (iter != kMetaNameToMetaType.end()) {
-        const auto apiStrict =
-            expCtx->opCtx && APIParameters::get(expCtx->opCtx).getAPIStrict().value_or(false);
-
-        auto typeName = iter->first;
-        auto usesUnstableField = (typeName == "searchScore") || (typeName == "indexKey") ||
-            (typeName == "textScore") || (typeName == "searchHighlights") ||
-            (typeName == "searchSequenceToken");
-
-        if (apiStrict && usesUnstableField) {
-            uasserted(ErrorCodes::APIStrictError,
-                      "Provided apiStrict is true with an unstable parameter");
-        }
-        return new ExpressionMeta(expCtx, iter->second);
-    } else {
-        uasserted(17308, "Unsupported argument to $meta: " + expr.String());
-    }
+    _assertMetaFieldCompatibleWithStrictAPI(expCtx, metaType);
+    _assertMetaFieldCompatibleWithHybridScoringFF(expCtx, metaType);
+    return new ExpressionMeta(expCtx, metaType);
 }
 
 ExpressionMeta::ExpressionMeta(ExpressionContext* const expCtx, MetaType metaType)
     : Expression(expCtx), _metaType(metaType) {
-    switch (_metaType) {
-        case MetaType::kSearchScore:
-        case MetaType::kSearchHighlights:
-        case MetaType::kSearchScoreDetails:
-        case MetaType::kSearchSequenceToken:
-            break;
-        default:
-            // If the query contains $meta fields that are not currently supported by SBE, then
-            // we can't run any part of pipeline in SBE and we have to run the entire pipeline
-            // under the classic engine.
-            expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-            expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
-    }
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
 }
 
 Value ExpressionMeta::serialize(const SerializationOptions& options) const {
-    const auto nameIter = kMetaTypeToMetaName.find(_metaType);
-    invariant(nameIter != kMetaTypeToMetaName.end());
-    return Value(DOC("$meta" << nameIter->second));
+    return Value(DOC("$meta" << DocumentMetadataFields::serializeMetaType(_metaType)));
 }
 
 Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const {
     const auto& metadata = root.metadata();
     switch (_metaType) {
+        case MetaType::kScore:
+            return metadata.hasScore() ? Value(metadata.getScore()) : Value();
         case MetaType::kVectorSearchScore:
             return metadata.hasVectorSearchScore() ? Value(metadata.getVectorSearchScore())
                                                    : Value();
@@ -3377,10 +3337,40 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
             return metadata.hasTimeseriesBucketMaxTime()
                 ? Value(metadata.getTimeseriesBucketMaxTime())
                 : Value();
+        case MetaType::kScoreDetails:
+            return metadata.hasScoreDetails() ? metadata.getScoreDetails() : Value();
         default:
             MONGO_UNREACHABLE;
     }
     MONGO_UNREACHABLE;
+}
+
+/* ------------------------- ExpressionInternalRawSortKey ----------------------------- */
+
+REGISTER_EXPRESSION_CONDITIONALLY(
+    _internalSortKey,
+    ExpressionInternalRawSortKey::parse,
+    AllowedWithApiStrict::kInternal,
+    AllowedWithClientType::kInternal,
+    // No feature flag.
+    boost::none,
+    true);  // The 'condition' is always true - we just wanted to restrict to internal.
+
+intrusive_ptr<Expression> ExpressionInternalRawSortKey::parse(ExpressionContext* const expCtx,
+                                                              BSONElement expr,
+                                                              const VariablesParseState& vpsIn) {
+    uassert(9182101,
+            "No known arguments - must be an empty object",
+            expr.type() == BSONType::Object && expr.Obj().isEmpty());
+    return make_intrusive<ExpressionInternalRawSortKey>(expCtx);
+}
+
+Value ExpressionInternalRawSortKey::serialize(const SerializationOptions& options) const {
+    return Value(Document{{kName, Document{}}});
+}
+
+Value ExpressionInternalRawSortKey::evaluate(const Document& root, Variables* variables) const {
+    return root.metadata().getSortKey();
 }
 
 /* ----------------------- ExpressionMod ---------------------------- */

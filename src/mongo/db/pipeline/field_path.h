@@ -53,7 +53,7 @@ public:
     /**
      * Throws a AssertionException if a field name does not pass validation.
      */
-    static void uassertValidFieldName(StringData fieldName);
+    static Status validateFieldName(StringData fieldName);
 
     /**
      * Concatenates 'prefix' and 'suffix' using dotted path notation. 'prefix' is allowed to be
@@ -72,7 +72,7 @@ public:
      * Throws a AssertionException if the string is empty or if any of the field names fail
      * validation.
      *
-     * Field names are validated using uassertValidFieldName().
+     * Field names are validated using validateFieldName().
      */
     /* implicit */ FieldPath(std::string inputPath,
                              bool precomputeHashes = false,

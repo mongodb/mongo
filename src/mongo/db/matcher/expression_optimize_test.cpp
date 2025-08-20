@@ -99,7 +99,8 @@ Status isValid(const std::string& queryStr, const FindCommandRequest& findComman
     BSONObj queryObj = fromjson(queryStr);
     std::unique_ptr<MatchExpression> me(parseMatchExpression(queryObj));
     me = MatchExpression::optimize(std::move(me));
-    if (auto status = parsed_find_command::isValid(me.get(), findCommand).getStatus();
+    if (auto status =
+            parsed_find_command::validateAndGetAvailableMetadata(me.get(), findCommand).getStatus();
         !status.isOK()) {
         return status;
     }

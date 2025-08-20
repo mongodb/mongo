@@ -70,6 +70,17 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        // This stage doesn't currently support tracking field dependencies since mongot is
+        // responsible for determining what fields to return. We do need to track metadata
+        // dependencies though, so downstream stages know they are allowed to access
+        // "vectorSearchScore" metadata.
+        // TODO SERVER-101100 Implement logic for dependency analysis.
+
+        deps->setMetadataAvailable(DocumentMetadataFields::kVectorSearchScore);
+        return DepsTracker::State::NOT_SUPPORTED;
+    }
+
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
@@ -92,6 +103,7 @@ public:
             constraints.unionRequirement = UnionRequirement::kAllowed;
         }
         constraints.requiresInputDocSource = false;
+        constraints.noFieldModifications = true;
         return constraints;
     };
 
@@ -112,6 +124,23 @@ private:
     // If this is an explain of a $vectorSearch at execution-level verbosity, then the explain
     // results are held here. Otherwise, this is an empty object.
     BSONObj _explainResponse;
+
+    /**
+     * Attempts a pipeline optimization that removes a $sort stage that comes after the output of
+     * of mongot, if the resulting documents from mongot are sorted by the same criteria as the
+     * $sort ('vectorSearchScore').
+     *
+     * Also, this optimization only applies to cases where the $sort comes directly after this
+     * stage.
+     * TODO SERVER-96068 generalize this optimization to cases where any number of stages that
+     * preserve sort order come between this stage and the sort.
+     *
+     * Returns a pair of the iterator to return to the optimizer, and a bool of whether or not the
+     * optimization was successful. If optimization was successful, the container will be modified
+     * appropriately.
+     */
+    std::pair<Pipeline::SourceContainer::iterator, bool> _attemptSortAfterVectorSearchOptimization(
+        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
 
     const std::unique_ptr<MatchExpression> _filterExpr;
 

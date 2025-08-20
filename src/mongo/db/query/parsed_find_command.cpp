@@ -103,7 +103,7 @@ void setProjection(ParsedFindCommand* out,
                                                           policies));
 
         // This will throw if any of the projection's dependencies are unavailable.
-        DepsTracker{out->unavailableMetadata}.requestMetadata(out->proj->metadataDeps());
+        DepsTracker{out->availableMetadata}.setNeedsMetadata(out->proj->metadataDeps());
     }
 }
 
@@ -151,17 +151,17 @@ Status setSortAndProjection(ParsedFindCommand* out,
 
 /**
  * Helper for building 'out.' Sets 'out->filter' and validates that it is well formed. In the
- * process, also populates 'out->unavailableMetadata.'
+ * process, also populates 'out->availableMetadata.'
  */
 Status setFilter(ParsedFindCommand* out,
                  std::unique_ptr<MatchExpression> filter,
                  const std::unique_ptr<FindCommandRequest>& findCommand) {
     // Verify the filter follows certain rules like there must be at most one text clause.
-    auto swMeta = parsed_find_command::isValid(filter.get(), *findCommand);
+    auto swMeta = parsed_find_command::validateAndGetAvailableMetadata(filter.get(), *findCommand);
     if (!swMeta.isOK()) {
         return swMeta.getStatus();
     }
-    out->unavailableMetadata = swMeta.getValue();
+    out->availableMetadata = swMeta.getValue();
     out->filter = std::move(filter);
     return Status::OK();
 }
@@ -228,9 +228,9 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> ParsedFindCommand::withExistingFi
 }
 
 namespace parsed_find_command {
-StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
-                                        const FindCommandRequest& findCommand) {
-    QueryMetadataBitSet unavailableMetadata{};
+StatusWith<QueryMetadataBitSet> validateAndGetAvailableMetadata(
+    const MatchExpression* root, const FindCommandRequest& findCommand) {
+    QueryMetadataBitSet availableMetadata{};
 
     // There can only be one TEXT.  If there is a TEXT, it cannot appear inside a NOR.
     //
@@ -243,9 +243,8 @@ StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
         if (hasNodeInSubtree(root, MatchExpression::TEXT, MatchExpression::NOR)) {
             return Status(ErrorCodes::BadValue, "text expression not allowed in nor");
         }
-    } else {
-        // Text metadata is not available.
-        unavailableMetadata.set(DocumentMetadataFields::kTextScore);
+        availableMetadata.set(DocumentMetadataFields::kTextScore);
+        availableMetadata.set(DocumentMetadataFields::kScore);
     }
 
     // There can only be one NEAR.  If there is a NEAR, it must be either the root or the root
@@ -254,10 +253,8 @@ StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
     if (numGeoNear > 1) {
         return Status(ErrorCodes::BadValue, "Too many geoNear expressions");
     } else if (1 == numGeoNear) {
-        // Do nothing, we will perform extra checks in CanonicalQuery::isValidNormalized.
-    } else {
-        // Geo distance and geo point metadata are unavailable.
-        unavailableMetadata |= DepsTracker::kAllGeoNearData;
+        // Geo distance and geo point metadata are available.
+        availableMetadata |= DepsTracker::kAllGeoNearData;
     }
 
     const BSONObj& sortObj = findCommand.getSort();
@@ -327,7 +324,7 @@ StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
         }
     }
 
-    return unavailableMetadata;
+    return availableMetadata;
 }
 
 StatusWith<std::unique_ptr<ParsedFindCommand>> parse(

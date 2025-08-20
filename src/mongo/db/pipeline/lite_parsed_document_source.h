@@ -235,6 +235,13 @@ public:
     }
 
     /**
+     * Returns true if this is a $rankFusion pipeline
+     */
+    virtual bool isRankFusionStage() const {
+        return false;
+    }
+
+    /**
      * Returns true if this stage require knowledge of the collection default collation at parse
      * time, false otherwise. This is useful to know as it could save a network request to discern
      * the collation.
@@ -421,6 +428,11 @@ public:
                                                  bool isImplicitDefault) const override;
 
 protected:
+    /**
+     * Simple implementation that only gets the privileges needed by children pipelines.
+     */
+    PrivilegeVector requiredPrivilegesBasic(bool isMongos, bool bypassDocumentValidation) const;
+
     boost::optional<NamespaceString> _foreignNss;
     std::vector<LiteParsedPipeline> _pipelines;
 };

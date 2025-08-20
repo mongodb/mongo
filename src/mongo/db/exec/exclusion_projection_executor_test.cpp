@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/record_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -99,7 +100,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldSerializeToEquivalentProjection) {
 
     // Converts numbers to bools, converts dotted paths to nested documents. Note order of excluded
     // fields is subject to change.
-    auto serialization = exclusion->serializeTransformation(boost::none);
+    auto serialization = exclusion->serializeTransformation();
     ASSERT_EQ(serialization.computeSize(), 4ULL);
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["_id"], Value(false));
@@ -116,14 +117,14 @@ TEST(ExclusionProjectionExecutionTest, ShouldSerializeToEquivalentProjection) {
 
 TEST(ExclusionProjectionExecutionTest, ShouldSerializeWithTopLevelID) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("a" << 0 << "b" << 0));
-    auto serialization = exclusion->serializeTransformation(boost::none);
+    auto serialization = exclusion->serializeTransformation();
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"], Value(false));
     ASSERT_VALUE_EQ(serialization["_id"], Value(true));
 
     exclusion = makeExclusionProjectionWithDefaultPolicies(
         BSON("a" << 0 << "b" << BSON("c" << 0 << "d" << 0)));
-    serialization = exclusion->serializeTransformation(boost::none);
+    serialization = exclusion->serializeTransformation();
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"]["c"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"]["d"], Value(false));
@@ -131,21 +132,21 @@ TEST(ExclusionProjectionExecutionTest, ShouldSerializeWithTopLevelID) {
     ASSERT_VALUE_EQ(serialization["b"]["_id"], Value());
 
     exclusion = makeExclusionProjectionWithDefaultIdExclusion(BSON("a" << false << "b" << false));
-    serialization = exclusion->serializeTransformation(boost::none);
+    serialization = exclusion->serializeTransformation();
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"], Value(false));
     ASSERT_VALUE_EQ(serialization["_id"], Value(false));
 
     exclusion = makeExclusionProjectionWithDefaultIdExclusion(
         BSON("a" << false << "b" << false << "_id" << false));
-    serialization = exclusion->serializeTransformation(boost::none);
+    serialization = exclusion->serializeTransformation();
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"], Value(false));
     ASSERT_VALUE_EQ(serialization["_id"], Value(false));
 
     exclusion = makeExclusionProjectionWithDefaultIdExclusion(
         BSON("a" << false << "b" << false << "_id" << true));
-    serialization = exclusion->serializeTransformation(boost::none);
+    serialization = exclusion->serializeTransformation();
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"], Value(false));
     ASSERT_VALUE_EQ(serialization["_id"], Value(true));
@@ -360,6 +361,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
+    // Used to set 'score' metadata.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(fromjson("{a: 0, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "
@@ -371,7 +374,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
                                                             "j: {$meta: 'indexKey'}, "
                                                             "k: {$meta: 'sortKey'}, "
                                                             "l: {$meta: 'searchScoreDetails'}, "
-                                                            "m: {$meta: 'vectorSearchScore'}}"));
+                                                            "m: {$meta: 'vectorSearchScore'}, "
+                                                            "n: {$meta: 'score'}}"));
 
     MutableDocument inputDocBuilder(Document{{"a", 1}, {"b", 2}});
     inputDocBuilder.metadata().setTextScore(0.0);
@@ -386,6 +390,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
     inputDocBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
                                                           << "foo"));
     inputDocBuilder.metadata().setVectorSearchScore(9.0);
+    inputDocBuilder.metadata().setScore(10.0);
     Document inputDoc = inputDocBuilder.freeze();
 
     auto result = exclusion->applyTransformation(inputDoc);
@@ -393,10 +398,59 @@ TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
     ASSERT_DOCUMENT_EQ(result,
                        Document{fromjson("{b: 2, c: 0.0, d: 1.0, e: 2.0, f: 'foo', g: 3.0, "
                                          "h: [4, 5], i: 6, j: {foo: 7}, k: [{bar: 8}],"
-                                         "l: {scoreDetails: 'foo'}, m: 9.0}")});
+                                         "l: {scoreDetails: 'foo'}, m: 9.0, n: 10.0}")});
+}
+
+TEST(ExclusionProjectionExecutionTest, MetaDependenciesFalseWhenNotIncluded) {
+    auto exclusion = makeExclusionProjectionWithDefaultPolicies(fromjson("{a: 0}"));
+
+    DepsTracker deps;
+    exclusion->addDependencies(&deps);
+
+    ASSERT_EQ(deps.fields.size(), 0UL);
+
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kRandVal]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kGeoNearDist]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kGeoNearPoint]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kRecordId]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kScore]);
+}
+
+TEST(ExclusionProjectionExecutionTest, ShouldAddSingleMetaExpressionDependency) {
+    auto exclusion =
+        makeExclusionProjectionWithDefaultPolicies(fromjson("{a: 0, b: {$meta: 'geoNearPoint'}}"));
+
+    DepsTracker deps;
+    exclusion->addDependencies(&deps);
+
+    ASSERT_EQ(deps.fields.size(), 0UL);
+
+    // Only geo near point should be included as a dependency.
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kGeoNearPoint]);
+
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kRandVal]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kGeoNearDist]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kRecordId]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kScore]);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
+    // Used to set 'score' metadata.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(fromjson("{a: 0, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "
@@ -408,19 +462,13 @@ TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
                                                             "j: {$meta: 'indexKey'}, "
                                                             "k: {$meta: 'sortKey'}, "
                                                             "l: {$meta: 'searchScoreDetails'}, "
-                                                            "m: {$meta: 'vectorSearchScore'}}"));
+                                                            "m: {$meta: 'vectorSearchScore'}, "
+                                                            "n: {$meta: 'score'}}"));
 
     DepsTracker deps;
     exclusion->addDependencies(&deps);
 
     ASSERT_EQ(deps.fields.size(), 0UL);
-
-    // We do not add the dependencies for searchScore, searchHighlights, searchScoreDetails, or
-    // distance because those values are not stored in the collection (or in mongod at all).
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
 
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kRandVal]);
@@ -429,6 +477,11 @@ TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kRecordId]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kScore]);
 }
 
 //
@@ -589,7 +642,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldExtractPartOfProjectOnRootField) {
     ASSERT_FALSE(allExtracted);
     ASSERT_BSONOBJ_EQ(fromjson("{b: false}"), extractedProj);
     ASSERT_BSONOBJ_EQ(fromjson("{c: false, _id: true}"),
-                      exclusion->serializeTransformation(boost::none).toBson());
+                      exclusion->serializeTransformation().toBson());
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldExtractPartOfProjectOnSubfields) {
@@ -602,7 +655,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldExtractPartOfProjectOnSubfields) {
     const UnorderedFieldsBSONObjComparator kComparator;
     ASSERT_EQ(kComparator.compare(fromjson("{w: {y: false, z: false}}"), extractedProj), 0);
     ASSERT_BSONOBJ_EQ(fromjson("{c: {d: false}, _id: true}"),
-                      exclusion->serializeTransformation(boost::none).toBson());
+                      exclusion->serializeTransformation().toBson());
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldCorrectlyLeaveRemainderWithExcludedId) {
@@ -612,8 +665,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldCorrectlyLeaveRemainderWithExcluded
 
     ASSERT_FALSE(allExtracted);
     ASSERT_BSONOBJ_EQ(fromjson("{b: false}"), extractedProj);
-    ASSERT_BSONOBJ_EQ(fromjson("{_id: false}"),
-                      exclusion->serializeTransformation(boost::none).toBson());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: false}"), exclusion->serializeTransformation().toBson());
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldNotExtractWhenFieldIsNotPresent) {
@@ -624,7 +676,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotExtractWhenFieldIsNotPresent) {
     ASSERT_FALSE(allExtracted);
     ASSERT_BSONOBJ_EQ(fromjson("{}"), extractedProj);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {b: false}, _id: true}"),
-                      exclusion->serializeTransformation(boost::none).toBson());
+                      exclusion->serializeTransformation().toBson());
 }
 }  // namespace
 }  // namespace mongo::projection_executor

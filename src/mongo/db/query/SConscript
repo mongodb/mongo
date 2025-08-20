@@ -555,6 +555,7 @@ env.CppUnitTest(
         'util/deferred_test.cpp',
         'util/hash_roaring_set_test.cpp',
         'util/memory_util_test.cpp',
+        'util/string_util_test.cpp',
         'view_response_formatter_test.cpp',
     ],
     LIBDEPS=[
@@ -677,5 +678,12 @@ env.Benchmark(
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'plan_cache_test_util',
+    ],
+)
+
+env.Library(
+    target='query_string_util',
+    source=[
+        'util/string_util.cpp',
     ],
 )

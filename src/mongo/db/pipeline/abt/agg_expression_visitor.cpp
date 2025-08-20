@@ -367,6 +367,10 @@ public:
         unsupportedExpression(expr->getOpName());
     }
 
+    void visit(const ExpressionInternalRawSortKey* expr) final {
+        unsupportedExpression("$_internalSortKey");
+    }
+
     void visit(const ExpressionMap* expr) final {
         unsupportedExpression("$map");
     }

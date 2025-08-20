@@ -88,15 +88,17 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
 
     boost::intrusive_ptr<DocumentSource> projectionStage =
         make_intrusive<DocumentSourceInternalProjection>(
-            expCtx,
-            transformStage.getTransformer().serializeTransformation(boost::none).toBson(),
-            policies);
+            expCtx, transformStage.getTransformer().serializeTransformation().toBson(), policies);
 
     if (expCtx->sbeCompatibility < minRequiredCompatibility) {
         return nullptr;
     }
 
     return projectionStage;
+}
+
+bool isSortStageSbeCompatible(const DocumentSourceSort* sort) {
+    return !sort->shouldSetSortKeyMetadata() && isSortSbeCompatible(sort->getSortKeyPattern());
 }
 
 /**
@@ -212,7 +214,7 @@ bool pushDownPipelineStageIfCompatible(
         }
         return false;
     } else if (auto sortStage = dynamic_cast<DocumentSourceSort*>(stage.get())) {
-        if (!allowedStages.sort || !isSortSbeCompatible(sortStage->getSortKeyPattern())) {
+        if (!allowedStages.sort || !isSortStageSbeCompatible(sortStage)) {
             return false;
         }
 
@@ -544,7 +546,7 @@ bool findSbeCompatibleStagesForPushdown(
         // the pipeline is the shard part of a sorted-merge query on a sharded collection. It is
         // possible that the merge operation will need a $sortKey field from the sort, and SBE plans
         // do not yet support metadata fields.
-        .sort = meetsRequirements(SbeCompatibility::requiresTrySbe) && !needsMerge,
+        .sort = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
         .limitSkip = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
@@ -591,9 +593,7 @@ bool findSbeCompatibleStagesForPushdown(
 }  // findSbeCompatibleStagesForPushdown
 }  // namespace
 
-void finalizePipelineStages(Pipeline* pipeline,
-                            QueryMetadataBitSet unavailableMetadata,
-                            CanonicalQuery* canonicalQuery) {
+void finalizePipelineStages(Pipeline* pipeline, CanonicalQuery* canonicalQuery) {
     if (!pipeline || pipeline->getSources().empty()) {
         return;
     }
@@ -606,9 +606,6 @@ void finalizePipelineStages(Pipeline* pipeline,
     for (size_t i = 0; i < stagesToRemove; ++i) {
         sources.erase(sources.begin());
     }
-
-    canonicalQuery->setRemainingSearchMetadata(
-        pipeline->getDependencies(unavailableMetadata).searchMetadataDeps());
 }
 
 void attachPipelineStages(const MultipleCollectionAccessor& collections,

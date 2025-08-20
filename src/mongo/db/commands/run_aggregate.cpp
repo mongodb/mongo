@@ -951,6 +951,7 @@ Status _runAggregate(OperationContext* opCtx,
 Status runAggregateOnView(OperationContext* opCtx,
                           const NamespaceString& origNss,
                           const AggregateCommandRequest& request,
+                          const LiteParsedPipeline& liteParsedPipeline,
                           const MultipleCollectionAccessor& collections,
                           boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse,
                           const ViewDefinition* view,
@@ -963,6 +964,11 @@ Status runAggregateOnView(OperationContext* opCtx,
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "mapReduce on a view is not supported",
             !request.getIsMapReduceCommand());
+
+    // TODO SERVER-101661 Enable $rankFusion run on views.
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            "$rankFusion is currently unsupported on views",
+            !request.getIsRankFusion() && !liteParsedPipeline.startsWithRankFusionStage());
 
     // Check that the default collation of 'view' is compatible with the operation's
     // collation. The check is skipped if the request did not specify a collation.
@@ -1460,6 +1466,7 @@ Status _runAggregate(OperationContext* opCtx,
             return runAggregateOnView(opCtx,
                                       origNss,
                                       request,
+                                      liteParsedPipeline,
                                       collections,
                                       std::move(collatorToUse),
                                       ctx->getView(),
@@ -1548,6 +1555,18 @@ Status _runAggregate(OperationContext* opCtx,
                     opCtx, nss, request.getEncryptionInformation().value(), std::move(pipeline));
                 request.getEncryptionInformation()->setCrudProcessed(true);
             }
+        }
+
+        if (search_helpers::isMongotPipeline(pipeline.get())) {
+            // Before preparing the pipeline executor, we need to do dependency analysis to validate
+            // the metadata dependencies.
+            // TODO SERVER-40900 Consider performing $meta validation for all queries at this point
+            // before optimization.
+            pipeline->validateMetaDependencies();
+
+            uassert(6253506,
+                    "Cannot have exchange specified in a search pipeline",
+                    !request.getExchange());
         }
 
         pipeline->optimizePipeline();

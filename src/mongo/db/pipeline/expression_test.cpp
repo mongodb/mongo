@@ -55,6 +55,7 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -3152,6 +3153,48 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchScoreAPIStrict) {
                        ErrorCodes::APIStrictError);
 }
 
+TEST(ExpressionMetaTest, ExpressionMetaScoreAPIStrict) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.opCtx).setAPIStrict(true);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"score\"}");
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::APIStrictError);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaScoreDetailsAPIStrict) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.opCtx).setAPIStrict(true);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"scoreDetails\"}");
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::APIStrictError);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaScoreFFNotEnabled) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.opCtx).setAPIStrict(false);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"score\"}");
+    // Should throw because 'featureFlagRankFusionFull' is not enabled.
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaScoreDetailsFFNotEnabled) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.opCtx).setAPIStrict(false);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"scoreDetails\"}");
+    // Should throw because 'featureFlagRankFusionFull' is not enabled.
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
 TEST(ExpressionMetaTest, ExpressionMetaSearchHighlights) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
@@ -3307,6 +3350,35 @@ TEST(ExpressionMetaTest, ExpressionMetaVectorSearchScore) {
     doc.metadata().setVectorSearchScore(1.23);
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
     ASSERT_EQ(val.getDouble(), 1.23);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaScore) {
+    // Used to set 'score' metadata.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{$meta: \"score\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    MutableDocument doc;
+    doc.metadata().setScore(1.23);
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
+    ASSERT_EQ(val.getDouble(), 1.23);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaScoreDetails) {
+    // Used to set 'scoreDetails' metadata.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{$meta: \"scoreDetails\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+
+    auto details = BSON("value" << 5 << "scoreDetails"
+                                << "foo");
+    MutableDocument doc;
+    doc.metadata().setScoreAndScoreDetails(Value(details));
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
+    ASSERT_DOCUMENT_EQ(val.getDocument(), Document(details));
 }
 }  // namespace expression_meta_test
 

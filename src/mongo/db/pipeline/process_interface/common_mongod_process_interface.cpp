@@ -974,7 +974,7 @@ Document CommonMongodProcessInterface::readRecordFromRecordStore(
     Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
     auto foundDoc = rs->findRecord(expCtx->opCtx, RecordId(rID), &possibleRecord);
     tassert(775101, str::stream() << "Could not find document id " << rID, foundDoc);
-    return Document(possibleRecord.toBson());
+    return Document::fromBsonWithMetaData(possibleRecord.toBson());
 }
 
 void CommonMongodProcessInterface::deleteRecordFromRecordStore(

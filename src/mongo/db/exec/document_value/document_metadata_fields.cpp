@@ -27,21 +27,82 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+
 #include <ostream>
 #include <vector>
-
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
+using MetaType = DocumentMetadataFields::MetaType;
 
 namespace {
 Value missingToNull(Value maybeMissing) {
     return maybeMissing.missing() ? Value(BSONNULL) : maybeMissing;
 }
+
+static const std::string textScoreName = "textScore";
+static const std::string randValName = "randVal";
+static const std::string searchScoreName = "searchScore";
+static const std::string searchHighlightsName = "searchHighlights";
+static const std::string geoNearDistanceName = "geoNearDistance";
+static const std::string geoNearPointName = "geoNearPoint";
+static const std::string recordIdName = "recordId";
+static const std::string indexKeyName = "indexKey";
+static const std::string sortKeyName = "sortKey";
+static const std::string searchScoreDetailsName = "searchScoreDetails";
+static const std::string searchSequenceTokenName = "searchSequenceToken";
+static const std::string timeseriesBucketMinTimeName = "timeseriesBucketMinTime";
+static const std::string timeseriesBucketMaxTimeName = "timeseriesBucketMaxTime";
+static const std::string vectorSearchScoreName = "vectorSearchScore";
+static const std::string scoreName = "score";
+static const std::string scoreDetailsName = "scoreDetails";
+
+// This field ("value") is extracted from the 'scoreDetails' Document to set the 'score' field too.
+static const std::string scoreDetailsScoreField = "value";
+
+static const StringMap<MetaType> kMetaNameToMetaType = {
+    {scoreName, MetaType::kScore},
+    {vectorSearchScoreName, MetaType::kVectorSearchScore},
+    {geoNearDistanceName, MetaType::kGeoNearDist},
+    {geoNearPointName, MetaType::kGeoNearPoint},
+    {indexKeyName, MetaType::kIndexKey},
+    {randValName, MetaType::kRandVal},
+    {recordIdName, MetaType::kRecordId},
+    {searchHighlightsName, MetaType::kSearchHighlights},
+    {searchScoreName, MetaType::kSearchScore},
+    {searchScoreDetailsName, MetaType::kSearchScoreDetails},
+    {searchSequenceTokenName, MetaType::kSearchSequenceToken},
+    {sortKeyName, MetaType::kSortKey},
+    {textScoreName, MetaType::kTextScore},
+    {timeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
+    {timeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
+    {scoreDetailsName, MetaType::kScoreDetails},
+};
+
+static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
+    {MetaType::kScore, scoreName},
+    {MetaType::kVectorSearchScore, vectorSearchScoreName},
+    {MetaType::kGeoNearDist, geoNearDistanceName},
+    {MetaType::kGeoNearPoint, geoNearPointName},
+    {MetaType::kIndexKey, indexKeyName},
+    {MetaType::kRandVal, randValName},
+    {MetaType::kRecordId, recordIdName},
+    {MetaType::kSearchHighlights, searchHighlightsName},
+    {MetaType::kSearchScore, searchScoreName},
+    {MetaType::kSearchScoreDetails, searchScoreDetailsName},
+    {MetaType::kSearchSequenceToken, searchSequenceTokenName},
+    {MetaType::kSortKey, sortKeyName},
+    {MetaType::kTextScore, textScoreName},
+    {MetaType::kTimeseriesBucketMinTime, timeseriesBucketMinTimeName},
+    {MetaType::kTimeseriesBucketMaxTime, timeseriesBucketMaxTimeName},
+    {MetaType::kScoreDetails, scoreDetailsName},
+};
 }  // namespace
 
 DocumentMetadataFields::DocumentMetadataFields(const DocumentMetadataFields& other)
@@ -62,6 +123,133 @@ DocumentMetadataFields& DocumentMetadataFields::operator=(DocumentMetadataFields
     _holder = std::move(other._holder);
     _modified = true;
     return *this;
+}
+
+MetaType DocumentMetadataFields::parseMetaType(StringData name) {
+    const auto iter = kMetaNameToMetaType.find(name);
+    uassert(17308, "Unsupported $meta field: " + name, iter != kMetaNameToMetaType.end());
+    return iter->second;
+}
+
+StringData DocumentMetadataFields::serializeMetaType(MetaType type) {
+    const auto nameIter = kMetaTypeToMetaName.find(type);
+    tassert(9733900,
+            str::stream() << "No name found for meta type: " << type,
+            nameIter != kMetaTypeToMetaName.end());
+    return nameIter->second;
+}
+
+void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
+    auto assertType = [&](BSONType typeRequested) {
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "Meta field '" << serializeMetaType(type) << "' requires "
+                              << typeName(typeRequested) << " type, found "
+                              << typeName(val.getType()),
+                val.getType() == typeRequested);
+    };
+    auto assertNumeric = [&]() {
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "Meta field '" << serializeMetaType(type)
+                              << "' requires numeric type, found " << typeName(val.getType()),
+                val.numeric());
+    };
+
+    switch (type) {
+        case DocumentMetadataFields::kGeoNearDist:
+            assertNumeric();
+            setGeoNearDistance(val.getDouble());
+            break;
+        case DocumentMetadataFields::kGeoNearPoint:
+            setGeoNearPoint(val);
+            break;
+        case DocumentMetadataFields::kIndexKey:
+            assertType(BSONType::Object);
+            setIndexKey(val.getDocument().toBson());
+            break;
+        case DocumentMetadataFields::kRandVal:
+            assertNumeric();
+            setRandVal(val.getDouble());
+            break;
+        case DocumentMetadataFields::kRecordId:
+            assertNumeric();
+            setRecordId(RecordId(val.getLong()));
+            break;
+        case DocumentMetadataFields::kSearchHighlights:
+            setSearchHighlights(val);
+            break;
+        case DocumentMetadataFields::kSearchScore:
+            assertNumeric();
+            setSearchScore(val.getDouble());
+            break;
+        case DocumentMetadataFields::kTextScore:
+            assertNumeric();
+            setTextScore(val.getDouble());
+            break;
+        case DocumentMetadataFields::kSearchScoreDetails:
+            assertType(BSONType::Object);
+            setSearchScoreDetails(val.getDocument().toBson());
+            break;
+        case DocumentMetadataFields::kTimeseriesBucketMinTime:
+            assertType(BSONType::Date);
+            setTimeseriesBucketMinTime(val.getDate());
+            break;
+        case DocumentMetadataFields::kTimeseriesBucketMaxTime:
+            assertType(BSONType::Date);
+            setTimeseriesBucketMaxTime(val.getDate());
+            break;
+        case DocumentMetadataFields::kSearchSortValues:
+            assertType(BSONType::Object);
+            setSearchSortValues(val.getDocument().toBson());
+            break;
+        case DocumentMetadataFields::kSearchSequenceToken:
+            setSearchSequenceToken(val);
+            break;
+        case DocumentMetadataFields::kVectorSearchScore:
+            assertNumeric();
+            setVectorSearchScore(val.getDouble());
+            break;
+        case DocumentMetadataFields::kScore:
+            assertNumeric();
+            setScore(val.getDouble());
+            break;
+        case DocumentMetadataFields::kScoreDetails:
+            // When using this API to set scoreDetails (likely via $setMetadata), it's required for
+            // 'scoreDetails' to have a "value" field with which 'score' will be set as well. That
+            // validation is done inside setScoreAndScoreDetails().
+            assertType(BSONType::Object);
+            setScoreAndScoreDetails(val);
+            break;
+        case DocumentMetadataFields::kSortKey:
+            tasserted(9733901,
+                      "Cannot set the sort key without knowing if it is a single element key");
+        default:
+            MONGO_UNREACHABLE_TASSERT(9733902);
+    }
+}
+
+void DocumentMetadataFields::setScoreDetails(Value scoreDetails, bool featureFlagAlreadyValidated) {
+    if (featureFlagAlreadyValidated ||
+        feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        _setCommon(MetaType::kScoreDetails);
+        _holder->scoreDetails = scoreDetails;
+    }
+}
+
+void DocumentMetadataFields::setScoreAndScoreDetails(Value scoreDetails) {
+    if (feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        auto score = scoreDetails.getDocument().getField(scoreDetailsScoreField);
+        tassert(9679300,
+                str::stream() << "scoreDetails must provide a numeric 'value' field with which to "
+                                 "set the score too, but got "
+                              << scoreDetails.toString(),
+                score.numeric());
+
+        const bool featureFlagAlreadyValidated = true;
+        setScore(score.getDouble(), featureFlagAlreadyValidated);
+        setScoreDetails(std::move(scoreDetails), featureFlagAlreadyValidated);
+    }
 }
 
 void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
@@ -106,6 +294,12 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     }
     if (!hasVectorSearchScore() && other.hasVectorSearchScore()) {
         setVectorSearchScore(other.getVectorSearchScore());
+    }
+    if (!hasScore() && other.hasScore()) {
+        setScore(other.getScore());
+    }
+    if (!hasScoreDetails() && other.hasScoreDetails()) {
+        setScoreDetails(other.getScoreDetails());
     }
 }
 
@@ -152,6 +346,12 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     if (other.hasVectorSearchScore()) {
         setVectorSearchScore(other.getVectorSearchScore());
     }
+    if (other.hasScore()) {
+        setScore(other.getScore());
+    }
+    if (other.hasScoreDetails()) {
+        setScoreDetails(other.getScoreDetails());
+    }
 }
 
 size_t DocumentMetadataFields::getApproximateSize() const {
@@ -175,6 +375,8 @@ size_t DocumentMetadataFields::getApproximateSize() const {
     size += _holder->searchScoreDetails.objsize();
     size += _holder->searchSortValues.objsize();
     size -= sizeof(_holder->searchSequenceToken);
+    size += _holder->scoreDetails.getApproximateSize();
+    size -= sizeof(_holder->scoreDetails);
     return size;
 }
 
@@ -242,6 +444,14 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kVectorSearchScore + 1));
         buf.appendNum(getVectorSearchScore());
     }
+    if (hasScore()) {
+        buf.appendNum(static_cast<char>(MetaType::kScore + 1));
+        buf.appendNum(getScore());
+    }
+    if (hasScoreDetails()) {
+        buf.appendNum(static_cast<char>(MetaType::kScoreDetails + 1));
+        getScoreDetails().serializeForSorter(buf);
+    }
     buf.appendNum(static_cast<char>(0));
 }
 
@@ -286,6 +496,11 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
             out->setVectorSearchScore(buf.read<LittleEndian<double>>());
         } else if (marker == static_cast<char>(MetaType::kSearchSequenceToken) + 1) {
             out->setSearchSequenceToken(
+                Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kScore) + 1) {
+            out->setScore(buf.read<LittleEndian<double>>());
+        } else if (marker == static_cast<char>(MetaType::kScoreDetails) + 1) {
+            out->setScoreDetails(
                 Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
@@ -352,6 +567,10 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "$search sequence token";
         case DocumentMetadataFields::kVectorSearchScore:
             return "$vectorSearch distance";
+        case DocumentMetadataFields::kScore:
+            return "score";
+        case DocumentMetadataFields::kScoreDetails:
+            return "scoreDetails";
         default:
             MONGO_UNREACHABLE;
     }
