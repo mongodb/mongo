@@ -42,6 +42,9 @@ function insertDocument(db) {
 // Make node 1 the primary.
 rst.stepUp(nodes[1]);
 
+// Ensure that all nodes are in the same term before enabling failpoints.
+rst.awaitReplication();
+
 // Set up a stopReplProducer failpoint on nodes 0 and 2.
 // Node 0 needs to be behind node 1 in order for it to enter drain mode.
 // Node 2 cannot be ahead of node 0 in order for node 0 to win its election.
