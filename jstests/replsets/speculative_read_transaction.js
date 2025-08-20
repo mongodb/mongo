@@ -45,7 +45,7 @@ function runTest(sessionOptions) {
     // TODO (SERVER-100669): Remove version check once 9.0 becomes last LTS.
     const versionSupportsAbortWaitingForWC =
         MongoRunner.compareBinVersions(testDB.getMongo().adminCommand({serverStatus: 1}).version,
-                                       "8.1") >= 0;
+                                       "8.0") >= 0;
     if (versionSupportsAbortWaitingForWC) {
         // Abort waits for write concern.
         jsTestLog("Starting majority-abort transaction");
