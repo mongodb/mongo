@@ -10,11 +10,20 @@ package(default_visibility = ["//visibility:public"])
     )
     for extension_name in [
         "foo",
+        "foo_v2",
         "bar",
         # TODO SERVER-109108: Remove this entry when the buzz extension is no longer needed.
         "buzz",
     ]
 ]
+
+# "foo_v2" is used for testing upgrade scenarios as the upgrade of "foo" from above. We cannot use
+# the "mongo_extension" suffix since loading this extension in passthroughs with "foo" V1 should
+# cause duplicate stage errors.
+mongo_cc_extension_shared_library(
+    name = "foo_extension_v2",
+    srcs = ["foo_v2.cpp"],
+)
 
 # "vector_search" is used to test that we can override the existing $vectorSearch implementation.
 # It must not have the _mongo_extension suffix so that it doesn't get loaded in the

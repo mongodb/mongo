@@ -26,6 +26,7 @@ selector:
   exclude_with_any_tags:
     - featureFlagToaster
     - featureFlagSpoon
+    - auth_incompatible
 
 # Multiversion tests start their own mongod's.
 executor:

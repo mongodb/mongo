@@ -3,11 +3,9 @@
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {
-    testPerformUpgradeDowngradeReplSet
-} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
-import {
-    testPerformUpgradeDowngradeSharded
+    testPerformUpgradeSharded
 } from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
 const collectionName = "coll";
@@ -255,7 +253,7 @@ function assertQueriesOnViewsFail(primaryConnection) {
     );
 }
 
-testPerformUpgradeDowngradeReplSet({
+testPerformUpgradeReplSet({
     setupFn: setupCollection,
     whenFullyDowngraded: assertViewCanBeCreatedButNotExecuted,
     whenSecondariesAreLatestBinary: assertViewCanBeCreatedButNotExecuted,
@@ -263,7 +261,7 @@ testPerformUpgradeDowngradeReplSet({
     whenFullyUpgraded: assertViewCanBeCreatedAndExecuted,
 });
 
-testPerformUpgradeDowngradeSharded({
+testPerformUpgradeSharded({
     setupFn: setupCollection,
     whenFullyDowngraded: assertViewCanBeCreatedButNotExecuted,
     whenOnlyConfigIsLatestBinary: assertViewCanBeCreatedButNotExecuted,

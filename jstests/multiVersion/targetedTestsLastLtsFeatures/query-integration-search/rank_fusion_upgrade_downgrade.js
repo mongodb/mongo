@@ -2,11 +2,9 @@
  * Verifies that $rankFusion behaves correctly in FCV upgrade/downgrade scenarios.
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {
-    testPerformUpgradeDowngradeReplSet
-} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
-import {
-    testPerformUpgradeDowngradeSharded
+    testPerformUpgradeSharded
 } from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
 const collName = jsTestName();
@@ -104,7 +102,7 @@ function assertRankFusionCompletelyAccepted(primaryConn) {
         {aggregate: viewName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}));
 }
 
-testPerformUpgradeDowngradeReplSet({
+testPerformUpgradeReplSet({
     setupFn: setupCollection,
     whenFullyDowngraded: assertRankFusionCompletelyRejected,
     whenSecondariesAreLatestBinary: assertRankFusionCompletelyRejected,
@@ -112,7 +110,7 @@ testPerformUpgradeDowngradeReplSet({
     whenFullyUpgraded: assertRankFusionCompletelyAccepted,
 });
 
-testPerformUpgradeDowngradeSharded({
+testPerformUpgradeSharded({
     setupFn: setupCollection,
     whenFullyDowngraded: assertRankFusionCompletelyRejected,
     whenOnlyConfigIsLatestBinary: assertRankFusionCompletelyRejected,

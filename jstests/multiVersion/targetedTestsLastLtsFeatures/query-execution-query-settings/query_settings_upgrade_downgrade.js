@@ -10,11 +10,9 @@ import {describe, it} from "jstests/libs/mochalite.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {
-    testPerformUpgradeDowngradeReplSet
-} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
-import {
-    testPerformUpgradeDowngradeSharded
+    testPerformUpgradeSharded
 } from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
 const dbName = "test";
@@ -68,7 +66,7 @@ describe("QuerySettings", function() {
                 assertQueryShapeConfigurations(true);
 
             it("in replica set", function() {
-                testPerformUpgradeDowngradeReplSet({
+                testPerformUpgradeReplSet({
                     setupFn,
                     whenFullyDowngraded:
                         assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,
@@ -82,7 +80,7 @@ describe("QuerySettings", function() {
             });
 
             it("in sharded cluster", function() {
-                testPerformUpgradeDowngradeSharded({
+                testPerformUpgradeSharded({
                     setupFn,
                     whenFullyDowngraded:
                         assertQueryShapeConfigurationsWithEmptyRepresentativeQueries,

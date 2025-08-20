@@ -84,3 +84,6 @@ filters:
   - "raw_operation_utils.js":
     approvers:
       - 10gen/server-collection-write-path
+  - "json_utils.js":
+    approvers:
+      - 10gen/query-integration-extensions

@@ -2,11 +2,9 @@
  * Verifies that $scoreFusion behaves correctly in FCV upgrade/downgrade scenarios.
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {
-    testPerformUpgradeDowngradeReplSet
-} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
-import {
-    testPerformUpgradeDowngradeSharded
+    testPerformUpgradeSharded
 } from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
 const collName = jsTestName();
@@ -186,7 +184,7 @@ function assertScoreFusionCompletelyAccepted(primaryConn) {
         db.runCommand({aggregate: collName, pipeline: scorePipelineWithScoreDetails, cursor: {}}));
 }
 
-testPerformUpgradeDowngradeReplSet({
+testPerformUpgradeReplSet({
     setupFn: setupCollection,
     whenFullyDowngraded: assertScoreFusionCompletelyRejected,
     whenSecondariesAreLatestBinary: assertScoreFusionCompletelyRejected,
@@ -194,7 +192,7 @@ testPerformUpgradeDowngradeReplSet({
     whenFullyUpgraded: assertScoreFusionCompletelyAccepted,
 });
 
-testPerformUpgradeDowngradeSharded({
+testPerformUpgradeSharded({
     setupFn: setupCollection,
     whenFullyDowngraded: assertScoreFusionCompletelyRejected,
     whenOnlyConfigIsLatestBinary: assertScoreFusionCompletelyRejected,

@@ -8,11 +8,9 @@
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {
-    testPerformUpgradeDowngradeReplSet
-} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
-import {
-    testPerformUpgradeDowngradeSharded
+    testPerformUpgradeSharded
 } from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
 const collectionName = "coll";
@@ -194,7 +192,7 @@ function assertCreateOrEvaluateViewsWithNewFeaturesFail(primaryConnection) {
     }
 }
 
-testPerformUpgradeDowngradeReplSet({
+testPerformUpgradeReplSet({
     setupFn: setupCollection,
     whenFullyDowngraded: assertCreateOrEvaluateViewsWithNewFeaturesFail,
     whenSecondariesAreLatestBinary: assertCreateOrEvaluateViewsWithNewFeaturesFail,
@@ -202,7 +200,7 @@ testPerformUpgradeDowngradeReplSet({
     whenFullyUpgraded: assertCreateAndEvaluateViewsWithNewFeaturesPass,
 });
 
-testPerformUpgradeDowngradeSharded({
+testPerformUpgradeSharded({
     setupFn: setupCollection,
     whenFullyDowngraded: assertCreateOrEvaluateViewsWithNewFeaturesFail,
     whenOnlyConfigIsLatestBinary: assertCreateOrEvaluateViewsWithNewFeaturesFail,

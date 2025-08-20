@@ -19,6 +19,9 @@ selector:
   exclude_with_any_tags:
     - featureFlagToaster
     - featureFlagSpoon
+    # This suite's fixture does not set up authentication. There is a multiversion_auth variant
+    # which does. Those tests which require auth should not run here, only in the auth variant.
+    - requires_auth
 
 # Multiversion tests start their own mongod's.
 executor:

@@ -4,15 +4,16 @@
 
 import "jstests/multiVersion/libs/multi_rs.js";
 
+import {copyJSON} from "jstests/libs/json_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 /**
- * Restarts the specified binaries in options with the specified binVersion.
+ * Restarts the specified binaries in upgradeOptions with the specified binVersion.
  * Note: this does not perform any upgrade operations.
  *
  * @param binVersion {string}
- * @param options {Object} format:
+ * @param upgradeOptions {Object} format:
  *
  * {
  *     upgradeShards: <bool>, // defaults to true
@@ -24,20 +25,20 @@ import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
  *                                 certain tests will likely want a stable cluster after upgrading.
  * }
  */
-ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
-    options = options || {};
-    if (options.upgradeShards == undefined)
-        options.upgradeShards = true;
-    if (options.upgradeOneShard == undefined)
-        options.upgradeOneShard = false;
-    if (options.upgradeConfigs == undefined)
-        options.upgradeConfigs = true;
-    if (options.upgradeMongos == undefined)
-        options.upgradeMongos = true;
-    if (options.waitUntilStable == undefined)
-        options.waitUntilStable = false;
+ShardingTest.prototype.upgradeCluster = function(binVersion, upgradeOptions, nodeOptions = {}) {
+    upgradeOptions = upgradeOptions || {};
+    if (upgradeOptions.upgradeShards == undefined)
+        upgradeOptions.upgradeShards = true;
+    if (upgradeOptions.upgradeOneShard == undefined)
+        upgradeOptions.upgradeOneShard = false;
+    if (upgradeOptions.upgradeConfigs == undefined)
+        upgradeOptions.upgradeConfigs = true;
+    if (upgradeOptions.upgradeMongos == undefined)
+        upgradeOptions.upgradeMongos = true;
+    if (upgradeOptions.waitUntilStable == undefined)
+        upgradeOptions.waitUntilStable = false;
 
-    if (options.upgradeConfigs) {
+    if (upgradeOptions.upgradeConfigs) {
         // Upgrade config servers
         const numConfigs = this.configRS.nodes.length;
 
@@ -45,27 +46,37 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
             var configSvr = this.configRS.nodes[i];
 
             MongoRunner.stopMongod(configSvr);
-            configSvr = MongoRunner.runMongod(
-                {restart: configSvr, binVersion: binVersion, appendOptions: true});
+            // Must copy the nodeOptions since they are modified by callee.
+            const configSrvOptions = copyJSON(nodeOptions);
+            configSvr = MongoRunner.runMongod({
+                restart: configSvr,
+                binVersion: binVersion,
+                appendOptions: true,
+                ...configSrvOptions
+            });
 
             this["config" + i] = this["c" + i] = this.configRS.nodes[i] = configSvr;
         }
     }
 
-    if (options.upgradeShards) {
+    if (upgradeOptions.upgradeShards) {
         // Upgrade shards
         this._rs.forEach((rs) => {
-            rs.test.upgradeSet({binVersion: binVersion});
+            // Must copy the nodeOptions since they are modified by callee.
+            const replSetOptions = copyJSON(nodeOptions);
+            rs.test.upgradeSet({binVersion: binVersion, ...replSetOptions});
         });
     }
 
-    if (options.upgradeOneShard) {
+    if (upgradeOptions.upgradeOneShard) {
         // Upgrade one shard.
-        let rs = options.upgradeOneShard;
-        rs.upgradeSet({binVersion: binVersion});
+        let rs = upgradeOptions.upgradeOneShard;
+        // Must copy the nodeOptions since they are modified by callee.
+        const replSetOptions = copyJSON(nodeOptions);
+        rs.upgradeSet({binVersion: binVersion, ...replSetOptions});
     }
 
-    if (options.upgradeMongos) {
+    if (upgradeOptions.upgradeMongos) {
         // Upgrade all mongos hosts if specified
         var numMongoses = this._mongos.length;
 
@@ -73,8 +84,10 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
             var mongos = this._mongos[i];
             MongoRunner.stopMongos(mongos);
 
+            // Must copy the nodeOptions since they are modified by callee.
+            const mongosOptions = copyJSON(nodeOptions);
             mongos = MongoRunner.runMongos(
-                {restart: mongos, binVersion: binVersion, appendOptions: true});
+                {restart: mongos, binVersion: binVersion, appendOptions: true, ...mongosOptions});
 
             this["s" + i] = this._mongos[i] = mongos;
             if (i == 0)
@@ -85,25 +98,25 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
         this.admin = this.s.getDB("admin");
     }
 
-    if (options.waitUntilStable) {
+    if (upgradeOptions.waitUntilStable) {
         this.waitUntilStable();
     }
 };
 
-ShardingTest.prototype.downgradeCluster = function(binVersion, options) {
-    options = options || {};
-    if (options.downgradeShards == undefined)
-        options.downgradeShards = true;
-    if (options.downgradeOneShard == undefined)
-        options.downgradeOneShard = false;
-    if (options.downgradeConfigs == undefined)
-        options.downgradeConfigs = true;
-    if (options.downgradeMongos == undefined)
-        options.downgradeMongos = true;
-    if (options.waitUntilStable == undefined)
-        options.waitUntilStable = false;
+ShardingTest.prototype.downgradeCluster = function(binVersion, downgradeOptions, nodeOptions = {}) {
+    downgradeOptions = downgradeOptions || {};
+    if (downgradeOptions.downgradeShards == undefined)
+        downgradeOptions.downgradeShards = true;
+    if (downgradeOptions.downgradeOneShard == undefined)
+        downgradeOptions.downgradeOneShard = false;
+    if (downgradeOptions.downgradeConfigs == undefined)
+        downgradeOptions.downgradeConfigs = true;
+    if (downgradeOptions.downgradeMongos == undefined)
+        downgradeOptions.downgradeMongos = true;
+    if (downgradeOptions.waitUntilStable == undefined)
+        downgradeOptions.waitUntilStable = false;
 
-    if (options.downgradeMongos) {
+    if (downgradeOptions.downgradeMongos) {
         // Downgrade all mongos hosts if specified
         var numMongoses = this._mongos.length;
 
@@ -111,8 +124,10 @@ ShardingTest.prototype.downgradeCluster = function(binVersion, options) {
             var mongos = this._mongos[i];
             MongoRunner.stopMongos(mongos);
 
+            // Must copy the nodeOptions since they are modified by callee.
+            const mongosOptions = copyJSON(nodeOptions);
             mongos = MongoRunner.runMongos(
-                {restart: mongos, binVersion: binVersion, appendOptions: true});
+                {restart: mongos, binVersion: binVersion, appendOptions: true, ...mongosOptions});
 
             this["s" + i] = this._mongos[i] = mongos;
             if (i == 0)
@@ -123,35 +138,46 @@ ShardingTest.prototype.downgradeCluster = function(binVersion, options) {
         this.admin = this.s.getDB("admin");
     }
 
-    if (options.downgradeShards) {
+    if (downgradeOptions.downgradeShards) {
         // Downgrade shards
         this._rs.forEach((rs) => {
-            rs.test.upgradeSet({binVersion: binVersion});
+            // Must copy the nodeOptions since they are modified by callee.
+            const replSetOptions = copyJSON(nodeOptions);
+            rs.test.upgradeSet({binVersion: binVersion, ...replSetOptions});
         });
     }
 
-    if (options.downgradeOneShard) {
+    if (downgradeOptions.downgradeOneShard) {
+        // Must copy the nodeOptions since they are modified by callee.
+        const replSetOptions = copyJSON(nodeOptions);
+
         // Downgrade one shard.
-        let rs = options.downgradeOneShard;
-        rs.upgradeSet({binVersion: binVersion});
+        let rs = downgradeOptions.downgradeOneShard;
+        rs.upgradeSet({binVersion: binVersion, ...replSetOptions});
     }
 
-    if (options.downgradeConfigs) {
+    if (downgradeOptions.downgradeConfigs) {
         // Downgrade config servers
         const numConfigs = this.configRS.nodes.length;
 
         for (var i = 0; i < numConfigs; i++) {
             var configSvr = this.configRS.nodes[i];
 
+            // Must copy the nodeOptions since they are modified by callee.
+            const configSvrOptions = copyJSON(nodeOptions);
             MongoRunner.stopMongod(configSvr);
-            configSvr = MongoRunner.runMongod(
-                {restart: configSvr, binVersion: binVersion, appendOptions: true});
+            configSvr = MongoRunner.runMongod({
+                restart: configSvr,
+                binVersion: binVersion,
+                appendOptions: true,
+                ...configSvrOptions
+            });
 
             this["config" + i] = this["c" + i] = this.configRS.nodes[i] = configSvr;
         }
     }
 
-    if (options.waitUntilStable) {
+    if (downgradeOptions.waitUntilStable) {
         this.waitUntilStable();
     }
 };

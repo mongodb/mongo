@@ -879,6 +879,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/**/check_metadata_consistency_helpers.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/libs/**/catalog_list_operations_consistency_validator.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/libs/**/raw_operation_utils.js @10gen/server-collection-write-path @svc-auto-approve-bot
+/jstests/libs/**/json_utils.js @10gen/query-integration-extensions @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/clustered_collections/OWNERS.yml
 /jstests/libs/clustered_collections/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
@@ -970,6 +971,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/capped_collections/OWNERS.yml
 /jstests/multiVersion/genericBinVersion/capped_collections/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/extensions_api/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/extensions_api/ @10gen/query-integration-extensions-api @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/index_builds/OWNERS.yml
 /jstests/multiVersion/genericBinVersion/index_builds/**/* @10gen/server-index-builds @svc-auto-approve-bot
