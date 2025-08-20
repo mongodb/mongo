@@ -61,4 +61,75 @@ auto DefaultRetryStrategy::backoffFromServerParameters() -> BackoffParameters {
     };
 }
 
+bool AdaptiveRetryStrategy::recordFailureAndEvaluateShouldRetry(
+    Status s,
+    const boost::optional<HostAndPort>& target,
+    std::span<const std::string> errorLabels) {
+    const bool targetOverloaded =
+        std::ranges::find(errorLabels, ErrorLabel::kSystemOverloadedError) != errorLabels.end();
+
+    const auto evaluateShouldRetry = [&] {
+        if (targetOverloaded) {
+            _previousAttemptOverloaded = true;
+            return _budget->tryAcquireToken();
+        }
+
+        _budget->recordNotOverloaded(_previousAttemptOverloaded);
+        _previousAttemptOverloaded = false;
+        return true;
+    };
+
+    return evaluateShouldRetry() &&
+        _underlyingStrategy->recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+}
+
+void AdaptiveRetryStrategy::recordSuccess(const boost::optional<HostAndPort>& target) {
+    _budget->recordNotOverloaded(_previousAttemptOverloaded);
+    _underlyingStrategy->recordSuccess(target);
+}
+
+bool AdaptiveRetryStrategy::RetryBudget::tryAcquireToken() {
+    auto currentBalance = _balance.load();
+    do {
+        if (currentBalance < 1) {
+            return false;
+        }
+    } while (MONGO_unlikely(!_balance.compareAndSwap(&currentBalance, currentBalance - 1)));
+
+    return true;
+}
+
+void AdaptiveRetryStrategy::RetryBudget::recordNotOverloaded(bool returnExtraToken) {
+    auto lk = _rwMutex.readLock();
+
+    const auto amountReturned = _returnRate + (returnExtraToken ? 1. : 0.);
+    auto currentBalance = _balance.load();
+    do {
+        if (currentBalance >= _capacity) {
+            return;
+        }
+    } while (MONGO_unlikely(!_balance.compareAndSwap(
+        &currentBalance, std::min(_capacity, currentBalance + amountReturned))));
+}
+
+void AdaptiveRetryStrategy::RetryBudget::updateRateParameters(double returnRate, double capacity) {
+    auto lk = _rwMutex.writeLock();
+    _returnRate = returnRate;
+
+    if (capacity < _capacity) {
+        auto currentBalance = _balance.load();
+        do {
+            if (currentBalance <= capacity) {
+                break;
+            }
+        } while (MONGO_unlikely(!_balance.compareAndSwap(&currentBalance, capacity)));
+    }
+
+    _capacity = capacity;
+}
+
+double AdaptiveRetryStrategy::RetryBudget::getBalance_forTest() const {
+    return _balance.load();
+}
+
 }  // namespace mongo
