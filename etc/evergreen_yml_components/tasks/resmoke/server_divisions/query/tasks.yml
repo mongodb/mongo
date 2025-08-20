@@ -619,32 +619,6 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
-  - <<: *task_template
-    name: change_streams_multitenant_passthrough
-    tags:
-      [
-        "assigned_to_jira_team_server_query_execution",
-        "experimental",
-        "serverless",
-        "change_streams",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
-  - <<: *task_template
-    name: change_streams_multitenant_sharded_collections_passthrough
-    tags:
-      [
-        "assigned_to_jira_team_server_query_execution",
-        "experimental",
-        "serverless",
-        "change_streams",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
   - <<: *gen_task_template
     name: change_streams_multiversion_gen
     tags:
