@@ -492,6 +492,8 @@ last-continuous:
       ticket: SERVER-94787
     - test_file: jstests/core/timeseries/ddl/rename_timeseries.js
       ticket: SERVER-109087
+    - test_file: jstests/core/timeseries/ddl/timeseries_bucket_index.js
+      ticket: SERVER-87119
   suites: null
 last-lts:
   all:
@@ -1039,4 +1041,6 @@ last-lts:
       ticket: SERVER-94787
     - test_file: jstests/core/timeseries/ddl/rename_timeseries.js
       ticket: SERVER-109087
+    - test_file: jstests/core/timeseries/ddl/timeseries_bucket_index.js
+      ticket: SERVER-87119
   suites: null
