@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/host_portal.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -57,7 +58,7 @@ public:
 
 class VectorSearchExtension : public sdk::Extension {
 public:
-    void initialize(const ::MongoExtensionHostPortal* portal) override {
+    void initialize(const sdk::HostPortalHandle& portal) override {
         _registerStage<VectorSearchStageDescriptor>(portal);
     }
 };

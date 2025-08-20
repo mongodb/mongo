@@ -17,6 +17,7 @@ mongo_cc_library(
         "extension_helper.h",
         "extension_status.h",
         "handle.h",
+        "host_portal.h",
     ],
     visibility = ["//visibility:public"],
     deps = [

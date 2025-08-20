@@ -10,7 +10,7 @@ mongo_cc_library(
     name = "api",
     srcs = [
         "document_source_extension.cpp",
-        "stage_registry.cpp",
+        "host_portal.cpp",
     ],
     hdrs = [
         "aggregation_stage.h",
@@ -19,7 +19,7 @@ mongo_cc_library(
         "extension_handle.h",
         "extension_status.h",
         "handle.h",
-        "stage_registry.h",
+        "host_portal.h",
     ],
     visibility = ["//visibility:public"],
     deps = [

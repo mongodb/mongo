@@ -30,7 +30,6 @@
 #include "mongo/db/extension/host/load_extension.h"
 
 #include "mongo/db/extension/host/extension_handle.h"
-#include "mongo/db/extension/host/stage_registry.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -163,9 +162,8 @@ void ExtensionLoader::load(const std::string& extensionPath) {
                .getIncomingInternalClient()
                .maxWireVersion);
 
-    ::MongoExtensionHostPortal portal{
-        extHandle.getVersion(), maxWireVersion, registerStageDescriptor};
-    extHandle.initialize(&portal);
+    HostPortal portal{extHandle.getVersion(), maxWireVersion};
+    extHandle.initialize(portal);
 
     // Add the 'SharedLibrary' pointer to our loaded extensions array to keep it alive for the
     // lifetime of the server.

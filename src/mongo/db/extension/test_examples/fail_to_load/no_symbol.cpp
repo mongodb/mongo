@@ -29,10 +29,12 @@
 
 #include "mongo/db/extension/sdk/extension_factory.h"
 
-class MyExtension : public mongo::extension::sdk::Extension {
+namespace sdk = mongo::extension::sdk;
+
+class MyExtension : public sdk::Extension {
 public:
     // The initialization function is empty since the test should never reach initialization.
-    void initialize(const ::MongoExtensionHostPortal* portal) override {}
+    void initialize(const sdk::HostPortalHandle& portal) override {}
 };
 
 // No definition of get_mongodb_extension() here, which is intentional to simulate a malformed

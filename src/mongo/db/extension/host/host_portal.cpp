@@ -26,38 +26,24 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/db/extension/host/host_portal.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/sdk/aggregation_stage.h"
-#include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/host/aggregation_stage.h"
+#include "mongo/db/extension/host/document_source_extension.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 
-namespace sdk = mongo::extension::sdk;
+namespace mongo::extension::host {
 
-class MyLogicalStage : public sdk::LogicalAggregationStage {};
+void registerStageDescriptor(const ::MongoExtensionAggregationStageDescriptor* descriptor) {
+    tassert(
+        10596400, "Got null stage descriptor during extension registration", descriptor != nullptr);
+    DocumentSourceExtension::registerStage(ExtensionAggregationStageDescriptorHandle(descriptor));
+}
 
-class MyStageDescriptor : public sdk::AggregationStageDescriptor {
-public:
-    static inline const std::string kStageName = "$myStage";
 
-    MyStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+::MongoExtensionStatus* HostPortal::_extRegisterStageDescriptor(
+    const MongoExtensionAggregationStageDescriptor* stageDesc) noexcept {
+    return sdk::enterCXX([&]() { return registerStageDescriptor(stageDesc); });
+}
 
-    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
-        uassert(10696403,
-                "Failed to parse " + kStageName + ", expected object",
-                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
-
-        return std::make_unique<MyLogicalStage>();
-    }
-};
-
-class MyExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        // Should fail due to registering the same StageDescriptor multiple times.
-        _registerStage<MyStageDescriptor>(portal);
-        _registerStage<MyStageDescriptor>(portal);
-    }
-};
-
-REGISTER_EXTENSION(MyExtension);
+}  // namespace mongo::extension::host

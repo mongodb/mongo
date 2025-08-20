@@ -31,6 +31,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/sdk/host_portal.h"
 
 #include <memory>
 
@@ -44,11 +45,11 @@ class Extension {
 public:
     virtual ~Extension() = default;
 
-    virtual void initialize(const ::MongoExtensionHostPortal* portal) = 0;
+    virtual void initialize(const HostPortalHandle& portal) = 0;
 
 protected:
     template <class StageDescriptor>
-    void _registerStage(const ::MongoExtensionHostPortal* portal) {
+    void _registerStage(const HostPortalHandle& portal) {
         // Error out if StageDescriptor is already registered to this extension.
         uassert(10696402,
                 str::stream() << StageDescriptor::kStageName << " is already registered",
@@ -57,11 +58,7 @@ protected:
         auto stageDesc = std::make_unique<ExtensionAggregationStageDescriptor>(
             std::make_unique<StageDescriptor>());
 
-        enterC([&] {
-            return portal->registerStageDescriptor(
-                reinterpret_cast<const ::MongoExtensionAggregationStageDescriptor*>(
-                    stageDesc.get()));
-        });
+        portal.registerStageDescriptor(stageDesc.get());
 
         _stageDescriptors.emplace(StageDescriptor::kStageName, std::move(stageDesc));
     }
@@ -86,8 +83,9 @@ private:
     static ::MongoExtensionStatus* _extInitialize(
         const ::MongoExtension* extensionPtr, const ::MongoExtensionHostPortal* portal) noexcept {
         return enterCXX([&]() {
+            auto hostPortal = HostPortalHandle(portal);
             static_cast<const sdk::ExtensionAdapter*>(extensionPtr)
-                ->_extensionPointer->initialize(portal);
+                ->_extensionPointer->initialize(hostPortal);
         });
     }
     static constexpr ::MongoExtensionVTable VTABLE{&_extInitialize};

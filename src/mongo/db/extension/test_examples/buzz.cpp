@@ -55,7 +55,7 @@ public:
 
 class BuzzExtension : public sdk::Extension {
 public:
-    void initialize(const ::MongoExtensionHostPortal* portal) override {
+    void initialize(const sdk::HostPortalHandle& portal) override {
         _registerStage<TestBuzzStageDescriptor>(portal);
     }
 };

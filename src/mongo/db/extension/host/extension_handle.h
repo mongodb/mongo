@@ -28,6 +28,7 @@
  */
 #pragma once
 #include "mongo/db/extension/host/handle.h"
+#include "mongo/db/extension/host/host_portal.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 
@@ -45,10 +46,10 @@ public:
         _assertValidVTable();
     }
 
-    void initialize(const ::MongoExtensionHostPortal* portal) const {
+    void initialize(const HostPortal& portal) const {
         sdk::enterC([&] {
             assertValid();
-            return vtable().initialize(get(), portal);
+            return vtable().initialize(get(), &portal);
         });
     }
 

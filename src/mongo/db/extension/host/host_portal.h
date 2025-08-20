@@ -26,24 +26,24 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "mongo/db/extension/host/stage_registry.h"
-
-#include "mongo/db/extension/host/document_source_extension.h"
-#include "mongo/db/extension/host/extension_status.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/extension/public/api.h"
 
 namespace mongo::extension::host {
 
-::MongoExtensionStatus* registerStageDescriptor(
-    const ::MongoExtensionAggregationStageDescriptor* descriptor) {
-    return mongo::extension::sdk::enterCXX([&]() {
-        tassert(10596400,
-                "Got null stage descriptor during extension registration",
-                descriptor != nullptr);
-        DocumentSourceExtension::registerStage(
-            ExtensionAggregationStageDescriptorHandle(descriptor));
-    });
-}
+void registerStageDescriptor(const ::MongoExtensionAggregationStageDescriptor* descriptor);
+
+class HostPortal final : public ::MongoExtensionHostPortal {
+public:
+    HostPortal(::MongoExtensionAPIVersion apiVersion, int maxWireVersion)
+        : ::MongoExtensionHostPortal(&VTABLE, apiVersion, maxWireVersion) {}
+
+private:
+    static ::MongoExtensionStatus* _extRegisterStageDescriptor(
+        const MongoExtensionAggregationStageDescriptor* stageDesc) noexcept;
+
+    static constexpr ::MongoExtensionHostPortalVTable VTABLE{&_extRegisterStageDescriptor};
+};
 
 }  // namespace mongo::extension::host

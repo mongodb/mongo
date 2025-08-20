@@ -36,7 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/extension/host/stage_registry.h"
+#include "mongo/db/extension/host/host_portal.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/byte_buf.h"
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
@@ -156,11 +156,9 @@ TEST_F(DocumentSourceExtensionTest, parseNoOpSuccess) {
     std::vector<BSONObj> testPipeline{kValidSpec};
     ASSERT_THROWS_CODE(buildTestPipeline(testPipeline), AssertionException, 16436);
     // Register the extension stage and try to reparse.
-    extension::sdk::enterC([&]() {
-        return mongo::extension::host::registerStageDescriptor(
-            reinterpret_cast<const ::MongoExtensionAggregationStageDescriptor*>(
-                &_noOpStaticDescriptor));
-    });
+    mongo::extension::host::registerStageDescriptor(
+        reinterpret_cast<const ::MongoExtensionAggregationStageDescriptor*>(
+            &_noOpStaticDescriptor));
     auto parsedPipeline = buildTestPipeline(testPipeline);
     ASSERT(parsedPipeline);
 

@@ -217,14 +217,18 @@ typedef struct MongoExtensionLogicalAggregationStageVTable {
  * register custom aggregation stages.
  */
 typedef struct MongoExtensionHostPortal {
+    const struct MongoExtensionHostPortalVTable* vtable;
     MongoExtensionAPIVersion hostExtensionsAPIVersion;
     // Wire versions in MongoDB are stored in an enum. Each service context will have both a min and
     // a max wire version; the extension should only need the max wire version in order to determine
     // if new server features have been added.
     int32_t hostMongoDBMaxWireVersion;
+} MongoExtensionHostPortal;
+
+typedef struct MongoExtensionHostPortalVTable {
     MongoExtensionStatus* (*registerStageDescriptor)(
         const MongoExtensionAggregationStageDescriptor* descriptor);
-} MongoExtensionHostPortal;
+} MongoExtensionHostPortalVTable;
 
 /**
  * MongoExtension is the top-level struct that must be defined by any MongoDB extension. It contains

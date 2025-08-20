@@ -26,27 +26,15 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/db/extension/sdk/extension_factory.h"
 
+namespace sdk = mongo::extension::sdk;
 
-#include "mongo/db/extension/sdk/extension_status.h"
-
-static ::MongoExtensionStatus* initialize_extension(const ::MongoExtension* extension,
-                                                    const ::MongoExtensionHostPortal* portal) {
-    return portal->registerStageDescriptor(nullptr);
-}
-
-static const ::MongoExtensionVTable vtable = {
-    .initialize = &initialize_extension,
+class NullStageExtension : public sdk::Extension {
+public:
+    void initialize(const sdk::HostPortalHandle& portal) {
+        portal.registerStageDescriptor(nullptr);
+    }
 };
 
-static const ::MongoExtension my_extension = {
-    .vtable = &vtable,
-    .version = MONGODB_EXTENSION_API_VERSION,
-};
-
-extern "C" {
-::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
-                                              const ::MongoExtension** extension) {
-    return mongo::extension::sdk::enterCXX([&]() { *extension = &my_extension; });
-}
-}
+REGISTER_EXTENSION(NullStageExtension);

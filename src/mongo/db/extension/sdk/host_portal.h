@@ -29,15 +29,45 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 
-namespace mongo::extension::host {
+namespace mongo::extension::sdk {
 
 /**
- * This function will be exposed to extensions via a function pointer in the future. It will be
- * invoked by extensions at load time so they can register a parser with their static
- * descriptor.
+ * Wrapper for ::MongoExtensionHostPortal providing safe access to its public API via the vtable.
+ * This is an unowned handle, meaning extensions remain fully owned by themselves, and ownership
+ * is never transferred to the host.
  */
-::MongoExtensionStatus* registerStageDescriptor(
-    const ::MongoExtensionAggregationStageDescriptor* descriptor);
+class HostPortalHandle : public sdk::UnownedHandle<const ::MongoExtensionHostPortal> {
+public:
+    HostPortalHandle(const ::MongoExtensionHostPortal* portal)
+        : sdk::UnownedHandle<const ::MongoExtensionHostPortal>(portal) {}
 
-}  // namespace mongo::extension::host
+    void registerStageDescriptor(const sdk::ExtensionAggregationStageDescriptor* stageDesc) const {
+        sdk::enterC([&] {
+            assertValid();
+            return vtable().registerStageDescriptor(
+                reinterpret_cast<const ::MongoExtensionAggregationStageDescriptor*>(stageDesc));
+        });
+    }
+
+    ::MongoExtensionAPIVersion getHostExtensionsAPIVersion() const {
+        assertValid();
+        return get()->hostExtensionsAPIVersion;
+    }
+
+    int getHostMongoDBMaxWireVersion() const {
+        assertValid();
+        return get()->hostMongoDBMaxWireVersion;
+    }
+
+private:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10926401,
+                "Extension 'registerStageDescriptor' is null",
+                vtable.registerStageDescriptor != nullptr);
+    };
+};
+
+}  // namespace mongo::extension::sdk

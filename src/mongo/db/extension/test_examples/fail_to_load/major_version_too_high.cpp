@@ -29,18 +29,20 @@
 
 #include "mongo/db/extension/sdk/extension_factory.h"
 
-class MyExtension : public mongo::extension::sdk::Extension {
+namespace sdk = mongo::extension::sdk;
+
+class MyExtension : public sdk::Extension {
 public:
     // The initialization function is empty since the test should never reach initialization.
-    void initialize(const ::MongoExtensionHostPortal* portal) override {}
+    void initialize(const sdk::HostPortalHandle& portal) override {}
 };
 
 extern "C" {
 ::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
                                               const ::MongoExtension** extension) {
 
-    return mongo::extension::sdk::enterCXX([&]() {
-        static auto ext = std::make_unique<mongo::extension::sdk::ExtensionAdapter>(
+    return sdk::enterCXX([&]() {
+        static auto ext = std::make_unique<sdk::ExtensionAdapter>(
             std::make_unique<MyExtension>(),
             // Major version is one more than the currently-supported version.
             ::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_VERSION.major + 1, 0, 0});

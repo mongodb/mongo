@@ -75,7 +75,7 @@ public:
 
 class MyExtension : public sdk::Extension {
 public:
-    void initialize(const ::MongoExtensionHostPortal* portal) override {
+    void initialize(const sdk::HostPortalHandle& portal) override {
         _registerStage<FooStageDescriptor>(portal);
         _registerStage<BarStageDescriptor>(portal);
     }

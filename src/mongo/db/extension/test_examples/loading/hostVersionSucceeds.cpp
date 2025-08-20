@@ -36,14 +36,14 @@ namespace sdk = mongo::extension::sdk;
 
 class ExtensionA : public sdk::Extension {
 public:
-    void initialize(const ::MongoExtensionHostPortal* portal) override {
+    void initialize(const sdk::HostPortalHandle& portal) override {
         // Intentionally left blank.
     }
 };
 
 class ExtensionB : public sdk::Extension {
 public:
-    void initialize(const ::MongoExtensionHostPortal* portal) override {
+    void initialize(const sdk::HostPortalHandle& portal) override {
         // Intentionally left blank.
     }
 };
