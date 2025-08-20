@@ -316,6 +316,7 @@ executor:
       - CheckReplOplogs
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
+      - DropSessionsCollection
   config:
     shell_options:
       # Note: fail_unclean_shutdown_incompatible_commands.js not included because it conflicts with
@@ -331,7 +332,7 @@ executor:
         await import('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
         await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
       global_vars:
-        TestData:
+        TestData: &TestData
           logRetryAttempts: true
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
@@ -342,6 +343,7 @@ executor:
             # electable.
             causalConsistency: true
             retryWrites: true
+          backgroundSessionCollectionDrop: true
       # We specify nodb so the shell used by each test will attempt to connect after loading the
       # retry logic in auto_retry_on_network_error.js.
       nodb: ""
@@ -359,8 +361,12 @@ executor:
     - class: CheckReplOplogs
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData: *TestData
     - class: ValidateCollections
     - class: CheckOrphansDeleted
+    - class: DropSessionsCollection
     - class: CleanEveryN
       n: 20
   fixture:

@@ -5,6 +5,66 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+Random.setRandomSeed();
+
+function dropSessionsCollection(mainConn, priConn, configConn) {
+    jsTest.log("Dropping sessions collection.");
+    if (mainConn == priConn) {
+        // ReplicaSet, just drop the collection on the primary.
+        priConn.getDB("config").getCollection("system.sessions").drop();
+    } else {
+        // Sharded cluster, drop the collection everywhere. Since the collection is sharded we need
+        // to clean up not only the local catalog (as above on replica sets) but also the metadata
+        // in the global catalog.
+        // TODO (SERVER-107023): replace this once we have the ability to drop the sessions
+        // collection internally.
+        let collDoc = configConn.getDB("config").getCollection("collections").findOne({
+            _id: "config.system.sessions"
+        });
+        if (collDoc == undefined) {
+            return;
+        }
+        let uuid = collDoc.uuid;
+        assert.commandWorked(
+            configConn.getDB("config")
+                .getCollection("collections")
+                .deleteOne({_id: "config.system.sessions"}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(configConn.getDB("config").getCollection("chunks").deleteMany(
+            {uuid: uuid}, {writeConcern: {w: "majority"}}));
+        // We update the placement history here to satisfy the hook which validates this information
+        // though in practices these inconsistencies do not matter since you cannot open change
+        // streams on config.system.sessions.
+        let existingPlacementDoc = configConn.getDB("config")
+                                       .getCollection("placementHistory")
+                                       .find()
+                                       .sort({timestamp: -1})
+                                       .limit(1)[0];
+        let newPlacement = {
+            _id: ObjectId(),
+            "nss": "config.system.sessions",
+            "uuid": uuid,
+            "timestamp": Timestamp(existingPlacementDoc.timestamp.getTime(),
+                                   existingPlacementDoc.timestamp.getInc() + 1),
+            "shards": []
+        };
+        assert.commandWorked(
+            configConn.getDB("config").getCollection("placementHistory").insertOne(newPlacement, {
+                writeConcern: {w: "majority"}
+            }));
+        configConn.getDB("config").getCollection("system.sessions").drop();
+        priConn.getDB("config").getCollection("system.sessions").drop();
+        assert.commandWorked(
+            configConn.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}));
+        assert.commandWorked(
+            priConn.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}));
+    }
+}
+
+function createSessionsCollection(configConn) {
+    jsTest.log("Forcing refresh of the sessions collection");
+    assert.commandWorked(configConn.adminCommand({refreshLogicalSessionCacheNow: 1}));
+}
+
 function checkFindAndModifyResult(expected, toCheck) {
     assert.eq(expected.ok, toCheck.ok);
     assert.eq(expected.value, toCheck.value);
@@ -33,7 +93,22 @@ function verifyServerStatusChanges(
               "expected retriedCommandsCount to increase by " + newCollectionWrites);
 }
 
-function runTests(mainConn, priConn) {
+function handleSessionsCollection(mainConn, priConn, configConn) {
+    // We have to either drop and recreate or do neither because in config shard suites otherwise
+    // the periodic creation will mess with the transaction.
+    let createdCollection = false;
+    if (Math.random() < 0.25) {
+        dropSessionsCollection(mainConn, priConn, configConn);
+        createSessionsCollection(configConn);
+        createdCollection = true;
+    }
+    // If we are in a config shard and we dropped and recreated the sessions collection then, as
+    // part of the create coordinator, we ran a transaction which will mess with server status
+    // counts.
+    return TestData.configShard && mainConn != priConn && createdCollection;
+}
+
+function runTests(mainConn, priConn, configConn) {
     var lsid = UUID();
     assert.commandWorked(mainConn.getDB("test").createCollection("user"));
 
@@ -60,6 +135,8 @@ function runTests(mainConn, priConn) {
     var testDBPri = priConn.getDB('test');
     assert.eq(2, testDBPri.user.find().itcount());
 
+    let createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+
     var retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
     assert.eq(result.ok, retryResult.ok);
     assert.eq(result.n, retryResult.n);
@@ -75,7 +152,7 @@ function runTests(mainConn, priConn) {
                               newStatus.transactions,
                               1 /* newCommands */,
                               2 /* newStatements */,
-                              1 /* newCollectionWrites */);
+                              createdCollectionInTxn ? 2 : 1 /* newCollectionWrites */);
 
     ////////////////////////////////////////////////////////////////////////
     // Test update command
@@ -104,6 +181,8 @@ function runTests(mainConn, priConn) {
 
     assert.eq(3, testDBPri.user.find().itcount());
 
+    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
     assert.eq(result.ok, retryResult.ok);
     assert.eq(result.n, retryResult.n);
@@ -127,7 +206,7 @@ function runTests(mainConn, priConn) {
                               newStatus.transactions,
                               1 /* newCommands */,
                               3 /* newStatements */,
-                              3 /* newCollectionWrites */);
+                              createdCollectionInTxn ? 4 : 3 /* newCollectionWrites */);
 
     ////////////////////////////////////////////////////////////////////////
     // Test delete command
@@ -156,6 +235,8 @@ function runTests(mainConn, priConn) {
     assert.eq(1, testDBPri.user.find({x: 1}).itcount());
     assert.eq(1, testDBPri.user.find({y: 1}).itcount());
 
+    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
     assert.eq(result.ok, retryResult.ok);
     assert.eq(result.n, retryResult.n);
@@ -173,7 +254,7 @@ function runTests(mainConn, priConn) {
                               newStatus.transactions,
                               1 /* newCommands */,
                               2 /* newStatements */,
-                              2 /* newCollectionWrites */);
+                              createdCollectionInTxn ? 3 : 2 /* newCollectionWrites */);
 
     ////////////////////////////////////////////////////////////////////////
     // Test findAndModify command (upsert)
@@ -196,6 +277,8 @@ function runTests(mainConn, priConn) {
     updateOplogEntries = oplog.find({ns: 'test.user', op: 'u'}).itcount();
     assert.eq({_id: 60, x: 1}, testDBPri.user.findOne({_id: 60}));
 
+    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
 
     assert.eq({_id: 60, x: 1}, testDBPri.user.findOne({_id: 60}));
@@ -210,7 +293,7 @@ function runTests(mainConn, priConn) {
                               newStatus.transactions,
                               1 /* newCommands */,
                               1 /* newStatements */,
-                              1 /* newCollectionWrites */);
+                              createdCollectionInTxn ? 2 : 1 /* newCollectionWrites */);
 
     ////////////////////////////////////////////////////////////////////////
     // Test findAndModify command (update, return pre-image)
@@ -232,6 +315,8 @@ function runTests(mainConn, priConn) {
     var oplogEntries = oplog.find({ns: 'test.user', op: 'u'}).itcount();
     assert.eq({_id: 60, x: 2}, testDBPri.user.findOne({_id: 60}));
 
+    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
 
     assert.eq({_id: 60, x: 2}, testDBPri.user.findOne({_id: 60}));
@@ -245,7 +330,7 @@ function runTests(mainConn, priConn) {
                               newStatus.transactions,
                               1 /* newCommands */,
                               1 /* newStatements */,
-                              1 /* newCollectionWrites */);
+                              createdCollectionInTxn ? 2 : 1 /* newCollectionWrites */);
 
     ////////////////////////////////////////////////////////////////////////
     // Test findAndModify command (update, return post-image)
@@ -267,6 +352,8 @@ function runTests(mainConn, priConn) {
     oplogEntries = oplog.find({ns: 'test.user', op: 'u'}).itcount();
     assert.eq({_id: 60, x: 3}, testDBPri.user.findOne({_id: 60}));
 
+    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
 
     assert.eq({_id: 60, x: 3}, testDBPri.user.findOne({_id: 60}));
@@ -280,7 +367,7 @@ function runTests(mainConn, priConn) {
                               newStatus.transactions,
                               1 /* newCommands */,
                               1 /* newStatements */,
-                              1 /* newCollectionWrites */);
+                              createdCollectionInTxn ? 2 : 1 /* newCollectionWrites */);
 
     ////////////////////////////////////////////////////////////////////////
     // Test findAndModify command (remove, return pre-image)
@@ -303,6 +390,8 @@ function runTests(mainConn, priConn) {
     oplogEntries = oplog.find({ns: 'test.user', op: 'd'}).itcount();
     var docCount = testDBPri.user.find().itcount();
 
+    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
 
     assert.eq(oplogEntries, oplog.find({ns: 'test.user', op: 'd'}).itcount());
@@ -316,7 +405,7 @@ function runTests(mainConn, priConn) {
                               newStatus.transactions,
                               1 /* newCommands */,
                               1 /* newStatements */,
-                              1 /* newCollectionWrites */);
+                              createdCollectionInTxn ? 2 : 1 /* newCollectionWrites */);
 }
 
 function runFailpointTests(mainConn, priConn) {
@@ -531,7 +620,7 @@ replTest.initiate();
 
 var priConn = replTest.getPrimary();
 
-runTests(priConn, priConn);
+runTests(priConn, priConn, priConn);
 runFailpointTests(priConn, priConn);
 runRetryableWriteErrorTest(priConn);
 runMultiTests(priConn);
@@ -542,7 +631,7 @@ replTest.stopSet();
 // Tests for sharded cluster
 var st = new ShardingTest({shards: {rs0: {nodes: 1, verbose: 5}}});
 
-runTests(st.s0, st.rs0.getPrimary());
+runTests(st.s0, st.rs0.getPrimary(), st.configRS.getPrimary());
 runFailpointTests(st.s0, st.rs0.getPrimary());
 runMultiTests(st.s0);
 

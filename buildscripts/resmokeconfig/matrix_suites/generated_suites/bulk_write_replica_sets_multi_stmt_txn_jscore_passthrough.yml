@@ -12,6 +12,7 @@ executor:
       - CheckReplOplogs
       - CheckReplDBHash
       - ValidateCollections
+      - DropSessionsCollection
   config:
     shell_options:
       eval:
@@ -32,6 +33,7 @@ executor:
         enableTestCommands: 1
     num_nodes: 2
   hooks:
+    - class: DropSessionsCollection
     - class: CheckReplOplogs
     - class: CheckReplDBHash
     - class: ValidateCollections

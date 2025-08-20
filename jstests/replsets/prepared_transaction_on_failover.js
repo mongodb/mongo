@@ -15,7 +15,8 @@ const dbName = jsTest.name();
 const collName = "coll";
 const otherDbName = dbName + "_other";
 
-function testTransactionsWithFailover(doWork, stepDown, postCommit) {
+function testTransactionsWithFailover(
+    doWork, stepDown, postCommit, dropCollection, recreateCollection) {
     const primary = replTest.getPrimary();
     const newPrimary = replTest.getSecondary();
     const testDB = primary.getDB(dbName);
@@ -33,6 +34,15 @@ function testTransactionsWithFailover(doWork, stepDown, postCommit) {
     jsTestLog("Putting transaction into prepare");
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
     replTest.awaitReplication();
+
+    if (dropCollection) {
+        jsTest.log("Drop the sessions collection");
+        assert.commandWorked(primary.getDB("config").runCommand({drop: "system.sessions"}));
+    }
+    if (recreateCollection) {
+        jsTest.log("Forcing re-creation of the sessions collection");
+        assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
+    }
 
     stepDown();
     reconnect(primary);
@@ -126,4 +136,17 @@ testTransactionsWithFailover(doInsert, stepDownViaCommand, postInsert);
 testTransactionsWithFailover(doInsertTextSearch, stepDownViaHeartbeat, postInsertTextSearch);
 testTransactionsWithFailover(doInsertTextSearch, stepDownViaCommand, postInsertTextSearch);
 
+// Tests for dropping and recreating the sessions collection while there is a prepared transaction.
+testTransactionsWithFailover(doInsert, stepDownViaHeartbeat, postInsert, true /* dropCollection */);
+testTransactionsWithFailover(doInsert, stepDownViaCommand, postInsert, true /* dropCollection */);
+testTransactionsWithFailover(doInsert,
+                             stepDownViaHeartbeat,
+                             postInsert,
+                             true /* dropCollection */,
+                             true /* recreateCollection */);
+testTransactionsWithFailover(doInsert,
+                             stepDownViaCommand,
+                             postInsert,
+                             true /* dropCollection */,
+                             true /* recreateCollection */);
 replTest.stopSet();

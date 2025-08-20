@@ -57,3 +57,6 @@ filters:
   - "replicaset_transition_to_and_from_csrs.py":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "drop_sessions_collection.py":
+    approvers:
+      - 10gen/server-catalog-and-routing

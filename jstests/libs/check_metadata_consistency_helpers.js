@@ -78,6 +78,20 @@ export var MetadataConsistencyChecker = (function() {
                 }
             }
 
+            // When we are dropping the sessions collection in the background, we may see
+            // inconsistencies if CMC interleaves with the non-atomic, non-guarded manual drop.
+            // Note that we check TestData here rather than jsTestOptions because this option is
+            // used in passthroughs which use the python class of this hook and thus we pass
+            // arguments via the suite + testData.
+            const isSessionsCollectionDropSuite = Boolean(TestData.backgroundSessionCollectionDrop);
+            if (isSessionsCollectionDropSuite) {
+                for (let i = inconsistencies.length - 1; i >= 0; i--) {
+                    if (inconsistencies[i].details.namespace == "config.system.sessions") {
+                        inconsistencies.splice(i, 1);  // Remove inconsistency
+                    }
+                }
+            }
+
             assert.eq(0,
                       inconsistencies.length,
                       `Found metadata inconsistencies: ${tojson(inconsistencies)}`);

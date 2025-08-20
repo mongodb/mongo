@@ -79,6 +79,8 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(preventSessionsCollectionSharding);
+
 void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* opCtx) {
     // First, check if the collection is already sharded.
     try {
@@ -178,6 +180,11 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
             Grid::get(opCtx)->isShardingInitialized());
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Cannot setup the sessions collection when failpoint "
+            "`preventSessionsCollectionSharding` is set",
+            !MONGO_unlikely(preventSessionsCollectionSharding.shouldFail()));
 
     _shardCollectionIfNeeded(opCtx);
     _generateIndexesIfNeeded(opCtx);

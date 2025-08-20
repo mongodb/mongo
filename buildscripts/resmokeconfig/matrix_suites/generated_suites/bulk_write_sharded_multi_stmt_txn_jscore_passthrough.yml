@@ -13,6 +13,7 @@ executor:
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
+      - DropSessionsCollection
   config:
     shell_options:
       eval:
@@ -21,7 +22,8 @@ executor:
         await import('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');;
         await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
       global_vars:
-        TestData:
+        TestData: &id001
+          backgroundSessionCollectionDrop: true
           networkErrorAndTxnOverrideConfig:
             wrapCRUDinTransactions: true
           sessionOptions:
@@ -37,9 +39,13 @@ executor:
         enableTestCommands: 1
     num_rs_nodes_per_shard: 2
   hooks:
+    - class: DropSessionsCollection
     - class: CheckReplDBHashInBackground
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData: *id001
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN
