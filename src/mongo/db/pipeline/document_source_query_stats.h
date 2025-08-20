@@ -82,8 +82,6 @@ public:
             transactionNotSupported(kStageName);
         }
 
-        bool _transformIdentifiers;
-
         const TransformAlgorithmEnum _algorithm;
 
         std::string _hmacKey;
