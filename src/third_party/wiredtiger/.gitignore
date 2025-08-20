@@ -1,9 +1,11 @@
 **/.DS_Store
 **/tags
 **/*.sw?
+.venv/
 .vscode/
 .cache/
 .ccls-cache/
+CMakeUserPresets.json
 compile_commands.json
 cscope.in.out
 cscope.out

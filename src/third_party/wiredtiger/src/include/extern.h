@@ -875,8 +875,8 @@ extern int __wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH_QUEUE_ENT
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_prepared_discover_filter_apply_handles(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_prepared_discover_find_or_create_transaction(
-  WT_SESSION_IMPL *session, wt_timestamp_t prepare_transaction_id, WT_SESSION_IMPL **prep_sessionp)
+extern int __wt_prepared_discover_find_or_create_transaction(WT_SESSION_IMPL *session,
+  wt_timestamp_t prepare_transaction_id, WT_SESSION_IMPL **prep_sessionp, bool create)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

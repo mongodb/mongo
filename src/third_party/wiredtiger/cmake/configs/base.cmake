@@ -18,12 +18,9 @@ if("${CMAKE_BUILD_TYPE}" MATCHES "^(Release|RelWithDebInfo)$")
 endif()
 
 # Enable python if we have the minimum version.
-set(python_libs)
-set(python_version)
-set(python_executable)
-source_python3_package(python_libs python_version python_executable)
+find_package(Python3 QUIET COMPONENTS Interpreter Development)
 
-if("${python_version}" VERSION_GREATER_EQUAL "3")
+if(Python3_FOUND)
   set(default_enable_python ON)
 endif()
 
@@ -193,7 +190,14 @@ config_string(
     By default, when this configuration is unset, CMake will preference the \
     highest python version found to be installed in the users system path. \
     Expected format of version string: major[.minor[.patch]]"
-    DEFAULT ""
+    DEPENDS "ENABLE_PYTHON"
+)
+
+config_string(
+    SWIG_REQUIRED_VERSION
+    "SWIG version to use when building Python bindings. \
+    Expected format of version string: major[.minor[.patch]]"
+    DEFAULT "4"
     DEPENDS "ENABLE_PYTHON"
 )
 
@@ -418,7 +422,7 @@ endif()
 
 # Ref tracking is always enabled in diagnostic build.
 if (HAVE_DIAGNOSTIC AND NOT HAVE_REF_TRACK)
-    set(HAVE_REF_TRACK ON CACHE STRING "" FORCE)
+    set(HAVE_REF_TRACK ON CACHE BOOL "" FORCE)
     set(HAVE_REF_TRACK_DISABLED OFF CACHE INTERNAL "" FORCE)
 endif()
 

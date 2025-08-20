@@ -222,9 +222,9 @@ function(config_bool config_name description)
         # We want to ensure we capture a transition from a disabled to enabled state when dependencies are met.
         if(${config_name}_DISABLED)
             unset(${config_name}_DISABLED CACHE)
-            set(${config_name} ${CONFIG_BOOL_DEFAULT} CACHE STRING "${description}" FORCE)
+            set(${config_name} ${CONFIG_BOOL_DEFAULT} CACHE BOOL "${description}" FORCE)
         else()
-            set(${config_name} ${CONFIG_BOOL_DEFAULT} CACHE STRING "${description}")
+            set(${config_name} ${CONFIG_BOOL_DEFAULT} CACHE BOOL "${description}")
         endif()
     else()
         set(config_value "0")
@@ -239,7 +239,7 @@ function(config_bool config_name description)
             endif()
         endif()
         # Config doesn't meet dependency requirements, set its default state and flag it as disabled.
-        set(${config_name} OFF CACHE STRING "${description}" FORCE)
+        set(${config_name} OFF CACHE BOOL "${description}" FORCE)
         set(${config_name}_DISABLED ON CACHE INTERNAL "" FORCE)
     endif()
 endfunction()
@@ -297,16 +297,16 @@ function(config_func config_name description)
         # We want to ensure we capture a transition from a disabled to enabled state when dependencies are met.
         if(${config_name}_DISABLED)
             unset(${config_name}_DISABLED CACHE)
-            set(${config_name} ${has_symbol} CACHE STRING "${description}" FORCE)
+            set(${config_name} ${has_symbol} CACHE BOOL "${description}" FORCE)
         else()
-            set(${config_name} ${has_symbol} CACHE STRING "${description}")
+            set(${config_name} ${has_symbol} CACHE BOOL "${description}")
         endif()
         # 'check_symbol_exists' sets our given temp variable into the cache. Clear this so it doesn't persist between
         # configuration runs.
         unset(has_symbol_${config_name} CACHE)
     else()
         # Config doesn't meet dependency requirements, set a disabled state.
-        set(${config_name} 0 CACHE INTERNAL "" FORCE)
+        set(${config_name} OFF CACHE INTERNAL "" FORCE)
         set(${config_name}_DISABLED ON CACHE INTERNAL "" FORCE)
     endif()
 endfunction()
@@ -357,9 +357,9 @@ function(config_include config_name description)
         # We want to ensure we capture a transition from a disabled to enabled state when dependencies are met.
         if(${config_name}_DISABLED)
             unset(${config_name}_DISABLED CACHE)
-            set(${config_name} ${has_include} CACHE STRING "${description}" FORCE)
+            set(${config_name} ${has_include} CACHE BOOL "${description}" FORCE)
         else()
-            set(${config_name} ${has_include} CACHE STRING "${description}")
+            set(${config_name} ${has_include} CACHE BOOL "${description}")
         endif()
         # 'check_include_files' sets our given temp variable into the cache. Clear this so it doesn't persist between
         # configuration runs.
@@ -404,7 +404,7 @@ function(config_lib config_name description)
     # Check that the configs dependencies are enabled before setting it to a visible enabled state.
     eval_dependency("${CONFIG_LIB_DEPENDS}" enabled)
     if(enabled)
-        message("-- Looking for library ${CONFIG_LIB_LIB}")
+        message(CHECK_START "Looking for library ${CONFIG_LIB_LIB}")
         # 'check_library_exists' won't use our current cache when test compiling the library.
         # To get around this we need to ensure we manually forward WT_ARCH and WT_OS as a minimum. This is particularly
         # needed if 'check_library_exists' will leverage one of our toolchain files.
@@ -420,17 +420,17 @@ function(config_lib config_name description)
             if (CONFIG_LIB_HEADER)
                 find_path(include_path_${config_name} ${CONFIG_LIB_HEADER})
                 if (include_path_${config_name})
-                    message("-- Looking for library ${CONFIG_LIB_LIB}: found ${has_lib_${config_name}}, include path ${include_path_${config_name}}")
+                    message(CHECK_PASS "found ${has_lib_${config_name}}, include path ${include_path_${config_name}}")
                     set(has_include ${include_path_${config_name}})
                 else()
-                    message("-- Looking for library ${CONFIG_LIB_LIB}: found ${has_lib_${config_name}}")
+                    message(CHECK_PASS "found ${has_lib_${config_name}}")
                 endif()
                 unset(include_path_${config_name} CACHE)
             else()
-                message("-- Looking for library ${CONFIG_LIB_LIB}: found ${has_lib_${config_name}}")
+                message(CHECK_PASS "found ${has_lib_${config_name}}")
             endif()
         else()
-            message("-- Looking for library ${CONFIG_LIB_LIB}: NOT found")
+            message(CHECK_FAIL "not found")
         endif()
         # Set an internal cache variable "${config_name}_DISABLED" to capture its enabled/disabled state.
         # We want to ensure we capture a transition from a disabled to enabled state when dependencies are met.
@@ -446,7 +446,7 @@ function(config_lib config_name description)
         # configuration runs.
         unset(has_lib_${config_name} CACHE)
     else()
-        message("-- Not looking for library ${CONFIG_LIB_LIB}: disabled")
+        message(STATUS "Not looking for library ${CONFIG_LIB_LIB}: disabled")
         set(${config_name} 0 CACHE INTERNAL "" FORCE)
         set(${config_name}_DISABLED ON CACHE INTERNAL "" FORCE)
     endif()
@@ -512,74 +512,6 @@ function(config_compile config_name description)
     else()
         set(${config_name} 0 CACHE INTERNAL "" FORCE)
         set(${config_name}_DISABLED ON CACHE INTERNAL "" FORCE)
-    endif()
-endfunction()
-
-# test_type_size(type output_size)
-# Helper function that tests for a given types size and returns its value if found.
-#   type - name of the type to test.
-#   output_size - name of the output variable, set with either the types size or "" (empty string)
-#       if not found.
-#   EXTRA_INCLUDES - extra/optional include files to access the given type e.g. a custom typedef in an include header.
-function(test_type_size type output_size)
-    cmake_parse_arguments(
-        PARSE_ARGV
-        2
-        "TEST_TYPE"
-        ""
-        ""
-        "EXTRA_INCLUDES"
-    )
-
-    if (NOT "${TEST_TYPE_UNPARSED_ARGUMENTS}" STREQUAL "")
-        message(FATAL_ERROR "Unknown arguments to assert_type: ${TEST_TYPE_UNPARSED_ARGUMENTS}")
-    endif()
-
-    set(CMAKE_EXTRA_INCLUDE_FILES "${TEST_TYPE_EXTRA_INCLUDES}")
-    check_type_size(${type} TEST_TYPE)
-    set(CMAKE_EXTRA_INCLUDE_FILES)
-
-    if(NOT HAVE_TEST_TYPE)
-        set(${output_size} "" PARENT_SCOPE)
-    else()
-        set(${output_size} ${TEST_TYPE} PARENT_SCOPE)
-    endif()
-endfunction()
-
-# assert_type_size(type size)
-# Wrapper function around 'test_type_size' that additionally asserts whether the given types meets an expected size.
-# Throws a fatal error if the type is not found or doesn't equal the expected size.
-#   type - name of the type to test.
-#   size - expected size of the type.
-#   EXTRA_INCLUDES - extra/optional include files to access the given type e.g. a custom typedef in an include header.
-function(assert_type_size type size)
-    cmake_parse_arguments(
-        PARSE_ARGV
-        2
-        "ASSERT_TYPE"
-        ""
-        ""
-        "EXTRA_INCLUDES"
-    )
-
-    if (NOT "${ASSERT_TYPE_UNPARSED_ARGUMENTS}" STREQUAL "")
-        message(FATAL_ERROR "Unknown arguments to assert_type: ${ASSERT_TYPE_UNPARSED_ARGUMENTS}")
-    endif()
-
-    set(additional_args "")
-    if(${ASSERT_TYPE_EXTRA_INCLUDES})
-        set(additional_args "EXTRA_INCLUDES ${ASSERT_TYPE_EXTRA_INCLUDES}")
-    endif()
-    test_type_size(${type} output_type_size ${additional_args})
-
-    if(${output_type_size} EQUAL "")
-        # Type does not exist.
-        message(FATAL_ERROR "Type assertion failed: ${type} does not exists")
-    endif()
-
-    if((NOT ${size} EQUAL 0) AND (NOT ${output_type_size} EQUAL ${size}))
-        # Type does not meet size assertion.
-        message(FATAL_ERROR "Type assertion failed: ${type} does not equal size ${size}")
     endif()
 endfunction()
 
@@ -667,7 +599,6 @@ function(escape_regex_special_characters input output)
     set(${output} "${escaped_input}" PARENT_SCOPE)
 endfunction()
 
-
 # check_c_flag(flag)
 # A helper function that adds a CMake flag to a list of included flags if it's not already present.
 # It first checks if the flag is already included in the list using a regex pattern.
@@ -678,35 +609,3 @@ function(add_cmake_flag included_flags flag)
         set(${included_flags} "${${included_flags}} ${flag}" CACHE STRING "" FORCE)
     endif()
 endfunction()
-
-macro(source_python3_package python_libs python_version python_executable)
-    set(required_version)
-    if(PYTHON3_REQUIRED_VERSION)
-        if(NOT PYTHON3_REQUIRED_VERSION MATCHES "^([0-9]+)(\\.[0-9]+(\\.[0-9]+)?)?$")
-            message(FATAL_ERROR "Invalid value for PYTHON3_REQUIRED_VERSION: Requires a valid version string \
-                Provide a version number following the format: major[.minor[.patch]]")
-        endif()
-        if ("${PYTHON3_REQUIRED_VERSION}" VERSION_LESS 3)
-            message(FATAL_ERROR "Invalid value for PYTHON3_REQUIRED_VERSION: Requires a Python version >= 3")
-        endif()
-        set(required_version ${PYTHON3_REQUIRED_VERSION} EXACT)
-    endif()
-    if("${CMAKE_VERSION}" VERSION_LESS "3.12.0")
-        # This method of finding python libs has been deprecated since version 3.12.
-        # If we are running with a greater CMake version, opt to use the Python3 package.
-        set(Python_ADDITIONAL_VERSIONS 3.11 3.9 3.8 3.7 3.6 3.5)
-        find_package(PythonInterp ${required_version} REQUIRED)
-        find_package(PythonLibs ${required_version} REQUIRED)
-        include_directories(${PYTHON_INCLUDE_DIRS})
-        set(${python_libs} ${PYTHON_LIBRARIES})
-        set(${python_version} ${PYTHON_VERSION_STRING})
-        set(${python_executable} ${PYTHON_EXECUTABLE})
-    else()
-        find_package(Python3 ${required_version} COMPONENTS Interpreter Development REQUIRED)
-        include_directories(${Python3_INCLUDE_DIRS})
-        set(${python_libs} ${Python3_LIBRARIES})
-        set(${python_version} ${Python3_VERSION})
-        set(${python_executable} ${Python3_EXECUTABLE})
-    endif()
-
-endmacro()

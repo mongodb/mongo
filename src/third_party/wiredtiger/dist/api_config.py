@@ -13,7 +13,7 @@ if not [f for f in filter_if_fast([
             "../src/include/conf.h"
             "../src/include/conf_keys.h"
             "../src/include/config.h"
-            "../src/include/wiredtiger.in",
+            "../src/include/wiredtiger.h.in",
         ], prefix="../")]:
     sys.exit(0)
 
@@ -34,9 +34,9 @@ else:
 tmp_file = '__tmp_apiconfig' + str(os.getpid())
 
 #####################################################################
-# Update wiredtiger.in with doxygen comments
+# Update wiredtiger.h.in with doxygen comments
 #####################################################################
-f='../src/include/wiredtiger.in'
+f='../src/include/wiredtiger.h.in'
 tfile = open(tmp_file, 'w')
 
 whitespace_re = re.compile(r'\s+')
@@ -348,7 +348,7 @@ if not test_config:
 
     tfile.close()
     compare_srcfile(tmp_file, f)
-    # Don't add wiredtiger.in to the clang_format list.
+    # Don't add wiredtiger.h.in to the clang_format list.
 
 #####################################################################
 # Create config_def.c with defaults for each config string

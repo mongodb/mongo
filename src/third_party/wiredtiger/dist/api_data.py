@@ -1886,8 +1886,8 @@ methods = {
         type='boolean'),
     Config('claim_prepared_id', '0', r'''
         allow a session to claim a prepared transaction that was restored upon restart by
-        specifying the transaction's prepared ID.''',
-        type='int', min=0)
+        specifying the transaction's prepared ID. Returns WT_NOTFOUND if the prepared id doesn't
+        exist.''', type='int', min=0)
 ], compilable=True),
 
 'WT_SESSION.commit_transaction' : Method([

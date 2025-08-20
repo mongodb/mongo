@@ -1,5 +1,5 @@
 {
-    "extraFiles": ["src/include/wiredtiger.in"],
+    "extraFiles": ["src/include/wiredtiger.h.in"],
     "modules": [
         # Modules in subdirectories of src/
         Module("block"),

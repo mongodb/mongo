@@ -46,7 +46,6 @@ functions:
 
             if [ "$OS" = "Windows_NT" ]; then
               export PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH
-              export PYTHONPATH="($WT_TOPDIR/lang/python/wiredtiger):$(cygpath -w $WT_TOPDIR/lang/python)"
             else
               export PATH=/opt/mongodbtoolchain/v5/bin:$PATH
               export LD_LIBRARY_PATH=$WT_BUILDDIR
@@ -335,17 +334,8 @@ functions:
         else
           echo "Using config flags $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|}"
 
-          SWIG_VERSION=$(swig -version | awk '/SWIG Version/ {print $3}')
-
-          if [[ "$(printf '%s\n' "4.0.0" "$SWIG_VERSION" | sort -V | head -n1)" == "4.0.0" ]]; then
-              echo "SWIG version $SWIG_VERSION is 4.0 or later."
-          else
-              echo "SWIG version $SWIG_VERSION is earlier than 4.0. Installing a newer version ..."
-              python3 -mvenv venv
-              source venv/bin/activate
-              pip3 install swig==4.2.1
-              swig -version
-          fi
+          # Make sure that SWIG v4 is available.
+          source test/evergreen/ensure_swig_version.sh
 
           if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]]; then
             # Preclude use of tcmalloc with sanitizer builds.
@@ -398,17 +388,8 @@ functions:
         if ! command -v swig >/dev/null 2>&1; then
             echo "SWIG is not installed. Skipping check ..."
         else
-            SWIG_VERSION=$(swig -version | awk '/SWIG Version/ {print $3}')
-
-            if [[ "$(printf '%s\n' "4.0.0" "$SWIG_VERSION" | sort -V | head -n1)" == "4.0.0" ]]; then
-                echo "SWIG version $SWIG_VERSION is 4.0 or later."
-            else
-                echo "SWIG version $SWIG_VERSION is earlier than 4.0. Installing a newer version ..."
-                python3 -mvenv venv
-                source venv/bin/activate
-                pip3 install swig==4.2.1
-                swig -version
-            fi
+            # Make sure that SWIG v4 is available.
+            source test/evergreen/ensure_swig_version.sh
         fi
 
         if [ "$OS" = "Windows_NT" ]; then
@@ -2981,8 +2962,10 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
+            ${PREPARE_PATH}
             . test/evergreen/find_cmake.sh
             cd test/evergreen
+            source ensure_swig_version.sh
             CMAKE_BIN=$CMAKE ./configure_combinations.sh -g="${cmake_generator|Ninja}" -j=$(grep -c ^processor /proc/cpuinfo) 2>&1
       # Handle special build combination for running all the diagnostic tests.
       - func: "configure wiredtiger"

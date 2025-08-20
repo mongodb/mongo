@@ -90,7 +90,7 @@ generate_config_header(
     extra_definitions = {},
     logfile = "wt_version.log",
     output = "wiredtiger.h",
-    template = "src/include/wiredtiger.in",
+    template = "src/include/wiredtiger.h.in",
 )
 
 symlink(

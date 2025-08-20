@@ -28,13 +28,6 @@ if(has_moutline_atomics)
 endif()
 unset(has_moutline_atomics CACHE)
 
-# Enable ARM Neon SIMD instrinsics when available.
-CHECK_INCLUDE_FILE("arm_neon.h" has_arm_neon)
-if(has_arm_neon)
-    add_cmake_flag(CMAKE_C_FLAGS -DHAVE_ARM_NEON_INTRIN_H)
-endif()
-unset(has_arm_neon CACHE)
-
 # Header file here is required for portable futex implementation.
 if(NOT CMAKE_CROSSCOMPILING)
     include_directories(AFTER SYSTEM "${CMAKE_SOURCE_DIR}/oss/apple")

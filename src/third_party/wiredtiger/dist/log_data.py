@@ -17,7 +17,7 @@ class LogRecordType:
 
 #
 # If you add a new record type you must also add its record type value in
-# src/include/wiredtiger.in.  The values cannot be generated because they must
+# src/include/wiredtiger.h.in.  The values cannot be generated because they must
 # never change after they're written in a log file.
 #
 rectypes = [
@@ -51,7 +51,7 @@ class LogOperationType:
 
 #
 # If you add a new operation type you must also add its type value in
-# src/include/wiredtiger.in.  The values cannot be generated because they must
+# src/include/wiredtiger.h.in.  The values cannot be generated because they must
 # never change after they're written in a log file.
 #
 optypes = [
@@ -83,7 +83,7 @@ optypes = [
 
 # diagnostic operations
 # Operations used only for diagnostic purposes should be have their type
-# values in the diagnostic range in src/include/wiredtiger.in so that they
+# values in the diagnostic range in src/include/wiredtiger.h.in so that they
 # are always ignored by recovery.
     #
     # We need to know the base size/type of a 'struct timespec'. Cast its

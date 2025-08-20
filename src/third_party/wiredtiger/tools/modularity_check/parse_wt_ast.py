@@ -397,8 +397,8 @@ def parse_wiredtiger_files(debug=False) -> List[File]:
     files = [f for f in source_files() if f.startswith("../../src/")]
     files = [f for f in files if f.endswith(".h") or f.endswith(".c")]
 
-    # Other than wiredtiger.in which contains structs and functions
-    files.append("../../src/include/wiredtiger.in")
+    # Other than wiredtiger.h.in which contains structs and functions
+    files.append("../../src/include/wiredtiger.h.in")
 
     # Remove extern files. They just contain externs
     # Use comprehensions to remove the files. list.remove() throws an error if they aren't present

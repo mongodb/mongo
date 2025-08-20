@@ -911,7 +911,7 @@ WARN_LOGFILE           = doxygen.log
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = ../include/wiredtiger.in \
+INPUT                  = ../include/wiredtiger.h.in \
                          ../include/wiredtiger_ext.h \
                          .
 

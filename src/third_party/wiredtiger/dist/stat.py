@@ -14,7 +14,7 @@ if not [f for f in filter_if_fast([
             "../dist/dist.py",
             "../dist/stat_data.py",
             "../src/include/stat.h",
-            "../src/include/wiredtiger.in",
+            "../src/include/wiredtiger.h.in",
             "../src/support/stat.c",
         ], prefix="../")]:
     sys.exit(0)
@@ -132,7 +132,7 @@ def print_defines_one(capname, base, stats):
             str(v) + '\n')
 
 def print_defines():
-    '''Print the #defines for the wiredtiger.in file.'''
+    '''Print the #defines for the wiredtiger.h.in file.'''
     f.write('''
 /*!
  * @name Connection statistics
@@ -165,11 +165,11 @@ def print_defines():
     print_defines_one('SESSION', 4000, session_stats)
     f.write('/*! @} */\n')
 
-# Update the #defines in the wiredtiger.in file.
+# Update the #defines in the wiredtiger.h.in file.
 tmp_file = '__tmp_stat' + str(os.getpid())
 f = open(tmp_file, 'w')
 skip = 0
-for line in open('../src/include/wiredtiger.in', 'r'):
+for line in open('../src/include/wiredtiger.h.in', 'r'):
     if not skip:
         f.write(line)
     if line.count('Statistics section: END'):
@@ -181,7 +181,7 @@ for line in open('../src/include/wiredtiger.in', 'r'):
         print_defines()
         f.write('/*\n')
 f.close()
-compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
+compare_srcfile(tmp_file, '../src/include/wiredtiger.h.in')
 
 def print_func(name, handle, statlist, capname=None):
     '''Print the structures/functions for the stat.c file.'''

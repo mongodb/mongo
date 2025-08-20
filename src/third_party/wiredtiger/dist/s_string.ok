@@ -1336,6 +1336,7 @@ strndup
 strnlen
 strobed
 strtoll
+strtoull
 strtouq
 struct
 structs

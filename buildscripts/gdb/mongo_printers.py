@@ -455,7 +455,7 @@ class WtCursorPrinter(object):
     """
 
     try:
-        with open("./src/third_party/wiredtiger/src/include/wiredtiger.in") as wiredtiger_header:
+        with open("./src/third_party/wiredtiger/src/include/wiredtiger.h.in") as wiredtiger_header:
             file_contents = wiredtiger_header.read()
             cursor_flags_re = re.compile(r"#define\s+WT_CURSTD_(\w+)\s+0x(\d+)u")
             cursor_flags = cursor_flags_re.findall(file_contents)[::-1]

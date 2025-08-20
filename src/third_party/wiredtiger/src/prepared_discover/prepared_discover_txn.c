@@ -15,8 +15,8 @@
  *     matching transaction.
  */
 int
-__wt_prepared_discover_find_or_create_transaction(
-  WT_SESSION_IMPL *session, wt_timestamp_t prepare_transaction_id, WT_SESSION_IMPL **prep_sessionp)
+__wt_prepared_discover_find_or_create_transaction(WT_SESSION_IMPL *session,
+  wt_timestamp_t prepare_transaction_id, WT_SESSION_IMPL **prep_sessionp, bool create)
 {
     WT_CONNECTION_IMPL *conn;
     WT_SESSION_IMPL *new_session, *next_session;
@@ -37,6 +37,9 @@ __wt_prepared_discover_find_or_create_transaction(
             }
         }
     }
+
+    if (!create)
+        return (WT_NOTFOUND);
 
     /* No existing session/transaction matched, create a new one */
     WT_RET(__wt_realloc_def(session, &txn_global->pending_prepared_sessions_allocated,
@@ -67,7 +70,7 @@ __wti_prepared_discover_add_artifact_upd(
     WT_SESSION_IMPL *prep_session;
 
     WT_RET(__wt_prepared_discover_find_or_create_transaction(
-      session, prepare_transaction_id, &prep_session));
+      session, prepare_transaction_id, &prep_session, true));
 
     /* Add the update to the prepared transaction context. */
     WT_WITH_DHANDLE(prep_session, session->dhandle, ret = __wt_txn_modify(prep_session, upd));

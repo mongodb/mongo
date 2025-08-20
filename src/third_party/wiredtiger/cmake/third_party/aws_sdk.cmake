@@ -1,5 +1,4 @@
 include(ExternalProject)
-include(GNUInstallDirs)
 include(${CMAKE_SOURCE_DIR}/cmake/helpers.cmake)
 
 # Skip the AWS SDK build step if the extension is not enabled.

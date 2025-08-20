@@ -24,14 +24,17 @@ extern "C" {
 /*******************************************
  * Required includes
  *******************************************/
-@wiredtiger_includes_decl@
+#include <sys/types.h>
+#include <inttypes.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
 
 /*******************************************
  * Portable type names
  *******************************************/
-@off_t_decl@
-@uintmax_t_decl@
-@uintptr_t_decl@
+typedef int64_t wt_off_t;
 
 #if defined(DOXYGEN) || defined(SWIG)
 #define __F(func) func
@@ -1617,8 +1620,8 @@ struct __wt_session {
      * @param session the session handle
      * @configstart{WT_SESSION.begin_transaction, see dist/api_data.py}
      * @config{claim_prepared_id, allow a session to claim a prepared transaction that was restored
-     * upon restart by specifying the transaction's prepared ID., an integer greater than or equal
-     * to \c 0; default \c 0.}
+     * upon restart by specifying the transaction's prepared ID. Returns WT_NOTFOUND if the prepared
+     * id doesn't exist., an integer greater than or equal to \c 0; default \c 0.}
      * @config{ignore_prepare, whether to ignore updates by other prepared transactions when doing
      * of read operations of this transaction.  When \c true\, forces the transaction to be
      * read-only.  Use \c force to ignore prepared updates and permit writes (see @ref

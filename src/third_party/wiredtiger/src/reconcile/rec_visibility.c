@@ -878,7 +878,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
                 continue;
             }
         } else if (!F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DELTA)) {
-            if (prepare_state == WT_PREPARE_INPROGRESS) {
+            if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
                 WT_ASSERT_ALWAYS(session,
                   upd_select->upd == NULL || upd_select->upd->txnid == upd->txnid,
                   "Cannot have two different prepared transactions active on the same key");

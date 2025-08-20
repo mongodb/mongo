@@ -344,7 +344,7 @@ while (do { local $/=undef; $_=<>;}) {
   # };
 }
 
-$_ = `cat src/include/error.h`; die "Can't read src/include/wiredtiger.in: $!" if $?;
+$_ = `cat src/include/error.h`; die "Can't read src/include/error.h: $!" if $?;
 s#((__ret|ret)\s*+(==|!=)\s*+((?&TOKEN_EXPR)))$re_arg_expr#
   my ($all, $ret, $op, $err) = ($1, $2, $3, $4);
   $err eq "0" ? $all :
@@ -356,10 +356,10 @@ write_file "src/include/error.h", $_;
 
 status "Adding error codes...\n";
 
-my $file_content = `cat src/include/wiredtiger.in`; die "Can't read src/include/wiredtiger.in: $!" if $?;
+my $file_content = `cat src/include/wiredtiger.h.in`; die "Can't read src/include/wiredtiger.h.in: $!" if $?;
 
 $file_content = "#pragma once\n\n$file_content";
-open F, ">", "src/include/wiredtiger.in" or die "src/include/wiredtiger.in: $!";
+open F, ">", "src/include/wiredtiger.h.in" or die "src/include/wiredtiger.h.in: $!";
 print F $file_content;
 
 my $err = -1000000000;

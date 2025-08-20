@@ -1,6 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
 include(ExternalProject)
-include(GNUInstallDirs)
 include(${CMAKE_SOURCE_DIR}/cmake/helpers.cmake)
 
 # Skip the GCP SDK build step if the extension is not enabled.

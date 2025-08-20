@@ -4,7 +4,7 @@ import os, re
 from dist import compare_srcfile
 
 verbose_categories = []
-filename = '../src/include/wiredtiger.in'
+filename = '../src/include/wiredtiger.h.in'
 start_tag = 'VERBOSE ENUM START'
 stop_tag = 'VERBOSE ENUM STOP'
 

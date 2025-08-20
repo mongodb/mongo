@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 3.10.0)
-
 if(NOT SYNC_DIR_SRC)
     message(FATAL_ERROR "Missing a source directory to sync")
 endif()

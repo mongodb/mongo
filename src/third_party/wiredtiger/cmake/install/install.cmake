@@ -1,5 +1,3 @@
-include(GNUInstallDirs)
-
 # Library installs
 
 # Define the wiredtiger public headers we want to export when running the install target.
@@ -60,10 +58,10 @@ if(WT_POSIX)
     endif()
     if(HAVE_BUILTIN_EXTENSION_IAA)
         set(private_libs "${private_libs} -lqpl")
-	if(HAVE_LIBCXX)
+	    if(HAVE_LIBCXX)
             set(private_libs "${private_libs} -lstdc++")
         endif()
-	if(HAVE_LIBACCEL_CONFIG)
+	    if(HAVE_LIBACCEL_CONFIG)
             set(private_libs "${private_libs} -laccel-config")
         endif()
     endif()

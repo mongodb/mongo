@@ -1,6 +1,4 @@
-include(GNUInstallDirs)
 include(${CMAKE_SOURCE_DIR}/cmake/helpers.cmake)
-cmake_minimum_required(VERSION 3.13)
 
 config_choice(
     IMPORT_AZURE_SDK

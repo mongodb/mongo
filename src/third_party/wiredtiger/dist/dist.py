@@ -47,7 +47,7 @@ def all_cpp_files():
 def all_h_files():
     for line in glob.iglob('../src/*/*.h'):
         yield line
-    yield "../src/include/wiredtiger.in"
+    yield "../src/include/wiredtiger.h.in"
     files = list()
     for (dirpath, dirnames, filenames) in os.walk('../test'):
         files += [os.path.join(dirpath, file) for file in filenames]

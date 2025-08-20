@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Output C #defines for errors into wiredtiger.in and the associated error
+# Output C #defines for errors into wiredtiger.h.in and the associated error
 # message code in strerror.c.
 
 import os, sys, textwrap
@@ -59,7 +59,7 @@ def check_write_document_errors(tfile, skip, err_type, errors):
 if not [f for f in filter_if_fast([
             "../src/conn/api_strerror.c",
             "../src/docs/error-handling.dox",
-            "../src/include/wiredtiger.in",
+            "../src/include/wiredtiger.h.in",
         ], prefix="../")]:
     sys.exit(0)
 
@@ -194,17 +194,17 @@ sub_errors = [
         because of a running live restore in the system.'''),
 ]
 
-# Update the #defines in the wiredtiger.in file.
+# Update the #defines in the wiredtiger.h.in file.
 tmp_file = '__tmp_api_err' + str(os.getpid())
 tfile = open(tmp_file, 'w')
 skip = 0
-for line in open('../src/include/wiredtiger.in', 'r'):
+for line in open('../src/include/wiredtiger.h.in', 'r'):
     if not skip:
         tfile.write(line)
     skip = check_write_errors(tfile, skip, 'Error', errors)
     skip = check_write_errors(tfile, skip, 'Sub-level error', sub_errors)
 tfile.close()
-compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
+compare_srcfile(tmp_file, '../src/include/wiredtiger.h.in')
 
 # Output the wiredtiger_strerror and wiredtiger_sterror_r code.
 tmp_file = '__tmp_api_err' + str(os.getpid())
