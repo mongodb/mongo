@@ -2,6 +2,12 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
+TARGET_COMPATIBILITY = select({
+    "//bazel/config:linux_aarch64": [],
+    "//bazel/config:linux_x86_64": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
 mongo_cc_library(
     name = "avro-cpp",
     srcs = glob(
@@ -27,17 +33,9 @@ mongo_cc_library(
     copts = [
         "-DAVRO_SOURCE",
         # Disable warnings that might cause build failures
-        "-Wno-unused-parameter",
         "-Wno-unused-but-set-variable",
-        "-Wno-unused-exception-parameter",
         "-Wno-implicit-fallthrough",
-        "-Wno-sign-compare",
-    ] + select({
-        "//bazel/config:compiler_type_gcc": [
-            "-Wno-maybe-uninitialized",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     includes = [
         "dist/impl",  # For impl internal headers
         "dist/impl/json",  # For json internal headers
@@ -46,6 +44,7 @@ mongo_cc_library(
         "dist/include/avro",  # For relative includes in source files
         "dist/include/avro/buffer",  # For buffer detail headers
     ],
+    target_compatible_with = TARGET_COMPATIBILITY,
     deps = [
         "//src/third_party/fmt",
         "//src/third_party/zlib",
@@ -65,5 +64,6 @@ mongo_cc_unit_test(
     name = "avro_tests",
     srcs = ["test_compilation.cc"],
     tags = ["mongo_unittest_fourth_group"],
+    target_compatible_with = TARGET_COMPATIBILITY,
     deps = [":avro-cpp"],
 )
