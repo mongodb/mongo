@@ -61,6 +61,7 @@ selector:
     - requires_profiling
     - assumes_unsharded_collection
     - primary_driven_index_builds_incompatible
+    - rolling_index_builds
   roots:
     - jstests/concurrency/fsm_workloads/index_builds/*.js
     - jstests/concurrency/fsm_workloads/ddl/create_index_background/*.js

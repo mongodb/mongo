@@ -16,6 +16,7 @@
  * @tags: [
  *   requires_persistence,
  *   requires_replication,
+ *   rolling_index_builds,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

@@ -6,6 +6,7 @@
  * @tags: [
  *   requires_persistence,
  *   requires_replication,
+ *   rolling_index_builds,
  * ]
  */
 

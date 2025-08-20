@@ -23,6 +23,7 @@ matrix_suite: true
 selector:
   exclude_with_any_tags:
     - primary_driven_index_builds_incompatible
+    - rolling_index_builds
   roots:
     - jstests/sharding/*index_build*.js
 test_kind: js_test
