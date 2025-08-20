@@ -2899,22 +2899,41 @@ class TestBinder(testcase.IDLTestcase):
             idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
         )
 
-        # if fcv_gated is false, enable_on_transitional_fcv is not allowed
+        # if fcv_gated is false, enable_on_transitional_fcv_UNSAFE is not allowed
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
                 featureFlagToaster:
-                    description: "Make toast"
+                    description: >
+                      Make toast
+                      (Enable on transitional FCV): Lorem ipsum dolor sit amet
                     cpp_varname: gToaster
                     default: true
                     fcv_gated: false
-                    enable_on_transitional_fcv: true
+                    enable_on_transitional_fcv_UNSAFE: true
             """),
             idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
         )
 
-        # if fcv_gated: true, enable_on_transitional_fcv is allowed
+        # if fcv_gated: true, enable_on_transitional_fcv_UNSAFE is allowed
         self.assert_bind(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: >
+                      Make toast
+                      (Enable on transitional FCV): Lorem ipsum dolor sit amet
+                    cpp_varname: gToaster
+                    default: true
+                    version: 123
+                    fcv_gated: true
+                    enable_on_transitional_fcv_UNSAFE: true
+            """)
+        )
+
+        # if enable_on_transitional_fcv_UNSAFE: true, the description must contain a
+        # "(Enable on transitional FCV): ..." text explaining why the usage is safe
+        self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
                 featureFlagToaster:
@@ -2923,8 +2942,9 @@ class TestBinder(testcase.IDLTestcase):
                     default: true
                     version: 123
                     fcv_gated: true
-                    enable_on_transitional_fcv: true
-            """)
+                    enable_on_transitional_fcv_UNSAFE: true
+            """),
+            idl.errors.ERROR_ID_FEATURE_FLAG_ENABLED_ON_TRANSITIONAL_FCV_MISSING_SAFETY_EXPLANATION
         )
 
         # if fcv_gated is false, fcv_context_unaware is not allowed

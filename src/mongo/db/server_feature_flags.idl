@@ -160,11 +160,18 @@ feature_flags:
         description: >-
             Feature flag which is only enabled once an upgrade to FCV v8.2 or higher is initiated,
             which guarantees that all binaries in the cluster support rawData operations.
+
+            (Enable on transitional FCV): This feature flag persists no data, and is only used to
+            determine if the `rawData` generic command argument can be used to clone viewless
+            timeseries collections (see featureFlagCreateViewlessTimeseriesCollections).
+            If this feature flag is disabled by a FCV downgrade, all users of this flag must either
+            finish before setFCV does, or fail gracefully they if older binaries not supporting
+            rawData are swapped in (causing commands to fail with an IDLUnknownField error).
         cpp_varname: gFeatureFlagAllBinariesSupportRawDataOperations
         default: true
         version: 8.2
         fcv_gated: true
-        enable_on_transitional_fcv: true
+        enable_on_transitional_fcv_UNSAFE: true
     featureFlagIntentRegistration:
         description: "Enables intent registration in place of RSTL acquisitions"
         cpp_varname: gFeatureFlagIntentRegistration

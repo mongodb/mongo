@@ -141,6 +141,7 @@ ERROR_ID_INCREMENTAL_FEATURE_FLAG_DEFAULT_VALUE = "ID0106"
 ERROR_ID_FEATURE_FLAG_WITHOUT_DEFAULT_VALUE = "ID0107"
 ERROR_ID_IFR_FLAG_WITH_VERSION = "ID108"
 ERROR_ID_BAD_VISIBILITY = "ID109"
+ERROR_ID_FEATURE_FLAG_ENABLED_ON_TRANSITIONAL_FCV_MISSING_SAFETY_EXPLANATION = "ID110"
 
 
 class IDLError(Exception):
@@ -1078,6 +1079,18 @@ class ParserContext(object):
             (
                 "The '%s' attribute is not allowed for feature flag that should not be FCV gated"
                 % (option_name)
+            ),
+        )
+
+    def add_feature_flag_enabled_on_transitional_fcv_missing_safety_explanation(self, location):
+        # type: (common.SourceLocation) -> None
+        """Add an error about a FCV gated feature flag enabled on transitional FCV with no safety explanation."""
+        self._add_error(
+            location,
+            ERROR_ID_FEATURE_FLAG_ENABLED_ON_TRANSITIONAL_FCV_MISSING_SAFETY_EXPLANATION,
+            (
+                "Feature flags enabled on transitional FCV must be accompanied by a description containing the text"
+                "'(Enable on transitional FCV): ' followed by a justification for why the use of the property is safe."
             ),
         )
 

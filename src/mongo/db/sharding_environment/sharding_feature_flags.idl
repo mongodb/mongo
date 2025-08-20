@@ -101,14 +101,17 @@ feature_flags:
         fcv_gated: true
     featureFlagCreateDatabaseDDLCoordinator:
         description: >
-            Feature flag for enabling the sharding DDL coordinator for database creation. Enabled in
-            transitional FCV because the new coordinator is needed during the transition phase of
-            authoritative databases.
+            Feature flag for enabling the sharding DDL coordinator for database creation.
+
+            (Enable on transitional FCV): This DDL coordinator is needed during the transition
+            phase of authoritative databases (featureFlagShardAuthoritativeDbMetadataDDL).
+            If this feature flag is disabled by a FCV downgrade, all instances of this DDL
+            coordinator are drained when finalizing the downgrade.
         cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator
         default: true
         version: 8.2
         fcv_gated: true
-        enable_on_transitional_fcv: true
+        enable_on_transitional_fcv_UNSAFE: true
     # TODO (SERVER-95599): remove once 9.0 becomes last LTS.
     featureFlagConfigDebugDumpSupported:
         description: "The configDebugDump flag is supported in listCollections and $listCatalog."
@@ -146,16 +149,21 @@ feature_flags:
         cpp_varname: feature_flags::gShardAuthoritativeDbMetadataCRUD
         default: false
         fcv_gated: true
-        enable_on_transitional_fcv: false
     # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
     featureFlagShardAuthoritativeDbMetadataDDL:
-        description:
-            "Feature flag to enable the authoritative model to store shard-local information
-            for database metadata."
+        description: >
+            Feature flag to enable the authoritative model to store shard-local information
+            for database metadata.
+
+            (Enable on transitional FCV): Enables cloning and writing of authoritative database
+            metadata in shards during the transition phase, so that once the FCV is fully upgraded,
+            operations can start reading from it (via featureFlagShardAuthoritativeDbMetadataCRUD).
+            If this feature flag is disabled by a FCV downgrade, all DDL coordinators checking
+            this flag are drained when finalizing the downgrade.
         cpp_varname: feature_flags::gShardAuthoritativeDbMetadataDDL
         default: false
         fcv_gated: true
-        enable_on_transitional_fcv: true
+        enable_on_transitional_fcv_UNSAFE: true
     # TODO (SERVER-89169): remove once 9.0 becomes last LTS.
     featureFlagShardAuthoritativeCollMetadata:
         description:
@@ -164,7 +172,6 @@ feature_flags:
         cpp_varname: feature_flags::gShardAuthoritativeCollMetadata
         default: false
         fcv_gated: true
-        enable_on_transitional_fcv: false
     # TODO (SERVER-100309): remove once 9.0 becomes last LTS.
     featureFlagSessionsCollectionCoordinatorOnConfigServer:
         description:
@@ -181,12 +188,19 @@ feature_flags:
         fcv_gated: true
     # TODO (SERVER-99655): remove this feature flag
     featureFlagSnapshotFCVInDDLCoordinators:
-        description: "Feature flag to enable snapshotting of the operation FCV at the start of DDL operations."
+        description: >
+            Feature flag to enable snapshotting of the operation FCV at the start of DDL operations.
+
+            (Enable on transitional FCV): Necessary to ensure that DDL coordinators have a stable
+            view of all feature flags with a version greater or equal than this feature flag.
+            See SERVER-102084 for more detail.
+            If this feature flag is disabled by a FCV downgrade, all DDL coordinators with an
+            operation FCV are drained when finalizing the downgrade.
         cpp_varname: feature_flags::gSnapshotFCVInDDLCoordinators
         default: true
         version: 8.2
         fcv_gated: true
-        enable_on_transitional_fcv: true
+        enable_on_transitional_fcv_UNSAFE: true
     # TODO (SERVER-104536): remove this feature flag once 9.0 becomes LTS.
     featureFlagCheckRangeDeletionsWithMissingShardKeyIndex:
         description: "Feature flag to enable detecting an inconsistency when a collection has an outstanding range deletion without a supporting shard key index during CheckMetadataConsistency."

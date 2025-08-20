@@ -977,7 +977,7 @@ def _parse_feature_flag(ctxt, spec, name, node):
             "fcv_gated": _RuleDesc(
                 "scalar_or_mapping", _RuleDesc.REQUIRED, mapping_parser_func=_parse_expression
             ),
-            "enable_on_transitional_fcv": _RuleDesc("bool_scalar"),
+            "enable_on_transitional_fcv_UNSAFE": _RuleDesc("bool_scalar"),
             "incremental_rollout_phase": _RuleDesc("scalar"),
             "fcv_context_unaware": _RuleDesc("bool_scalar"),
         },

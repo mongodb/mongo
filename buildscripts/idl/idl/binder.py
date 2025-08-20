@@ -1642,7 +1642,7 @@ def _bind_non_ifr_feature_flag_default(ctxt, param):
     )
     if param.fcv_gated.literal == "true":
         expr_for_default.expr = f'{param.default.literal}, "{param.version or ""}"_sd'
-        if param.enable_on_transitional_fcv:
+        if param.enable_on_transitional_fcv_UNSAFE:
             expr_for_default.expr += ", true"
     else:
         expr_for_default.expr = param.default.literal
@@ -1717,9 +1717,14 @@ def _bind_feature_flags(ctxt, param):
             if param.default.literal == "true" and not param.version:
                 ctxt.add_feature_flag_default_true_missing_version(param)
                 return None
+
+            if (param.enable_on_transitional_fcv_UNSAFE and
+                "(Enable on transitional FCV):" not in param.description):
+                ctxt.add_feature_flag_enabled_on_transitional_fcv_missing_safety_explanation(param)
+                return None
         else:
             # Feature flags that should not be FCV gated must not have unsupported options.
-            for option_name in ("version", "enable_on_transitional_fcv", "fcv_context_unaware"):
+            for option_name in ("version", "enable_on_transitional_fcv_UNSAFE", "fcv_context_unaware"):
                 if getattr(param, option_name):
                     ctxt.add_feature_flag_fcv_gated_false_has_unsupported_option(param, option_name)
                     return None

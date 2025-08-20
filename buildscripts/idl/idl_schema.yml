@@ -917,11 +917,15 @@ properties:
           fcv_gated:
             type: boolean
             description: Whether or not the feature flag should be FCV gated
-          enable_on_transitional_fcv:
+          enable_on_transitional_fcv_UNSAFE:
             type: boolean
             description: >
               Also enable this feature flag during the transitional FCV state (kUpgrade,
               kDowngrade). Can only appear along with fcv_gated: true.
+
+              Setting this property should be avoided if possible, and requires careful handling to
+              avoid compatibility issues with old FCVs and binaries.
+              See the FCV and Feature Flag README (FCV_AND_FEATURE_FLAG_README.md) for more detail.
           incremental_rollout_phase:
             type: string
             description: >

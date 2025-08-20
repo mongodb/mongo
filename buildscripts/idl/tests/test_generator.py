@@ -1336,7 +1336,9 @@ class TestGenerator(testcase.IDLTestcase):
                 """
             feature_flags:
                 featureFlagToaster:
-                    description: "Make toast"
+                    description: >
+                      Make toast
+                      (Enable on transitional FCV): Lorem ipsum dolor sit amet
                     cpp_varname: gToaster
                     default: true
                     version: 123
@@ -1365,12 +1367,14 @@ class TestGenerator(testcase.IDLTestcase):
                 """
             feature_flags:
                 featureFlagToaster:
-                    description: "Make toast"
+                    description: >
+                      Make toast
+                      (Enable on transitional FCV): Lorem ipsum dolor sit amet
                     cpp_varname: gToaster
                     default: true
                     version: 123
                     fcv_gated: true
-                    enable_on_transitional_fcv: true
+                    enable_on_transitional_fcv_UNSAFE: true
             """
             )
         )
@@ -1389,7 +1393,7 @@ class TestGenerator(testcase.IDLTestcase):
     def test_fcv_gated_feature_flag_disabled_on_all_versions_by_default_with_enable_on_transitional_fcv_false(
         self,
     ) -> None:
-        """Test that the generation of an FCV-gated feature flag that specifies enable_on_transitional_fcv: false is equivalent to the default"""
+        """Test that the generation of an FCV-gated feature flag that specifies enable_on_transitional_fcv_UNSAFE: false is equivalent to the default"""
         header, source = self.assert_generate_with_basic_types(
             dedent(
                 """
@@ -1400,7 +1404,7 @@ class TestGenerator(testcase.IDLTestcase):
                     default: true
                     version: 123
                     fcv_gated: true
-                    enable_on_transitional_fcv: false
+                    enable_on_transitional_fcv_UNSAFE: false
             """
             )
         )
