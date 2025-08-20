@@ -99,3 +99,11 @@ A `MongoExtensionLogicalAggregationStage` describes a stage that has been parsed
 instance specific context -- the stage definition and other context data from the pipeline.
 These objects are suitable for pipeline optimization. Once optimization is complete they can
 be used to generate objects for execution.
+
+## Extension Initialization
+
+All extensions must expose a `get_mongodb_extension` function symbol as the top-level extension
+entrypoint for the host to facilitate extension loading and initialization. The `MongoExtension`
+initialization function receives a pointer to the `MongoExtensionHostPortal`, which provides a
+function `registerStageDescriptor`. Each aggregation stage you wish to load as part of an extension
+must be registered during initialization.
