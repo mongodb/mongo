@@ -69,7 +69,7 @@ public:
     RemoveShardCmd() : BasicCommandWithRequestParser() {}
 
     std::string help() const override {
-        return "remove a shard from the system.";
+        return "[deprecated] remove a shard from the system.";
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -108,6 +108,10 @@ public:
                 str::stream() << Request::kCommandName
                               << " command should be run on admin database",
                 request.getDbName().isAdminDB());
+
+        LOGV2_WARNING(10949600,
+                      "'removeShard' command is deprecated. Please use the new shard removal API "
+                      "(startShardDraining, shardDrainingStatus, commitShardRemoval) instead!");
 
         ConfigSvrRemoveShard configsvrRequest{target};
         configsvrRequest.setRemoveShardRequestBase(request.getRemoveShardRequestBase());
