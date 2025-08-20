@@ -502,7 +502,8 @@ BSONObj replaceNamespaceByBucketNss(OperationContext* opCtx,
     BSONObjBuilder bob;
     for (const auto& elem : cmdObj) {
         const auto name = elem.fieldNameStringData();
-        if (name == write_ops::FindAndModifyCommandRequest::kCommandName) {
+        if (name == write_ops::FindAndModifyCommandRequest::kCommandName ||
+            name == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
             bob.append(write_ops::FindAndModifyCommandRequest::kCommandName, bucketNss.coll());
         } else {
             bob.append(elem);
