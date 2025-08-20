@@ -36,8 +36,8 @@ export function getQueryPlanner(explain) {
     }
     assert(explain.hasOwnProperty("stages"), explain);
     const stage = explain.stages[0];
-    assert(stage.hasOwnProperty("$cursor"), explain);
-    const cursorStage = stage.$cursor;
+    const cursorStage = stage.$cursor || stage.$geoNearCursor;
+    assert(cursorStage, explain);
     assert(cursorStage.hasOwnProperty("queryPlanner"), explain);
     return cursorStage.queryPlanner;
 }
