@@ -121,12 +121,13 @@ public:
      * Runs the scanning/insertion phase of the index build..
      */
     Status startBuildingIndex(OperationContext* opCtx,
-                              const CollectionPtr& collection,
+                              const DatabaseName& dbName,
+                              const UUID& collectionUUID,
                               const UUID& buildUUID,
                               const boost::optional<RecordId>& resumeAfterRecordId = boost::none);
 
     Status resumeBuildingIndexFromBulkLoadPhase(OperationContext* opCtx,
-                                                const CollectionPtr& collection,
+                                                const CollectionAcquisition& collection,
                                                 const UUID& buildUUID);
 
     /**
@@ -137,7 +138,7 @@ public:
      */
     StatusWith<std::pair<long long, long long>> startBuildingIndexForRecovery(
         OperationContext* opCtx,
-        const CollectionPtr& coll,
+        const CollectionAcquisition& coll,
         const UUID& buildUUID,
         RepairData repair);
 

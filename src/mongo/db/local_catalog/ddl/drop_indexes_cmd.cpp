@@ -296,8 +296,7 @@ public:
 
         // The following function performs its own WriteConflict handling, so don't wrap it in a
         // writeConflictRetry loop.
-        uassertStatusOK(
-            indexer->insertAllDocumentsInCollection(opCtx, acquisition.getCollectionPtr()));
+        uassertStatusOK(indexer->insertAllDocumentsInCollection(opCtx, toReIndexNss));
 
         uassertStatusOK(indexer->checkConstraints(opCtx, acquisition.getCollectionPtr()));
 

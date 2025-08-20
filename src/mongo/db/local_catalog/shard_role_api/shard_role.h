@@ -423,6 +423,21 @@ CollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
     OperationContext* opCtx, const NamespaceString& nss, LockMode mode);
 
 /**
+ * Acquire a collection but without establishing consistent catalog with the read timestamp - it
+ * will present the latest catalog, which might not be the one corresponding to the read timestamp.
+ * This acquisition is sharding-unaware, meaning it will present the collection as unsharded, and
+ * will allow reading from orphaned documents.
+ *
+ * IMPORTANT: To be used only by IndexBuildsCoordinator.
+ * TODO SERVER-109542: Remove this.
+ */
+CollectionAcquisition acquireLocalCollectionNoConsistentCatalog(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AcquisitionPrerequisites::OperationType operationType,
+    LockMode lockMode);
+
+/**
  * This utility is what allows modifications to the local catalog part of an acquisition for a
  * specific collection to become visible on a previously established acquisition for that
  * collection, before or after the end of a WUOW.
@@ -670,7 +685,7 @@ private:
     bool _successful = false;
     boost::optional<long long> _replTermBeforeSnapshot;
     boost::optional<std::shared_ptr<const CollectionCatalog>> _catalogBeforeSnapshot;
-    boost::optional<bool> _shouldReadAtLastApplied;
+    bool _shouldReadAtLastApplied = false;
 };
 
 /*

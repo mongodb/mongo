@@ -2192,7 +2192,8 @@ void IndexBuildsCoordinator::_createIndex(OperationContext* opCtx,
         _indexBuildsManager.abortIndexBuild(
             opCtx, collection, buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
     });
-    uassertStatusOK(_indexBuildsManager.startBuildingIndex(opCtx, collection.get(), buildUUID));
+    uassertStatusOK(
+        _indexBuildsManager.startBuildingIndex(opCtx, nss.dbName(), collection->uuid(), buildUUID));
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto onCreateEachFn = [&](const BSONObj& spec, StringData ident) {
@@ -3125,16 +3126,12 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
         // if it waited.
         _awaitLastOpTimeBeforeInterceptorsMajorityCommitted(opCtx, replState);
 
-        auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
-                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
-        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
-
-        auto collection = _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
-
-        uassertStatusOK(_indexBuildsManager.startBuildingIndex(
-            opCtx, collection, replState->buildUUID, resumeAfterRecordId));
+        invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
+        uassertStatusOK(_indexBuildsManager.startBuildingIndex(opCtx,
+                                                               replState->dbName,
+                                                               replState->collectionUUID,
+                                                               replState->buildUUID,
+                                                               resumeAfterRecordId));
 
         if (MONGO_unlikely(hangAfterIndexBuildDumpsInsertsFromBulkLock.shouldFail())) {
             LOGV2(7490902,
@@ -3152,17 +3149,23 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
 void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     {
-        auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
-                .explicitIntent =
-                    rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-                        .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)
-                    ? rss::consensus::IntentRegistry::Intent::Write
-                    : rss::consensus::IntentRegistry::Intent::LocalWrite});
-        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        AutoGetCollection collLock(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
+        tassert(7683109,
+                "Expected readSource to be kNoTimestamp",
+                shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource() ==
+                    RecoveryUnit::ReadSource::kNoTimestamp);
+        invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
 
-        auto collection = _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
+        const auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(
+                NamespaceStringOrUUID{replState->dbName, replState->collectionUUID},
+                PlacementConcern::kPretendUnsharded,
+                repl::ReadConcernArgs::get(opCtx),
+                AcquisitionPrerequisites::kUnreplicatedWrite),
+            MODE_IX);
+
+        tassert(7683105, "Expected collection to exist", collection.exists());
+
         uassertStatusOK(_indexBuildsManager.resumeBuildingIndexFromBulkLoadPhase(
             opCtx, collection, replState->buildUUID));
     }
@@ -3171,20 +3174,6 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
         LOGV2(4940800, "Hanging after dumping inserts from bulk builder");
         hangAfterIndexBuildDumpsInsertsFromBulk.pauseWhileSet();
     }
-}
-
-CollectionPtr IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeysIntoIndex(
-    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    // Rebuilding system indexes during startup using the IndexBuildsCoordinator is done by all
-    // storage engines if they're missing.
-    invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
-
-    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
-        CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, replState->collectionUUID));
-    invariant(collection);
-    collection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, collection));
-    return collection;
 }
 
 /*
@@ -3430,9 +3419,17 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     try {
         LOGV2(20673, "Index builds manager starting", "buildUUID"_attr = buildUUID, logAttrs(nss));
 
+        const auto collAcquisition =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest(nss,
+                                                           PlacementConcern::kPretendUnsharded,
+                                                           repl::ReadConcernArgs::get(opCtx),
+                                                           AcquisitionPrerequisites::kWrite),
+                              MODE_X);
+
         std::tie(numRecords, dataSize) =
             uassertStatusOK(_indexBuildsManager.startBuildingIndexForRecovery(
-                opCtx, collection.get(), buildUUID, repair));
+                opCtx, collAcquisition, buildUUID, repair));
 
         // Since we are holding an exclusive collection lock to stop new writes, do not yield locks
         // while draining.

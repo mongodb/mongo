@@ -130,8 +130,8 @@ Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, 
 
 Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
     {
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         WriteUnitOfWork wunit(opCtx);
         CollectionWriter writer{opCtx, nss};
@@ -146,6 +146,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     }
     MultiIndexBlock indexer;
     ScopeGuard abortOnExit([&] {
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         CollectionWriter collection(opCtx, nss);
         WriteUnitOfWork wunit(opCtx);
@@ -154,6 +155,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     });
     auto status = Status::OK();
     {
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         CollectionWriter collection(opCtx, nss);
         status = initializeMultiIndexBlock(opCtx, collection, indexer, spec, [opCtx] {
@@ -170,15 +172,14 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         }
     }
     {
-        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-        // Using CollectionWriter for convenience here.
-        CollectionWriter collection(opCtx, nss);
-        status = indexer.insertAllDocumentsInCollection(opCtx, collection.get());
+        status = indexer.insertAllDocumentsInCollection(opCtx, nss);
         if (!status.isOK()) {
             return status;
         }
     }
     {
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
+
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         CollectionWriter collection(opCtx, nss);
         status = indexer.retrySkippedRecords(opCtx, collection.get());

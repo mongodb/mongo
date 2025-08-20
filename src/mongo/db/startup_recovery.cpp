@@ -241,7 +241,7 @@ Status buildMissingIdIndex(OperationContext* opCtx, const NamespaceString nss) {
         return swSpecs.getStatus();
     }
 
-    auto status = indexer.insertAllDocumentsInCollection(opCtx, collWriter.get());
+    auto status = indexer.insertAllDocumentsInCollection(opCtx, nss);
     if (!status.isOK()) {
         return status;
     }

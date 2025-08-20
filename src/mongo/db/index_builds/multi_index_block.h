@@ -171,7 +171,7 @@ public:
      */
     Status insertAllDocumentsInCollection(
         OperationContext* opCtx,
-        const CollectionPtr& collection,
+        const NamespaceStringOrUUID& nssOrUUID,
         const boost::optional<RecordId>& resumeAfterRecordId = boost::none);
 
     /**
@@ -206,9 +206,9 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    Status dumpInsertsFromBulk(OperationContext* opCtx, const CollectionPtr& collection);
+    Status dumpInsertsFromBulk(OperationContext* opCtx, const CollectionAcquisition& collection);
     Status dumpInsertsFromBulk(OperationContext* opCtx,
-                               const CollectionPtr& collection,
+                               const CollectionAcquisition& collection,
                                const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord);
     /**
      * For background indexes using an IndexBuildInterceptor to capture inserts during a build,
@@ -364,7 +364,7 @@ private:
      * the external sorter.
      */
     void _doCollectionScan(OperationContext* opCtx,
-                           const CollectionPtr& collection,
+                           const CollectionAcquisition& collection,
                            const boost::optional<RecordId>& resumeAfterRecordId,
                            ProgressMeterHolder* progress);
 
