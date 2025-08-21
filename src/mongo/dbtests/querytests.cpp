@@ -170,7 +170,7 @@ public:
         _collection = acquireCollection(&_opCtx,
                                         CollectionAcquisitionRequest::fromOpCtx(
                                             &_opCtx, nss(), AcquisitionPrerequisites::kWrite),
-                                        MODE_IX);
+                                        MODE_IS);
         ASSERT(_collection->exists());
         addIndex(IndexSpec().addKey("a").unique(false));
     }
@@ -205,7 +205,7 @@ protected:
             ASSERT_OK(dbtests::initializeMultiIndexBlock(&_opCtx, collection, indexer, specObj));
             wunit.commit();
         }
-        uassertStatusOK(indexer.insertAllDocumentsInCollection(&_opCtx, _collection->nss()));
+        uassertStatusOK(indexer.insertAllDocumentsInCollection(&_opCtx, collection.get()));
         uassertStatusOK(
             indexer.drainBackgroundWrites(&_opCtx,
                                           RecoveryUnit::ReadSource::kNoTimestamp,

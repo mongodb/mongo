@@ -146,25 +146,22 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
 
 Status IndexBuildsManager::startBuildingIndex(
     OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const UUID& collectionUUID,
+    const CollectionPtr& collection,
     const UUID& buildUUID,
     const boost::optional<RecordId>& resumeAfterRecordId) {
     auto builder = invariant(_getBuilder(buildUUID));
-    return builder->insertAllDocumentsInCollection(
-        opCtx, {dbName, collectionUUID}, resumeAfterRecordId);
+
+    return builder->insertAllDocumentsInCollection(opCtx, collection, resumeAfterRecordId);
 }
 
-Status IndexBuildsManager::resumeBuildingIndexFromBulkLoadPhase(
-    OperationContext* opCtx, const CollectionAcquisition& collection, const UUID& buildUUID) {
+Status IndexBuildsManager::resumeBuildingIndexFromBulkLoadPhase(OperationContext* opCtx,
+                                                                const CollectionPtr& collection,
+                                                                const UUID& buildUUID) {
     return invariant(_getBuilder(buildUUID))->dumpInsertsFromBulk(opCtx, collection);
 }
 
 StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingIndexForRecovery(
-    OperationContext* opCtx,
-    const CollectionAcquisition& coll,
-    const UUID& buildUUID,
-    RepairData repair) {
+    OperationContext* opCtx, const CollectionPtr& coll, const UUID& buildUUID, RepairData repair) {
     auto builder = invariant(_getBuilder(buildUUID));
 
     // Iterate all records in the collection. Validate the records and index them
@@ -176,14 +173,12 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     ProgressMeterHolder progressMeter;
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
-        progressMeter.set(lk,
-                          CurOp::get(opCtx)->setProgress(
-                              lk, curopMessage, coll.getCollectionPtr()->numRecords(opCtx)),
-                          opCtx);
+        progressMeter.set(
+            lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, coll->numRecords(opCtx)), opCtx);
     }
 
-    auto ns = coll.nss();
-    auto rs = coll.getCollectionPtr()->getRecordStore();
+    auto ns = coll->ns();
+    auto rs = coll->getRecordStore();
     auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     auto record = cursor->next();
     while (record) {
@@ -217,15 +212,14 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                         stdx::unique_lock<Client> lk(*opCtx->getClient());
                         // Must reduce the progress meter's expected total after deleting an invalid
                         // document from the collection.
-                        progressMeter.get(lk)->setTotalWhileRunning(
-                            coll.getCollectionPtr()->numRecords(opCtx));
+                        progressMeter.get(lk)->setTotalWhileRunning(coll->numRecords(opCtx));
                     }
                 } else {
                     numRecords++;
                     dataSize += data.size();
                     auto insertStatus = builder->insertSingleDocumentForInitialSyncOrRecovery(
                         opCtx,
-                        coll.getCollectionPtr(),
+                        coll,
                         data.releaseToBson(),
                         id,
                         [&cursor] { cursor->save(); },
@@ -278,7 +272,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     long long bytesRemoved = 0;
 
     const NamespaceString lostAndFoundNss =
-        NamespaceString::makeLocalCollection("lost_and_found." + coll.uuid().toString());
+        NamespaceString::makeLocalCollection("lost_and_found." + coll->uuid().toString());
 
     // Delete duplicate record and insert it into local lost and found.
     Status status = [&] {

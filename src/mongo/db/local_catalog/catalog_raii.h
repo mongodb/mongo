@@ -216,12 +216,6 @@ public:
 
     CollectionNamespaceOrUUIDLock(CollectionNamespaceOrUUIDLock&& other) = default;
 
-    static Lock::CollectionLock resolveAndLockCollectionByNssOrUUID(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& nsOrUUID,
-        LockMode mode,
-        Date_t deadline = Date_t::max());
-
 private:
     Lock::CollectionLock _lock;
 };

@@ -91,6 +91,8 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringBulkLoadPhase);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringBulkLoadPhaseSecond);
+MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYield);
+MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYieldSecond);
 
 /**
  * Static factory method that constructs and returns an appropriate IndexAccessMethod depending on
@@ -846,6 +848,50 @@ SorterTracker* IndexAccessMethod::BulkBuilder::bulkBuilderTracker() {
     return &indexBulkBuilderSSS.sorterTracker;
 }
 
+const IndexCatalogEntry* IndexAccessMethod::BulkBuilder::yield(OperationContext* opCtx,
+                                                               const CollectionPtr& collection,
+                                                               const NamespaceString& ns,
+                                                               const IndexCatalogEntry* entry) {
+    const std::string indexIdent = entry->getIdent();
+
+    // Releasing locks means a new snapshot should be acquired when restored.
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    collection.yield();
+
+    auto locker = shard_role_details::getLocker(opCtx);
+    Locker::LockSnapshot snapshot;
+    locker->saveLockStateAndUnlock(&snapshot);
+
+    // Track the number of yields in CurOp.
+    CurOp::get(opCtx)->yielded();
+
+    auto failPointHang = [opCtx, &ns](FailPoint* fp) {
+        fp->executeIf(
+            [fp](auto&&) {
+                LOGV2(5180600, "Hanging index build during bulk load yield");
+                fp->pauseWhileSet();
+            },
+            [opCtx, &ns](auto&& config) {
+                return NamespaceStringUtil::parseFailPointData(config, "namespace") == ns;
+            });
+    };
+    failPointHang(&hangDuringIndexBuildBulkLoadYield);
+    failPointHang(&hangDuringIndexBuildBulkLoadYieldSecond);
+
+    locker->restoreLockState(opCtx, snapshot);
+    collection.restore();
+
+    // After yielding, the latest instance of the collection is fetched and can be
+    // different from the collection instance prior to yielding. For this reason we need
+    // to refresh the index entry pointer.
+    if (!collection) {
+        return nullptr;
+    }
+
+    return collection->getIndexCatalog()
+        ->findIndexByIdent(opCtx, indexIdent, IndexCatalog::InclusionPolicy::kUnfinished)
+        ->getEntry();
+}
 
 class SortedDataIndexAccessMethod::BaseBulkBuilder : public IndexAccessMethod::BulkBuilder {
 public:
@@ -879,12 +925,12 @@ public:
 
     Status commit(OperationContext* opCtx,
                   RecoveryUnit& ru,
+                  const CollectionPtr& collection,
                   const IndexCatalogEntry* entry,
                   bool dupsAllowed,
                   int32_t yieldIterations,
                   const KeyHandlerFn& onDuplicateKeyInserted,
-                  const RecordIdHandlerFn& onDuplicateRecord,
-                  const YieldFn& yieldFn) final;
+                  const RecordIdHandlerFn& onDuplicateRecord) final;
 
 protected:
     const MultikeyPaths& getMultikeyPaths() const final;
@@ -1102,12 +1148,12 @@ Status SortedDataIndexAccessMethod::BaseBulkBuilder::insert(
 Status SortedDataIndexAccessMethod::BaseBulkBuilder::commit(
     OperationContext* opCtx,
     RecoveryUnit& ru,
+    const CollectionPtr& collection,
     const IndexCatalogEntry* entry,
     bool dupsAllowed,
     int32_t yieldIterations,
     const KeyHandlerFn& onDuplicateKeyInserted,
-    const RecordIdHandlerFn& onDuplicateRecord,
-    const YieldFn& yieldFn) {
+    const RecordIdHandlerFn& onDuplicateRecord) {
     Timer timer;
 
     _ns = entry->getNSSFromCatalog(opCtx);
@@ -1193,7 +1239,7 @@ Status SortedDataIndexAccessMethod::BaseBulkBuilder::commit(
 
         // Yield locks every 'yieldIterations' key insertions.
         if (yieldIterations > 0 && (++iterations % yieldIterations == 0)) {
-            entry = yieldFn(opCtx);
+            entry = yield(opCtx, collection, _ns, entry);
         }
 
         {

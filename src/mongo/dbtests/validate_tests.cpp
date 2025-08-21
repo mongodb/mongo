@@ -352,7 +352,7 @@ protected:
         {
             Lock::CollectionLock collLock(&_opCtx, _nss, MODE_IX);
             CollectionWriter collection(&_opCtx, _nss);
-            status = indexer.insertAllDocumentsInCollection(&_opCtx, _nss);
+            status = indexer.insertAllDocumentsInCollection(&_opCtx, collection.get());
             if (!status.isOK()) {
                 return status;
             }

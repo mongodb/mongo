@@ -264,7 +264,7 @@ protected:
 
         // Initialize the index builder and add all documents currently in the collection.
         ASSERT_OK(dbtests::initializeMultiIndexBlock(opCtx(), coll, indexer, indexSpec));
-        ASSERT_OK(indexer.insertAllDocumentsInCollection(opCtx(), nss));
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(opCtx(), coll.get()));
         ASSERT_OK(indexer.checkConstraints(opCtx(), coll.get()));
 
         WriteUnitOfWork wunit(opCtx());

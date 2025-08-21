@@ -271,34 +271,28 @@ CollectionNamespaceOrUUIDLock::CollectionNamespaceOrUUIDLock(OperationContext* o
                                                              const NamespaceStringOrUUID& nsOrUUID,
                                                              LockMode mode,
                                                              Date_t deadline)
-    : _lock(resolveAndLockCollectionByNssOrUUID(opCtx, nsOrUUID, mode, deadline)) {}
+    : _lock([opCtx, &nsOrUUID, mode, deadline] {
+          if (nsOrUUID.isNamespaceString()) {
+              return Lock::CollectionLock{opCtx, nsOrUUID.nss(), mode, deadline};
+          }
 
-Lock::CollectionLock CollectionNamespaceOrUUIDLock::resolveAndLockCollectionByNssOrUUID(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    LockMode mode,
-    Date_t deadline) {
-    if (nsOrUUID.isNamespaceString()) {
-        return Lock::CollectionLock{opCtx, nsOrUUID.nss(), mode, deadline};
-    }
+          auto resolveNs = [opCtx, &nsOrUUID] {
+              return CollectionCatalog::get(opCtx)
+                  ->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(opCtx, nsOrUUID);
+          };
 
-    auto resolveNs = [opCtx, &nsOrUUID] {
-        return CollectionCatalog::get(opCtx)
-            ->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(opCtx, nsOrUUID);
-    };
-
-    // We cannot be sure that the namespace we lock matches the UUID given because we resolve
-    // the namespace from the UUID without the safety of a lock. Therefore, we will continue
-    // to re-lock until the namespace we resolve from the UUID before and after taking the
-    // lock is the same.
-    while (true) {
-        auto ns = resolveNs();
-        Lock::CollectionLock lock{opCtx, ns, mode, deadline};
-        if (ns == resolveNs()) {
-            return lock;
-        }
-    }
-}
+          // We cannot be sure that the namespace we lock matches the UUID given because we resolve
+          // the namespace from the UUID without the safety of a lock. Therefore, we will continue
+          // to re-lock until the namespace we resolve from the UUID before and after taking the
+          // lock is the same.
+          while (true) {
+              auto ns = resolveNs();
+              Lock::CollectionLock lock{opCtx, ns, mode, deadline};
+              if (ns == resolveNs()) {
+                  return lock;
+              }
+          }
+      }()) {}
 
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nsOrUUID,

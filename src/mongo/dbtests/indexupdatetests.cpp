@@ -125,7 +125,7 @@ protected:
             });
 
             uassertStatusOK(dbtests::initializeMultiIndexBlock(_opCtx, collection(), indexer, key));
-            uassertStatusOK(indexer.insertAllDocumentsInCollection(_opCtx, collection()->ns()));
+            uassertStatusOK(indexer.insertAllDocumentsInCollection(_opCtx, collection().get()));
             WriteUnitOfWork wunit(_opCtx);
             ASSERT_OK(indexer.commit(_opCtx,
                                      collection().getWritableCollection(_opCtx),
@@ -192,7 +192,7 @@ public:
         });
 
         ASSERT_OK(dbtests::initializeMultiIndexBlock(_opCtx, collection(), indexer, spec));
-        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, _nss));
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
         ASSERT_OK(indexer.checkConstraints(_opCtx, coll.get()));
 
         WriteUnitOfWork wunit(_opCtx);
@@ -257,7 +257,7 @@ public:
             ASSERT(desc);
 
             // Hybrid index builds check duplicates explicitly.
-            ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, _nss));
+            ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
 
             auto status = indexer.checkConstraints(_opCtx, coll.get());
             ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
@@ -376,7 +376,7 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
     if (!status.isOK()) {
         return status;
     }
-    status = indexer.insertAllDocumentsInCollection(_opCtx, _nss);
+    status = indexer.insertAllDocumentsInCollection(_opCtx, collection().get());
     if (!status.isOK()) {
         return status;
     }

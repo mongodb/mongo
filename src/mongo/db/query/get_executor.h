@@ -224,7 +224,7 @@ enum class CollectionScanDirection {
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
     OperationContext* opCtx,
-    const CollectionAcquisition& collection,
+    const CollectionPtr& collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     CollectionScanDirection scanDirection,
     const boost::optional<RecordId>& resumeAfterRecordId = boost::none);

@@ -784,6 +784,8 @@ protected:
      */
     void _insertSortedKeysIntoIndexForResume(OperationContext* opCtx,
                                              std::shared_ptr<ReplIndexBuildState> replState);
+    CollectionPtr _setUpForScanCollectionAndInsertSortedKeysIntoIndex(
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
 
     /**
      * Third phase is catching up on all the writes that occurred during the first two phases.

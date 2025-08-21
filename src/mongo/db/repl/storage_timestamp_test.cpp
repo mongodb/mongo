@@ -224,7 +224,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
-    status = indexer.insertAllDocumentsInCollection(opCtx, nss);
+    status = indexer.insertAllDocumentsInCollection(opCtx, collection.get());
     if (!status.isOK()) {
         return status;
     }
@@ -508,7 +508,7 @@ public:
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
 
-        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll->ns()));
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
         ASSERT_OK(indexer.checkConstraints(_opCtx, coll.get()));
 
         {
@@ -2119,7 +2119,7 @@ public:
 
         // Inserting all the documents has the side-effect of setting internal state on the index
         // builder that the index is multikey.
-        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, nss));
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, autoColl.getCollection()));
         ASSERT_OK(indexer.checkConstraints(_opCtx, autoColl.getCollection()));
 
         {
@@ -2774,7 +2774,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
             IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished));
         ASSERT(buildingIndex);
 
-        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, nss));
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, collection.get()));
 
         ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
 

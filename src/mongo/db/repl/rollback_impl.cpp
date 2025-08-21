@@ -795,7 +795,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
                       str::stream() << "Catalog returned invalid collection: "
                                     << nss.toStringForErrorMsg() << " (" << uuid.toString() << ")");
             auto exec = getCollectionScanExecutor(opCtx,
-                                                  collToScan,
+                                                  collToScan.getCollectionPtr(),
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                   CollectionScanDirection::kForward);
             long long countFromScan = 0;

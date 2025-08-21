@@ -2106,14 +2106,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
     OperationContext* opCtx,
-    const CollectionAcquisition& collection,
+    const CollectionPtr& yieldableCollection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     CollectionScanDirection scanDirection,
     const boost::optional<RecordId>& resumeAfterRecordId) {
     auto isForward = scanDirection == CollectionScanDirection::kForward;
     auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
     return InternalPlanner::collectionScan(
-        opCtx, collection, yieldPolicy, direction, resumeAfterRecordId);
+        opCtx, &yieldableCollection, yieldPolicy, direction, resumeAfterRecordId);
 }
 
 }  // namespace mongo
