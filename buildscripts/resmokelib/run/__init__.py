@@ -339,7 +339,7 @@ class TestRunner(Subcommand):
         min: 1, max: 16, options: [1, 4, 16]
         ...
         """
-        from buildscripts.resmokelib.config_fuzzer_limits import (
+        from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_limits import (
             config_fuzzer_extra_configs,
             config_fuzzer_params,
         )
@@ -384,7 +384,9 @@ class TestRunner(Subcommand):
         debug_mode.slow_checkpoint: false
         eviction_checkpoint_target: 4, min: 1, max: 99
         """
-        from buildscripts.resmokelib.config_fuzzer_wt_limits import config_fuzzer_params
+        from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_wt_limits import (
+            config_fuzzer_params,
+        )
 
         # check_limit_dict checks if a parameter is in a dictionary that may have the parameter's mins and maxes (limits).
         def check_limit_dict(limit_dict, param_name):

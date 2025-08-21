@@ -4,7 +4,8 @@ import argparse
 import os.path
 import shutil
 
-from buildscripts.resmokelib import config, mongo_fuzzer_configs, utils
+from buildscripts.resmokelib import config, utils
+from buildscripts.resmokelib.generate_fuzz_config import mongo_fuzzer_configs
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 _HELP = """

@@ -6,7 +6,7 @@ import shlex
 from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib.discovery import DiscoveryPlugin
 from buildscripts.resmokelib.generate_fcv_constants import GenerateFCVConstantsPlugin
-from buildscripts.resmokelib.generate_fuzz_config import GenerateFuzzConfigPlugin
+from buildscripts.resmokelib.generate_fuzz_config.plugin import GenerateFuzzConfigPlugin
 from buildscripts.resmokelib.hang_analyzer import HangAnalyzerPlugin
 from buildscripts.resmokelib.hang_analyzer.core_analyzer import CoreAnalyzerPlugin
 from buildscripts.resmokelib.multiversion import MultiversionPlugin

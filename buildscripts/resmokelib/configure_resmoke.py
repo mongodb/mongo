@@ -28,7 +28,8 @@ from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 
 from buildscripts.idl import gen_all_feature_flag_list
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib import mongo_fuzzer_configs, multiversionsetupconstants, utils
+from buildscripts.resmokelib import multiversionsetupconstants, utils
+from buildscripts.resmokelib.generate_fuzz_config import mongo_fuzzer_configs
 from buildscripts.resmokelib.run import TestRunner
 from buildscripts.resmokelib.utils import autoloader
 from buildscripts.resmokelib.utils.batched_baggage_span_processor import BatchedBaggageSpanProcessor
@@ -183,7 +184,9 @@ def _validate_options(parser: argparse.ArgumentParser, args: dict):
 
 
 def _validate_config(parser: argparse.ArgumentParser):
-    from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
+    from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_limits import (
+        config_fuzzer_params,
+    )
 
     """Do validation on the config settings and config fuzzer limits."""
 

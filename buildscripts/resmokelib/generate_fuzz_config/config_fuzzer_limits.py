@@ -1,57 +1,9 @@
 """Minimum and maximum dictionary declarations for the different randomized parameters (mongod and mongos)."""
 
+
 """
-How to add a fuzzed mongod/mongos parameter:
-
-Below is a list of ways to fuzz configs which are supported without having to also change buildscripts/resmokelib/mongo_fuzzer_configs.py.
-Please ensure that you add it correctly to the "mongod" or "mongos" subdictionary.
-
-You need to specify if your parameter should be fuzzed at runtime, startup, or both by declaring the 'fuzz_at' key for the parameter. The 'fuzz_at' key should be a list that can contain the values "startup", "runtime", or both.
-For a parameter that is only fuzzed at startup, the fuzzer will generate a fuzzed value for the parameter and set it when starting up the server.
-For a parameter fuzzed at runtime, the fuzzer will generate a fuzzed value for the parameter while running the server based on a 'period' key that is required for fuzzed runtime parameters.
-The 'period' key describes how often the parameter should be changed, in seconds. Every 'period' seconds, the fuzzer will select a new random value for the parameter and use the setParameter command to update the value of the
-parameter on every node in the cluster while the suite is running.
-
-Let choices = [choice1, choice2, ..., choiceN] (an array of choices that the parameter can have as a value).
-The parameters are added in order of priority chosen in the if-elif-else statement in generate_normal_mongo_parameters()
-in buildscripts/resmokelib/mongo_fuzzer_configs.py.
-So, if you added the fields "default", "min", and "max" for a "param", case 4 would get evaluated over case 5.
-
-1. param = rng.uniform(min, max)
-    Add:
-    “param”: {“min”: min, “max”: max, "isUniform": True}
-
-2. param = rng.randint([choices, rng.randint(min, max)])
-    Add:
-    "param": {"min": <min of (min and choices)>, "max": <max of (max and choices)>, "lower_bound": lower_bound, "upper_bound": upper_bound, "choices": [choice1, choice2, ..., choiceN], "isRandomizedChoice": true}
-
-3. param = rng.choices(choices), where choices is an array
-    Add:
-    "param": {"choices": [choice1, choice2, ..., choiceN]}
-
-4. param = rng.randint(min, max)
-    Add:
-    “param”: {“min”: min, “max”: max}
-
-5. param = default
-    Add:
-    "param": {"default": default}
-    Note: For the default case, please add the value "fuzz_at": ["startup"] (the default value gets set at "startup").
-
-If you have a parameter that depends on another parameter being generated (see throughputProbingInitialConcurrency needing to be initialized before
-throughputProbingMinConcurrency and throughputProbingMaxConcurrency as an example in buildscripts/resmokelib/mongo_fuzzer_configs.py) or behavior that
-differs from the above cases, please do the following steps:
-1. Add the parameter and the needed information about the parameters here (ensure to correctly add to the mongod or mongos sub-dictionary)
-
-In buildscripts/resmokelib/mongo_fuzzer_configs.py:
-2. Add the parameter to excluded_normal_parameters in the generate_mongod_parameters() or generate_mongos_parameters()
-3. Add the parameter's special handling in generate_special_mongod_parameters() or generate_special_mongos_parameters()
-
-If you add a flow control parameter, please add the the parameter's name to flow_control_params in generate_mongod_parameters.
-
-Note: The main distinction between min/max vs. lower-bound/upper_bound is there is some transformation involving the lower and upper bounds,
-while the min/max should be the true min/max of the parameters. You should also include the true min/max of the parameter so this can be logged.
-If the min/max is not inclusive, this is added as a note above the parameter.
+For context and maintenance, see:
+https://github.com/10gen/mongo/blob/master/buildscripts/resmokelib/generate_fuzz_config/README.md#adding-new-mongo-parameters
 """
 
 config_fuzzer_params = {

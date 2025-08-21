@@ -39,7 +39,7 @@ Specify any of the following as the `hooks` in your [Suite](../../../../buildscr
     cluster.
 - [`EnableSpuriousWriteConflicts`](./enable_spurious_write_conflicts.py) - Toggles write conflicts.
 - [`FCVUpgradeDowngradeInBackground`](./fcv_upgrade_downgrade.py) - A hook to run background FCV upgrade and downgrade against test servers while a test is running.
-- [`FuzzRuntimeParameters`](./fuzz_runtime_parameters.py) - Regularly connect to nodes and sends them a `setParameter` command.
+- [`FuzzRuntimeParameters`](./fuzz_runtime_parameters.py) - Regularly connect to nodes and sends them a `setParameter` command; uses the [Config Fuzzer](../../../../buildscripts/resmokelib/generate_fuzz_config/README.md).
 - [`FuzzRuntimeStress`](./fuzz_runtime_stress.py) - Test hook that periodically changes the amount of stress the system is experiencing.
 - [`FuzzerRestoreSettings`](./fuzzer_restore_settings.py) - Cleans up unwanted changes from fuzzer.
 - [`GenerateAndCheckPerfResults`](./generate_and_check_perf_results.py) - Combine JSON results from individual benchmarks and check their reported values against any thresholds set for them.

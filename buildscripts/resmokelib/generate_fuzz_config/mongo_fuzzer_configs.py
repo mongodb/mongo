@@ -21,7 +21,9 @@ def generate_normal_wt_parameters(rng, value):
 
 def generate_special_eviction_configs(rng, ret, params):
     """Returns the value assigned the WiredTiger eviction parameters based on the fields of the parameters in config_fuzzer_wt_limits.py for special parameters (parameters with different assignment behaviors)."""
-    from buildscripts.resmokelib.config_fuzzer_wt_limits import min_trigger_bytes
+    from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_wt_limits import (
+        min_trigger_bytes,
+    )
 
     # eviction_trigger is relative to eviction_target, so you have to leave them excluded to ensure
     # eviction_trigger is fuzzed first.
@@ -70,7 +72,9 @@ def generate_special_eviction_configs(rng, ret, params):
 
 def generate_eviction_configs(rng):
     """Returns a string with random configurations for wiredTigerEngineConfigString parameter."""
-    from buildscripts.resmokelib.config_fuzzer_wt_limits import config_fuzzer_params
+    from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_wt_limits import (
+        config_fuzzer_params,
+    )
 
     params = config_fuzzer_params["wt"]
 
@@ -144,7 +148,9 @@ def generate_special_table_configs(rng, ret, params):
 
 def generate_table_configs(rng):
     """Returns a string with random configurations for WiredTiger tables."""
-    from buildscripts.resmokelib.config_fuzzer_wt_limits import config_fuzzer_params
+    from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_wt_limits import (
+        config_fuzzer_params,
+    )
 
     params = config_fuzzer_params["wt_table"]
 
@@ -349,7 +355,9 @@ def generate_flow_control_parameters(rng, ret, flow_control_params, params):
 
 def generate_mongod_parameters(rng):
     """Return a dictionary with values for each mongod parameter."""
-    from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
+    from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_limits import (
+        config_fuzzer_params,
+    )
 
     # Get only the mongod parameters that have "startup" in the "fuzz_at" param value.
     params = {
@@ -412,7 +420,9 @@ def generate_mongod_parameters(rng):
 
 def generate_mongod_extra_configs(rng):
     """Return a dictionary with values for each additional (i.e. not setParameter) mongod config."""
-    from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_extra_configs
+    from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_limits import (
+        config_fuzzer_extra_configs,
+    )
 
     return {
         key: generate_normal_mongo_parameters(rng, value)
@@ -422,7 +432,9 @@ def generate_mongod_extra_configs(rng):
 
 def generate_mongos_parameters(rng):
     """Return a dictionary with values for each mongos parameter."""
-    from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
+    from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_limits import (
+        config_fuzzer_params,
+    )
 
     # Get only the mongos parameters that have "startup" in the "fuzz_at" param value.
     params = {

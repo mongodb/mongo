@@ -1,39 +1,8 @@
 """Minimum and maximum declarations for all WiredTiger parameters that are supported by the config fuzzer."""
 
 """
-How to add a fuzzed WiredTiger parameters:
-
-Below is a list of ways to fuzz configs which are supported without having to also change buildscripts/resmokelib/mongo_fuzzer_configs.py.
-Please ensure that you add it correctly to the "wt" (eviction parameters) or "wt_table" subdictionary.
-Let choices = [choice1, choice2, ..., choiceN] (an array of choices that the parameter can have as a value).
-The parameters are added in order of priority chosen in the if-elif-else statement in generate_normal_wt_parameters() in
-buildscripts/resmokelib/mongo_fuzzer_configs.py.
-
-1. param = rng.choices(choices), where choices is an array
-    Add:
-    "param": {"choices": [choice1, choice2, ..., choiceN]}
-
-    You can also add a "multiplier" key which multiplies the key by the multiplier value.
-    param = rng.choice(choices) * multiplier
-    Add:
-    "param": {"choices": [choice1, choice2, ..., choiceN], "multiplier": multiplier}
-
-2. param = rng.randint(min, max)
-    Add:
-    “param”: {“min”: min, “max”: max}
-
-If you have a parameter that depends on another parameter being generated (see eviction_target needing to be initialized before
-eviction_trigger as an example in buildscripts/resmokelib/mongo_fuzzer_configs.py) or behavior that differs from the above cases, 
-please do the following step:
-1. Add the parameter and the needed information about the parameters here (ensure to correctly add to the wt or wt_table sub-dictionary)
-
-In buildscripts/resmokelib/mongo_fuzzer_configs.py:
-2. Add the parameter to excluded_normal_parameters in the generate_eviction_configs() or generate_table_configs()
-3. Add the parameter's special handling in generate_special_eviction_configs() or generate_special_table_configs()
-
-Note: The main distinction between min/max vs. lower-bound/upper_bound is there is some transformation involving the lower and upper bounds,
-while the min/max should be the true min/max of the parameters. You should also include the true min/max of the parameter so this can be logged.
-If the min/max is not inclusive, this is added as a note above the parameter.
+For context and maintenance, see:
+https://github.com/10gen/mongo/blob/master/buildscripts/resmokelib/generate_fuzz_config/README.md#adding-new-wiredtiger-parameters
 """
 
 target_bytes_min = 50 * 1024 * 1024  # 50MB # 5% of 1GB default cache size on Evergreen
