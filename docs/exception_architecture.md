@@ -62,7 +62,11 @@ mistakenly using these assertions midway through mutating process state.
 
 `fassert` failures will terminate the entire process; this is used for low-level checks where
 continuing might lead to corrupt data or loss of data on disk. Additionally, `fassert` will log
-the assertion message with fatal severity and add a breakpoint before terminating.
+a generic assertion message with fatal severity and add a breakpoint before terminating.
+
+To log a custom assertion message and terminate the server, use `LOGV2_FATAL`.
+To avoid printing a stacktrace on failure use `fassertNoTrace` or `LOGV2_FATAL_NO_TRACE`.
+Consider using them if there is only one way to reach this fatal point in code.
 
 `tassert` will fail the operation like `uassert`, but also triggers a "deferred-fatality tripwire
 flag". In testing environments, if the tripwire flag is set during shutdown, the process will

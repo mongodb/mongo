@@ -427,6 +427,9 @@ constexpr T checkNoTrace(MsgId msgid,
  * Each `fassert` call site must have a unique `msgid` as the first argument.
  * These are chosen using the same convention as logv2 log IDs.
  *
+ * To log a custom assert message with process-fatal semantics, use LOGV2_FATAL.
+ * Consider using this variant if there is only one way to reach the fatal point in code.
+ *
  * The second argument is a condition. `fassert` invocations are forwarded to an
  * overload set of handlers such that it can accept a `bool`, `const Status&`,
  * or `StatusWith` as a condition.
@@ -450,6 +453,8 @@ constexpr T checkNoTrace(MsgId msgid,
 /**
  * Same usage and arguments as `fassert`, but performs
  * a quickExit instead of a stacktrace-dumping abort.
+ * Use LOGV2_FATAL_NO_TRACE to supply a custom error message.
+ * Consider using this variant if there is only one way to reach the fatal point in code.
  */
 #define fassertNoTrace MONGO_fassertNoTrace
 
