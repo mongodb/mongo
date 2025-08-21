@@ -31,23 +31,12 @@
 
 #include "mongo/db/exec/mutable_bson/algorithm.h"
 #include "mongo/db/exec/mutable_bson/document.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-#define TEST_BEGIN auto runTest = [this](bool multiservice) { \
-    std::cout << "Running " << unittest::getTestName() << " with multiservice=" << \
-    multiservice << std::endl
-
-#define TEST_END                          \
-    }                                     \
-    ;                                     \
-    do {                                  \
-        for (auto mode : {true, false}) { \
-            runTest(mode);                \
-        }                                 \
-    } while (0)
 
 const Date_t kDate = Date_t::now();
 const std::vector<BSONObj> kField1Elements = {
@@ -61,23 +50,13 @@ const std::vector<BSONObj> kField2Elements = {
     BSON("enableSomething" << true), BSON("delaySeconds" << 400), BSON("someName" << "foobar")};
 
 BSONObj buildSample(
-    bool multiservice,
     const boost::optional<const std::vector<BSONObj>&>& field1Elements = boost::none,
     const boost::optional<const std::vector<BSONObj>&>& field2Elements = boost::none) {
     BSONObjBuilder sampleBuilder;
-    std::unique_ptr<BSONObjBuilder> serviceBuilder;
-    auto* endLevelBuilder = &sampleBuilder;
-
     sampleBuilder.appendDate("start", kDate);
 
-    if (multiservice) {
-        serviceBuilder = std::make_unique<BSONObjBuilder>(sampleBuilder.subobjStart("common"));
-        serviceBuilder->appendDate("start", kDate);
-        endLevelBuilder = serviceBuilder.get();
-    }
-
     if (field1Elements) {
-        BSONObjBuilder subBob = endLevelBuilder->subobjStart("field1");
+        BSONObjBuilder subBob = sampleBuilder.subobjStart("field1");
         subBob.appendDate("start", kDate);
         for (auto& obj : field1Elements.value()) {
             subBob.appendElements(obj);
@@ -85,18 +64,13 @@ BSONObj buildSample(
         subBob.appendDate("end", kDate);
     }
     if (field2Elements) {
-        BSONObjBuilder subBob = endLevelBuilder->subobjStart("field2");
+        BSONObjBuilder subBob = sampleBuilder.subobjStart("field2");
         subBob.appendDate("start", kDate);
         for (auto& obj : field2Elements.value()) {
             subBob.appendElements(obj);
         }
         subBob.appendDate("end", kDate);
     }
-
-    if (multiservice) {
-        serviceBuilder->appendDate("end", kDate);
-    }
-    serviceBuilder.reset(nullptr);
     sampleBuilder.appendDate("end", kDate);
     return sampleBuilder.obj();
 }
@@ -119,9 +93,9 @@ void alterOneFieldValueAndAddSample(
 
     std::vector<BSONObj> changedElements{deltaElement};
     auto deltaCountExpected = compressor.getDeltaCount() + 1;
-    auto deltaDocExpected = buildSample(compressor.isMultiService(), changedElements);
+    auto deltaDocExpected = buildSample(changedElements);
 
-    auto sample = buildSample(compressor.isMultiService(), field1Elements, field2Elements);
+    auto sample = buildSample(field1Elements, field2Elements);
     auto result = compressor.addSample(sample);
 
     ASSERT(result);
@@ -130,16 +104,14 @@ void alterOneFieldValueAndAddSample(
 }
 
 // Tests addSample returns just the delta document on non-schema breaking changes.
-TEST(FTDCMetadataCompressorTest, TestAddSample_BasicDeltas) {
-    TEST_BEGIN;
-
-    FTDCMetadataCompressor compressor(UseMultiServiceSchema{multiservice});
+TEST(FTDCMetadataCompressor, TestAddSample_BasicDeltas) {
+    FTDCMetadataCompressor compressor;
 
     auto field1Elements = kField1Elements;
     auto field2Elements = kField2Elements;
 
     // Set the reference document
-    auto sample = buildSample(multiservice, field1Elements, field2Elements);
+    auto sample = buildSample(field1Elements, field2Elements);
     auto result = compressor.addSample(sample);
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result.value(), sample);
@@ -151,9 +123,9 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_BasicDeltas) {
 
     auto deltaElement = BSON(field1Elements.at(0).firstElementFieldNameStringData() << "new_value");
     field1Elements.at(0) = deltaElement;
-    auto sampleDoc = buildSample(multiservice, field1Elements, field2Elements);
+    auto sampleDoc = buildSample(field1Elements, field2Elements);
     changedElements.push_back(deltaElement);
-    auto deltaDoc = buildSample(multiservice, changedElements);
+    auto deltaDoc = buildSample(changedElements);
     result = compressor.addSample(sampleDoc);
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result.value(), deltaDoc);
@@ -166,8 +138,8 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_BasicDeltas) {
         field1Elements.at(i) = deltaElement;
         changedElements.push_back(deltaElement);
     }
-    sampleDoc = buildSample(multiservice, field1Elements, field2Elements);
-    deltaDoc = buildSample(multiservice, changedElements);
+    sampleDoc = buildSample(field1Elements, field2Elements);
+    deltaDoc = buildSample(changedElements);
     result = compressor.addSample(sampleDoc);
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result.value(), deltaDoc);
@@ -191,55 +163,20 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_BasicDeltas) {
         field2Elements.at(i) = deltaElement;
         field2ChangedElements.push_back(deltaElement);
     }
-    sampleDoc = buildSample(multiservice, field1Elements, field2Elements);
-    deltaDoc = buildSample(multiservice, changedElements, field2ChangedElements);
+    sampleDoc = buildSample(field1Elements, field2Elements);
+    deltaDoc = buildSample(changedElements, field2ChangedElements);
     result = compressor.addSample(sampleDoc);
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result.value(), deltaDoc);
     ASSERT_EQ(compressor.getDeltaCount(), 3);
-
-    TEST_END;
-}
-
-// Tests that services with unchanged periodic metadata are not included in the delta document.
-TEST(FTDCMetadataCompressorTest, TestAddSample_MultiServiceDelta) {
-    auto cmd1 = BSON("cmd" << BSON("foo" << 1));
-    auto cmd2 = BSON("cmd" << BSON("foo" << 2));
-    auto sample1 = BSON("start" << kDate << "common" << cmd1 << "router" << cmd1 << "end" << kDate);
-    auto sample2 = BSON("start" << kDate << "common" << cmd1 << "router" << cmd2 << "end" << kDate);
-    auto sample3 = BSON("start" << kDate << "common" << cmd2 << "router" << cmd2 << "end" << kDate);
-    auto delta1 = BSON("start" << kDate << "router" << cmd2 << "end" << kDate);
-    auto delta2 = BSON("start" << kDate << "common" << cmd2 << "end" << kDate);
-
-    FTDCMetadataCompressor compressor(UseMultiServiceSchema{true});
-    auto result = compressor.addSample(sample1);
-    ASSERT(result);
-    ASSERT_BSONOBJ_EQ(result.value(), sample1);
-    ASSERT_EQ(compressor.getDeltaCount(), 0);
-
-    ASSERT_FALSE(compressor.addSample(sample1).has_value());
-
-    result = compressor.addSample(sample2);
-    ASSERT(result);
-    ASSERT_BSONOBJ_EQ(result.value(), delta1);
-    ASSERT_EQ(compressor.getDeltaCount(), 1);
-
-    ASSERT_FALSE(compressor.addSample(sample2).has_value());
-
-    result = compressor.addSample(sample3);
-    ASSERT(result);
-    ASSERT_BSONOBJ_EQ(result.value(), delta2);
-    ASSERT_EQ(compressor.getDeltaCount(), 2);
 }
 
 // Tests the sample document at some snapshot, i, can be reconstructed from the initial
 // reference and the delta documents.
-TEST(FTDCMetadataCompressorTest, TestReconstruction) {
-    TEST_BEGIN;
-
+TEST(FTDCMetadataCompressor, TestReconstruction) {
     namespace mmb = mongo::mutablebson;
 
-    FTDCMetadataCompressor compressor(UseMultiServiceSchema{multiservice});
+    FTDCMetadataCompressor compressor;
 
     auto field1Elements = kField1Elements;
     auto field2Elements = kField2Elements;
@@ -248,21 +185,21 @@ TEST(FTDCMetadataCompressorTest, TestReconstruction) {
 
     // Build the list of sample documents to test against.
     // -- initial ref doc
-    samples.push_back(buildSample(multiservice, field1Elements, field2Elements));
+    samples.push_back(buildSample(field1Elements, field2Elements));
 
     // -- first delta
     field1Elements.at(0) = BSON(field1Elements.at(0).firstElementFieldNameStringData() << "newval");
-    samples.push_back(buildSample(multiservice, field1Elements, field2Elements));
+    samples.push_back(buildSample(field1Elements, field2Elements));
 
     // -- second delta
     field2Elements.at(0) = BSON(field2Elements.at(0).firstElementFieldNameStringData() << "foo");
-    samples.push_back(buildSample(multiservice, field1Elements, field2Elements));
+    samples.push_back(buildSample(field1Elements, field2Elements));
 
     // -- third delta
     field1Elements.at(1) =
         BSON(field1Elements.at(1).firstElementFieldNameStringData() << BSON("foo" << "bar"));
     field2Elements.at(0) = BSON(field2Elements.at(0).firstElementFieldNameStringData() << true);
-    samples.push_back(buildSample(multiservice, field1Elements, field2Elements));
+    samples.push_back(buildSample(field1Elements, field2Elements));
 
     // Build the list of delta documents
     for (auto& sample : samples) {
@@ -302,27 +239,7 @@ TEST(FTDCMetadataCompressorTest, TestReconstruction) {
                 auto currentLvl2Element = mmb::findFirstChildNamed(
                     currentElement, deltaLvl2Element.fieldNameStringData());
                 ASSERT(currentLvl2Element.ok());
-
-                if (multiservice) {
-                    // go one more level deeper
-                    if (deltaLvl2Element.type() != BSONType::object) {
-                        ASSERT_FALSE(currentLvl2Element.isType(BSONType::object));
-                        ASSERT_OK(currentLvl2Element.setValueBSONElement(deltaLvl2Element));
-                        continue;
-                    }
-
-                    ASSERT(currentLvl2Element.isType(BSONType::object));
-                    BSONObjIterator deltaLvl3Itr(deltaLvl2Element.Obj());
-                    while (deltaLvl3Itr.more()) {
-                        auto deltaLvl3Element = deltaLvl3Itr.next();
-                        auto currentLvl3Element = mmb::findFirstChildNamed(
-                            currentLvl2Element, deltaLvl3Element.fieldNameStringData());
-                        ASSERT(currentLvl3Element.ok());
-                        ASSERT_OK(currentLvl3Element.setValueBSONElement(deltaLvl3Element));
-                    }
-                } else {
-                    ASSERT_OK(currentLvl2Element.setValueBSONElement(deltaLvl2Element));
-                }
+                ASSERT_OK(currentLvl2Element.setValueBSONElement(deltaLvl2Element));
             }
         }
 
@@ -330,20 +247,16 @@ TEST(FTDCMetadataCompressorTest, TestReconstruction) {
         auto reconstructed = doc.getObject();
         ASSERT_BSONOBJ_EQ(samples.at(i), reconstructed);
     }
-
-    TEST_END;
 }
 
 // Tests addSample resets delta tracking if a top-level element is added/removed/reordered/renamed.
-TEST(FTDCMetadataCompressorTest, TestAddSample_Level1SchemaChange) {
-    TEST_BEGIN;
-
-    FTDCMetadataCompressor compressor(UseMultiServiceSchema{multiservice});
+TEST(FTDCMetadataCompressor, TestAddSample_Level1SchemaChange) {
+    FTDCMetadataCompressor compressor;
 
     auto field1Elements = kField1Elements;
 
     // Set the reference document
-    auto sample = buildSample(multiservice, kField1Elements, kField2Elements);
+    auto sample = buildSample(kField1Elements, kField2Elements);
     auto result = compressor.addSample(sample);
     ASSERT(result);
 
@@ -352,7 +265,7 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_Level1SchemaChange) {
 
     // Remove "field2".
     // Assert delta count resets to 0 and the delta doc is the same as the sample.
-    sample = buildSample(multiservice, field1Elements);
+    sample = buildSample(field1Elements);
     result = compressor.addSample(sample);
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result.value(), sample);
@@ -366,7 +279,7 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_Level1SchemaChange) {
     alterOneFieldValueAndAddSample(compressor, field1Elements, 0, boost::none);
 
     // Add back "field2". Assert delta resets.
-    sample = buildSample(multiservice, field1Elements, kField2Elements);
+    sample = buildSample(field1Elements, kField2Elements);
     result = compressor.addSample(sample);
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result.value(), sample);
@@ -380,7 +293,7 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_Level1SchemaChange) {
     alterOneFieldValueAndAddSample(compressor, field1Elements, 0, kField2Elements);
 
     // Swap subobjects of "field1" and "field2". Assert delta resets.
-    sample = buildSample(multiservice, kField2Elements, field1Elements);
+    sample = buildSample(kField2Elements, field1Elements);
     result = compressor.addSample(sample);
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result.value(), sample);
@@ -389,20 +302,16 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_Level1SchemaChange) {
     result = compressor.addSample(sample);
     ASSERT_FALSE(result);
     ASSERT_EQ(compressor.getDeltaCount(), 0);
-
-    TEST_END;
 }
 
 // Tests addSample resets delta tracking if a level 2 element is added/removed/reordered/renamed.
-TEST(FTDCMetadataCompressorTest, TestAddSample_Level2SchemaChange) {
-    TEST_BEGIN;
-
-    FTDCMetadataCompressor compressor(UseMultiServiceSchema{multiservice});
+TEST(FTDCMetadataCompressor, TestAddSample_Level2SchemaChange) {
+    FTDCMetadataCompressor compressor;
 
     auto field1Elements = kField1Elements;
 
     // Set the reference document
-    auto sample = buildSample(multiservice, kField1Elements, kField2Elements);
+    auto sample = buildSample(kField1Elements, kField2Elements);
     auto result = compressor.addSample(sample);
     ASSERT(result);
 
@@ -413,7 +322,7 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_Level2SchemaChange) {
     // Assert delta count resets to 0 and the delta doc is the same as the sample.
     BSONObj removedElement = field1Elements.back();
     field1Elements.pop_back();
-    sample = buildSample(multiservice, field1Elements, kField2Elements);
+    sample = buildSample(field1Elements, kField2Elements);
     result = compressor.addSample(sample);
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result.value(), sample);
@@ -428,7 +337,7 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_Level2SchemaChange) {
 
     // Add one field value. Assert delta resets.
     field1Elements.push_back(removedElement);
-    sample = buildSample(multiservice, field1Elements, kField2Elements);
+    sample = buildSample(field1Elements, kField2Elements);
     result = compressor.addSample(sample);
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result.value(), sample);
@@ -443,7 +352,7 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_Level2SchemaChange) {
 
     // Rename one field. Assert delta resets.
     field1Elements.at(1) = BSON("renamedField" << 42);
-    sample = buildSample(multiservice, field1Elements, kField2Elements);
+    sample = buildSample(field1Elements, kField2Elements);
     result = compressor.addSample(sample);
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result.value(), sample);
@@ -452,20 +361,16 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_Level2SchemaChange) {
     result = compressor.addSample(sample);
     ASSERT_FALSE(result);
     ASSERT_EQ(compressor.getDeltaCount(), 0);
-
-    TEST_END;
 }
 
 // Tests addSample where a subobject only contains the "start" and "end" timestamps
-TEST(FTDCMetadataCompressorTest, TestAddSample_StartAndEndOnly) {
-    TEST_BEGIN;
-
-    FTDCMetadataCompressor compressor(UseMultiServiceSchema{multiservice});
+TEST(FTDCMetadataCompressor, TestAddSample_StartAndEndOnly) {
+    FTDCMetadataCompressor compressor;
 
     std::vector<BSONObj> field1Elements, field2Elements;
 
     // Build sample where field1 & field2 only have "start" and "end" fields.
-    auto sample = buildSample(multiservice, field1Elements, field2Elements);
+    auto sample = buildSample(field1Elements, field2Elements);
 
     // Set the reference document
     auto result = compressor.addSample(sample);
@@ -477,10 +382,5 @@ TEST(FTDCMetadataCompressorTest, TestAddSample_StartAndEndOnly) {
     result = compressor.addSample(sample);
     ASSERT_FALSE(result);
     ASSERT_EQ(compressor.getDeltaCount(), 0);
-
-    TEST_END;
 }
-
-#undef TEST_BEGIN
-#undef TEST_END
 }  // namespace mongo

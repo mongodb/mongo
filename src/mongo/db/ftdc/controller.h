@@ -69,13 +69,11 @@ public:
 
     FTDCController(boost::filesystem::path path,
                    FTDCConfig config,
-                   UseMultiServiceSchema multiServiceSchema,
                    std::unique_ptr<Env> env = _makeDefaultEnv())
         : _env(std::move(env)),
           _path(std::move(path)),
           _config(std::move(config)),
-          _configTemp(_config),
-          _multiServiceSchema(multiServiceSchema) {
+          _configTemp(_config) {
         if (feature_flags::gFeatureFlagGaplessFTDC.isEnabled()) {
             _asyncPeriodicCollectors.emplace(
                 _config.sampleTimeout, _config.minThreads, _config.maxThreads);
@@ -164,35 +162,25 @@ public:
      * Add a metadata collector to collect periodically (e.g., Configuration Settings). Does not
      * lose info on compression. Collects as or less frequently than PeriodicCollector.
      *
-     * `role` is used to disambiguate role-specific collectors with colliding names.
-     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
-     *
      * It is not safe to call this after FTDC startup.
      */
-    void addPeriodicMetadataCollector(std::unique_ptr<FTDCCollectorInterface> collector,
-                                      ClusterRole role);
+    void addPeriodicMetadataCollector(std::unique_ptr<FTDCCollectorInterface> collector);
 
     /**
      * Add a metric collector to collect periodically (e.g., serverStatus).
      *
-     * `role` is used to disambiguate role-specific collectors with colliding names.
-     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
-     *
      * It is not safe to call this after FTDC startup.
      */
-    void addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role);
+    void addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface> collector);
 
     /**
      * Add a collector that gathers machine or process configuration settings (not metrics).
      * These are emitted at the top of every log file the server produces, which is
      * why the "on rotate" terminology is used.
      *
-     * `role` is used to disambiguate role-specific collectors with colliding names.
-     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
-     *
      * It is not safe to call this after FTDC startup.
      */
-    void addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role);
+    void addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface> collector);
 
     /**
      * Start the controller.
@@ -312,9 +300,6 @@ private:
 
     // Background collection and writing thread
     stdx::thread _thread;
-
-    // Whether or not to use the multiversion schema for FTDC files.
-    UseMultiServiceSchema _multiServiceSchema;
 };
 
 }  // namespace mongo

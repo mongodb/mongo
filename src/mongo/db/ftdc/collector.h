@@ -52,8 +52,6 @@
 
 namespace mongo {
 
-enum UseMultiServiceSchema : bool {};
-
 /**
  * BSON Collector interface
  *
@@ -138,19 +136,10 @@ public:
     /**
      * Add a metric collector to the collection.
      * Must be called before collect. Cannot be called after collect is called.
-     *
-     * If the collector has characteristics of the process depending of the acting role, it requires
-     * passing a ClusterRole::ShardServer or a ClusterRole::RouterServer role. On the other hand, if
-     * the collector is composed by indicators that are specific to the underlying hardware or to
-     * the process, it requires a ClusterRole::None.
      */
-    virtual void add(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role) = 0;
+    virtual void add(std::unique_ptr<FTDCCollectorInterface> collector) = 0;
 
-    /**
-     * Checks if all collectors associated with each ClusterRole is empty.
-     */
-    bool empty();
-    virtual bool empty(ClusterRole role) = 0;
+    virtual bool empty() = 0;
 
     /**
      * Collect a sample from all collectors. Called after all adding is complete.
@@ -168,13 +157,13 @@ public:
      *    "end" : Date_t,      <- Time at which all collecting ended
      * }
      */
-    std::tuple<BSONObj, Date_t> collect(Client* client, UseMultiServiceSchema multiServiceSchema);
+    std::tuple<BSONObj, Date_t> collect(Client* client);
 
 protected:
     FTDCCollectorCollection() = default;
 
 private:
-    virtual void _collect(OperationContext* opCtx, ClusterRole role, BSONObjBuilder* builder) = 0;
+    virtual void _collect(OperationContext* opCtx, BSONObjBuilder* builder) = 0;
 };
 
 class SampleCollectorCache {
@@ -186,22 +175,18 @@ public:
         boost::intrusive_ptr<ClientStrand> clientStrand;
         DeferredSampleEntry updatedValue;
         SampleCollectFn collectFn;
-        ClusterRole role;
         int timesSkipped;
         bool hasData;
     };
 
-    SampleCollectorCache(ClusterRole role,
-                         Milliseconds maxSampleWaitMS,
-                         size_t minThreads,
-                         size_t maxThreads);
+    SampleCollectorCache(Milliseconds maxSampleWaitMS, size_t minThreads, size_t maxThreads);
 
     ~SampleCollectorCache();
 
     /**
      * Registers a new SampleCollector.
      */
-    void addCollector(StringData name, bool hasData, ClusterRole role, SampleCollectFn&& fn);
+    void addCollector(StringData name, bool hasData, SampleCollectFn&& fn);
 
     /**
      * Refreshes the data in each SampleCollector and writes the results to builder.
@@ -238,7 +223,6 @@ private:
 
     std::map<std::string, SampleCollector> _sampleCollectors;
 
-    ClusterRole _role;
     Atomic<Milliseconds> _maxSampleWaitMS;
     size_t _minThreads;
     size_t _maxThreads;
@@ -247,21 +231,15 @@ private:
     std::unique_ptr<ThreadPool> _pool;
 };
 
-class AsyncFTDCCollectorCollectionSet {
+class AsyncFTDCCollectorCollection : public FTDCCollectorCollection {
 public:
-    AsyncFTDCCollectorCollectionSet(ClusterRole role,
-                                    Milliseconds maxSampleWaitMS,
-                                    size_t minThreads,
-                                    size_t maxThreads)
-        : _role(role),
-          _collectorCache(std::make_unique<SampleCollectorCache>(
-              role, std::move(maxSampleWaitMS), minThreads, maxThreads)) {}
+    AsyncFTDCCollectorCollection(Milliseconds maxSampleWait, size_t minThreads, size_t maxThreads)
+        : _collectorCache(std::make_unique<SampleCollectorCache>(
+              std::move(maxSampleWait), minThreads, maxThreads)) {}
 
-    void addCollector(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role);
+    void add(std::unique_ptr<FTDCCollectorInterface> collector) override;
 
-    void collect(OperationContext* opCtx, BSONObjBuilder* builder);
-
-    bool empty() const {
+    bool empty() override {
         return _collectors.empty();
     }
 
@@ -278,83 +256,12 @@ public:
     }
 
 private:
-    ClusterRole _role;
+    void _collect(OperationContext* opCtx, BSONObjBuilder* builder) override;
+
     std::vector<std::unique_ptr<FTDCCollectorInterface>> _collectors;
 
     // This must be declared after _collectors so that it is destructed first.
     std::unique_ptr<SampleCollectorCache> _collectorCache;
-};
-
-class AsyncFTDCCollectorCollection : public FTDCCollectorCollection {
-public:
-    AsyncFTDCCollectorCollection(Milliseconds maxSampleWait, size_t minThreads, size_t maxThreads)
-        : _none(ClusterRole::None, maxSampleWait, minThreads, maxThreads),
-          _router(ClusterRole::RouterServer, maxSampleWait, minThreads, maxThreads),
-          _shard(ClusterRole::ShardServer, maxSampleWait, minThreads, maxThreads) {}
-
-    AsyncFTDCCollectorCollectionSet& operator[](ClusterRole role) {
-        if (role.hasExclusively(ClusterRole::None))
-            return _none;
-        if (role.hasExclusively(ClusterRole::RouterServer))
-            return _router;
-        if (role.hasExclusively(ClusterRole::ShardServer))
-            return _shard;
-        MONGO_UNREACHABLE;
-    }
-
-    AsyncFTDCCollectorCollectionSet& getSet(ClusterRole role) {
-        return (*this)[role];
-    }
-
-    void add(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role) override;
-
-    bool empty(ClusterRole role) override {
-        return getSet(role).empty();
-    }
-
-    void updateSampleTimeout(Milliseconds newValue) {
-        _forEach([&](AsyncFTDCCollectorCollectionSet& set) { set.updateSampleTimeout(newValue); });
-    }
-
-    void updateMinThreads(size_t newValue) {
-        _forEach([&](AsyncFTDCCollectorCollectionSet& set) { set.updateMinThreads(newValue); });
-    }
-
-    void updateMaxThreads(size_t newValue) {
-        _forEach([&](AsyncFTDCCollectorCollectionSet& set) { set.updateMaxThreads(newValue); });
-    }
-
-private:
-    void _collect(OperationContext* opCtx, ClusterRole role, BSONObjBuilder* builder) override;
-
-    void _forEach(std::function<void(AsyncFTDCCollectorCollectionSet&)> f);
-
-    AsyncFTDCCollectorCollectionSet _none;    // Contains collectors & cache for none.
-    AsyncFTDCCollectorCollectionSet _router;  // Contains collectors & cache for router.
-    AsyncFTDCCollectorCollectionSet _shard;   // Contains collectors & cache for shard.
-};
-
-
-class SyncFTDCCollectorCollectionSet {
-public:
-    /**
-     * Returns the sequence of collectors for the specified `role`.
-     * The `role` must be exactly one of None, ShardServer, or RouterServer.
-     */
-    std::vector<std::unique_ptr<FTDCCollectorInterface>>& operator[](ClusterRole role) {
-        if (role.hasExclusively(ClusterRole::None))
-            return _none;
-        if (role.hasExclusively(ClusterRole::ShardServer))
-            return _shard;
-        if (role.hasExclusively(ClusterRole::RouterServer))
-            return _router;
-        MONGO_UNREACHABLE;
-    }
-
-private:
-    std::vector<std::unique_ptr<FTDCCollectorInterface>> _none;
-    std::vector<std::unique_ptr<FTDCCollectorInterface>> _shard;
-    std::vector<std::unique_ptr<FTDCCollectorInterface>> _router;
 };
 
 class SyncFTDCCollectorCollection : public FTDCCollectorCollection {
@@ -364,18 +271,18 @@ class SyncFTDCCollectorCollection : public FTDCCollectorCollection {
 public:
     SyncFTDCCollectorCollection() = default;
 
-    void add(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role) override;
+    void add(std::unique_ptr<FTDCCollectorInterface> collector) override;
 
-    bool empty(ClusterRole role) override {
-        return _collectors[role].empty();
+    bool empty() override {
+        return _collectors.empty();
     }
 
 private:
-    void _collect(OperationContext* opCtx, ClusterRole role, BSONObjBuilder* builder) override;
+    void _collect(OperationContext* opCtx, BSONObjBuilder* builder) override;
 
 private:
     // collection of collectors
-    SyncFTDCCollectorCollectionSet _collectors;
+    std::vector<std::unique_ptr<FTDCCollectorInterface>> _collectors;
 };
 
 }  // namespace mongo

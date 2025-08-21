@@ -168,15 +168,12 @@ std::unique_ptr<FTDCCollectorInterface> makeFilteredCollector(
 }
 
 void registerShardCollectors(FTDCController* controller) {
-    const auto role = ClusterRole::ShardServer;
-    registerServerCollectorsForRole(controller, role);
+    registerServerCollectors(controller);
 
     if (auto rc = getGlobalRC(); rc && isRepl(*rc)) {
         // CmdReplSetGetStatus
-        controller->addPeriodicCollector(
-            std::make_unique<FTDCSimpleInternalCommandCollector>(
-                "replSetGetStatus", "replSetGetStatus", DatabaseName::kEmpty, replSetGetStatusObj),
-            role);
+        controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
+            "replSetGetStatus", "replSetGetStatus", DatabaseName::kEmpty, replSetGetStatusObj));
 
 
         // CollectionStats
@@ -201,26 +198,21 @@ void registerShardCollectors(FTDCController* controller) {
                                               .append("aggregate", spec.coll)
                                               .append("cursor", BSONObj{})
                                               .append("pipeline", pipelineObj)
-                                              .obj())),
-                role);
+                                              .obj())));
         }
     }
 
-    controller->addPeriodicMetadataCollector(
-        std::make_unique<FTDCSimpleInternalCommandCollector>(
-            "getParameter", "getParameter", DatabaseName::kEmpty, getParameterQueryObj),
-        role);
+    controller->addPeriodicMetadataCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
+        "getParameter", "getParameter", DatabaseName::kEmpty, getParameterQueryObj));
 
     controller->addPeriodicMetadataCollector(
         std::make_unique<FTDCSimpleInternalCommandCollector>("getClusterParameter",
                                                              "getClusterParameter",
                                                              DatabaseName::kEmpty,
-                                                             getClusterParameterQueryObj),
-        role);
+                                                             getClusterParameterQueryObj));
 
     controller->addPeriodicCollector(
-        makeFilteredCollector(isDataStoringNode, std::make_unique<FTDCCollectionStatsCollector>()),
-        role);
+        makeFilteredCollector(isDataStoringNode, std::make_unique<FTDCCollectionStatsCollector>()));
 }
 
 }  // namespace
@@ -237,17 +229,7 @@ void startMongoDFTDC(ServiceContext* serviceContext) {
         registerShardCollectors,
     };
 
-    const bool multiServiceFTDCSchema = feature_flags::gMultiServiceLogAndFTDCFormat.isEnabled();
-
-    const UseMultiServiceSchema multiversionSchema{
-        serviceContext->getService(ClusterRole::RouterServer) && multiServiceFTDCSchema};
-
-    if (multiversionSchema) {
-        registerFns.emplace_back(registerRouterCollectors);
-    }
-
-    startFTDC(
-        serviceContext, dir, FTDCStartMode::kStart, std::move(registerFns), multiversionSchema);
+    startFTDC(serviceContext, dir, FTDCStartMode::kStart, std::move(registerFns));
 }
 
 void stopMongoDFTDC() {

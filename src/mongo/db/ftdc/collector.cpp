@@ -66,51 +66,13 @@ namespace mongo {
 
 namespace {
 
-static constexpr auto roles = std::to_array<std::pair<ClusterRole::Value, StringData>>({
-    {ClusterRole::ShardServer, "shard"_sd},
-    {ClusterRole::RouterServer, "router"_sd},
-    {ClusterRole::None, "common"_sd},
-});
-
-auto getRoleName(ClusterRole role) {
-    auto it = std::find_if(
-        std::begin(roles), std::end(roles), [&](const std::pair<ClusterRole, StringData>& kvp) {
-            return role.has(kvp.first);
-        });
-    invariant(it != roles.end());
-
-    return it->second;
-}
-
 auto getCurrentDate(OperationContext* opCtx) {
     return opCtx->getServiceContext()->getPreciseClockSource()->now();
 }
 
-BSONObjBuilder* setUpSubObjIfNeeded(OperationContext* opCtx,
-                                    BSONObjBuilder* originalBuilder,
-                                    boost::optional<BSONObjBuilder>& subBuilder,
-                                    ClusterRole role,
-                                    UseMultiServiceSchema multiServiceSchema) {
-    if (!multiServiceSchema) {
-        return originalBuilder;
-    }
-
-    subBuilder.emplace(originalBuilder->subobjStart(getRoleName(role)));
-    subBuilder->appendDate(kFTDCCollectStartField, getCurrentDate(opCtx));
-    return &(*subBuilder);
-}
-
 }  // namespace
 
-bool FTDCCollectorCollection::empty() {
-    if (std::all_of(roles.begin(), roles.end(), [&](auto r) { return empty(r.first); })) {
-        return true;
-    }
-    return false;
-}
-
-std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
-    Client* client, UseMultiServiceSchema multiServiceSchema) {
+std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     BSONObjBuilder builder;
     // If there are no collectors, just return an empty BSONObj so that that are caller knows we did
     // not collect anything
@@ -134,43 +96,17 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
     // aggregation which are AllowedOnSecondary::kOptIn.
     ReadPreferenceSetting::get(opCtx.get()) = ReadPreferenceSetting{ReadPreference::Nearest};
 
-    for (auto&& role : roles) {
-        if (empty(role.first)) {
-            continue;
-        }
-
-        boost::optional<BSONObjBuilder> maybeSubBuilder;
-        BSONObjBuilder* parent = setUpSubObjIfNeeded(
-            opCtx.get(), &builder, maybeSubBuilder, role.first, multiServiceSchema);
-
-        // If we are running router collectors, we need to make sure that the opCtx points to the
-        // router service.
-        boost::optional<replica_set_endpoint::ScopedSetRouterService> scopedRouterService;
-        if (role.first == ClusterRole::RouterServer &&
-            !opCtx->getService()->role().has(ClusterRole::RouterServer)) {
-            scopedRouterService.emplace(opCtx.get());
-        }
-
-        _collect(opCtx.get(), role.first, parent);
-
-        if (multiServiceSchema) {
-            maybeSubBuilder->appendDate(kFTDCCollectEndField, getCurrentDate(opCtx.get()));
-        }
-    }
+    _collect(opCtx.get(), &builder);
 
     builder.appendDate(kFTDCCollectEndField, getCurrentDate(opCtx.get()));
 
     return std::tuple<BSONObj, Date_t>(builder.obj(), start);
 }
 
-SampleCollectorCache::SampleCollectorCache(ClusterRole role,
-                                           Milliseconds maxSampleWaitMS,
+SampleCollectorCache::SampleCollectorCache(Milliseconds maxSampleWaitMS,
                                            size_t minThreads,
                                            size_t maxThreads)
-    : _role(role),
-      _maxSampleWaitMS(maxSampleWaitMS),
-      _minThreads(minThreads),
-      _maxThreads(maxThreads) {
+    : _maxSampleWaitMS(maxSampleWaitMS), _minThreads(minThreads), _maxThreads(maxThreads) {
     _startNewPool(minThreads, maxThreads);
 }
 
@@ -179,16 +115,12 @@ SampleCollectorCache::~SampleCollectorCache() {
     _shutdownPool_inlock(lk);
 }
 
-void SampleCollectorCache::addCollector(StringData name,
-                                        bool hasData,
-                                        ClusterRole role,
-                                        SampleCollectFn&& fn) {
+void SampleCollectorCache::addCollector(StringData name, bool hasData, SampleCollectFn&& fn) {
     _sampleCollectors[std::string{name}] = {
         ClientStrand::make(getGlobalServiceContext()->getService()->makeClient(
             std::string{name}, nullptr, ClientOperationKillableByStepdown{false})),
         boost::none,
         std::move(fn),
-        role,
         0,
         hasData};
 }
@@ -228,15 +160,6 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
                     // such as aggregation which are AllowedOnSecondary::kOptIn.
                     ReadPreferenceSetting::get(collectionOpCtx) =
                         ReadPreferenceSetting{ReadPreference::Nearest};
-
-                    // If we are running router collectors, we need to make sure that the
-                    // collectionOpCtx points to the router service.
-                    boost::optional<replica_set_endpoint::ScopedSetRouterService>
-                        scopedRouterService;
-                    if (collector.role.has(ClusterRole::RouterServer) &&
-                        !collectionOpCtx->getService()->role().has(ClusterRole::RouterServer)) {
-                        scopedRouterService.emplace(collectionOpCtx);
-                    }
 
                     collectorBuilder.appendDate(kFTDCCollectStartField,
                                                 getCurrentDate(collectionOpCtx));
@@ -300,11 +223,8 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
 }
 
 void SampleCollectorCache::_startNewPool(size_t minThreads, size_t maxThreads) {
-    auto roleName = std::string{getRoleName(_role)};
-    roleName[0] = ctype::toUpper(roleName[0]);
-
     ThreadPool::Options options;
-    options.poolName = fmt::format("{}Collector", roleName);
+    options.poolName = "FTDCCollector";
     options.minThreads = minThreads;
     options.maxThreads = maxThreads;
 
@@ -312,52 +232,27 @@ void SampleCollectorCache::_startNewPool(size_t minThreads, size_t maxThreads) {
     _pool->startup();
 }
 
-void AsyncFTDCCollectorCollectionSet::addCollector(
-    std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role) {
+void AsyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collector) {
     auto collectFn = [collector = collector.get()](OperationContext* opCtx,
                                                    BSONObjBuilder* builder) {
         collector->collect(opCtx, *builder);
     };
 
-    _collectorCache->addCollector(
-        collector->name(), collector->hasData(), role, std::move(collectFn));
+    _collectorCache->addCollector(collector->name(), collector->hasData(), std::move(collectFn));
     _collectors.push_back(std::move(collector));
 }
 
-void AsyncFTDCCollectorCollectionSet::collect(OperationContext* opCtx, BSONObjBuilder* builder) {
+void AsyncFTDCCollectorCollection::_collect(OperationContext* opCtx, BSONObjBuilder* builder) {
     _collectorCache->refresh(opCtx, builder);
 }
 
-void AsyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collector,
-                                       ClusterRole role) {
-    getSet(role).addCollector(std::move(collector), role);
-}
-
-void AsyncFTDCCollectorCollection::_collect(OperationContext* opCtx,
-                                            ClusterRole role,
-                                            BSONObjBuilder* builder) {
-    getSet(role).collect(opCtx, builder);
-}
-
-void AsyncFTDCCollectorCollection::_forEach(
-    std::function<void(AsyncFTDCCollectorCollectionSet&)> f) {
-    for (auto&& role : roles) {
-        auto& collectionSet = getSet(role.first);
-        f(collectionSet);
-    }
-}
-
-void SyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collector,
-                                      ClusterRole role) {
+void SyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collector) {
     // TODO: ensure the collectors all have unique names.
-    _collectors[role].emplace_back(std::move(collector));
+    _collectors.emplace_back(std::move(collector));
 }
 
-void SyncFTDCCollectorCollection::_collect(OperationContext* opCtx,
-                                           ClusterRole role,
-                                           BSONObjBuilder* builder) {
-    auto& collectorVector = _collectors[role];
-    for (auto& collector : collectorVector) {
+void SyncFTDCCollectorCollection::_collect(OperationContext* opCtx, BSONObjBuilder* builder) {
+    for (auto& collector : _collectors) {
         // Skip collection if this collector has no data to return
         if (!collector->hasData()) {
             continue;

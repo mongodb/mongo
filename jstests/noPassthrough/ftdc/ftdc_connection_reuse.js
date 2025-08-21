@@ -39,7 +39,7 @@ function sumOverPools(diagnosticData, host, property) {
 }
 
 function getDiagnosticData() {
-    let stats = verifyGetDiagnosticData(st.s.getDB("admin")).router.connPoolStats;
+    let stats = verifyGetDiagnosticData(st.s.getDB("admin")).connPoolStats;
     jsTestLog("FTDC stats: " + tojson(stats));
     assert(stats.hasOwnProperty('totalWasUsedOnce'));
     assert(stats.hasOwnProperty('totalConnUsageTimeMillis'));

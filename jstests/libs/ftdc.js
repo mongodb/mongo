@@ -19,14 +19,6 @@ export function setParameter(adminDb, obj) {
 }
 
 /**
- * Returns whether the FTDC file format should follow the new format or not.
- */
-export function hasMultiserviceFTDCSchema(adminDb) {
-    return FeatureFlagUtil.isPresentAndEnabled(adminDb, "MultiServiceLogAndFTDCFormat") &&
-        (isMongos(adminDb) || isClusterNode(adminDb));
-}
-
-/**
  * `has(obj, "foo", "bar", "baz")` returns whether `obj.foo.bar.baz` exists.
  */
 function has(object, ...properties) {
@@ -42,19 +34,11 @@ function has(object, ...properties) {
  * determine whether the response returned for "getDiagnosticData" is as
  * expected.
  */
-function getCriteriaForGetDiagnosticData({data, adminDb, assumeMultiserviceSchema}) {
+function getCriteriaForGetDiagnosticData(data) {
     let criteria = [];
 
     criteria.push(() => has(data, "start"));
-
-    if (hasMultiserviceFTDCSchema(adminDb) || assumeMultiserviceSchema ||
-        TestData.testingReplicaSetEndpoint) {
-        criteria.push(() => has(data, "shard", "serverStatus") ||
-                          has(data, "router", "connPoolStats"));
-    } else {
-        criteria.push(() => has(data, "serverStatus"));
-    }
-
+    criteria.push(() => has(data, "serverStatus"));
     criteria.push(() => has(data, "end"));
 
     return criteria;
@@ -63,7 +47,7 @@ function getCriteriaForGetDiagnosticData({data, adminDb, assumeMultiserviceSchem
 /**
  * Verify that getDiagnosticData is working correctly.
  */
-export function verifyGetDiagnosticData(adminDb, logData = true, assumeMultiserviceSchema = false) {
+export function verifyGetDiagnosticData(adminDb, logData = true) {
     const maxAttempts = 60;
     const retryMillis = 500;
     // We need to retry a few times in case we're running this test immediately
@@ -73,7 +57,7 @@ export function verifyGetDiagnosticData(adminDb, logData = true, assumeMultiserv
         const result = adminDb.runCommand("getDiagnosticData");
         assert.commandWorked(result);
         const data = result.data;
-        const criteria = getCriteriaForGetDiagnosticData({data, adminDb, assumeMultiserviceSchema});
+        const criteria = getCriteriaForGetDiagnosticData(data);
         // results :: {[some predicate]: bool result, ...}
         const results = criteria.reduce((results, predicate) => {
             results[predicate.toString()] = predicate();
@@ -117,18 +101,7 @@ export function verifyCommonFTDCParameters(adminDb, isEnabled) {
     // Verify the defaults are as we documented them
     assert.eq(getparam("diagnosticDataCollectionEnabled"), isEnabled);
     assert.eq(getparam("diagnosticDataCollectionPeriodMillis"), 1000);
-
-    const diagnosticDataCollectionDirectorySizeMB =
-        getparam("diagnosticDataCollectionDirectorySizeMB");
-
-    const isShardedCluster = adminDb.system.version.findOne({_id: "shardIdentity"});
-    if (isShardedCluster &&
-        FeatureFlagUtil.isPresentAndEnabled(adminDb, "MultiServiceLogAndFTDCFormat") && !isMongos) {
-        assert.eq(diagnosticDataCollectionDirectorySizeMB, 500);
-    } else {
-        assert.eq(diagnosticDataCollectionDirectorySizeMB, 250);
-    }
-
+    assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 250);
     assert.eq(getparam("diagnosticDataCollectionFileSizeMB"), 10);
     assert.eq(getparam("diagnosticDataCollectionSamplesPerChunk"), 300);
     assert.eq(getparam("diagnosticDataCollectionSamplesPerInterimUpdate"), 10);
@@ -165,8 +138,7 @@ export function verifyCommonFTDCParameters(adminDb, isEnabled) {
 
     // Reset
     assert.commandWorked(setparam({"diagnosticDataCollectionFileSizeMB": 10}));
-    assert.commandWorked(setparam(
-        {"diagnosticDataCollectionDirectorySizeMB": diagnosticDataCollectionDirectorySizeMB}));
+    assert.commandWorked(setparam({"diagnosticDataCollectionDirectorySizeMB": 250}));
     assert.commandWorked(setparam({"diagnosticDataCollectionPeriodMillis": 1000}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerChunk": 300}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerInterimUpdate": 10}));

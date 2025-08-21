@@ -63,7 +63,7 @@ namespace mongo {
 
 class FTDCFileManagerTest : public ServiceContextTest {
 protected:
-    void testPeriodicCollection(bool multiservice);
+    void testPeriodicCollection();
 };
 
 // Test a full buffer
@@ -79,7 +79,7 @@ TEST_F(FTDCFileManagerTest, TestFull) {
     createDirectoryClean(dir);
 
     SyncFTDCCollectorCollection rotate;
-    auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
+    auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client);
     ASSERT_OK(swMgr.getStatus());
     auto mgr = std::move(swMgr.getValue());
 
@@ -164,8 +164,7 @@ TEST_F(FTDCFileManagerTest, TestNormalRestart) {
     for (int i = 0; i < 3; i++) {
         // Do a few cases of stop and start to ensure it works as expected
         SyncFTDCCollectorCollection rotate;
-        auto swMgr =
-            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
+        auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client);
         ASSERT_OK(swMgr.getStatus());
         auto mgr = std::move(swMgr.getValue());
 
@@ -222,8 +221,7 @@ TEST_F(FTDCFileManagerTest, TestCorruptCrashRestart) {
     for (int i = 0; i < 2; i++) {
         // Do a few cases of stop and start to ensure it works as expected
         SyncFTDCCollectorCollection rotate;
-        auto swMgr =
-            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
+        auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client);
         ASSERT_OK(swMgr.getStatus());
         auto mgr = std::move(swMgr.getValue());
 
@@ -295,8 +293,7 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
 
     {
         SyncFTDCCollectorCollection rotate;
-        auto swMgr =
-            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
+        auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client);
         ASSERT_OK(swMgr.getStatus());
         auto swFile = swMgr.getValue()->generateArchiveFileName(dir, "0test-crash");
         ASSERT_OK(swFile);
@@ -307,7 +304,7 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
     createDirectoryClean(dir);
 
     {
-        FTDCFileWriter writer(&c, UseMultiServiceSchema{false});
+        FTDCFileWriter writer(&c);
 
         ASSERT_OK(writer.open(fileOut));
 
@@ -330,8 +327,7 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
     // Let the manager run the recovery over the interim file
     {
         SyncFTDCCollectorCollection rotate;
-        auto swMgr =
-            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
+        auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client);
         ASSERT_OK(swMgr.getStatus());
         auto mgr = std::move(swMgr.getValue());
         ASSERT_OK(mgr->close());
@@ -352,7 +348,7 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
     ValidateDocumentList(files[1], docs2, FTDCValidationMode::kStrict);
 }
 
-void FTDCFileManagerTest::testPeriodicCollection(bool multiservice) {
+TEST_F(FTDCFileManagerTest, TestPeriodicMetadataCollection) {
     Client* client = &cc();
     FTDCConfig c;
     c.maxFileSizeBytes = 1024;
@@ -364,8 +360,7 @@ void FTDCFileManagerTest::testPeriodicCollection(bool multiservice) {
     createDirectoryClean(dir);
 
     SyncFTDCCollectorCollection rotate;
-    auto mgr = uassertStatusOK(
-        FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{multiservice}));
+    auto mgr = uassertStatusOK(FTDCFileManager::create(&c, dir, &rotate, client));
 
     BSONObj subObj1 = BSON("f1_1" << 101 << "f1_2" << 102);
     BSONObj subObj2 = BSON("f2_1" << 201 << "f2_2" << 202);
@@ -374,12 +369,6 @@ void FTDCFileManagerTest::testPeriodicCollection(bool multiservice) {
     BSONObj doc2 = BSON("field1" << altSubObj1 << "field2" << subObj2);
     BSONObj deltaDoc1 = BSON("field1" << altSubObj1);
     BSONObj deltaDoc2 = BSON("field1" << subObj1);
-
-    if (multiservice) {
-        for (auto ptr : {&doc1, &doc2, &deltaDoc1, &deltaDoc2}) {
-            *ptr = BSON("common" << *ptr);
-        }
-    }
 
     int pmSamplesBeforeRotate = 0;
     auto currentFiles = scanDirectory(dir);
@@ -443,14 +432,6 @@ void FTDCFileManagerTest::testPeriodicCollection(bool multiservice) {
     verifyDeltaDocuments(pmSamplesBeforeRotate / 2);
 
     mgr->close().transitional_ignore();
-}
-
-TEST_F(FTDCFileManagerTest, PeriodicMetadataCollection) {
-    testPeriodicCollection(false);
-}
-
-TEST_F(FTDCFileManagerTest, MultiservicePeriodicMetadataCollection) {
-    testPeriodicCollection(true);
 }
 
 }  // namespace mongo

@@ -79,8 +79,7 @@ enum class FTDCStartMode {
 void startFTDC(ServiceContext* serviceContext,
                boost::filesystem::path& path,
                FTDCStartMode startupMode,
-               std::vector<RegisterCollectorsFunction> registerCollectorsFns,
-               UseMultiServiceSchema multiServiceSchema);
+               std::vector<RegisterCollectorsFunction> registerCollectorsFns);
 
 /**
  * Stop Full Time Data Capture
@@ -92,7 +91,7 @@ void stopFTDC();
 /**
  * Register collectors wanted by all server roles.
  */
-void registerServerCollectorsForRole(FTDCController* controller, ClusterRole clusterRole);
+void registerServerCollectors(FTDCController* controller);
 
 /**
  * A simple FTDC Collector that runs Commands.
