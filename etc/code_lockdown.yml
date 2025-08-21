@@ -1,32 +1,81 @@
-defaults:
-  overall:
+notifications:
+  - scopes:
+      - name: "master branch"
+        jira_queries:
+          hot: "filter = 53085 AND filter = 53200"
+          cold: "filter = 53085 AND filter != 53200"
     thresholds:
-      hot:
-        count: 70 # temporary while we get AFs under control, then should reduce to 60
-        grace_period_days: 7
-      cold:
-        count: 100
-        grace_period_days: 7
-    slack_tags:
-      - "<!here>"
-  group:
+      overall:
+        hot:
+          count: 70 # temporary while we get AFs under control, then should reduce to 60
+          grace_period_days: 7
+        cold:
+          count: 100
+          grace_period_days: 7
+      group:
+        hot:
+          count: 16
+          grace_period_days: 7
+        cold:
+          count: 32
+          grace_period_days: 7
+      team:
+        hot:
+          count: 6
+          grace_period_days: 2
+        cold:
+          count: 10
+          grace_period_days: 2
+    slack:
+      channel: "#10gen-mongo-code-lockdown"
+      overall_scope_tags:
+        - "<!here>"
+      message_footer: |
+        Refer to our playbook at <http://go/blockonred> for details.
+        Drill into the data using the <https://jira.mongodb.org/secure/Dashboard.jspa?selectPageId=33310|Jira Dashboard>.
+
+  - scopes:
+      - name: "v7.0 version"
+        jira_queries:
+          hot: 'filter = 56041 and filter = 56042 and "Evergreen Project" in (mongodb-mongo-v7.0, mongodb-mongo-v7.0-staging, sys-perf-7.0)'
+          cold: 'filter = 56041 AND filter != 56042 and "Evergreen Project" in (mongodb-mongo-v7.0, mongodb-mongo-v7.0-staging, sys-perf-7.0)'
+      - name: "v8.0 version"
+        jira_queries:
+          hot: 'filter = 56041 and filter = 56042 and "Evergreen Project" in (mongodb-mongo-v8.0, mongodb-mongo-v8.0-staging, sys-perf-8.0)'
+          cold: 'filter = 56041 AND filter != 56042 and "Evergreen Project" in (mongodb-mongo-v8.0, mongodb-mongo-v8.0-staging, sys-perf-8.0)'
+      - name: "v8.2 version"
+        jira_queries:
+          hot: 'filter = 56041 and filter = 56042 and "Evergreen Project" in (mongodb-mongo-v8.2, mongodb-mongo-v8.2-staging, sys-perf-8.2)'
+          cold: 'filter = 56041 AND filter != 56042 and "Evergreen Project" in (mongodb-mongo-v8.2, mongodb-mongo-v8.2-staging, sys-perf-8.2)'
     thresholds:
-      hot:
-        count: 16
-        grace_period_days: 7
-      cold:
-        count: 32
-        grace_period_days: 7
-    slack_tags: []
-  team:
-    thresholds:
-      hot:
-        count: 6
-        grace_period_days: 2
-      cold:
-        count: 10
-        grace_period_days: 2
-    slack_tags: []
+      overall:
+        hot:
+          count: 50
+          grace_period_days: 0
+        cold:
+          count: 100
+          grace_period_days: 0
+      group:
+        hot:
+          count: 16
+          grace_period_days: 0
+        cold:
+          count: 32
+          grace_period_days: 0
+      team:
+        hot:
+          count: 6
+          grace_period_days: 0
+        cold:
+          count: 10
+          grace_period_days: 0
+    slack:
+      channel: "#10gen-mongo-version-lockdown"
+      overall_scope_tags:
+        - "<!here>"
+      message_footer: |
+        Drill into the data using the <https://jira.mongodb.org/secure/Dashboard.jspa?selectPageId=33950|Jira Dashboard> (apply the Version filter as quotas are version-specific).
+      short_issue_data_table: True
 
 groups:
   #######################################################################
@@ -37,13 +86,6 @@ groups:
   #     - "Team Name 1"  # Should exactly match "Assigned Teams" Jira BF field value
   #     - "Team Name 2"
   #     - "Team Name 3"
-  #   thresholds:  # Optional, group default thresholds will be used if absent
-  #     hot:
-  #       count: 15
-  #       grace_period_days: 7
-  #     cold:
-  #       count: 50
-  #       grace_period_days: 7
   #   slack_tags:  # Optional, group default slack_tags will be used if absent
   #     - "<!here>" # This is equivalent to "@here"
   #     - "<@{slack-member-id}>" # How to find Slack member ID: https://forums.slackcommunity.com/s/question/0D5Hq00009mZfnuKAC/hello-i-am-a-slack-newbie-how-do-i-find-my-slack-id?language=en_US
@@ -106,13 +148,6 @@ teams:
   #                     Team configuration example                      #
   #######################################################################
   # - name: "Team Name"  # Should exactly match "Assigned Teams" Jira BF field value
-  #   thresholds:  # Optional, team default thresholds will be used if absent
-  #     hot:
-  #       count: 3
-  #       grace_period_days: 2
-  #     cold:
-  #       count: 10
-  #       grace_period_days: 2
   #   slack_tags:  # Optional, team default slack_tags will be used if absent
   #     - "<!here>" # This is equivalent to "@here"
   #     - "<@{slack-member-id}>" # How to find Slack member ID: https://forums.slackcommunity.com/s/question/0D5Hq00009mZfnuKAC/hello-i-am-a-slack-newbie-how-do-i-find-my-slack-id?language=en_US

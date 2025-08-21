@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, NamedTuple, Optional, Set
+from typing import Dict, Iterable, List, NamedTuple, Optional, Set
 
 from buildscripts.monitor_build_status.jira_service import IssueTuple
 
@@ -28,6 +28,7 @@ class CategorizedIssues(NamedTuple):
         """
         Add Issue data to report.
 
+        :param category: Issue category.
         :param issue: IssueTuple representing issue.
         """
         if category == IssueCategory.HOT:
@@ -64,6 +65,7 @@ class IssueReport(NamedTuple):
         """
         Add Issue data to report.
 
+        :param category: Issue category.
         :param item: IssueTuple representing issue.
         """
         if item.assigned_team not in self.team_reports:
@@ -79,7 +81,7 @@ class IssueReport(NamedTuple):
         """
         Calculate Issue count for a given criteria.
 
-        :param category: issue category (hot, cold).
+        :param category: Issue category.
         :param include_items_older_than_time: Count Items that have created date older than provided time.
         :param assigned_teams: List of Assigned teams criterion, all teams if None.
         :return: Item count.

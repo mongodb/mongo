@@ -16,32 +16,48 @@ class IssueThresholds(BaseModel):
     cold: ThresholdConfig
 
 
-class Defaults(BaseModel):
-    thresholds: IssueThresholds
-    slack_tags: List[str]
+class ThresholdsConfig(BaseModel):
+    overall: IssueThresholds
+    group: IssueThresholds
+    team: IssueThresholds
 
 
-class DefaultsConfig(BaseModel):
-    overall: Defaults
-    group: Defaults
-    team: Defaults
+class JiraQueriesConfig(BaseModel):
+    hot: str
+    cold: str
+
+
+class ScopesConfig(BaseModel):
+    name: str
+    jira_queries: JiraQueriesConfig
+
+
+class SlackConfig(BaseModel):
+    channel: str
+    overall_scope_tags: List[str]
+    message_footer: str
+    short_issue_data_table: bool = False
+
+
+class NotificationsConfig(BaseModel):
+    scopes: List[ScopesConfig]
+    thresholds: ThresholdsConfig
+    slack: SlackConfig
 
 
 class TeamConfig(BaseModel):
     name: str
-    thresholds: Optional[IssueThresholds]
     slack_tags: Optional[List[str]]
 
 
 class GroupConfig(BaseModel):
     name: str
     teams: List[str]
-    thresholds: Optional[IssueThresholds]
     slack_tags: Optional[List[str]]
 
 
 class CodeLockdownConfig(BaseModel):
-    defaults: DefaultsConfig
+    notifications: List[NotificationsConfig]
     teams: List[TeamConfig]
     groups: List[GroupConfig]
 
@@ -73,62 +89,28 @@ class CodeLockdownConfig(BaseModel):
 
         return []
 
-    def get_overall_thresholds(self) -> IssueThresholds:
-        """Get overall thresholds."""
-        return self.defaults.overall.thresholds
-
-    def get_group_thresholds(self, group_name: str) -> IssueThresholds:
-        """
-        Get group or default thresholds.
-
-        :param group_name: The name of the group.
-        :return: Group thresholds or default group thresholds.
-        """
-        for group in self.groups:
-            if group.name == group_name:
-                return group.thresholds or self.defaults.group.thresholds
-
-        return self.defaults.group.thresholds
-
-    def get_team_thresholds(self, team_name: str) -> IssueThresholds:
-        """
-        Get team or default thresholds.
-
-        :param team_name: The name of the team.
-        :return: Team thresholds or default team thresholds.
-        """
-        for team in self.teams:
-            if team.name == team_name:
-                return team.thresholds or self.defaults.team.thresholds
-
-        return self.defaults.team.thresholds
-
-    def get_overall_slack_tags(self) -> List[str]:
-        """Get overall slack tags."""
-        return self.defaults.overall.slack_tags
-
     def get_group_slack_tags(self, group_name: str) -> List[str]:
         """
-        Get group or default slack tags.
+        Get group slack tags.
 
         :param group_name: The name of the group.
-        :return: Group slack tags or default group slack tags.
+        :return: Group slack tags.
         """
         for group in self.groups:
             if group.name == group_name:
-                return group.slack_tags or self.defaults.group.slack_tags
+                return group.slack_tags or []
 
-        return self.defaults.group.slack_tags
+        return []
 
     def get_team_slack_tags(self, team_name: str) -> List[str]:
         """
-        Get team or default slack tags.
+        Get team slack tags.
 
         :param team_name: The name of the team.
-        :return: Team slack tags or default team slack tags.
+        :return: Team slack tags.
         """
         for team in self.teams:
             if team.name == team_name:
-                return team.slack_tags or self.defaults.team.slack_tags
+                return team.slack_tags or []
 
-        return self.defaults.team.slack_tags
+        return []
