@@ -48,7 +48,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failReshardingChangeStreamsMonitorAfterProcessingBatch);
 MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeReceivingNextBatch);
-MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorAfterCreatingCursor);
 
 const StringData kAggregateCommentFieldName = "reshardingChangeStreamsMonitor"_sd;
 const StringData kCommonUUIDFieldName = "commonUUID"_sd;
@@ -83,43 +82,6 @@ std::vector<CursorId> lookUpCursorIds(OperationContext* opCtx,
         cursorIds.push_back(cursorObj["cursorId"].Long());
     }
     return cursorIds;
-}
-
-/**
- * If there are open change stream cursors with the given resharding UUID, kills them and returns
- * the status.
- */
-Status killCursors(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   const UUID& reshardingUUID,
-                   const BSONObj& aggComment) {
-    auto cursorIds = lookUpCursorIds(opCtx, nss, aggComment);
-
-    if (cursorIds.empty()) {
-        return Status::OK();
-    }
-
-    LOGV2(1006680,
-          "Found idle change stream cursors",
-          "reshardingUUID"_attr = reshardingUUID,
-          "cursorIds"_attr = cursorIds);
-
-    DBDirectClient client(opCtx);
-    BSONObj result;
-    client.runCommand(nss.dbName(), KillCursorsCommandRequest(nss, cursorIds).toBSON(), result);
-    auto status = getStatusFromCommandResult(result);
-
-    if (!status.isOK()) {
-        LOGV2(1006681,
-              "Failed to kill the idle change stream cursors",
-              "reshardingUUID"_attr = reshardingUUID,
-              "error"_attr = status);
-    } else {
-        LOGV2(1006682,
-              "Killed the idle change stream cursors",
-              "reshardingUUID"_attr = reshardingUUID);
-    }
-    return status;
 }
 
 /**
@@ -207,9 +169,7 @@ SemiFuture<void> ReshardingChangeStreamsMonitor::startMonitoring(
         .thenRunOn(cleanupExecutor)
         .onCompletion([this, anchor = shared_from_this()](Status finalEventStatus) {
             auto opCtx = cc().makeOperationContext();
-            auto aggComment = makeAggregateComment(_reshardingUUID);
-            auto killCursorsStatus =
-                killCursors(opCtx.get(), _monitorNss, _reshardingUUID, aggComment);
+            auto killCursorsStatus = killCursors(opCtx.get());
 
             LOGV2(1006685,
                   "The resharding change streams monitor finished cleaning up",
@@ -375,8 +335,6 @@ ExecutorFuture<void> ReshardingChangeStreamsMonitor::_consumeChangeEvents(
                DBDirectClient client(opCtx.get());
                auto cursor = _makeDBClientCursor(&client);
 
-               hangReshardingChangeStreamsMonitorAfterCreatingCursor.pauseWhileSet();
-
                while (!batch.shouldDispose()) {
                    if (cursor->more()) {
                        auto doc = cursor->next();
@@ -429,6 +387,38 @@ ExecutorFuture<void> ReshardingChangeStreamsMonitor::_consumeChangeEvents(
            })
         .until([this](Status status) { return _receivedFinalEvent || !status.isOK(); })
         .on(executor, cancelToken);
+}
+
+Status ReshardingChangeStreamsMonitor::killCursors(OperationContext* opCtx) {
+    auto aggComment = makeAggregateComment(_reshardingUUID);
+    auto cursorIds = lookUpCursorIds(opCtx, _monitorNss, aggComment);
+
+    if (cursorIds.empty()) {
+        return Status::OK();
+    }
+
+    LOGV2(1006680,
+          "Found idle change stream cursors",
+          "reshardingUUID"_attr = _reshardingUUID,
+          "cursorIds"_attr = cursorIds);
+
+    DBDirectClient client(opCtx);
+    BSONObj result;
+    client.runCommand(
+        _monitorNss.dbName(), KillCursorsCommandRequest(_monitorNss, cursorIds).toBSON(), result);
+    auto status = getStatusFromCommandResult(result);
+
+    if (!status.isOK()) {
+        LOGV2(1006681,
+              "Failed to kill the idle change stream cursors",
+              "reshardingUUID"_attr = _reshardingUUID,
+              "error"_attr = status);
+    } else {
+        LOGV2(1006682,
+              "Killed the idle change stream cursors",
+              "reshardingUUID"_attr = _reshardingUUID);
+    }
+    return status;
 }
 
 ReshardingChangeStreamsMonitor::EventBatch::EventBatch(Role role)

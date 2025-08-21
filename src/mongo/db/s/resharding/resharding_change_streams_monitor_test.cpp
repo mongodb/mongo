@@ -433,6 +433,17 @@ protected:
     };
 };
 
+class TestReshardingChangeStreamsMonitorNoKill : public ReshardingChangeStreamsMonitor {
+public:
+    using ReshardingChangeStreamsMonitor::ReshardingChangeStreamsMonitor;
+
+protected:
+    Status killCursors(OperationContext* opCtx) override {
+        LOGV2(10960500, "Skipping killCursors for test");
+        return Status::OK();
+    }
+};
+
 TEST_F(ReshardingChangeStreamsMonitorTest, SuccessfullyInitializeMonitorWithStartAtTime) {
     createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
@@ -527,13 +538,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
     createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
-    // Hang monitor0 after creating its cursor to simulate a leftover cursor.
-    auto hangFp =
-        globalFailPointRegistry().find("hangReshardingChangeStreamsMonitorAfterCreatingCursor");
-    auto timesEntered = hangFp->setMode(FailPoint::nTimes, 1);
-
     // Start a monitor.
-    auto monitor0 = std::make_shared<ReshardingChangeStreamsMonitor>(
+    auto monitor0 = std::make_shared<TestReshardingChangeStreamsMonitorNoKill>(
         reshardingUUID, tempNss, startAtTime, boost::none /* startAfterResumeToken */, callback);
     auto awaitCompletion0 =
         monitor0->startMonitoring(executor, cleanupExecutor, cancelSource.token(), *factory);
@@ -542,8 +548,6 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
     resharding_test_util::assertSoon(opCtx, [&] {
         return hasOpenCursor(tempNss, monitor0->makeAggregateComment(reshardingUUID));
     });
-
-    hangFp->waitForTimesEntered(timesEntered + 1);
 
     // Start another monitor and make it run to completion successfully.
     auto executor1 = makeTaskExecutor("New");

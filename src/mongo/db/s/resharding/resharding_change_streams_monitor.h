@@ -111,6 +111,8 @@ public:
                                    boost::optional<BSONObj> startAfterResumeToken,
                                    BatchProcessedCallback callback);
 
+    virtual ~ReshardingChangeStreamsMonitor() = default;
+
     /**
      * Schedules work to open a local change streams and track the events.
      */
@@ -150,6 +152,13 @@ public:
      * Creates the aggregation command request for the change streams monitor.
      */
     AggregateCommandRequest makeAggregateCommandRequest();
+
+protected:
+    /**
+     * If there are open change stream cursors with the resharding UUID, kills them and returns
+     * the status.
+     */
+    virtual Status killCursors(OperationContext* opCtx);
 
 private:
     /**
