@@ -90,7 +90,7 @@ class StorageInterface;
  *      wallTime: <Date_t>
  * }
  */
-class ReplicationConsistencyMarkers {
+class MONGO_MOD_OPEN ReplicationConsistencyMarkers {
     ReplicationConsistencyMarkers(const ReplicationConsistencyMarkers&) = delete;
     ReplicationConsistencyMarkers& operator=(const ReplicationConsistencyMarkers&) = delete;
 

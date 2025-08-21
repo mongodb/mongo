@@ -46,7 +46,7 @@
 #include <cstdint>
 
 namespace mongo {
-namespace repl {
+namespace MONGO_MOD_PUB repl {
 
 /**
  * Validates that the given bool is true.
@@ -106,5 +106,5 @@ inline void serializeOptionalBoolIfTrue(const OptionalBool& value,
     }
 }
 
-}  // namespace repl
+}  // namespace MONGO_MOD_PUB repl
 }  // namespace mongo

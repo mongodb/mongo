@@ -1190,7 +1190,7 @@ public:
      * Use [reserve|release]ConfigWriteConcernTagChanges when executing a reconfig that
      * could potentially change read/write concern tags.
      */
-    class WriteConcernTagChanges {
+    class MONGO_MOD_OPEN WriteConcernTagChanges {
     public:
         WriteConcernTagChanges() = default;
         virtual ~WriteConcernTagChanges() = default;
